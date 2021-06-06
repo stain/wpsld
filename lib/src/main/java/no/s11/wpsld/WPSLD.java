@@ -31,6 +31,5 @@ public interface WPSLD {
 	 * @throws IOException If the temporary directory could not be created 
 	 */
 	WPSLDPath newRoot() throws IOException;
-
 	
 }

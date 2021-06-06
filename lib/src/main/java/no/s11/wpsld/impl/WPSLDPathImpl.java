@@ -23,14 +23,14 @@ import no.s11.wpsld.WPSLDPath;
 
 public class WPSLDPathImpl implements WPSLDPath {
 
-	private Path root;
+	private Path path;
 
 	public WPSLDPathImpl(Path root) {
-		this.root = root;
+		this.path = root;
 	}
 
 	@Override
 	public Path getPath() {
-		return root;
+		return path;
 	}
 }
