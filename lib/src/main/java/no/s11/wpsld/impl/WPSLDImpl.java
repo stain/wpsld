@@ -18,8 +18,6 @@
 package no.s11.wpsld.impl;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 import no.s11.wpsld.WPSLD;
 import no.s11.wpsld.WPSLDPath;
@@ -28,8 +26,12 @@ public class WPSLDImpl implements WPSLD {
 
 	@Override
 	public WPSLDPath newRoot() throws IOException {
-		Path root = Files.createTempDirectory("wpsld");
-		return new WPSLDPathImpl(root);
+		return new TemporaryRoot();
+	}
+
+	@Override
+	public WPSLDPath writeMetadata(WPSLDPath root) {
+		return new WrittenMetadata(root);		
 	}
 
 }

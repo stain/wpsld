@@ -19,6 +19,8 @@ package no.s11.wpsld;
 
 import java.io.IOException;
 
+import no.s11.wpsld.impl.WPSLDImpl;
+
 /**
  * Entry service for WpsLD
  */
@@ -31,5 +33,14 @@ public interface WPSLD {
 	 * @throws IOException If the temporary directory could not be created 
 	 */
 	WPSLDPath newRoot() throws IOException;
+
+	class Factory {
+		public static WPSLD create() {
+			return new WPSLDImpl();
+		}
+	}
+
+	WPSLDPath writeMetadata(WPSLDPath root);
+	
 	
 }
