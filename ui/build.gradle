@@ -8,7 +8,10 @@
 
 plugins {
   id 'application'
-  id 'org.openjfx.javafxplugin' version '0.0.9'
+  //id 'org.openjfx.javafxplugin' version '0.0.9'
+  // Above broken with Java 16 / Gradle 7, using fork instead
+  // See https://stackoverflow.com/a/67205817
+  id 'com.dua3.javafxgradle7plugin' version '0.0.9'
 }
 
 repositories {
@@ -18,7 +21,7 @@ repositories {
 
 javafx {
     version = "15.0.1"
-    modules = [ 'javafx.controls' ]
+    modules = [ 'javafx.controls', 'javafx.fxml' ]
 }
 
 dependencies {
