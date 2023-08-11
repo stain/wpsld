@@ -8,15 +8,19 @@
 
 plugins {
   id 'application'
-  //id 'org.openjfx.javafxplugin' version '0.0.9'
-  // Above broken with Java 16 / Gradle 7, using fork instead
-  // See https://stackoverflow.com/a/67205817
-  id 'com.dua3.javafxgradle7plugin' version '0.0.9'
+  id 'org.openjfx.javafxplugin' version '0.0.14'
+  id 'org.beryx.jlink' version '2.25.0'
 }
 
 repositories {
     // Use JCenter for resolving dependencies.
     jcenter()
+}
+
+jlink {
+    launcher {
+        name = 'hello'
+    }
 }
 
 javafx {
@@ -30,4 +34,7 @@ dependencies {
 
 }
 
-mainClassName = 'no.s11.wpsld.ui.HelloFX'
+application { 
+  mainClassName = 'no.s11.wpsld.ui.HelloFX'
+  mainModule = 'no.s11.wpsld.ui'
+}
