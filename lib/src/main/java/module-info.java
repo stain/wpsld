@@ -16,6 +16,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 module no.s11.wpsld {
-//    requires transitive org.gradle.sample.list;
+    
+    requires edu.kit.datamanager.ro_crate;
     exports no.s11.wpsld;
 }

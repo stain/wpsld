@@ -9,20 +9,22 @@
 plugins {
     // Apply the java-library plugin for API and implementation separation.
     id 'java-library'
+    id 'org.gradlex.extra-java-module-info' version "1.4"
 }
 
 repositories {
-    // Use JCenter for resolving dependencies.
     jcenter()
 }
 
+extraJavaModuleInfo {
+    automaticModule('ro-crate-java-1.1.0.jar', 'edu.kit.datamanager.ro_crate')
+}
+
 dependencies {
+
+    implementation 'edu.kit.datamanager:ro-crate-java:1.1.0'
+
     // Use JUnit test framework.
     testImplementation 'junit:junit:4.13'
 
-    // This dependency is exported to consumers, that is to say found on their compile classpath.
-    api 'org.apache.commons:commons-math3:3.6.1'
-
-    // This dependency is used internally, and not exposed to consumers on their own compile classpath.
-    implementation 'com.google.guava:guava:29.0-jre'
 }

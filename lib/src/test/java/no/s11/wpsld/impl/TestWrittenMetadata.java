@@ -15,24 +15,33 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+
 package no.s11.wpsld.impl;
 
 import static org.junit.Assert.*;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 
 import org.junit.Test;
 
 import no.s11.wpsld.WPSLD;
 import no.s11.wpsld.WPSLDPath;
 
-public class TestWPSLD {
+public class TestWrittenMetadata {
+    private static final String RO_CRATE_METADATA_JSON = "ro-crate-metadata.json";
+
     @Test 
-    public void newRootIsDirectory() throws IOException {
+    public void metadataExists() throws IOException {
     	WPSLD wpsld = WPSLD.Factory.create();
         WPSLDPath root = wpsld.newRoot();
-        assertTrue("New root should be a directory", 
-        		Files.isDirectory(root.getPath()));
+        Path metadata = root.getPath().resolve(RO_CRATE_METADATA_JSON);
+        assertFalse("metadata should not be written yet", 
+        		Files.exists(metadata));
+        WrittenMetadata written = new WrittenMetadata(root);
+        Path writtenMetadata = written.getPath().resolve(RO_CRATE_METADATA_JSON);
+        assertTrue("metadata should now be written", 
+        		Files.exists(writtenMetadata));
     }
 }

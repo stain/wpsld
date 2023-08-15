@@ -21,13 +21,24 @@ import java.nio.file.Path;
 
 import no.s11.wpsld.WPSLDPath;
 
+import edu.kit.datamanager.ro_crate.RoCrate;
+import edu.kit.datamanager.ro_crate.RoCrateBuilder;
+import edu.kit.datamanager.ro_crate.writer.RoCrateWriter;
+
 public class WrittenMetadata implements WPSLDPath {
 
 	private WPSLDPath root;
 
 	public WrittenMetadata(WPSLDPath root) {
 		this.root = root;
-		
+		writeMetadata();		
+	}
+
+	private void writeMetadata() {
+		RoCrate roCrate = new RoCrateBuilder("name", "description").build();
+		RoCrateWriter folderRoCrateWriter = new RoCrateWriter(new FolderWriter());
+		// FIXME: Below assumes path is on local file system!
+		folderRoCrateWriter.save(roCrate, this.root.toString());
 	}
 
 	@Override
