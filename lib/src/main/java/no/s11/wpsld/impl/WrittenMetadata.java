@@ -22,8 +22,10 @@ import java.nio.file.Path;
 import no.s11.wpsld.WPSLDPath;
 
 import edu.kit.datamanager.ro_crate.RoCrate;
-import edu.kit.datamanager.ro_crate.RoCrateBuilder;
+import edu.kit.datamanager.ro_crate.RoCrate.RoCrateBuilder;
 import edu.kit.datamanager.ro_crate.writer.RoCrateWriter;
+import edu.kit.datamanager.ro_crate.writer.FolderWriter;
+
 
 public class WrittenMetadata implements WPSLDPath {
 
