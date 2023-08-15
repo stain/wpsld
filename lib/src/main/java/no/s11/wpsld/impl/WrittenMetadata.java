@@ -40,7 +40,8 @@ public class WrittenMetadata implements WPSLDPath {
 		RoCrate roCrate = new RoCrateBuilder("name", "description").build();
 		RoCrateWriter folderRoCrateWriter = new RoCrateWriter(new FolderWriter());
 		// FIXME: Below assumes path is on local file system!
-		folderRoCrateWriter.save(roCrate, this.root.toString());
+		folderRoCrateWriter.save(roCrate, this.root.getPath().toString());
+		System.out.println(this.root.getPath());
 	}
 
 	@Override

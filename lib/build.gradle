@@ -19,8 +19,8 @@ repositories {
 extraJavaModuleInfo {
     failOnMissingModuleInfo.set(false)
     module('edu.kit.datamanager:ro-crate-java', 'edu.kit.datamanager.ro_crate') {
-        exports("edu.kit.datamanager.ro_crate")
-        exports("edu.kit.datamanager.ro_crate.writer")
+//        exports("edu.kit.datamanager.ro_crate")
+//      exports("edu.kit.datamanager.ro_crate.writer")
         exportAllPackages();
     }
 
