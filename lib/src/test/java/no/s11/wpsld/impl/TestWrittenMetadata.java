@@ -21,8 +21,10 @@ package no.s11.wpsld.impl;
 import static org.junit.Assert.*;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserDefinedFileAttributeView;
 
 import org.junit.Test;
 
@@ -39,6 +41,9 @@ public class TestWrittenMetadata {
         Path metadata = root.getPath().resolve(RO_CRATE_METADATA_JSON);
         assertFalse("metadata should not be written yet", 
         		Files.exists(metadata));
+        UserDefinedFileAttributeView view = Files.getFileAttributeView(root.getPath(), UserDefinedFileAttributeView.class);        
+        view.write("wpsld.license", 
+            ByteBuffer.wrap("{\"@id\": \"http://spdx.org/licenses/CC0-1.0\"}".getBytes("UTF-8")));
         WrittenMetadata written = new WrittenMetadata(root);
         Path writtenMetadata = written.getPath().resolve(RO_CRATE_METADATA_JSON);
         assertTrue("metadata should now be written", 

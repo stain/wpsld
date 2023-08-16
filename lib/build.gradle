@@ -18,9 +18,13 @@ repositories {
 
 extraJavaModuleInfo {
     failOnMissingModuleInfo.set(false)
+    //automaticModule(, "com.fasterxml.jackson.databind")
     module('edu.kit.datamanager:ro-crate-java', 'edu.kit.datamanager.ro_crate') {
 //        exports("edu.kit.datamanager.ro_crate")
 //      exports("edu.kit.datamanager.ro_crate.writer")
+        requires("com.fasterxml.jackson.core")
+        requires("com.fasterxml.jackson.databind")
+        requires("com.fasterxml.jackson.annotations")
         exportAllPackages();
     }
 
@@ -30,6 +34,7 @@ extraJavaModuleInfo {
 dependencies {
 
     implementation 'edu.kit.datamanager:ro-crate-java:1.1.0'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
 
     // Use JUnit test framework.
     testImplementation 'junit:junit:4.13'
