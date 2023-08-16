@@ -41,9 +41,10 @@ public class TestWrittenMetadata {
         Path metadata = root.getPath().resolve(RO_CRATE_METADATA_JSON);
         assertFalse("metadata should not be written yet", 
         		Files.exists(metadata));
-        UserDefinedFileAttributeView view = Files.getFileAttributeView(root.getPath(), UserDefinedFileAttributeView.class);        
+        UserDefinedFileAttributeView view = Files.getFileAttributeView(root.getPath(), UserDefinedFileAttributeView.class);
+        // FIXME: Update for convention for URI references       
         view.write("wpsld.license", 
-            ByteBuffer.wrap("{\"@id\": \"http://spdx.org/licenses/CC0-1.0\"}".getBytes("UTF-8")));
+            ByteBuffer.wrap("http://spdx.org/licenses/CC0-1.0".getBytes("UTF-8")));
         WrittenMetadata written = new WrittenMetadata(root);
         Path writtenMetadata = written.getPath().resolve(RO_CRATE_METADATA_JSON);
         assertTrue("metadata should now be written", 
