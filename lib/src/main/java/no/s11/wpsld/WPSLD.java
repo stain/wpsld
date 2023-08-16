@@ -40,7 +40,7 @@ public interface WPSLD {
 		}
 	}
 
-	WPSLDPath writeMetadata(WPSLDPath root);
+	WPSLDPath writeMetadata(WPSLDPath root) throws IOException;
 	
 	
 }

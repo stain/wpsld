@@ -17,7 +17,13 @@
  */
 package no.s11.wpsld.impl;
 
+import java.io.IOException;
+import java.lang.System.Logger;
+import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileAttributeView;
+import java.nio.file.attribute.UserDefinedFileAttributeView;
 
 import no.s11.wpsld.WPSLDPath;
 
@@ -26,22 +32,41 @@ import edu.kit.datamanager.ro_crate.RoCrate.RoCrateBuilder;
 import edu.kit.datamanager.ro_crate.writer.RoCrateWriter;
 import edu.kit.datamanager.ro_crate.writer.FolderWriter;
 
-
 public class WrittenMetadata implements WPSLDPath {
-
+	private static Logger logger = Logger.getLogger(WrittenMetadata.class.getName());
 	private WPSLDPath root;
 
-	public WrittenMetadata(WPSLDPath root) {
+	public WrittenMetadata(WPSLDPath root) throws IOException {
 		this.root = root;
 		writeMetadata();		
 	}
 
-	private void writeMetadata() {
-		RoCrate roCrate = new RoCrateBuilder("name", "description").build();
+	private void writeMetadata() throws IOException {
+		RoCrate roCrate = new RoCrateBuilder("name", "").build();
+		UserDefinedFileAttributeView view = Files.getFileAttributeView(getPath(), UserDefinedFileAttributeView.class);
+		// FIXME: Generalize for every path
+		view.list().stream().filter(s -> s.startsWith("wpsld.")).forEach(key -> {
+			ByteBuffer buff;
+			try {
+				buff = ByteBuffer.allocate(view.size(key));
+			} catch (IOException e) {
+				logger.log(Logger.Level.WARNING, "Can't determine size of file attribute {0} from path {1}: {2}", key, getPath(), e);
+				return;
+			}
+			try {
+				view.read(key, buff);
+			} catch (IOException e) {
+				logger.log(Logger.Level.WARNING, "Can't read of file attribute {0} from path {1}: {2}", key, getPath(), e);
+			}
+//			buff.reset();
+			roCrate.getRootDataEntity().addProperty(key.replaceFirst("wpsld", ""), 
+			// TODO: Support { objects } and numbers etc.
+			// FIXME: Don't assume default charset
+				buff.toString());
+		});
 		RoCrateWriter folderRoCrateWriter = new RoCrateWriter(new FolderWriter());
 		// FIXME: Below assumes path is on local file system!
-		folderRoCrateWriter.save(roCrate, this.root.getPath().toString());
-		System.out.println(this.root.getPath());
+		folderRoCrateWriter.save(roCrate, root.getPath().toString());
 	}
 
 	@Override

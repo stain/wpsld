@@ -30,7 +30,7 @@ public class WPSLDImpl implements WPSLD {
 	}
 
 	@Override
-	public WPSLDPath writeMetadata(WPSLDPath root) {
+	public WPSLDPath writeMetadata(WPSLDPath root) throws IOException {
 		return new WrittenMetadata(root);		
 	}
 
