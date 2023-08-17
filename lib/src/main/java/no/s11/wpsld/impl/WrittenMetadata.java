@@ -37,11 +37,14 @@ public class WrittenMetadata implements WPSLDPath {
 
 	public WrittenMetadata(WPSLDPath root) throws IOException {
 		this.root = root;
-		writeMetadata();		
+		writeMetadata();
 	}
 
 	private void writeMetadata() throws IOException {
 		RoCrate roCrate = new RoCrateBuilder("name", "").build();
+		if (! Files.getFileStore(getPath()).supportsFileAttributeView(UserDefinedFileAttributeView.class)) {
+			throw new IOException("File system does not support extended attributes (UserDefinedFileAttributeView): " + getPath());
+		}
 		UserDefinedFileAttributeView view = Files.getFileAttributeView(getPath(), UserDefinedFileAttributeView.class);
 		// FIXME: Generalize for every path
 		view.list().stream().filter(s -> s.startsWith("wpsld.")).forEach(key -> {
@@ -55,7 +58,7 @@ public class WrittenMetadata implements WPSLDPath {
 			try {
 				view.read(key, buff);
 			} catch (IOException e) {
-				logger.log(Logger.Level.WARNING, "Can't read of file attribute {0} from path {1}: {2}", key, getPath(), e);
+				logger.log(Logger.Level.WARNING, "Can't read file attribute {0} from path {1}: {2}", key, getPath(), e);
 			}
 			roCrate.getRootDataEntity().addProperty(key.replaceFirst("^wpsld\\.", ""), 
 			// TODO: Support { objects } and numbers etc.
