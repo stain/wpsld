@@ -18,6 +18,7 @@
 package no.s11.wpsld.impl;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.FileStore;
 import java.nio.file.FileSystem;
 import java.nio.file.Path;
@@ -28,6 +29,12 @@ import java.nio.file.spi.FileSystemProvider;
 import java.util.Set;
 
 public class ARCPFileSystem extends FileSystem {
+
+    private URI root;
+
+    ARCPFileSystem(URI root) {
+        this.root = root;
+    }
 
     @Override
     public FileSystemProvider provider() {

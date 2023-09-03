@@ -73,22 +73,43 @@ public final class ARCPPath implements Path,WPSLDPath {
 
     @Override
     public boolean isAbsolute() {
-        return this.path.startsWith("/");
+        return uri.isAbsolute();
     }
 
     @Override
     public Path getRoot() {
+        if (! isAbsolute()) { 
+            return null;
+        }
         return new ARCPPath(filesystem);
     }
 
     @Override
     public Path getFileName() {
-        URI filename = uri.resolve("./").relativize(uri);
-        return new ARCPPath(filesystem, filename);
+        if (path.equals("/")) {
+            // Root is nameless
+            return null;
+        }
+        String[] split = path.split("/");
+        if (split.length < 2) {
+            // No directory elements, it's just us
+            return this;
+        }
+        if (split[split.length-1].isEmpty()) {
+            // path ended in /, our name is split element before
+            return new ARCPPath(filesystem, split[split.length-2]);
+        } else { 
+            // filename is at end of path
+            return new ARCPPath(filesystem, split[split.length-1]);
+        }
     }
 
     @Override
     public Path getParent() {
+        if (path.equals("/")) {
+            // Root is nameless
+            return null;
+        }
         URI directory = uri.resolve("./");
         if (! directory.equals(uri)) {
             return new ARCPPath(filesystem, directory); // We were a file
