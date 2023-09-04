@@ -19,15 +19,12 @@ package no.s11.wpsld.arcp;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.FileSystem;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.WatchEvent.Kind;
 import java.nio.file.WatchEvent.Modifier;
 import java.util.Optional;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Future;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 
@@ -100,16 +97,11 @@ public final class ARCPPath implements Path,WPSLDPath {
 
     @Override
     public Path getParent() {
-        if (path.equals("/")) {
-            // Root is nameless
+        Value<Optional<Path>> parent = new ParentPath(filesystem, uri);
+        if (parent.get().isPresent()) {
+            return parent.get().get();
+        } else {
             return null;
-        }
-        URI directory = uri.resolve("./");
-        if (! directory.equals(uri)) {
-            return new ARCPPath(filesystem, directory); // We were a file
-        } else { 
-            URI parent = uri.resolve("../");
-            return new ARCPPath(filesystem, parent);
         }
     }
 
@@ -177,8 +169,7 @@ public final class ARCPPath implements Path,WPSLDPath {
 
     @Override
     public URI toUri() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'toUri'");
+        return uri;
     }
 
     @Override
