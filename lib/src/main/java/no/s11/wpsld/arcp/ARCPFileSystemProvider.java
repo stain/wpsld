@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package no.s11.wpsld.impl;
+package no.s11.wpsld.arcp;
 
 import java.io.IOException;
 import java.net.URI;

@@ -15,19 +15,24 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package no.s11.wpsld.impl;
+package no.s11.wpsld.arcp;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.FileSystem;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.WatchEvent.Kind;
 import java.nio.file.WatchEvent.Modifier;
+import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 
 import no.s11.wpsld.WPSLDPath;
+import no.s11.wpsld.util.Value;
 
 /**
  * Path using the arcp:// URI scheme from a base directory.
@@ -45,21 +50,20 @@ public final class ARCPPath implements Path,WPSLDPath {
     ARCPPath(ARCPFileSystem fs) {
         this.filesystem = fs;
         this.path = "/";
-        this.uri = fs.getRootDirectories().iterator().next().toUri();
+        this.uri = fs.getRootURI();
     }
 
     ARCPPath(ARCPFileSystem fs, URI uri) {
         this.filesystem = fs;
+        this.path = uri.getPath(); // decoded
         this.uri = uri;
-        this.path = uri.getPath();
     }
 
 
     ARCPPath(ARCPFileSystem fs, String path) {
         this.filesystem = fs;
         this.path = path;
-        // FIXME: Check relative/absolute
-        this.uri = new URI(null, path);
+        this.uri = new URIFromPath(path, fs.getRootURI()).get();
     }
 
     public ARCPPath getPath() { 
@@ -86,21 +90,11 @@ public final class ARCPPath implements Path,WPSLDPath {
 
     @Override
     public Path getFileName() {
-        if (path.equals("/")) {
-            // Root is nameless
+        Value<Optional<Path>> filename = new FileNamePath(filesystem, path);
+        if (filename.get().isPresent()) {
+            return filename.get().get();
+        } else {
             return null;
-        }
-        String[] split = path.split("/");
-        if (split.length < 2) {
-            // No directory elements, it's just us
-            return this;
-        }
-        if (split[split.length-1].isEmpty()) {
-            // path ended in /, our name is split element before
-            return new ARCPPath(filesystem, split[split.length-2]);
-        } else { 
-            // filename is at end of path
-            return new ARCPPath(filesystem, split[split.length-1]);
         }
     }
 

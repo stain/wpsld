@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package no.s11.wpsld.impl;
+package no.s11.wpsld.arcp;
 
 import java.io.IOException;
 import java.net.URI;
@@ -34,6 +34,10 @@ public class ARCPFileSystem extends FileSystem {
 
     ARCPFileSystem(URI root) {
         this.root = root;
+    }
+
+    public URI getRootURI() {
+        return this.root;
     }
 
     @Override
@@ -66,44 +70,42 @@ public class ARCPFileSystem extends FileSystem {
     }
 
     @Override
-    public Iterable<Path> getRootDirectories() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getRootDirectories'");
+    public Iterable<Path> getRootDirectories() {        
+        return new RootDirectories(this, this.root);
     }
 
     @Override
     public Iterable<FileStore> getFileStores() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getFileStores'");
+        return new FileStores(this, this.root);
     }
 
     @Override
     public Set<String> supportedFileAttributeViews() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'supportedFileAttributeViews'");
+        return new SupportedFileAttributeViews();
     }
 
     @Override
     public Path getPath(String first, String... more) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getPath'");
+        ARCPPath firstPath = new ARCPPath(this, first);
+        if (more.length == 0) {
+            return firstPath;
+        }
+        String joinedPath = String.join("/", more);
+        return firstPath.resolve(joinedPath);
     }
 
     @Override
     public PathMatcher getPathMatcher(String syntaxAndPattern) {
-        // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'getPathMatcher'");
     }
 
     @Override
     public UserPrincipalLookupService getUserPrincipalLookupService() {
-        // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'getUserPrincipalLookupService'");
     }
 
     @Override
     public WatchService newWatchService() throws IOException {
-        // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'newWatchService'");
     }
     
