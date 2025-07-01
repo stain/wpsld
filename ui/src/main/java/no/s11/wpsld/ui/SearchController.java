@@ -27,7 +27,7 @@ public class SearchController {
     @FXML
     private void initialize() {
         // search panel
-        searchButton.setText("Search");
+        searchButton.setText("Searchy");
         searchButton.setOnAction(event -> loadData());
         searchButton.setStyle("-fx-background-color: #457ecd; -fx-text-fill: #ffffff;");
 

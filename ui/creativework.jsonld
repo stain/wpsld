@@ -1,0 +1,3656 @@
+{
+    "@context": "https://schema.org",
+    "ExchangeRateSpecification": {
+        "name": "",
+        "about": ""
+    },
+    "ComicIssue": {
+        "name": "",
+        "about": ""
+    },
+    "FindAction": {
+        "name": "",
+        "about": ""
+    },
+    "Recipe": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalTherapy": {
+        "name": "",
+        "about": ""
+    },
+    "SportingGoodsStore": {
+        "name": "",
+        "about": ""
+    },
+    "MusicRelease": {
+        "name": "",
+        "about": ""
+    },
+    "PoliceStation": {
+        "name": "",
+        "about": ""
+    },
+    "Embassy": {
+        "name": "",
+        "about": ""
+    },
+    "BreadcrumbList": {
+        "name": "",
+        "about": ""
+    },
+    "StatusEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "TattooParlor": {
+        "name": "",
+        "about": ""
+    },
+    "Vein": {
+        "name": "",
+        "about": ""
+    },
+    "VisualArtsEvent": {
+        "name": "",
+        "about": ""
+    },
+    "Thing": {
+        "name": "",
+        "about": ""
+    },
+    "NightClub": {
+        "name": "",
+        "about": ""
+    },
+    "BookStore": {
+        "name": "",
+        "about": ""
+    },
+    "BusOrCoach": {
+        "name": "",
+        "about": ""
+    },
+    "MonetaryAmount": {
+        "name": "",
+        "about": ""
+    },
+    "EducationalOccupationalCredential": {
+        "name": "",
+        "about": ""
+    },
+    "PurchaseType": {
+        "name": "",
+        "about": ""
+    },
+    "EatAction": {
+        "name": "",
+        "about": ""
+    },
+    "Audience": {
+        "name": "",
+        "about": ""
+    },
+    "CivicStructure": {
+        "name": "",
+        "about": ""
+    },
+    "PublicationVolume": {
+        "name": "",
+        "about": ""
+    },
+    "Bakery": {
+        "name": "",
+        "about": ""
+    },
+    "ReturnMethodEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "JewelryStore": {
+        "name": "",
+        "about": ""
+    },
+    "PostOffice": {
+        "name": "",
+        "about": ""
+    },
+    "BankOrCreditUnion": {
+        "name": "",
+        "about": ""
+    },
+    "Park": {
+        "name": "",
+        "about": ""
+    },
+    "VideoGame": {
+        "name": "",
+        "about": ""
+    },
+    "Newspaper": {
+        "name": "",
+        "about": ""
+    },
+    "Game": {
+        "name": "",
+        "about": ""
+    },
+    "Diet": {
+        "name": "",
+        "about": ""
+    },
+    "HomeAndConstructionBusiness": {
+        "name": "",
+        "about": ""
+    },
+    "Consortium": {
+        "name": "",
+        "about": ""
+    },
+    "MapCategoryType": {
+        "name": "",
+        "about": ""
+    },
+    "DriveWheelConfigurationValue": {
+        "name": "",
+        "about": ""
+    },
+    "BookSeries": {
+        "name": "",
+        "about": ""
+    },
+    "AccountingService": {
+        "name": "",
+        "about": ""
+    },
+    "OnlineStore": {
+        "name": "",
+        "about": ""
+    },
+    "MusicReleaseFormatType": {
+        "name": "",
+        "about": ""
+    },
+    "Reservoir": {
+        "name": "",
+        "about": ""
+    },
+    "PalliativeProcedure": {
+        "name": "",
+        "about": ""
+    },
+    "IndividualProduct": {
+        "name": "",
+        "about": ""
+    },
+    "BeautySalon": {
+        "name": "",
+        "about": ""
+    },
+    "BodyOfWater": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalEntity": {
+        "name": "",
+        "about": ""
+    },
+    "ClothingStore": {
+        "name": "",
+        "about": ""
+    },
+    "MortgageLoan": {
+        "name": "",
+        "about": ""
+    },
+    "UnitPriceSpecification": {
+        "name": "",
+        "about": ""
+    },
+    "TelevisionChannel": {
+        "name": "",
+        "about": ""
+    },
+    "MarryAction": {
+        "name": "",
+        "about": ""
+    },
+    "LiquorStore": {
+        "name": "",
+        "about": ""
+    },
+    "ItemListOrderType": {
+        "name": "",
+        "about": ""
+    },
+    "RadioClip": {
+        "name": "",
+        "about": ""
+    },
+    "MemberProgram": {
+        "name": "",
+        "about": ""
+    },
+    "PoliticalParty": {
+        "name": "",
+        "about": ""
+    },
+    "Motorcycle": {
+        "name": "",
+        "about": ""
+    },
+    "Trip": {
+        "name": "",
+        "about": ""
+    },
+    "AlignmentObject": {
+        "name": "",
+        "about": ""
+    },
+    "DeliveryMethod": {
+        "name": "",
+        "about": ""
+    },
+    "BankAccount": {
+        "name": "",
+        "about": ""
+    },
+    "EUEnergyEfficiencyEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "DepositAccount": {
+        "name": "",
+        "about": ""
+    },
+    "DataDownload": {
+        "name": "",
+        "about": ""
+    },
+    "ItemList": {
+        "name": "",
+        "about": ""
+    },
+    "UnRegisterAction": {
+        "name": "",
+        "about": ""
+    },
+    "CompoundPriceSpecification": {
+        "name": "",
+        "about": ""
+    },
+    "EmploymentAgency": {
+        "name": "",
+        "about": ""
+    },
+    "UserTweets": {
+        "name": "",
+        "about": ""
+    },
+    "RVPark": {
+        "name": "",
+        "about": ""
+    },
+    "PublicSwimmingPool": {
+        "name": "",
+        "about": ""
+    },
+    "Locksmith": {
+        "name": "",
+        "about": ""
+    },
+    "EducationalAudience": {
+        "name": "",
+        "about": ""
+    },
+    "EntryPoint": {
+        "name": "",
+        "about": ""
+    },
+    "Vehicle": {
+        "name": "",
+        "about": ""
+    },
+    "ComicStory": {
+        "name": "",
+        "about": ""
+    },
+    "AutoWash": {
+        "name": "",
+        "about": ""
+    },
+    "CovidTestingFacility": {
+        "name": "",
+        "about": ""
+    },
+    "MobileApplication": {
+        "name": "test",
+        "about": "asd"
+    },
+    "NLNonprofitType": {
+        "name": "",
+        "about": ""
+    },
+    "HowToSection": {
+        "name": "",
+        "about": ""
+    },
+    "AudioObjectSnapshot": {
+        "name": "",
+        "about": ""
+    },
+    "OrganizeAction": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalGuideline": {
+        "name": "",
+        "about": ""
+    },
+    "MusicVenue": {
+        "name": "",
+        "about": ""
+    },
+    "DepartmentStore": {
+        "name": "",
+        "about": ""
+    },
+    "PlayGameAction": {
+        "name": "",
+        "about": ""
+    },
+    "CheckAction": {
+        "name": "",
+        "about": ""
+    },
+    "ActivateAction": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalObservationalStudyDesign": {
+        "name": "",
+        "about": ""
+    },
+    "BioChemEntity": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalIndication": {
+        "name": "",
+        "about": ""
+    },
+    "TheaterEvent": {
+        "name": "",
+        "about": ""
+    },
+    "Brand": {
+        "name": "",
+        "about": ""
+    },
+    "NewsMediaOrganization": {
+        "name": "",
+        "about": ""
+    },
+    "MovieClip": {
+        "name": "",
+        "about": ""
+    },
+    "State": {
+        "name": "",
+        "about": ""
+    },
+    "LinkRole": {
+        "name": "",
+        "about": ""
+    },
+    "WebSite": {
+        "name": "",
+        "about": ""
+    },
+    "Plumber": {
+        "name": "",
+        "about": ""
+    },
+    "DDxElement": {
+        "name": "",
+        "about": ""
+    },
+    "DefinedTerm": {
+        "name": "",
+        "about": ""
+    },
+    "Bridge": {
+        "name": "",
+        "about": ""
+    },
+    "RadioSeason": {
+        "name": "",
+        "about": ""
+    },
+    "EndorsementRating": {
+        "name": "",
+        "about": ""
+    },
+    "PeopleAudience": {
+        "name": "",
+        "about": ""
+    },
+    "VisualArtwork": {
+        "name": "",
+        "about": ""
+    },
+    "DrugClass": {
+        "name": "",
+        "about": ""
+    },
+    "ImageObjectSnapshot": {
+        "name": "",
+        "about": ""
+    },
+    "PetStore": {
+        "name": "",
+        "about": ""
+    },
+    "BookmarkAction": {
+        "name": "",
+        "about": ""
+    },
+    "DataCatalog": {
+        "name": "",
+        "about": ""
+    },
+    "MaximumDoseSchedule": {
+        "name": "",
+        "about": ""
+    },
+    "BroadcastService": {
+        "name": "",
+        "about": ""
+    },
+    "MerchantReturnPolicy": {
+        "name": "",
+        "about": ""
+    },
+    "FAQPage": {
+        "name": "",
+        "about": ""
+    },
+    "SteeringPositionValue": {
+        "name": "",
+        "about": ""
+    },
+    "Report": {
+        "name": "",
+        "about": ""
+    },
+    "TechArticle": {
+        "name": "",
+        "about": ""
+    },
+    "TypeAndQuantityNode": {
+        "name": "",
+        "about": ""
+    },
+    "SportsEvent": {
+        "name": "",
+        "about": ""
+    },
+    "ListItem": {
+        "name": "",
+        "about": ""
+    },
+    "LoanOrCredit": {
+        "name": "",
+        "about": ""
+    },
+    "ItemAvailability": {
+        "name": "",
+        "about": ""
+    },
+    "PostalCodeRangeSpecification": {
+        "name": "",
+        "about": ""
+    },
+    "WarrantyScope": {
+        "name": "",
+        "about": ""
+    },
+    "Nerve": {
+        "name": "",
+        "about": ""
+    },
+    "DaySpa": {
+        "name": "",
+        "about": ""
+    },
+    "Aquarium": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalSpecialty": {
+        "name": "",
+        "about": ""
+    },
+    "MonetaryAmountDistribution": {
+        "name": "",
+        "about": ""
+    },
+    "LiveBlogPosting": {
+        "name": "",
+        "about": ""
+    },
+    "ComputerStore": {
+        "name": "",
+        "about": ""
+    },
+    "BusinessEvent": {
+        "name": "",
+        "about": ""
+    },
+    "WriteAction": {
+        "name": "",
+        "about": ""
+    },
+    "RegisterAction": {
+        "name": "",
+        "about": ""
+    },
+    "Artery": {
+        "name": "",
+        "about": ""
+    },
+    "Audiobook": {
+        "name": "",
+        "about": ""
+    },
+    "CDCPMDRecord": {
+        "name": "",
+        "about": ""
+    },
+    "Volcano": {
+        "name": "",
+        "about": ""
+    },
+    "TouristInformationCenter": {
+        "name": "",
+        "about": ""
+    },
+    "FilmAction": {
+        "name": "",
+        "about": ""
+    },
+    "Person": {
+        "name": "",
+        "about": ""
+    },
+    "CategoryCodeSet": {
+        "name": "",
+        "about": ""
+    },
+    "EmergencyService": {
+        "name": "",
+        "about": ""
+    },
+    "WebPageElement": {
+        "name": "",
+        "about": ""
+    },
+    "VideoGameSeries": {
+        "name": "",
+        "about": ""
+    },
+    "Organization": {
+        "name": "",
+        "about": ""
+    },
+    "LodgingReservation": {
+        "name": "",
+        "about": ""
+    },
+    "AutoDealer": {
+        "name": "",
+        "about": ""
+    },
+    "ReturnLabelSourceEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "ShareAction": {
+        "name": "",
+        "about": ""
+    },
+    "HealthAspectEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "HowToDirection": {
+        "name": "",
+        "about": ""
+    },
+    "URL": {
+        "name": "",
+        "about": ""
+    },
+    "ClaimReview": {
+        "name": "",
+        "about": ""
+    },
+    "BusReservation": {
+        "name": "",
+        "about": ""
+    },
+    "ReactAction": {
+        "name": "",
+        "about": ""
+    },
+    "UserCheckins": {
+        "name": "",
+        "about": ""
+    },
+    "AdvertiserContentArticle": {
+        "name": "",
+        "about": ""
+    },
+    "InvestmentOrDeposit": {
+        "name": "",
+        "about": ""
+    },
+    "UserPlusOnes": {
+        "name": "",
+        "about": ""
+    },
+    "SurgicalProcedure": {
+        "name": "",
+        "about": ""
+    },
+    "LiteraryEvent": {
+        "name": "",
+        "about": ""
+    },
+    "Menu": {
+        "name": "",
+        "about": ""
+    },
+    "Property": {
+        "name": "",
+        "about": ""
+    },
+    "RestrictedDiet": {
+        "name": "",
+        "about": ""
+    },
+    "RealEstateListing": {
+        "name": "",
+        "about": ""
+    },
+    "PhotographAction": {
+        "name": "",
+        "about": ""
+    },
+    "DrawAction": {
+        "name": "",
+        "about": ""
+    },
+    "PawnShop": {
+        "name": "",
+        "about": ""
+    },
+    "3DModel": {
+        "name": "",
+        "about": ""
+    },
+    "InfectiousDisease": {
+        "name": "",
+        "about": ""
+    },
+    "EventSeries": {
+        "name": "",
+        "about": ""
+    },
+    "BroadcastEvent": {
+        "name": "",
+        "about": ""
+    },
+    "DoseSchedule": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalConditionStage": {
+        "name": "",
+        "about": ""
+    },
+    "MoveAction": {
+        "name": "",
+        "about": ""
+    },
+    "MusicEvent": {
+        "name": "",
+        "about": ""
+    },
+    "ViewAction": {
+        "name": "",
+        "about": ""
+    },
+    "PlanAction": {
+        "name": "",
+        "about": ""
+    },
+    "WatchAction": {
+        "name": "",
+        "about": ""
+    },
+    "PathologyTest": {
+        "name": "",
+        "about": ""
+    },
+    "ControlAction": {
+        "name": "",
+        "about": ""
+    },
+    "TouristAttraction": {
+        "name": "",
+        "about": ""
+    },
+    "RecyclingCenter": {
+        "name": "",
+        "about": ""
+    },
+    "HowToTool": {
+        "name": "",
+        "about": ""
+    },
+    "AdultEntertainment": {
+        "name": "",
+        "about": ""
+    },
+    "MerchantReturnEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "PaymentCard": {
+        "name": "",
+        "about": ""
+    },
+    "AllocateAction": {
+        "name": "",
+        "about": ""
+    },
+    "PaymentChargeSpecification": {
+        "name": "",
+        "about": ""
+    },
+    "EnergyEfficiencyEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalDevicePurpose": {
+        "name": "",
+        "about": ""
+    },
+    "SaleEvent": {
+        "name": "",
+        "about": ""
+    },
+    "TipAction": {
+        "name": "",
+        "about": ""
+    },
+    "SizeGroupEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "PlaceOfWorship": {
+        "name": "",
+        "about": ""
+    },
+    "Campground": {
+        "name": "",
+        "about": ""
+    },
+    "TradeAction": {
+        "name": "",
+        "about": ""
+    },
+    "ScholarlyArticle": {
+        "name": "",
+        "about": ""
+    },
+    "CorrectionComment": {
+        "name": "",
+        "about": ""
+    },
+    "EducationEvent": {
+        "name": "",
+        "about": ""
+    },
+    "IceCreamShop": {
+        "name": "",
+        "about": ""
+    },
+    "AskPublicNewsArticle": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalRiskEstimator": {
+        "name": "",
+        "about": ""
+    },
+    "UserInteraction": {
+        "name": "",
+        "about": ""
+    },
+    "Library": {
+        "name": "",
+        "about": ""
+    },
+    "EmployerAggregateRating": {
+        "name": "",
+        "about": ""
+    },
+    "SoftwareApplication": {
+        "name": "",
+        "about": ""
+    },
+    "EventStatusType": {
+        "name": "",
+        "about": ""
+    },
+    "MusicComposition": {
+        "name": "",
+        "about": ""
+    },
+    "Synagogue": {
+        "name": "",
+        "about": ""
+    },
+    "BoardingPolicyType": {
+        "name": "",
+        "about": ""
+    },
+    "DepartAction": {
+        "name": "",
+        "about": ""
+    },
+    "WearableSizeGroupEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "AddAction": {
+        "name": "",
+        "about": ""
+    },
+    "TrackAction": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalObservationalStudy": {
+        "name": "",
+        "about": ""
+    },
+    "WearAction": {
+        "name": "",
+        "about": ""
+    },
+    "EndorseAction": {
+        "name": "",
+        "about": ""
+    },
+    "MenuSection": {
+        "name": "",
+        "about": ""
+    },
+    "DrinkAction": {
+        "name": "",
+        "about": ""
+    },
+    "CreativeWorkSeason": {
+        "name": "",
+        "about": ""
+    },
+    "WarrantyPromise": {
+        "name": "",
+        "about": ""
+    },
+    "VideoGameClip": {
+        "name": "",
+        "about": ""
+    },
+    "Periodical": {
+        "name": "",
+        "about": ""
+    },
+    "Series": {
+        "name": "",
+        "about": ""
+    },
+    "InviteAction": {
+        "name": "",
+        "about": ""
+    },
+    "BookFormatType": {
+        "name": "",
+        "about": ""
+    },
+    "Seat": {
+        "name": "",
+        "about": ""
+    },
+    "BusinessEntityType": {
+        "name": "",
+        "about": ""
+    },
+    "SolveMathAction": {
+        "name": "",
+        "about": ""
+    },
+    "MemberProgramTier": {
+        "name": "",
+        "about": ""
+    },
+    "EventReservation": {
+        "name": "",
+        "about": ""
+    },
+    "TireShop": {
+        "name": "",
+        "about": ""
+    },
+    "Suite": {
+        "name": "",
+        "about": ""
+    },
+    "ImagingTest": {
+        "name": "",
+        "about": ""
+    },
+    "Sculpture": {
+        "name": "",
+        "about": ""
+    },
+    "ConsumeAction": {
+        "name": "",
+        "about": ""
+    },
+    "OnDemandEvent": {
+        "name": "",
+        "about": ""
+    },
+    "ShoppingCenter": {
+        "name": "",
+        "about": ""
+    },
+    "Taxi": {
+        "name": "",
+        "about": ""
+    },
+    "MediaSubscription": {
+        "name": "",
+        "about": ""
+    },
+    "GameServerStatus": {
+        "name": "",
+        "about": ""
+    },
+    "TaxiReservation": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalTest": {
+        "name": "",
+        "about": ""
+    },
+    "AcceptAction": {
+        "name": "",
+        "about": ""
+    },
+    "PropertyValueSpecification": {
+        "name": "",
+        "about": ""
+    },
+    "AssessAction": {
+        "name": "",
+        "about": ""
+    },
+    "PropertyValue": {
+        "name": "",
+        "about": ""
+    },
+    "GamePlayMode": {
+        "name": "",
+        "about": ""
+    },
+    "Code": {
+        "name": "",
+        "about": ""
+    },
+    "PreventionIndication": {
+        "name": "",
+        "about": ""
+    },
+    "ServicePeriod": {
+        "name": "",
+        "about": ""
+    },
+    "Project": {
+        "name": "",
+        "about": ""
+    },
+    "FlightReservation": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalAudience": {
+        "name": "",
+        "about": ""
+    },
+    "BlogPosting": {
+        "name": "",
+        "about": ""
+    },
+    "AutomatedTeller": {
+        "name": "",
+        "about": ""
+    },
+    "Waterfall": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalImagingTechnique": {
+        "name": "",
+        "about": ""
+    },
+    "RadiationTherapy": {
+        "name": "",
+        "about": ""
+    },
+    "AutoBodyShop": {
+        "name": "",
+        "about": ""
+    },
+    "WorkBasedProgram": {
+        "name": "",
+        "about": ""
+    },
+    "AnimalShelter": {
+        "name": "",
+        "about": ""
+    },
+    "HyperToc": {
+        "name": "",
+        "about": ""
+    },
+    "LymphaticVessel": {
+        "name": "",
+        "about": ""
+    },
+    "EventAttendanceModeEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "Substance": {
+        "name": "",
+        "about": ""
+    },
+    "Ticket": {
+        "name": "",
+        "about": ""
+    },
+    "Statement": {
+        "name": "",
+        "about": ""
+    },
+    "BedType": {
+        "name": "",
+        "about": ""
+    },
+    "Taxon": {
+        "name": "",
+        "about": ""
+    },
+    "HowToSupply": {
+        "name": "",
+        "about": ""
+    },
+    "ReplaceAction": {
+        "name": "",
+        "about": ""
+    },
+    "SpecialAnnouncement": {
+        "name": "",
+        "about": ""
+    },
+    "Restaurant": {
+        "name": "",
+        "about": ""
+    },
+    "Occupation": {
+        "name": "",
+        "about": ""
+    },
+    "GovernmentOrganization": {
+        "name": "",
+        "about": ""
+    },
+    "ParcelDelivery": {
+        "name": "",
+        "about": ""
+    },
+    "FundingAgency": {
+        "name": "",
+        "about": ""
+    },
+    "MusicStore": {
+        "name": "",
+        "about": ""
+    },
+    "ComedyEvent": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalBusiness": {
+        "name": "",
+        "about": ""
+    },
+    "ServiceChannel": {
+        "name": "",
+        "about": ""
+    },
+    "MediaManipulationRatingEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "SportsOrganization": {
+        "name": "",
+        "about": ""
+    },
+    "Beach": {
+        "name": "",
+        "about": ""
+    },
+    "DietarySupplement": {
+        "name": "",
+        "about": ""
+    },
+    "SomeProducts": {
+        "name": "",
+        "about": ""
+    },
+    "PodcastSeason": {
+        "name": "",
+        "about": ""
+    },
+    "DiagnosticProcedure": {
+        "name": "",
+        "about": ""
+    },
+    "BowlingAlley": {
+        "name": "",
+        "about": ""
+    },
+    "AppendAction": {
+        "name": "",
+        "about": ""
+    },
+    "EmployeeRole": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalEvidenceLevel": {
+        "name": "",
+        "about": ""
+    },
+    "GasStation": {
+        "name": "",
+        "about": ""
+    },
+    "PerformingGroup": {
+        "name": "",
+        "about": ""
+    },
+    "CollegeOrUniversity": {
+        "name": "",
+        "about": ""
+    },
+    "PhysicalActivity": {
+        "name": "",
+        "about": ""
+    },
+    "FMRadioChannel": {
+        "name": "",
+        "about": ""
+    },
+    "CheckInAction": {
+        "name": "",
+        "about": ""
+    },
+    "ApartmentComplex": {
+        "name": "",
+        "about": ""
+    },
+    "NewsArticle": {
+        "name": "",
+        "about": ""
+    },
+    "FollowAction": {
+        "name": "",
+        "about": ""
+    },
+    "FurnitureStore": {
+        "name": "",
+        "about": ""
+    },
+    "HowToStep": {
+        "name": "",
+        "about": ""
+    },
+    "Observation": {
+        "name": "",
+        "about": ""
+    },
+    "QuoteAction": {
+        "name": "",
+        "about": ""
+    },
+    "Class": {
+        "name": "",
+        "about": ""
+    },
+    "WebContent": {
+        "name": "",
+        "about": ""
+    },
+    "GameAvailabilityEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "TrainStation": {
+        "name": "",
+        "about": ""
+    },
+    "HardwareStore": {
+        "name": "",
+        "about": ""
+    },
+    "VideoObject": {
+        "name": "",
+        "about": ""
+    },
+    "ElectronicsStore": {
+        "name": "",
+        "about": ""
+    },
+    "Review": {
+        "name": "",
+        "about": ""
+    },
+    "InteractAction": {
+        "name": "",
+        "about": ""
+    },
+    "InvestmentFund": {
+        "name": "",
+        "about": ""
+    },
+    "Mountain": {
+        "name": "",
+        "about": ""
+    },
+    "QualitativeValue": {
+        "name": "",
+        "about": ""
+    },
+    "StatisticalVariable": {
+        "name": "",
+        "about": ""
+    },
+    "HowToTip": {
+        "name": "",
+        "about": ""
+    },
+    "PerformingArtsTheater": {
+        "name": "",
+        "about": ""
+    },
+    "MathSolver": {
+        "name": "",
+        "about": ""
+    },
+    "PaymentService": {
+        "name": "",
+        "about": ""
+    },
+    "ProductModel": {
+        "name": "",
+        "about": ""
+    },
+    "TravelAgency": {
+        "name": "",
+        "about": ""
+    },
+    "MovieRentalStore": {
+        "name": "",
+        "about": ""
+    },
+    "DayOfWeek": {
+        "name": "",
+        "about": ""
+    },
+    "SizeSpecification": {
+        "name": "",
+        "about": ""
+    },
+    "VideoObjectSnapshot": {
+        "name": "",
+        "about": ""
+    },
+    "Manuscript": {
+        "name": "",
+        "about": ""
+    },
+    "FoodEstablishment": {
+        "name": "",
+        "about": ""
+    },
+    "Episode": {
+        "name": "",
+        "about": ""
+    },
+    "Continent": {
+        "name": "",
+        "about": ""
+    },
+    "OutletStore": {
+        "name": "",
+        "about": ""
+    },
+    "WPSideBar": {
+        "name": "",
+        "about": ""
+    },
+    "Invoice": {
+        "name": "",
+        "about": ""
+    },
+    "GovernmentPermit": {
+        "name": "",
+        "about": ""
+    },
+    "ReservationStatusType": {
+        "name": "",
+        "about": ""
+    },
+    "PaintAction": {
+        "name": "",
+        "about": ""
+    },
+    "RefundTypeEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "CompleteDataFeed": {
+        "name": "",
+        "about": ""
+    },
+    "DanceGroup": {
+        "name": "",
+        "about": ""
+    },
+    "ListenAction": {
+        "name": "",
+        "about": ""
+    },
+    "CourseInstance": {
+        "name": "",
+        "about": ""
+    },
+    "VeterinaryCare": {
+        "name": "",
+        "about": ""
+    },
+    "VideoGallery": {
+        "name": "",
+        "about": ""
+    },
+    "VirtualLocation": {
+        "name": "",
+        "about": ""
+    },
+    "DrugPrescriptionStatus": {
+        "name": "",
+        "about": ""
+    },
+    "House": {
+        "name": "",
+        "about": ""
+    },
+    "IncentiveType": {
+        "name": "",
+        "about": ""
+    },
+    "Apartment": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalProcedure": {
+        "name": "",
+        "about": ""
+    },
+    "Mass": {
+        "name": "",
+        "about": ""
+    },
+    "TennisComplex": {
+        "name": "",
+        "about": ""
+    },
+    "OfferShippingDetails": {
+        "name": "",
+        "about": ""
+    },
+    "DeleteAction": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalSymptom": {
+        "name": "",
+        "about": ""
+    },
+    "Country": {
+        "name": "",
+        "about": ""
+    },
+    "BikeStore": {
+        "name": "",
+        "about": ""
+    },
+    "ScreeningEvent": {
+        "name": "",
+        "about": ""
+    },
+    "HealthInsurancePlan": {
+        "name": "",
+        "about": ""
+    },
+    "AutoRepair": {
+        "name": "",
+        "about": ""
+    },
+    "Article": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalTestPanel": {
+        "name": "",
+        "about": ""
+    },
+    "HVACBusiness": {
+        "name": "",
+        "about": ""
+    },
+    "FulfillmentTypeEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "ResumeAction": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalSign": {
+        "name": "",
+        "about": ""
+    },
+    "Intangible": {
+        "name": "",
+        "about": ""
+    },
+    "LocationFeatureSpecification": {
+        "name": "",
+        "about": ""
+    },
+    "FundingScheme": {
+        "name": "",
+        "about": ""
+    },
+    "BedDetails": {
+        "name": "",
+        "about": ""
+    },
+    "MediaObject": {
+        "name": "",
+        "about": ""
+    },
+    "Movie": {
+        "name": "",
+        "about": ""
+    },
+    "FoodEvent": {
+        "name": "",
+        "about": ""
+    },
+    "Chapter": {
+        "name": "",
+        "about": ""
+    },
+    "Motel": {
+        "name": "",
+        "about": ""
+    },
+    "BedAndBreakfast": {
+        "name": "",
+        "about": ""
+    },
+    "InteractionCounter": {
+        "name": "",
+        "about": ""
+    },
+    "Corporation": {
+        "name": "",
+        "about": ""
+    },
+    "TrainTrip": {
+        "name": "",
+        "about": ""
+    },
+    "DefenceEstablishment": {
+        "name": "",
+        "about": ""
+    },
+    "ActionAccessSpecification": {
+        "name": "",
+        "about": ""
+    },
+    "Electrician": {
+        "name": "",
+        "about": ""
+    },
+    "CityHall": {
+        "name": "",
+        "about": ""
+    },
+    "schema:ArchiveComponent": {
+        "name": "",
+        "about": ""
+    },
+    "Ligament": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalCode": {
+        "name": "",
+        "about": ""
+    },
+    "BarOrPub": {
+        "name": "",
+        "about": ""
+    },
+    "UKNonprofitType": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalDevice": {
+        "name": "",
+        "about": ""
+    },
+    "MotorcycleDealer": {
+        "name": "",
+        "about": ""
+    },
+    "GatedResidenceCommunity": {
+        "name": "",
+        "about": ""
+    },
+    "Quotation": {
+        "name": "",
+        "about": ""
+    },
+    "GovernmentService": {
+        "name": "",
+        "about": ""
+    },
+    "Hospital": {
+        "name": "",
+        "about": ""
+    },
+    "VacationRental": {
+        "name": "",
+        "about": ""
+    },
+    "Cemetery": {
+        "name": "",
+        "about": ""
+    },
+    "AggregateOffer": {
+        "name": "",
+        "about": ""
+    },
+    "WPAdBlock": {
+        "name": "",
+        "about": ""
+    },
+    "Order": {
+        "name": "",
+        "about": ""
+    },
+    "schema:ArchiveOrganization": {
+        "name": "",
+        "about": ""
+    },
+    "AdultOrientedEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "Thesis": {
+        "name": "",
+        "about": ""
+    },
+    "LeaveAction": {
+        "name": "",
+        "about": ""
+    },
+    "RsvpAction": {
+        "name": "",
+        "about": ""
+    },
+    "UserDownloads": {
+        "name": "",
+        "about": ""
+    },
+    "PaymentMethod": {
+        "name": "",
+        "about": ""
+    },
+    "SportsClub": {
+        "name": "",
+        "about": ""
+    },
+    "RealEstateAgent": {
+        "name": "",
+        "about": ""
+    },
+    "PerformanceRole": {
+        "name": "",
+        "about": ""
+    },
+    "DefinedRegion": {
+        "name": "",
+        "about": ""
+    },
+    "ProductCollection": {
+        "name": "",
+        "about": ""
+    },
+    "WebPage": {
+        "name": "",
+        "about": ""
+    },
+    "ContactPointOption": {
+        "name": "",
+        "about": ""
+    },
+    "CssSelectorType": {
+        "name": "",
+        "about": ""
+    },
+    "Message": {
+        "name": "",
+        "about": ""
+    },
+    "PayAction": {
+        "name": "",
+        "about": ""
+    },
+    "InstallAction": {
+        "name": "",
+        "about": ""
+    },
+    "BuddhistTemple": {
+        "name": "",
+        "about": ""
+    },
+    "TierBenefitEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "SellAction": {
+        "name": "",
+        "about": ""
+    },
+    "SkiResort": {
+        "name": "",
+        "about": ""
+    },
+    "AnatomicalStructure": {
+        "name": "",
+        "about": ""
+    },
+    "RadioStation": {
+        "name": "",
+        "about": ""
+    },
+    "PodcastEpisode": {
+        "name": "",
+        "about": ""
+    },
+    "EducationalOrganization": {
+        "name": "",
+        "about": ""
+    },
+    "SoftwareSourceCode": {
+        "name": "",
+        "about": ""
+    },
+    "ShippingDeliveryTime": {
+        "name": "",
+        "about": ""
+    },
+    "Blog": {
+        "name": "",
+        "about": ""
+    },
+    "AdministrativeArea": {
+        "name": "",
+        "about": ""
+    },
+    "Drug": {
+        "name": "",
+        "about": ""
+    },
+    "JobPosting": {
+        "name": "",
+        "about": ""
+    },
+    "FastFoodRestaurant": {
+        "name": "",
+        "about": ""
+    },
+    "CookAction": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalCondition": {
+        "name": "",
+        "about": ""
+    },
+    "SendAction": {
+        "name": "",
+        "about": ""
+    },
+    "OrderAction": {
+        "name": "",
+        "about": ""
+    },
+    "DownloadAction": {
+        "name": "",
+        "about": ""
+    },
+    "InsuranceAgency": {
+        "name": "",
+        "about": ""
+    },
+    "DrugPregnancyCategory": {
+        "name": "",
+        "about": ""
+    },
+    "MovingCompany": {
+        "name": "",
+        "about": ""
+    },
+    "BusStop": {
+        "name": "",
+        "about": ""
+    },
+    "GroceryStore": {
+        "name": "",
+        "about": ""
+    },
+    "Claim": {
+        "name": "",
+        "about": ""
+    },
+    "TieAction": {
+        "name": "",
+        "about": ""
+    },
+    "DeliveryEvent": {
+        "name": "",
+        "about": ""
+    },
+    "Airline": {
+        "name": "",
+        "about": ""
+    },
+    "Canal": {
+        "name": "",
+        "about": ""
+    },
+    "FoodEstablishmentReservation": {
+        "name": "",
+        "about": ""
+    },
+    "Store": {
+        "name": "",
+        "about": ""
+    },
+    "Product": {
+        "name": "",
+        "about": ""
+    },
+    "MusicAlbumProductionType": {
+        "name": "",
+        "about": ""
+    },
+    "AboutPage": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalProcedureType": {
+        "name": "",
+        "about": ""
+    },
+    "ChildrensEvent": {
+        "name": "",
+        "about": ""
+    },
+    "ResearchProject": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalTrialDesign": {
+        "name": "",
+        "about": ""
+    },
+    "MotorcycleRepair": {
+        "name": "",
+        "about": ""
+    },
+    "UserLikes": {
+        "name": "",
+        "about": ""
+    },
+    "UserReview": {
+        "name": "",
+        "about": ""
+    },
+    "DiscussionForumPosting": {
+        "name": "",
+        "about": ""
+    },
+    "AuthorizeAction": {
+        "name": "",
+        "about": ""
+    },
+    "CampingPitch": {
+        "name": "",
+        "about": ""
+    },
+    "AMRadioChannel": {
+        "name": "",
+        "about": ""
+    },
+    "HomeGoodsStore": {
+        "name": "",
+        "about": ""
+    },
+    "MusicAlbumReleaseType": {
+        "name": "",
+        "about": ""
+    },
+    "TrainReservation": {
+        "name": "",
+        "about": ""
+    },
+    "HotelRoom": {
+        "name": "",
+        "about": ""
+    },
+    "FinancialProduct": {
+        "name": "",
+        "about": ""
+    },
+    "Joint": {
+        "name": "",
+        "about": ""
+    },
+    "Hackathon": {
+        "name": "",
+        "about": ""
+    },
+    "ChooseAction": {
+        "name": "",
+        "about": ""
+    },
+    "ParentAudience": {
+        "name": "",
+        "about": ""
+    },
+    "ComicSeries": {
+        "name": "",
+        "about": ""
+    },
+    "Pond": {
+        "name": "",
+        "about": ""
+    },
+    "BusStation": {
+        "name": "",
+        "about": ""
+    },
+    "ConstraintNode": {
+        "name": "",
+        "about": ""
+    },
+    "Museum": {
+        "name": "",
+        "about": ""
+    },
+    "UserPageVisits": {
+        "name": "",
+        "about": ""
+    },
+    "RiverBodyOfWater": {
+        "name": "",
+        "about": ""
+    },
+    "UserPlays": {
+        "name": "",
+        "about": ""
+    },
+    "CreativeWork": {
+        "name": "",
+        "about": ""
+    },
+    "SubscribeAction": {
+        "name": "",
+        "about": ""
+    },
+    "BroadcastFrequencySpecification": {
+        "name": "",
+        "about": ""
+    },
+    "ContactPoint": {
+        "name": "",
+        "about": ""
+    },
+    "OrderStatus": {
+        "name": "",
+        "about": ""
+    },
+    "RadioSeries": {
+        "name": "",
+        "about": ""
+    },
+    "PhysicalActivityCategory": {
+        "name": "",
+        "about": ""
+    },
+    "StructuredValue": {
+        "name": "",
+        "about": ""
+    },
+    "ReportedDoseSchedule": {
+        "name": "",
+        "about": ""
+    },
+    "SocialEvent": {
+        "name": "",
+        "about": ""
+    },
+    "ImageGallery": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalIntangible": {
+        "name": "",
+        "about": ""
+    },
+    "DataType": {
+        "name": "",
+        "about": ""
+    },
+    "Season": {
+        "name": "",
+        "about": ""
+    },
+    "OpinionNewsArticle": {
+        "name": "",
+        "about": ""
+    },
+    "ReservationPackage": {
+        "name": "",
+        "about": ""
+    },
+    "DeactivateAction": {
+        "name": "",
+        "about": ""
+    },
+    "MovieSeries": {
+        "name": "",
+        "about": ""
+    },
+    "Enumeration": {
+        "name": "",
+        "about": ""
+    },
+    "DrugCost": {
+        "name": "",
+        "about": ""
+    },
+    "PhysicalExam": {
+        "name": "",
+        "about": ""
+    },
+    "FloorPlan": {
+        "name": "",
+        "about": ""
+    },
+    "HealthPlanFormulary": {
+        "name": "",
+        "about": ""
+    },
+    "LearningResource": {
+        "name": "",
+        "about": ""
+    },
+    "WebAPI": {
+        "name": "",
+        "about": ""
+    },
+    "HealthPlanCostSharingSpecification": {
+        "name": "",
+        "about": ""
+    },
+    "MusicGroup": {
+        "name": "",
+        "about": ""
+    },
+    "Place": {
+        "name": "",
+        "about": ""
+    },
+    "OwnershipInfo": {
+        "name": "",
+        "about": ""
+    },
+    "MediaEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "EducationalOccupationalProgram": {
+        "name": "",
+        "about": ""
+    },
+    "SheetMusic": {
+        "name": "",
+        "about": ""
+    },
+    "ReportageNewsArticle": {
+        "name": "",
+        "about": ""
+    },
+    "HinduTemple": {
+        "name": "",
+        "about": ""
+    },
+    "DigitalDocumentPermission": {
+        "name": "",
+        "about": ""
+    },
+    "TheaterGroup": {
+        "name": "",
+        "about": ""
+    },
+    "SuperficialAnatomy": {
+        "name": "",
+        "about": ""
+    },
+    "Course": {
+        "name": "",
+        "about": ""
+    },
+    "EnergyConsumptionDetails": {
+        "name": "",
+        "about": ""
+    },
+    "RadioChannel": {
+        "name": "",
+        "about": ""
+    },
+    "NutritionInformation": {
+        "name": "",
+        "about": ""
+    },
+    "CollectionPage": {
+        "name": "",
+        "about": ""
+    },
+    "HealthTopicContent": {
+        "name": "",
+        "about": ""
+    },
+    "Festival": {
+        "name": "",
+        "about": ""
+    },
+    "InformAction": {
+        "name": "",
+        "about": ""
+    },
+    "OrganizationRole": {
+        "name": "",
+        "about": ""
+    },
+    "DatedMoneySpecification": {
+        "name": "",
+        "about": ""
+    },
+    "Duration": {
+        "name": "",
+        "about": ""
+    },
+    "LikeAction": {
+        "name": "",
+        "about": ""
+    },
+    "ComputerLanguage": {
+        "name": "",
+        "about": ""
+    },
+    "Role": {
+        "name": "",
+        "about": ""
+    },
+    "ShippingConditions": {
+        "name": "",
+        "about": ""
+    },
+    "ExerciseGym": {
+        "name": "",
+        "about": ""
+    },
+    "Airport": {
+        "name": "",
+        "about": ""
+    },
+    "OccupationalTherapy": {
+        "name": "",
+        "about": ""
+    },
+    "ElementarySchool": {
+        "name": "",
+        "about": ""
+    },
+    "QuantitativeValueDistribution": {
+        "name": "",
+        "about": ""
+    },
+    "ExercisePlan": {
+        "name": "",
+        "about": ""
+    },
+    "RentAction": {
+        "name": "",
+        "about": ""
+    },
+    "LoseAction": {
+        "name": "",
+        "about": ""
+    },
+    "TVClip": {
+        "name": "",
+        "about": ""
+    },
+    "BoatTerminal": {
+        "name": "",
+        "about": ""
+    },
+    "RoofingContractor": {
+        "name": "",
+        "about": ""
+    },
+    "LodgingBusiness": {
+        "name": "",
+        "about": ""
+    },
+    "FinancialIncentive": {
+        "name": "",
+        "about": ""
+    },
+    "TransferAction": {
+        "name": "",
+        "about": ""
+    },
+    "CancelAction": {
+        "name": "",
+        "about": ""
+    },
+    "Rating": {
+        "name": "",
+        "about": ""
+    },
+    "BuyAction": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalScholarlyArticle": {
+        "name": "",
+        "about": ""
+    },
+    "CommentAction": {
+        "name": "",
+        "about": ""
+    },
+    "BorrowAction": {
+        "name": "",
+        "about": ""
+    },
+    "ShippingRateSettings": {
+        "name": "",
+        "about": ""
+    },
+    "AggregateRating": {
+        "name": "",
+        "about": ""
+    },
+    "ReturnAction": {
+        "name": "",
+        "about": ""
+    },
+    "School": {
+        "name": "",
+        "about": ""
+    },
+    "WPHeader": {
+        "name": "",
+        "about": ""
+    },
+    "Language": {
+        "name": "",
+        "about": ""
+    },
+    "Researcher": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalSignOrSymptom": {
+        "name": "",
+        "about": ""
+    },
+    "EngineSpecification": {
+        "name": "",
+        "about": ""
+    },
+    "MeasurementMethodEnum": {
+        "name": "",
+        "about": ""
+    },
+    "InternetCafe": {
+        "name": "",
+        "about": ""
+    },
+    "Room": {
+        "name": "",
+        "about": ""
+    },
+    "DrugStrength": {
+        "name": "",
+        "about": ""
+    },
+    "Grant": {
+        "name": "",
+        "about": ""
+    },
+    "FireStation": {
+        "name": "",
+        "about": ""
+    },
+    "Physician": {
+        "name": "",
+        "about": ""
+    },
+    "Residence": {
+        "name": "",
+        "about": ""
+    },
+    "LandmarksOrHistoricalBuildings": {
+        "name": "",
+        "about": ""
+    },
+    "NonprofitType": {
+        "name": "",
+        "about": ""
+    },
+    "EventVenue": {
+        "name": "",
+        "about": ""
+    },
+    "DonateAction": {
+        "name": "",
+        "about": ""
+    },
+    "CreditCard": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalClinic": {
+        "name": "",
+        "about": ""
+    },
+    "OccupationalExperienceRequirements": {
+        "name": "",
+        "about": ""
+    },
+    "CafeOrCoffeeShop": {
+        "name": "",
+        "about": ""
+    },
+    "OfferItemCondition": {
+        "name": "",
+        "about": ""
+    },
+    "GovernmentOffice": {
+        "name": "",
+        "about": ""
+    },
+    "MediaReview": {
+        "name": "",
+        "about": ""
+    },
+    "Schedule": {
+        "name": "",
+        "about": ""
+    },
+    "PublicationEvent": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalTrial": {
+        "name": "",
+        "about": ""
+    },
+    "PresentationDigitalDocument": {
+        "name": "",
+        "about": ""
+    },
+    "RsvpResponseType": {
+        "name": "",
+        "about": ""
+    },
+    "NailSalon": {
+        "name": "",
+        "about": ""
+    },
+    "Flight": {
+        "name": "",
+        "about": ""
+    },
+    "CurrencyConversionService": {
+        "name": "",
+        "about": ""
+    },
+    "UserBlocks": {
+        "name": "",
+        "about": ""
+    },
+    "MerchantReturnPolicySeasonalOverride": {
+        "name": "",
+        "about": ""
+    },
+    "CertificationStatusEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "PreOrderAction": {
+        "name": "",
+        "about": ""
+    },
+    "OfficeEquipmentStore": {
+        "name": "",
+        "about": ""
+    },
+    "Distance": {
+        "name": "",
+        "about": ""
+    },
+    "ArtGallery": {
+        "name": "",
+        "about": ""
+    },
+    "FoodService": {
+        "name": "",
+        "about": ""
+    },
+    "ExhibitionEvent": {
+        "name": "",
+        "about": ""
+    },
+    "Recommendation": {
+        "name": "",
+        "about": ""
+    },
+    "ReplyAction": {
+        "name": "",
+        "about": ""
+    },
+    "GeoCoordinates": {
+        "license": "License B",
+        "name": "",
+        "about": ""
+    },
+    "TakeAction": {
+        "name": "",
+        "about": ""
+    },
+    "Distillery": {
+        "name": "",
+        "about": ""
+    },
+    "TVSeries": {
+        "name": "",
+        "about": ""
+    },
+    "DryCleaningOrLaundry": {
+        "name": "",
+        "about": ""
+    },
+    "SpreadsheetDigitalDocument": {
+        "name": "",
+        "about": ""
+    },
+    "Map": {
+        "name": "",
+        "about": ""
+    },
+    "Hostel": {
+        "name": "",
+        "about": ""
+    },
+    "PriceTypeEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "ActionStatusType": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalGuidelineContraindication": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalContraindication": {
+        "name": "",
+        "about": ""
+    },
+    "Conversation": {
+        "name": "",
+        "about": ""
+    },
+    "WholesaleStore": {
+        "name": "",
+        "about": ""
+    },
+    "QAPage": {
+        "name": "",
+        "about": ""
+    },
+    "RejectAction": {
+        "name": "",
+        "about": ""
+    },
+    "Energy": {
+        "name": "",
+        "about": ""
+    },
+    "TaxiService": {
+        "name": "",
+        "about": ""
+    },
+    "LakeBodyOfWater": {
+        "name": "",
+        "about": ""
+    },
+    "PublicationIssue": {
+        "name": "",
+        "about": ""
+    },
+    "DislikeAction": {
+        "name": "",
+        "about": ""
+    },
+    "GiveAction": {
+        "name": "",
+        "about": ""
+    },
+    "EnergyStarEnergyEfficiencyEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "ImageObject": {
+        "name": "",
+        "about": ""
+    },
+    "Dataset": {
+        "name": "",
+        "about": ""
+    },
+    "HealthPlanNetwork": {
+        "name": "",
+        "about": ""
+    },
+    "ExerciseAction": {
+        "name": "",
+        "about": ""
+    },
+    "MensClothingStore": {
+        "name": "",
+        "about": ""
+    },
+    "CreativeWorkSeries": {
+        "name": "",
+        "about": ""
+    },
+    "CheckOutAction": {
+        "name": "",
+        "about": ""
+    },
+    "InsertAction": {
+        "name": "",
+        "about": ""
+    },
+    "OfferForLease": {
+        "name": "",
+        "about": ""
+    },
+    "Accommodation": {
+        "name": "",
+        "about": ""
+    },
+    "Church": {
+        "name": "",
+        "about": ""
+    },
+    "CriticReview": {
+        "name": "",
+        "about": ""
+    },
+    "XPathType": {
+        "name": "",
+        "about": ""
+    },
+    "VitalSign": {
+        "name": "",
+        "about": ""
+    },
+    "WearableSizeSystemEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "ChemicalSubstance": {
+        "name": "",
+        "about": ""
+    },
+    "SiteNavigationElement": {
+        "name": "",
+        "about": ""
+    },
+    "ReviewNewsArticle": {
+        "name": "",
+        "about": ""
+    },
+    "Reservation": {
+        "name": "",
+        "about": ""
+    },
+    "GeoCircle": {
+        "name": "",
+        "about": ""
+    },
+    "Courthouse": {
+        "name": "",
+        "about": ""
+    },
+    "SocialMediaPosting": {
+        "name": "",
+        "about": ""
+    },
+    "ReturnFeesEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "LocalBusiness": {
+        "name": "",
+        "about": ""
+    },
+    "DiscoverAction": {
+        "name": "",
+        "about": ""
+    },
+    "PriceSpecification": {
+        "name": "",
+        "about": ""
+    },
+    "City": {
+        "name": "",
+        "about": ""
+    },
+    "MediaGallery": {
+        "name": "",
+        "about": ""
+    },
+    "ComicCoverArt": {
+        "name": "",
+        "about": ""
+    },
+    "Certification": {
+        "name": "",
+        "about": ""
+    },
+    "CoverArt": {
+        "name": "",
+        "about": ""
+    },
+    "WearableMeasurementTypeEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "ReviewAction": {
+        "name": "",
+        "about": ""
+    },
+    "HealthClub": {
+        "name": "",
+        "about": ""
+    },
+    "NGO": {
+        "name": "",
+        "about": ""
+    },
+    "Collection": {
+        "name": "",
+        "about": ""
+    },
+    "AskAction": {
+        "name": "",
+        "about": ""
+    },
+    "Notary": {
+        "name": "",
+        "about": ""
+    },
+    "RadioEpisode": {
+        "name": "",
+        "about": ""
+    },
+    "Hotel": {
+        "name": "",
+        "about": ""
+    },
+    "MusicAlbum": {
+        "name": "",
+        "about": ""
+    },
+    "TextDigitalDocument": {
+        "name": "",
+        "about": ""
+    },
+    "SportsTeam": {
+        "name": "",
+        "about": ""
+    },
+    "OnlineBusiness": {
+        "name": "",
+        "about": ""
+    },
+    "SatiricalArticle": {
+        "name": "",
+        "about": ""
+    },
+    "Comment": {
+        "name": "",
+        "about": ""
+    },
+    "JoinAction": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalRiskCalculator": {
+        "name": "",
+        "about": ""
+    },
+    "Cooperative": {
+        "name": "",
+        "about": ""
+    },
+    "IPTCDigitalSourceEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "PronounceableText": {
+        "name": "",
+        "about": ""
+    },
+    "CheckoutPage": {
+        "name": "",
+        "about": ""
+    },
+    "NoteDigitalDocument": {
+        "name": "",
+        "about": ""
+    },
+    "Painting": {
+        "name": "",
+        "about": ""
+    },
+    "CommunicateAction": {
+        "name": "",
+        "about": ""
+    },
+    "TouristDestination": {
+        "name": "",
+        "about": ""
+    },
+    "RecommendedDoseSchedule": {
+        "name": "",
+        "about": ""
+    },
+    "MedicineSystem": {
+        "name": "",
+        "about": ""
+    },
+    "ProductGroup": {
+        "name": "",
+        "about": ""
+    },
+    "HowToItem": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalStudyStatus": {
+        "name": "",
+        "about": ""
+    },
+    "BloodTest": {
+        "name": "",
+        "about": ""
+    },
+    "ShoeStore": {
+        "name": "",
+        "about": ""
+    },
+    "WantAction": {
+        "name": "",
+        "about": ""
+    },
+    "IncentiveStatus": {
+        "name": "",
+        "about": ""
+    },
+    "MonetaryGrant": {
+        "name": "",
+        "about": ""
+    },
+    "PaymentStatusType": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalStudy": {
+        "name": "",
+        "about": ""
+    },
+    "GovernmentBuilding": {
+        "name": "",
+        "about": ""
+    },
+    "HairSalon": {
+        "name": "",
+        "about": ""
+    },
+    "SpeakableSpecification": {
+        "name": "",
+        "about": ""
+    },
+    "LibrarySystem": {
+        "name": "",
+        "about": ""
+    },
+    "CableOrSatelliteService": {
+        "name": "",
+        "about": ""
+    },
+    "ResearchOrganization": {
+        "name": "",
+        "about": ""
+    },
+    "VoteAction": {
+        "name": "",
+        "about": ""
+    },
+    "MusicRecording": {
+        "name": "",
+        "about": ""
+    },
+    "TreatmentIndication": {
+        "name": "",
+        "about": ""
+    },
+    "MobilePhoneStore": {
+        "name": "",
+        "about": ""
+    },
+    "PostalAddress": {
+        "name": "",
+        "about": ""
+    },
+    "Float": {
+        "name": "",
+        "about": ""
+    },
+    "Landform": {
+        "name": "",
+        "about": ""
+    },
+    "UseAction": {
+        "name": "",
+        "about": ""
+    },
+    "LendAction": {
+        "name": "",
+        "about": ""
+    },
+    "OfferForPurchase": {
+        "name": "",
+        "about": ""
+    },
+    "AutomotiveBusiness": {
+        "name": "",
+        "about": ""
+    },
+    "MusicPlaylist": {
+        "name": "",
+        "about": ""
+    },
+    "ConfirmAction": {
+        "name": "",
+        "about": ""
+    },
+    "ProgramMembership": {
+        "name": "",
+        "about": ""
+    },
+    "SeaBodyOfWater": {
+        "name": "",
+        "about": ""
+    },
+    "Attorney": {
+        "name": "",
+        "about": ""
+    },
+    "PhysicalTherapy": {
+        "name": "",
+        "about": ""
+    },
+    "DefinedTermSet": {
+        "name": "",
+        "about": ""
+    },
+    "Winery": {
+        "name": "",
+        "about": ""
+    },
+    "ProfilePage": {
+        "name": "",
+        "about": ""
+    },
+    "CatholicChurch": {
+        "name": "",
+        "about": ""
+    },
+    "AutoPartsStore": {
+        "name": "",
+        "about": ""
+    },
+    "PhysiciansOffice": {
+        "name": "",
+        "about": ""
+    },
+    "GolfCourse": {
+        "name": "",
+        "about": ""
+    },
+    "MolecularEntity": {
+        "name": "",
+        "about": ""
+    },
+    "BoatReservation": {
+        "name": "",
+        "about": ""
+    },
+    "Quiz": {
+        "name": "",
+        "about": ""
+    },
+    "BoatTrip": {
+        "name": "",
+        "about": ""
+    },
+    "AnatomicalSystem": {
+        "name": "",
+        "about": ""
+    },
+    "Question": {
+        "name": "",
+        "about": ""
+    },
+    "TVEpisode": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalWebPage": {
+        "name": "",
+        "about": ""
+    },
+    "IgnoreAction": {
+        "name": "",
+        "about": ""
+    },
+    "MeasurementTypeEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "UpdateAction": {
+        "name": "",
+        "about": ""
+    },
+    "ItemPage": {
+        "name": "",
+        "about": ""
+    },
+    "ProfessionalService": {
+        "name": "",
+        "about": ""
+    },
+    "WorkersUnion": {
+        "name": "",
+        "about": ""
+    },
+    "BusinessFunction": {
+        "name": "",
+        "about": ""
+    },
+    "Permit": {
+        "name": "",
+        "about": ""
+    },
+    "GovernmentBenefitsType": {
+        "name": "",
+        "about": ""
+    },
+    "Event": {
+        "name": "",
+        "about": ""
+    },
+    "DiagnosticLab": {
+        "name": "",
+        "about": ""
+    },
+    "BrainStructure": {
+        "name": "",
+        "about": ""
+    },
+    "BodyMeasurementTypeEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "GeoShape": {
+        "name": "",
+        "about": ""
+    },
+    "ShortStory": {
+        "name": "",
+        "about": ""
+    },
+    "BrokerageAccount": {
+        "name": "",
+        "about": ""
+    },
+    "GardenStore": {
+        "name": "",
+        "about": ""
+    },
+    "GeospatialGeometry": {
+        "name": "",
+        "about": ""
+    },
+    "TVSeason": {
+        "name": "",
+        "about": ""
+    },
+    "GameServer": {
+        "name": "",
+        "about": ""
+    },
+    "InfectiousAgentClass": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalCause": {
+        "name": "",
+        "about": ""
+    },
+    "TaxiStand": {
+        "name": "",
+        "about": ""
+    },
+    "Brewery": {
+        "name": "",
+        "about": ""
+    },
+    "APIReference": {
+        "name": "",
+        "about": ""
+    },
+    "PaymentMethodType": {
+        "name": "",
+        "about": ""
+    },
+    "OceanBodyOfWater": {
+        "name": "",
+        "about": ""
+    },
+    "Legislation": {
+        "name": "",
+        "about": ""
+    },
+    "AutoRental": {
+        "name": "",
+        "about": ""
+    },
+    "Specialty": {
+        "name": "",
+        "about": ""
+    },
+    "AgreeAction": {
+        "name": "",
+        "about": ""
+    },
+    "Offer": {
+        "name": "",
+        "about": ""
+    },
+    "SubwayStation": {
+        "name": "",
+        "about": ""
+    },
+    "MotorizedBicycle": {
+        "name": "",
+        "about": ""
+    },
+    "ToyStore": {
+        "name": "",
+        "about": ""
+    },
+    "LegalValueLevel": {
+        "name": "",
+        "about": ""
+    },
+    "SuspendAction": {
+        "name": "",
+        "about": ""
+    },
+    "Drawing": {
+        "name": "",
+        "about": ""
+    },
+    "GeneralContractor": {
+        "name": "",
+        "about": ""
+    },
+    "Action": {
+        "name": "",
+        "about": ""
+    },
+    "Guide": {
+        "name": "",
+        "about": ""
+    },
+    "DrugCostCategory": {
+        "name": "",
+        "about": ""
+    },
+    "Dentist": {
+        "name": "",
+        "about": ""
+    },
+    "DataFeedItem": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalGuidelineRecommendation": {
+        "name": "",
+        "about": ""
+    },
+    "Vessel": {
+        "name": "",
+        "about": ""
+    },
+    "StatisticalPopulation": {
+        "name": "",
+        "about": ""
+    },
+    "DigitalPlatformEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "HousePainter": {
+        "name": "",
+        "about": ""
+    },
+    "PsychologicalTreatment": {
+        "name": "",
+        "about": ""
+    },
+    "ReadAction": {
+        "name": "",
+        "about": ""
+    },
+    "RepaymentSpecification": {
+        "name": "",
+        "about": ""
+    },
+    "HowTo": {
+        "name": "",
+        "about": ""
+    },
+    "UserComments": {
+        "name": "",
+        "about": ""
+    },
+    "WPFooter": {
+        "name": "",
+        "about": ""
+    },
+    "Patient": {
+        "name": "",
+        "about": ""
+    },
+    "MenuItem": {
+        "name": "",
+        "about": ""
+    },
+    "AnalysisNewsArticle": {
+        "name": "",
+        "about": ""
+    },
+    "Playground": {
+        "name": "",
+        "about": ""
+    },
+    "Integer": {
+        "name": "",
+        "about": ""
+    },
+    "Answer": {
+        "name": "",
+        "about": ""
+    },
+    "HighSchool": {
+        "name": "",
+        "about": ""
+    },
+    "BroadcastChannel": {
+        "name": "",
+        "about": ""
+    },
+    "PublicToilet": {
+        "name": "",
+        "about": ""
+    },
+    "MovieTheater": {
+        "name": "",
+        "about": ""
+    },
+    "Bone": {
+        "name": "",
+        "about": ""
+    },
+    "DataFeed": {
+        "name": "",
+        "about": ""
+    },
+    "PodcastSeries": {
+        "name": "",
+        "about": ""
+    },
+    "CategoryCode": {
+        "name": "",
+        "about": ""
+    },
+    "IndividualPhysician": {
+        "name": "",
+        "about": ""
+    },
+    "ComedyClub": {
+        "name": "",
+        "about": ""
+    },
+    "WinAction": {
+        "name": "",
+        "about": ""
+    },
+    "SizeSystemEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "Gene": {
+        "name": "",
+        "about": ""
+    },
+    "EmployerReview": {
+        "name": "",
+        "about": ""
+    },
+    "Book": {
+        "name": "",
+        "about": ""
+    },
+    "TravelAction": {
+        "name": "",
+        "about": ""
+    },
+    "PlayAction": {
+        "name": "",
+        "about": ""
+    },
+    "AssignAction": {
+        "name": "",
+        "about": ""
+    },
+    "RentalCarReservation": {
+        "name": "",
+        "about": ""
+    },
+    "OpeningHoursSpecification": {
+        "name": "",
+        "about": ""
+    },
+    "ConvenienceStore": {
+        "name": "",
+        "about": ""
+    },
+    "FinancialService": {
+        "name": "",
+        "about": ""
+    },
+    "Florist": {
+        "name": "",
+        "about": ""
+    },
+    "LegalService": {
+        "name": "",
+        "about": ""
+    },
+    "HealthAndBeautyBusiness": {
+        "name": "",
+        "about": ""
+    },
+    "Pharmacy": {
+        "name": "",
+        "about": ""
+    },
+    "Barcode": {
+        "name": "",
+        "about": ""
+    },
+    "BackgroundNewsArticle": {
+        "name": "",
+        "about": ""
+    },
+    "Syllabus": {
+        "name": "",
+        "about": ""
+    },
+    "MiddleSchool": {
+        "name": "",
+        "about": ""
+    },
+    "SearchAction": {
+        "name": "",
+        "about": ""
+    },
+    "DanceEvent": {
+        "name": "",
+        "about": ""
+    },
+    "Clip": {
+        "name": "",
+        "about": ""
+    },
+    "CarUsageType": {
+        "name": "",
+        "about": ""
+    },
+    "Optician": {
+        "name": "",
+        "about": ""
+    },
+    "MeetingRoom": {
+        "name": "",
+        "about": ""
+    },
+    "ShippingService": {
+        "name": "",
+        "about": ""
+    },
+    "WebApplication": {
+        "name": "",
+        "about": ""
+    },
+    "DrugLegalStatus": {
+        "name": "",
+        "about": ""
+    },
+    "Table": {
+        "name": "",
+        "about": ""
+    },
+    "ReceiveAction": {
+        "name": "",
+        "about": ""
+    },
+    "AudioObject": {
+        "name": "",
+        "about": ""
+    },
+    "PerformAction": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "DigitalDocument": {
+        "name": "",
+        "about": ""
+    },
+    "GenderType": {
+        "name": "",
+        "about": ""
+    },
+    "SearchResultsPage": {
+        "name": "",
+        "about": ""
+    },
+    "Play": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalOrganization": {
+        "name": "",
+        "about": ""
+    },
+    "OrderItem": {
+        "name": "",
+        "about": ""
+    },
+    "ContactPage": {
+        "name": "",
+        "about": ""
+    },
+    "Photograph": {
+        "name": "",
+        "about": ""
+    },
+    "AmusementPark": {
+        "name": "",
+        "about": ""
+    },
+    "SingleFamilyResidence": {
+        "name": "",
+        "about": ""
+    },
+    "ReserveAction": {
+        "name": "",
+        "about": ""
+    },
+    "ApprovedIndication": {
+        "name": "",
+        "about": ""
+    },
+    "Mosque": {
+        "name": "",
+        "about": ""
+    },
+    "USNonprofitType": {
+        "name": "",
+        "about": ""
+    },
+    "ParkingFacility": {
+        "name": "",
+        "about": ""
+    },
+    "BusinessAudience": {
+        "name": "",
+        "about": ""
+    },
+    "PriceComponentTypeEnumeration": {
+        "name": "",
+        "about": ""
+    },
+    "HyperTocEntry": {
+        "name": "",
+        "about": ""
+    },
+    "DigitalDocumentPermissionType": {
+        "name": "",
+        "about": ""
+    },
+    "MoneyTransfer": {
+        "name": "",
+        "about": ""
+    },
+    "ChildCare": {
+        "name": "",
+        "about": ""
+    },
+    "ScheduleAction": {
+        "name": "",
+        "about": ""
+    },
+    "LegislativeBuilding": {
+        "name": "",
+        "about": ""
+    },
+    "MediaReviewItem": {
+        "name": "",
+        "about": ""
+    },
+    "Muscle": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalAudienceType": {
+        "name": "",
+        "about": ""
+    },
+    "Demand": {
+        "name": "",
+        "about": ""
+    },
+    "Atlas": {
+        "name": "",
+        "about": ""
+    },
+    "EmailMessage": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalRiskScore": {
+        "name": "",
+        "about": ""
+    },
+    "SearchRescueOrganization": {
+        "name": "",
+        "about": ""
+    },
+    "TelevisionStation": {
+        "name": "",
+        "about": ""
+    },
+    "AmpStory": {
+        "name": "",
+        "about": ""
+    },
+    "ApplyAction": {
+        "name": "",
+        "about": ""
+    },
+    "MusicVideoObject": {
+        "name": "",
+        "about": ""
+    },
+    "Protein": {
+        "name": "",
+        "about": ""
+    },
+    "TextObject": {
+        "name": "",
+        "about": ""
+    },
+    "BefriendAction": {
+        "name": "",
+        "about": ""
+    },
+    "Car": {
+        "name": "",
+        "about": ""
+    },
+    "DisagreeAction": {
+        "name": "",
+        "about": ""
+    },
+    "Poster": {
+        "name": "",
+        "about": ""
+    },
+    "Crematorium": {
+        "name": "",
+        "about": ""
+    },
+    "Zoo": {
+        "name": "",
+        "about": ""
+    },
+    "LegislationObject": {
+        "name": "",
+        "about": ""
+    },
+    "Resort": {
+        "name": "",
+        "about": ""
+    },
+    "LifestyleModification": {
+        "name": "",
+        "about": ""
+    },
+    "RadioBroadcastService": {
+        "name": "",
+        "about": ""
+    },
+    "HobbyShop": {
+        "name": "",
+        "about": ""
+    },
+    "LegalForceStatus": {
+        "name": "",
+        "about": ""
+    },
+    "TherapeuticProcedure": {
+        "name": "",
+        "about": ""
+    },
+    "EntertainmentBusiness": {
+        "name": "",
+        "about": ""
+    },
+    "StadiumOrArena": {
+        "name": "",
+        "about": ""
+    },
+    "BusTrip": {
+        "name": "",
+        "about": ""
+    },
+    "CreateAction": {
+        "name": "",
+        "about": ""
+    },
+    "ArriveAction": {
+        "name": "",
+        "about": ""
+    },
+    "IncentiveQualifiedExpenseType": {
+        "name": "",
+        "about": ""
+    },
+    "Preschool": {
+        "name": "",
+        "about": ""
+    },
+    "Quantity": {
+        "name": "",
+        "about": ""
+    },
+    "Service": {
+        "name": "",
+        "about": ""
+    },
+    "PrependAction": {
+        "name": "",
+        "about": ""
+    },
+    "OfferCatalog": {
+        "name": "",
+        "about": ""
+    },
+    "QuantitativeValue": {
+        "name": "",
+        "about": ""
+    },
+    "SelfStorage": {
+        "name": "",
+        "about": ""
+    },
+    "SchoolDistrict": {
+        "name": "",
+        "about": ""
+    },
+    "TouristTrip": {
+        "name": "",
+        "about": ""
+    },
+    "Casino": {
+        "name": "",
+        "about": ""
+    },
+    "AchieveAction": {
+        "name": "",
+        "about": ""
+    },
+    "MedicalRiskFactor": {
+        "name": "",
+        "about": ""
+    },
+    "SportsActivityLocation": {
+        "name": "",
+        "about": ""
+    },
+    "SeekToAction": {
+        "name": "",
+        "about": ""
+    },
+    "DeliveryChargeSpecification": {
+        "name": "",
+        "about": ""
+    }
+}

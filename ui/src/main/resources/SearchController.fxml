@@ -16,7 +16,7 @@
             <children>
                 <Label text="Search Text:"/>
                 <TextField fx:id="searchField"/>
-                <Button fx:id="searchButton"/>
+                <Button fx:id="searchButton" />
             </children>
         </HBox>
 
