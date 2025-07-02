@@ -8,10 +8,13 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 
 import jakarta.json.Json;
@@ -22,11 +25,6 @@ import jakarta.json.JsonReader;
 import jakarta.json.JsonValue;
 import jakarta.json.JsonWriter;
 import jakarta.json.stream.JsonGenerator;
-
-// CreativeWorkEditor.java
-// JavaFX application that downloads schema.org JSON-LD, parses it using jakarta.json,
-// maps properties to classes using domainIncludes, and builds a UI with tabs for each class.
-
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -45,24 +43,25 @@ public class CreativeWorkEditor extends Application {
     private final Map<String, Map<String, Control>> classFields = new HashMap<>();
     private final Map<String, List<String>> classProperties = new HashMap<>();
     private final Map<String, String> propertyRanges = new HashMap<>();
+    private final Map<String, List<String>> subclassMap = new HashMap<>();
+    private final Set<String> targetClasses = new HashSet<>();
 
     @Override
-    public void start(Stage primaryStage) {
-        primaryStage.setTitle("Schema.org Editor");
+    public void start(Stage primaryStage) throws Exception {
+        String rootClass = "schema:MediaObject";
+
+        JsonArray graph = loadSchemaGraph();
+        buildSubclassMap(graph);
+        findAllSubclasses(rootClass);
+        mapPropertiesToClasses(graph);
 
         TabPane tabPane = new TabPane();
-
-        try {
-            JsonArray graph = loadSchemaGraph();
-            extractClassPropertyMappings(graph);
-            for (String className : classProperties.keySet()) {
-                Tab tab = new Tab(className);
-                GridPane grid = createClassForm(className);
-                tab.setContent(grid);
-                tabPane.getTabs().add(tab);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+        for (String className : targetClasses) {
+            String label = className.replace("schema:", "");
+            Tab tab = new Tab(label);
+            GridPane grid = createFormForClass(label);
+            tab.setContent(grid);
+            tabPane.getTabs().add(tab);
         }
 
         Button saveButton = new Button("Save");
@@ -71,6 +70,7 @@ public class CreativeWorkEditor extends Application {
         VBox root = new VBox(tabPane, saveButton);
         Scene scene = new Scene(root, 600, 400);
         primaryStage.setScene(scene);
+        primaryStage.setTitle("MediaObject Editor");
         primaryStage.show();
     }
 
@@ -86,38 +86,20 @@ public class CreativeWorkEditor extends Application {
         }
     }
 
-    private void extractClassPropertyMappings(JsonArray graph) {
-        Set<String> classNames = new HashSet<>();
-
-        for (JsonValue item : graph) {
-            JsonObject obj = item.asJsonObject();
-            String id = obj.getString("@id", "");
-            if (obj.containsKey("@type") && obj.get("@type").toString().contains("rdfs:Class")) {
-                String className = id.replace("schema:", "");
-                classNames.add(className);
-                classProperties.putIfAbsent(className, new ArrayList<>());
-            }
-        }
-
-        for (JsonValue item : graph) {
-            JsonObject obj = item.asJsonObject();
-            String id = obj.getString("@id", "");
-            if (obj.containsKey("@type") && obj.get("@type").toString().contains("rdf:Property")) {
-                String propName = id.replace("schema:", "");
-                JsonArray domains = obj.getJsonArray("http://schema.org/domainIncludes");
-                JsonArray ranges = obj.getJsonArray("http://schema.org/rangeIncludes");
-                String rangeType = "Text";
-                if (ranges != null && !ranges.isEmpty()) {
-                    JsonObject rangeObj = ranges.get(0).asJsonObject();
-                    rangeType = rangeObj.getString("@id", "Text").replace("schema:", "");
-                }
-                propertyRanges.put(propName, rangeType);
-                if (domains != null) {
-                    for (JsonValue domain : domains) {
-                        JsonObject domainObj = domain.asJsonObject();
-                        String className = domainObj.getString("@id", "").replace("schema:", "");
-                        if (classNames.contains(className)) {
-                            classProperties.computeIfAbsent(className, k -> new ArrayList<>()).add(propName);
+    private void buildSubclassMap(JsonArray graph) {
+        for (JsonValue val : graph) {
+            JsonObject obj = val.asJsonObject();
+            if ("rdfs:Class".equals(obj.getString("@type", ""))) {
+                String id = obj.getString("@id", "");
+                JsonValue sub = obj.get("rdfs:subClassOf");
+                if (sub != null) {
+                    if (sub.getValueType() == JsonValue.ValueType.OBJECT) {
+                        String parent = sub.asJsonObject().getString("@id", "");
+                        subclassMap.computeIfAbsent(parent, k -> new ArrayList<>()).add(id);
+                    } else if (sub.getValueType() == JsonValue.ValueType.ARRAY) {
+                        for (JsonValue v : sub.asJsonArray()) {
+                            String parent = v.asJsonObject().getString("@id", "");
+                            subclassMap.computeIfAbsent(parent, k -> new ArrayList<>()).add(id);
                         }
                     }
                 }
@@ -125,30 +107,77 @@ public class CreativeWorkEditor extends Application {
         }
     }
 
-    private GridPane createClassForm(String className) {
+    private void findAllSubclasses(String root) {
+        Queue<String> queue = new LinkedList<>();
+        queue.add(root);
+        while (!queue.isEmpty()) {
+            String current = queue.poll();
+            if (targetClasses.add(current)) {
+                List<String> children = subclassMap.getOrDefault(current, Collections.emptyList());
+                queue.addAll(children);
+            }
+        }
+    }
+
+    private void mapPropertiesToClasses(JsonArray graph) {
+        for (JsonValue val : graph) {
+            JsonObject obj = val.asJsonObject();
+            if ("rdf:Property".equals(obj.getString("@type", ""))) {
+                String propId = obj.getString("@id", "");
+                JsonValue domain = obj.get("http://schema.org/domainIncludes");
+                if (domain != null) {
+                    List<String> domains = new ArrayList<>();
+                    if (domain.getValueType() == JsonValue.ValueType.ARRAY) {
+                        for (JsonValue d : domain.asJsonArray()) {
+                            domains.add(d.asJsonObject().getString("@id", ""));
+                        }
+                    } else {
+                        domains.add(domain.asJsonObject().getString("@id", ""));
+                    }
+                    for (String cls : domains) {
+                        if (targetClasses.contains(cls)) {
+                            classProperties.computeIfAbsent(cls, k -> new ArrayList<>()).add(propId);
+                        }
+                    }
+                }
+                JsonValue range = obj.get("http://schema.org/rangeIncludes");
+                if (range != null) {
+                    if (range.getValueType() == JsonValue.ValueType.ARRAY) {
+                        JsonValue first = range.asJsonArray().get(0);
+                        propertyRanges.put(propId, first.asJsonObject().getString("@id", ""));
+                    } else {
+                        propertyRanges.put(propId, range.asJsonObject().getString("@id", ""));
+                    }
+                }
+            }
+        }
+    }
+
+    private GridPane createFormForClass(String className) {
         GridPane grid = new GridPane();
-        grid.setVgap(8);
+        grid.setVgap(10);
         grid.setHgap(10);
+        String fullClass = "schema:" + className;
+        List<String> props = classProperties.getOrDefault(fullClass, Collections.emptyList());
         Map<String, Control> fields = new HashMap<>();
-        List<String> props = classProperties.getOrDefault(className, new ArrayList<>());
         int row = 0;
         for (String prop : props) {
-            Label label = new Label(prop + ":");
-            String range = propertyRanges.getOrDefault(prop, "Text");
-            if (range.equals("Text")) {
+            String label = prop.replace("schema:", "");
+            Label lbl = new Label(label + ":");
+            String range = propertyRanges.getOrDefault(prop, "schema:Text");
+            if ("schema:Text".equals(range)) {
                 TextField tf = new TextField();
-                grid.add(label, 0, row);
+                grid.add(lbl, 0, row);
                 grid.add(tf, 1, row);
-                fields.put(prop, tf);
+                fields.put(label, tf);
             } else {
                 ComboBox<String> cb = new ComboBox<>();
-                cb.getItems().addAll("Entity1", "Entity2", "Entity3");
-                Button addBtn = new Button("+");
-                addBtn.setOnAction(e -> System.out.println("Add new " + range));
-                grid.add(label, 0, row);
+                cb.getItems().addAll("Entity1", "Entity2");
+                Button plus = new Button("+");
+                grid.add(lbl, 0, row);
                 grid.add(cb, 1, row);
-                grid.add(addBtn, 2, row);
-                fields.put(prop, cb);
+                grid.add(plus, 2, row);
+                fields.put(label, cb);
             }
             row++;
         }
@@ -157,28 +186,25 @@ public class CreativeWorkEditor extends Application {
     }
 
     private void saveToJsonLd() {
-        JsonObjectBuilder rootBuilder = Json.createObjectBuilder();
-        rootBuilder.add("@context", "https://schema.org");
-        for (String className : classFields.keySet()) {
-            JsonObjectBuilder classBuilder = Json.createObjectBuilder();
-            Map<String, Control> fields = classFields.get(className);
-            for (String prop : fields.keySet()) {
-                Control ctrl = fields.get(prop);
+        JsonObjectBuilder root = Json.createObjectBuilder();
+        root.add("@context", "https://schema.org");
+        for (Map.Entry<String, Map<String, Control>> entry : classFields.entrySet()) {
+            String className = entry.getKey();
+            JsonObjectBuilder obj = Json.createObjectBuilder();
+            for (Map.Entry<String, Control> field : entry.getValue().entrySet()) {
+                String key = field.getKey();
+                Control ctrl = field.getValue();
                 if (ctrl instanceof TextField tf) {
-                    classBuilder.add(prop, tf.getText());
-                } else if (ctrl instanceof ComboBox<?> cb) {
-                    Object val = cb.getValue();
-                    if (val != null) {
-                        classBuilder.add(prop, val.toString());
-                    }
+                    obj.add(key, tf.getText());
+                } else if (ctrl instanceof ComboBox<?> cb && cb.getValue() != null) {
+                    obj.add(key, cb.getValue().toString());
                 }
             }
-            rootBuilder.add(className, classBuilder);
+            root.add(className, obj);
         }
-        JsonObject jsonLd = rootBuilder.build();
         try (FileWriter fw = new FileWriter("creativework.jsonld");
              JsonWriter writer = Json.createWriterFactory(Map.of(JsonGenerator.PRETTY_PRINTING, true)).createWriter(fw)) {
-            writer.writeObject(jsonLd);
+            writer.writeObject(root.build());
             System.out.println("Saved to creativework.jsonld");
         } catch (Exception e) {
             e.printStackTrace();
