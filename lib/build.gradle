@@ -7,36 +7,81 @@
  */
 
 plugins {
+	  id 'application'
+	
     // Apply the java-library plugin for API and implementation separation.
-    id 'java-library'
-    id 'org.gradlex.extra-java-module-info' version "1.4"
+//    id 'java-library'
+   // id 'org.gradlex.extra-java-module-info' version "1.13"
 }
 
 repositories {
     jcenter()
 }
 
+/*
+
 extraJavaModuleInfo {
-    failOnMissingModuleInfo.set(false)
+	
+	module('com.apicatalog:titanium-json-ld', 'com.apicatalog.jsonld') {
+		exports("com.apicatalog.jsonld")
+		exports("com.apicatalog.jsonld.api")
+		exports("com.apicatalog.jsonld.document")
+		exports("com.apicatalog.jsonld.lang")
+		exports("com.apicatalog.jsonld.processor")
+	}
+
+	module('com.apicatalog:titanium-jcs', 'com.apicatalog.jcs') {
+		exports("com.apicatalog.jcs")
+	}
+	module('com.apicatalog:titanium-rdf-n-quads', 'com.apicatalog.rdf.nquads') {
+		exports("com.apicatalog.rdf.nquads")
+	}
+	module('com.apicatalog:titanium-rdf-api', 'com.apicatalog.rdf.api') {
+		exports("com.apicatalog.rdf.api")
+	}
+	module('com.github.andrewoma.dexx:collection', 'com.github.andrewoma.dexx.collection') { 
+		exports("com.github.andrewoma.dexx.collection")
+	}
+
+
+ 
     //automaticModule(, "com.fasterxml.jackson.databind")
-    module('edu.kit.datamanager:ro-crate-java', 'edu.kit.datamanager.ro_crate') {
+
+    // FIXME: This does not seem to work
+//    automaticModule("com.apicatalog:titanium-json-ld", "titanium.json.ld")
+
+//    module('edu.kit.datamanager:ro-crate-java', 'edu.kit.datamanager.ro_crate') {
 //        exports("edu.kit.datamanager.ro_crate")
-//      exports("edu.kit.datamanager.ro_crate.writer")
-        requires("com.fasterxml.jackson.core")
-        requires("com.fasterxml.jackson.databind")
-        requires("com.fasterxml.jackson.annotations")
-        exportAllPackages();
-    }
-
-
+//        exports("edu.kit.datamanager.ro_crate.writer")
+//        requires("com.fasterxml.jackson.core")
+//        requires("com.fasterxml.jackson.databind")
+//        requires("com.fasterxml.jackson.annotations")
+//        exportAllPackages();
+//    }
 }
+*/
 
 dependencies {
 
-    implementation 'edu.kit.datamanager:ro-crate-java:1.1.0'
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+	// TODO: Update dependency
+    //implementation 'edu.kit.datamanager:ro-crate-java:2.0.2'
+  //  implementation 'edu.kit.datamanager:ro-crate-java:1.1.0'
+    
+//    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+	
+	implementation("com.apicatalog:titanium-json-ld:1.6.0")
+	//implementation("org.glassfish:jakarta.json:2.0.1")
 
+	implementation 'org.apache.commons:commons-rdf-api:0.5.0'
+	//implementation 'org.apache.commons:commons-jsonld-java:0.5.0'
+	implementation 'org.apache.jena:jena-commonsrdf:5.5.0'
+	
     // Use JUnit test framework.
     testImplementation 'junit:junit:4.13'
 
+}
+
+application { 
+  mainClassName = 'no.s11.wpsld.soss.SchemaFromJsonLd' // 'no.s11.wpsld.ui.HelloFX'
+//  mainModule = 'no.s11.wpsld'
 }

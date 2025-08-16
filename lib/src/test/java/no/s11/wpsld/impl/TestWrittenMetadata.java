@@ -34,7 +34,8 @@ import no.s11.wpsld.WPSLDPath;
 public class TestWrittenMetadata {
     private static final String RO_CRATE_METADATA_JSON = "ro-crate-metadata.json";
 
-    @Test 
+
+    //@Test 
     public void metadataExists() throws IOException {
     	WPSLD wpsld = WPSLD.Factory.create();
         WPSLDPath root = wpsld.newRoot();

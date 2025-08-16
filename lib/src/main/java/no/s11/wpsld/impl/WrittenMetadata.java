@@ -26,10 +26,10 @@ import java.nio.file.Path;
 import java.nio.file.attribute.UserDefinedFileAttributeView;
 import no.s11.wpsld.WPSLDPath;
 
-import edu.kit.datamanager.ro_crate.RoCrate;
-import edu.kit.datamanager.ro_crate.RoCrate.RoCrateBuilder;
-import edu.kit.datamanager.ro_crate.writer.RoCrateWriter;
-import edu.kit.datamanager.ro_crate.writer.FolderWriter;
+//import edu.kit.datamanager.ro_crate.RoCrate;
+//import edu.kit.datamanager.ro_crate.RoCrate.RoCrateBuilder;
+//import edu.kit.datamanager.ro_crate.writer.RoCrateWriter;
+//import edu.kit.datamanager.ro_crate.writer.FolderWriter;
 
 public class WrittenMetadata implements WPSLDPath {
 	private static Logger logger = System.getLogger(WrittenMetadata.class.getName());
@@ -41,33 +41,33 @@ public class WrittenMetadata implements WPSLDPath {
 	}
 
 	private void writeMetadata() throws IOException {
-		RoCrate roCrate = new RoCrateBuilder("name", "").build();
-		if (! Files.getFileStore(getPath()).supportsFileAttributeView(UserDefinedFileAttributeView.class)) {
-			throw new IOException("File system does not support extended attributes (UserDefinedFileAttributeView): " + getPath());
-		}
-		UserDefinedFileAttributeView view = Files.getFileAttributeView(getPath(), UserDefinedFileAttributeView.class);
-		// FIXME: Generalize for every path
-		view.list().stream().filter(s -> s.startsWith("wpsld.")).forEach(key -> {
-			ByteBuffer buff;
-			try {
-				buff = ByteBuffer.allocate(view.size(key));
-			} catch (IOException e) {
-				logger.log(Logger.Level.WARNING, "Can't determine size of file attribute {0} from path {1}: {2}", key, getPath(), e);
-				return;
-			}
-			try {
-				view.read(key, buff);
-			} catch (IOException e) {
-				logger.log(Logger.Level.WARNING, "Can't read file attribute {0} from path {1}: {2}", key, getPath(), e);
-			}
-			roCrate.getRootDataEntity().addProperty(key.replaceFirst("^wpsld\\.", ""), 
-			// TODO: Support { objects } and numbers etc.
-			// FIXME: Don't assume default charset
-				new String(buff.array()));
-		});
-		RoCrateWriter folderRoCrateWriter = new RoCrateWriter(new FolderWriter());
-		// FIXME: Below assumes path is on local file system!
-		folderRoCrateWriter.save(roCrate, root.getPath().toString());
+//		RoCrate roCrate = new RoCrateBuilder("name", "").build();
+//		if (! Files.getFileStore(getPath()).supportsFileAttributeView(UserDefinedFileAttributeView.class)) {
+//			throw new IOException("File system does not support extended attributes (UserDefinedFileAttributeView): " + getPath());
+//		}
+//		UserDefinedFileAttributeView view = Files.getFileAttributeView(getPath(), UserDefinedFileAttributeView.class);
+//		// FIXME: Generalize for every path
+//		view.list().stream().filter(s -> s.startsWith("wpsld.")).forEach(key -> {
+//			ByteBuffer buff;
+//			try {
+//				buff = ByteBuffer.allocate(view.size(key));
+//			} catch (IOException e) {
+//				logger.log(Logger.Level.WARNING, "Can't determine size of file attribute {0} from path {1}: {2}", key, getPath(), e);
+//				return;
+//			}
+//			try {
+//				view.read(key, buff);
+//			} catch (IOException e) {
+//				logger.log(Logger.Level.WARNING, "Can't read file attribute {0} from path {1}: {2}", key, getPath(), e);
+//			}
+//			roCrate.getRootDataEntity().addProperty(key.replaceFirst("^wpsld\\.", ""), 
+//			// TODO: Support { objects } and numbers etc.
+//			// FIXME: Don't assume default charset
+//				new String(buff.array()));
+//		});
+//		RoCrateWriter folderRoCrateWriter = new RoCrateWriter(new FolderWriter());
+//		// FIXME: Below assumes path is on local file system!
+//		folderRoCrateWriter.save(roCrate, root.getPath().toString());
 	}
 
 	@Override

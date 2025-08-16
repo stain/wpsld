@@ -17,7 +17,15 @@
  */
 module no.s11.wpsld {
     
-    requires edu.kit.datamanager.ro_crate;
-    requires com.fasterxml.jackson.databind;
+    //requires edu.kit.datamanager.ro_crate;
+    //requires com.fasterxml.jackson.databind;
+    
+    // FIXME: Avoid "Name of automatic module.. is unstable"
+    //requires com.apicatalog.jsonld;
+
+    requires org.apache.commons.rdf.api;
+    requires org.apache.jena.core;     
+    requires org.apache.jena.arq;
+    requires org.apache.jena.commonsrdf;
     exports no.s11.wpsld;
 }
