@@ -1,9 +1,13 @@
 package no.s11.wpsld.soss;
 
 import java.net.URL;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.function.Supplier;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.commons.rdf.api.IRI;
 import org.apache.commons.rdf.api.Literal;
@@ -32,29 +36,51 @@ public class SchemaFromJsonLd {
 	private static final IRI S_DESCRIPTION = JENA.createIRI(S.getIRIString() + "description");
 	
 	private org.apache.commons.rdf.api.Graph graph;
+	private Map<IRI, ClassDef> classes;
+	private Map<IRI, PropertyDef> properties;
 
 	
 	public SchemaFromJsonLd() {
 		// Note: NQ/Turtle loads much faster than JSON-LD
-		// Source: https://schema.org/version/29.2/schemaorg-current-http.nq
+		// Source: https://schema.org/version/29.2/schemaorg-current-http.ttl
 		
 		URL url = getClass().getResource("schemaorg-29.2-http.ttl");
 		System.out.println(url);
 		graph = JenaCommonsRDF.fromJena(RDFDataMgr.loadGraph(url.toExternalForm(), Lang.TURTLE));
 		System.out.println("Loaded schema.org types");
-		for (IRI iri : classes()) {
-			
-			Optional<Literal> label = label(iri)
-						.or(() -> name(iri));
-			Optional<Literal> comment = comment(iri)
-					.or(() -> description(iri));
-			List<IRI> subClassOf = superClasses(iri);
-			List<IRI> domainIncludes = domainIncludes(iri);
-			List<IRI> rangeIncludes = rangeIncludes(iri);
-			ClassDef classDef = new ClassDef(iri, label, comment, subClassOf, domainIncludes, rangeIncludes);
-			
-		}
-		System.out.println("Identified classes");
+		this.classes = classes().collect(Collectors.toUnmodifiableMap(
+						Function.identity(),
+						this::classDef));
+		System.out.println("Identified classes: " + classes);
+		this.properties = classes().collect(Collectors.toUnmodifiableMap(
+				Function.identity(),
+				this::propertyDef));
+		System.out.println("Identified properties: " + properties);
+
+		
+	}
+
+	private PropertyDef propertyDef(IRI iri) {
+		Optional<Literal> label = label(iri)
+					.or(() -> name(iri));
+		Optional<Literal> comment = comment(iri)
+				.or(() -> description(iri));
+		return new PropertyDef(iri, 
+				label, 
+				comment, 
+				superProperties(iri), domainIncludes(iri), rangeIncludes(iri));
+	}
+
+	
+	private ClassDef classDef(IRI iri) {
+		Optional<Literal> label = label(iri)
+					.or(() -> name(iri));
+		Optional<Literal> comment = comment(iri)
+				.or(() -> description(iri));
+		return new ClassDef(iri, 
+				label, 
+				comment, 
+				superClasses(iri));
 	}
 
 	private Optional<Literal> name(IRI iri) {
@@ -77,6 +103,10 @@ public class SchemaFromJsonLd {
 		return objects(iri, RDFS_SUBCLASSOF);
 	}
 
+	private List<IRI> superProperties(IRI iri) {
+		return objects(iri, RDFS_SUBPROPERTYOF);
+	}
+	
 	private Optional<Literal> label(IRI iri) {
 		return literal(iri, RDFS_LABEL);
 	}
@@ -102,13 +132,11 @@ public class SchemaFromJsonLd {
 	}
 
 	
-	private List<IRI> classes() {
-		List<IRI> classes = graph.stream(null, RDF_TYPE, RDFS_CLASS)
+	private Stream<IRI> classes() {
+		return graph.stream(null, RDF_TYPE, RDFS_CLASS)
 				.map(t -> t.getSubject())
 				.filter(IRI.class::isInstance)
-				.map(IRI.class::cast)
-				.toList();
-		return classes;
+				.map(IRI.class::cast);
 	}
 
 	public static void main(String[] args) {
