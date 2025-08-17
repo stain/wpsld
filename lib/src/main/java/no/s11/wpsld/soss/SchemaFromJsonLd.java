@@ -40,14 +40,16 @@ public class SchemaFromJsonLd {
 
 	public SchemaFromJsonLd() {
 		System.out.println("Initialising RDF parsers");
-		JenaCommonsRDF.fromJena(RDFDataMgr.loadGraph(getClass().getResource("empty.ttl").toExternalForm(), Lang.TURTLE));
-
+		Lang rdfLang = Lang.TURTLE; 
+		graph = JenaCommonsRDF.fromJena(RDFDataMgr.loadGraph(getClass().getResource("empty.ttl").toExternalForm(), rdfLang));
+		// Above will fail if Jena dependencies for given rdfLang are incomplete.
+		
 		// Note: NQ/Turtle loads much faster than JSON-LD
 		// Source: https://schema.org/version/29.2/schemaorg-current-http.ttl
 		
 		URL url = getClass().getResource("schemaorg-29.2-http.ttl");
 		System.out.println("Parsing " + url);
-		graph = JenaCommonsRDF.fromJena(RDFDataMgr.loadGraph(url.toExternalForm(), Lang.TURTLE));
+		graph = JenaCommonsRDF.fromJena(RDFDataMgr.loadGraph(url.toExternalForm(), rdfLang));
 		System.out.println("Loaded schema.org types");
 		this.classes = classes().collect(Collectors.toUnmodifiableMap(Function.identity(), this::classDef));
 		System.out.println("Identified classes");
