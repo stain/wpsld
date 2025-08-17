@@ -30,6 +30,9 @@ public class DefinedTerm {
 		return comment;
 	}
 
-
+	@Override
+	public String toString() {
+		return "DefinedTerm " + id;
+	}
 
 }

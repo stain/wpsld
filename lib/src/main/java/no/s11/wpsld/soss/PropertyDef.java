@@ -33,6 +33,10 @@ public class PropertyDef extends DefinedTerm {
 		return subPropertyOf;
 	}
 	
+	@Override
+	public String toString() {
+		return "Property " + getName();
+	}
 	
 	
 

@@ -1,7 +1,6 @@
 package no.s11.wpsld.soss;
 
 import java.net.URL;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -52,12 +51,17 @@ public class SchemaFromJsonLd {
 						Function.identity(),
 						this::classDef));
 		System.out.println("Identified classes: " + classes);
-		this.properties = classes().collect(Collectors.toUnmodifiableMap(
+		this.properties = properties().collect(Collectors.toUnmodifiableMap(
 				Function.identity(),
 				this::propertyDef));
 		System.out.println("Identified properties: " + properties);
-
+		qualityCheck();
 		
+	}
+
+	private void qualityCheck() {
+		classes.forEach(this::qaClass);
+		properties.forEach(this::qaProperty);
 	}
 
 	private PropertyDef propertyDef(IRI iri) {
@@ -138,8 +142,47 @@ public class SchemaFromJsonLd {
 				.filter(IRI.class::isInstance)
 				.map(IRI.class::cast);
 	}
+	
+
+	private Stream<IRI> properties() {
+		return graph.stream(null, RDF_TYPE, RDF_PROPERTY)
+				.map(t -> t.getSubject())
+				.filter(IRI.class::isInstance)
+				.map(IRI.class::cast);
+	}
 
 	public static void main(String[] args) {
 		new SchemaFromJsonLd();
+	}
+
+	private void qaClass(IRI iri, ClassDef classDef) {
+		if (! iri.equals(classDef.getID())) { 
+			throw new IllegalStateException("Expected ID " + iri + " in " + classDef);
+		}
+		classDef.getSubClassOf().forEach(superClass -> {
+			if (superClass.equals(RDFS_CLASS)) {
+				return; // Not defined by schema.org,  but used structurally in SoSS
+			}
+			if (! classes.containsKey(superClass)) {
+				throw new IllegalStateException("Can't find superclass " + superClass + " for " + classDef);
+			}
+		}
+		);
+	}
+
+	private void qaProperty(IRI iri, PropertyDef propertydef) {
+		if (! iri.equals(propertydef.getID())) { 
+			throw new IllegalStateException("Expected ID " + iri + " in " + propertydef);
+		}
+		propertydef.getSubPropertyOf().forEach(superClass -> {
+			if (superClass.equals(RDF_PROPERTY) || superClass.equals(RDFS_LABEL) || superClass.equals(RDF_TYPE)) {
+				return; // Not defined by schema.org, but used structurally in SoSS
+			}
+			if (! properties.containsKey(superClass)) {
+				throw new IllegalStateException("Can't find property " + superClass + " for " + propertydef);
+			}
+		}
+		
+		);
 	}
 }
