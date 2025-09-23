@@ -1,7 +1,6 @@
 package no.s11.wpsld.soss;
 
 import java.net.URL;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -34,30 +33,27 @@ public class SchemaFromJsonLd {
 	private static final IRI S_NAME = JENA.createIRI(S.getIRIString() + "name");
 	private static final IRI S_DESCRIPTION = JENA.createIRI(S.getIRIString() + "description");
 
-	private org.apache.commons.rdf.api.Graph graph;
-	private Map<IRI, ClassDef> classes;
-	private Map<IRI, PropertyDef> properties;
+	private final org.apache.commons.rdf.api.Graph graph;
+	private final Map<IRI, ClassDef> classes;
+	private final Map<IRI, PropertyDef> properties;
 
 	public SchemaFromJsonLd() {
-		System.out.println("Initialising RDF parsers");
 		Lang rdfLang = Lang.TURTLE; 
-		graph = JenaCommonsRDF.fromJena(RDFDataMgr.loadGraph(getClass().getResource("empty.ttl").toExternalForm(), rdfLang));
+		try {
+			JenaCommonsRDF.fromJena(RDFDataMgr.loadGraph(getClass().getResource("empty.ttl").toExternalForm(), rdfLang));
+		} catch (RuntimeException ex) {
+			throw new RuntimeException("Unable to initialise Jena, check dependencies", ex);
+		}
 		// Above will fail if Jena dependencies for given rdfLang are incomplete.
 		
 		// Note: NQ/Turtle loads much faster than JSON-LD
 		// Source: https://schema.org/version/29.2/schemaorg-current-http.ttl
 		
 		URL url = getClass().getResource("schemaorg-29.2-http.ttl");
-		System.out.println("Parsing " + url);
 		graph = JenaCommonsRDF.fromJena(RDFDataMgr.loadGraph(url.toExternalForm(), rdfLang));
-		System.out.println("Loaded schema.org types");
 		this.classes = classes().collect(Collectors.toUnmodifiableMap(Function.identity(), this::classDef));
-		System.out.println("Identified classes");
 		this.properties = properties().collect(Collectors.toUnmodifiableMap(Function.identity(), this::propertyDef));
-		System.out.println("Identified properties");
 		qualityCheck();
-		System.out.println("QA complete");
-
 	}
 
 	private void qualityCheck() {
@@ -85,22 +81,31 @@ public class SchemaFromJsonLd {
 		return literal(iri, S_DESCRIPTION);
 	}
 
-	private List<IRI> rangeIncludes(IRI iri) {
-		return objects(iri, S_RANGE_INCLUDES);
+	private Stream<ClassDef> rangeIncludes(IRI iri) {
+		return asClassDef(objects(iri, S_RANGE_INCLUDES));
 	}
 
-	private List<IRI> domainIncludes(IRI iri) {
-		return objects(iri, S_DOMAIN_INCLUDES);
+	private Stream<ClassDef> domainIncludes(IRI iri) {
+		return asClassDef(objects(iri, S_DOMAIN_INCLUDES));
 	}
 
-	private List<IRI> superClasses(IRI iri) {
-		return objects(iri, RDFS_SUBCLASSOF);
+	private Stream<ClassDef> superClasses(IRI iri) {
+		return asClassDef(objects(iri, RDFS_SUBCLASSOF));
 	}
 
-	private List<IRI> superProperties(IRI iri) {
-		return objects(iri, RDFS_SUBPROPERTYOF);
+	private Stream<PropertyDef> superProperties(IRI iri) {
+		return asPropertyDef(objects(iri, RDFS_SUBPROPERTYOF));
 	}
 
+	private Stream<ClassDef> asClassDef(Stream<IRI> iris) {
+		return iris.map(this::getClassDef);
+	}
+
+	private Stream<PropertyDef> asPropertyDef(Stream<IRI> iris) {
+		return iris.map(this::getPropertyDef);
+	}
+
+	
 	private Optional<Literal> label(IRI iri) {
 		return literal(iri, RDFS_LABEL);
 	}
@@ -110,22 +115,26 @@ public class SchemaFromJsonLd {
 	}
 
 	private Optional<Literal> literal(IRI subject, IRI property) {
-		return graph.stream(subject, property, null).map(t -> t.getObject()).filter(Literal.class::isInstance)
+		return graph.stream(subject, property, null)
+				.map(t -> t.getObject()).filter(Literal.class::isInstance)
 				.map(Literal.class::cast).findAny();
 	}
 
-	private List<IRI> objects(IRI subject, IRI property) {
-		return graph.stream(subject, property, null).map(t -> t.getObject()).filter(IRI.class::isInstance)
-				.map(IRI.class::cast).toList();
+	private Stream<IRI> objects(IRI subject, IRI property) {
+		return graph.stream(subject, property, null)
+				.map(t -> t.getObject()).filter(IRI.class::isInstance)
+				.map(IRI.class::cast);
 	}
 
 	private Stream<IRI> classes() {
-		return graph.stream(null, RDF_TYPE, RDFS_CLASS).map(t -> t.getSubject()).filter(IRI.class::isInstance)
+		return graph.stream(null, RDF_TYPE, RDFS_CLASS)
+				.map(t -> t.getSubject()).filter(IRI.class::isInstance)
 				.map(IRI.class::cast);
 	}
 
 	private Stream<IRI> properties() {
-		return graph.stream(null, RDF_TYPE, RDF_PROPERTY).map(t -> t.getSubject()).filter(IRI.class::isInstance)
+		return graph.stream(null, RDF_TYPE, RDF_PROPERTY)
+				.map(t -> t.getSubject()).filter(IRI.class::isInstance)
 				.map(IRI.class::cast);
 	}
 
@@ -137,12 +146,14 @@ public class SchemaFromJsonLd {
 		if (!iri.equals(classDef.getID())) {
 			throw new IllegalStateException("Expected ID " + iri + " in " + classDef);
 		}
-		classDef.getSubClassOf().forEach(superClass -> {
+		classDef.getSubClassOf().forEach(superClassDef -> {
+			IRI superClass = superClassDef.getID();
 			if (superClass.equals(RDFS_CLASS)) {
 				return; // Not defined by schema.org, but used structurally in SoSS
 			}
 			if (!classes.containsKey(superClass)) {
 				throw new IllegalStateException("Can't find superclass " + superClass + " for " + classDef);
+				//System.out.println("Can't find superclass " + superClass + " for " + classDef);
 			}
 		});
 	}
@@ -151,7 +162,9 @@ public class SchemaFromJsonLd {
 		if (! iri.equals(propertydef.getID())) { 
 			throw new IllegalStateException("Expected ID " + iri + " in " + propertydef);
 		}
-		for (IRI superClass : propertydef.getSubPropertyOf()) {
+
+		for (ClassDef superClassDef : propertydef.getDomainIncludes()) { 
+			IRI superClass = superClassDef.getID();
 			if (superClass.equals(RDF_PROPERTY) || superClass.equals(RDFS_LABEL) || superClass.equals(RDF_TYPE)) {
 				return; // Not defined by schema.org, but used structurally in SoSS
 			}
@@ -159,18 +172,36 @@ public class SchemaFromJsonLd {
 				throw new IllegalStateException("Can't find property " + superClass + " from subPropertyOf in " + propertydef);
 			}
 		}
-		for (IRI domain : propertydef.getDomainIncludes()) { 
+		
+		for (ClassDef domainDef : propertydef.getDomainIncludes()) { 
+			IRI domain = domainDef.getID();
 			if (! classes.containsKey(domain)) {
 				throw new IllegalStateException("Can't find class " + domain + " from domainIncludes in " + propertydef);
 			}
 			// TODO: Ensure domains are subclasses of Thing (type) and not Datatype
 		}
-		for (IRI range : propertydef.getRangeIncludes()) { 
+		for (ClassDef rangeDef : propertydef.getRangeIncludes()) { 
+			IRI range = rangeDef.getID();
 			if (! classes.containsKey(range)) {
 				throw new IllegalStateException("Can't find class " + range + " from rangeIncludes in " + propertydef);
 			}
 			// Note: Range may go to both a type and datatype
 		}
+	}
 
+	private ClassDef getClassDef(IRI iri) {
+		if (classes == null || ! classes.containsKey(iri)) {
+			return new ClassDef(iri);
+		} else {
+			return classes.get(iri);
+		}
+	}
+
+	private <R> PropertyDef getPropertyDef(IRI iri) {
+		if (properties == null || ! properties.containsKey(iri)) {
+			return new PropertyDef(iri);
+		} else {
+			return properties.get(iri);
+		}
 	}
 }

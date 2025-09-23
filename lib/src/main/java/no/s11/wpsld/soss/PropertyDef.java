@@ -1,35 +1,66 @@
 package no.s11.wpsld.soss;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import org.apache.commons.rdf.api.IRI;
 import org.apache.commons.rdf.api.Literal;
 
 public class PropertyDef extends DefinedTerm {
 
-	private final List<IRI> domainIncludes;
-	private final List<IRI> rangeIncludes;
-	private final List<IRI> subPropertyOf;
+	private List<ClassDef> domainIncludes;
+	private List<ClassDef> rangeIncludes;
+	private List<PropertyDef> subPropertyOf;
+	private final Stream<PropertyDef> subPropertyOfFutures;
+	private final Stream<ClassDef> domainIncludesFutures;
+	private final Stream<ClassDef> rangeIncludesFutures;
 
-	public PropertyDef(IRI id, Optional<Literal> name, Optional<Literal> comment,  List<IRI> subPropertyOf, List<IRI> domainIncludes,  List<IRI> rangeIncludes) {
+	PropertyDef(IRI id) { 
+		this(id, Optional.empty(), Optional.empty(), Stream.empty(), Stream.empty(), Stream.empty());
+	}
+	
+	PropertyDef(IRI id, Optional<Literal> name, Optional<Literal> comment,  Stream<PropertyDef> subPropertyOf, 
+			Stream<ClassDef> domainIncludes,  Stream<ClassDef> rangeIncludes) {
 		super(id, name, comment);
-		this.subPropertyOf = Collections.unmodifiableList(subPropertyOf);
-		this.domainIncludes = Collections.unmodifiableList(domainIncludes);
-		this.rangeIncludes = Collections.unmodifiableList(rangeIncludes);
+		this.subPropertyOfFutures = subPropertyOf;
+		this.domainIncludesFutures = domainIncludes;
+		this.rangeIncludesFutures = rangeIncludes;
 	}
 
-	public List<IRI> getDomainIncludes() {
+	public List<ClassDef> getDomainIncludes() {
+		if (domainIncludes == null) {
+			synchronized (domainIncludesFutures) {
+				if (domainIncludes == null) { 
+					// Ensure we only process the stream once
+					domainIncludes = domainIncludesFutures.toList();
+				}
+			}
+		}
 		return domainIncludes;
 	}
 
-	public List<IRI> getRangeIncludes() {
+	public List<ClassDef> getRangeIncludes() {
+		if (rangeIncludes == null) {
+			synchronized (rangeIncludesFutures) {
+				if (rangeIncludes == null) { 
+					// Ensure we only process the stream once
+					rangeIncludes = rangeIncludesFutures.toList();
+				}
+			}
+		}
 		return rangeIncludes;
 	}
 
-	public List<IRI> getSubPropertyOf() {
+	public List<PropertyDef> getSubPropertyOf() {
+		if (subPropertyOf == null) {
+			synchronized (subPropertyOfFutures) {
+				if (subPropertyOf == null) { 
+					// Ensure we only process the stream once
+					subPropertyOf = subPropertyOfFutures.toList();
+				}
+			}
+		}
 		return subPropertyOf;
 	}
 	
