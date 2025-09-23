@@ -1,9 +1,12 @@
 package no.s11.wpsld.soss;
 
 import java.net.URL;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -27,7 +30,7 @@ public class SchemaFromJsonLd {
 	private static final IRI RDFS_LABEL = JENA.createIRI(RDFS.getIRIString() + "label");
 	private static final IRI RDFS_COMMENT = JENA.createIRI(RDFS.getIRIString() + "comment");
 
-	private static final IRI S = JENA.createIRI("http://www.schema.org/");
+	private static final IRI S = JENA.createIRI("http://schema.org/");
 	private static final IRI S_DOMAIN_INCLUDES = JENA.createIRI(S.getIRIString() + "domainIncludes");
 	private static final IRI S_RANGE_INCLUDES = JENA.createIRI(S.getIRIString() + "rangeIncludes");
 	private static final IRI S_NAME = JENA.createIRI(S.getIRIString() + "name");
@@ -38,17 +41,18 @@ public class SchemaFromJsonLd {
 	private final Map<IRI, PropertyDef> properties;
 
 	public SchemaFromJsonLd() {
-		Lang rdfLang = Lang.TURTLE; 
+		Lang rdfLang = Lang.TURTLE;
 		try {
-			JenaCommonsRDF.fromJena(RDFDataMgr.loadGraph(getClass().getResource("empty.ttl").toExternalForm(), rdfLang));
+			JenaCommonsRDF
+					.fromJena(RDFDataMgr.loadGraph(getClass().getResource("empty.ttl").toExternalForm(), rdfLang));
 		} catch (RuntimeException ex) {
 			throw new RuntimeException("Unable to initialise Jena, check dependencies", ex);
 		}
 		// Above will fail if Jena dependencies for given rdfLang are incomplete.
-		
+
 		// Note: NQ/Turtle loads much faster than JSON-LD
 		// Source: https://schema.org/version/29.2/schemaorg-current-http.ttl
-		
+
 		URL url = getClass().getResource("schemaorg-29.2-http.ttl");
 		graph = JenaCommonsRDF.fromJena(RDFDataMgr.loadGraph(url.toExternalForm(), rdfLang));
 		this.classes = classes().collect(Collectors.toUnmodifiableMap(Function.identity(), this::classDef));
@@ -98,14 +102,15 @@ public class SchemaFromJsonLd {
 	}
 
 	private Stream<ClassDef> asClassDef(Stream<IRI> iris) {
-		return iris.map(this::getClassDef);
+		return iris.map(this::getClassDef)
+				.sorted((a,b) -> a.getName().compareTo(b.getName()));
 	}
 
 	private Stream<PropertyDef> asPropertyDef(Stream<IRI> iris) {
-		return iris.map(this::getPropertyDef);
+		return iris.map(this::getPropertyDef)
+				.sorted((a,b) -> a.getName().compareTo(b.getName()));
 	}
 
-	
 	private Optional<Literal> label(IRI iri) {
 		return literal(iri, RDFS_LABEL);
 	}
@@ -115,31 +120,63 @@ public class SchemaFromJsonLd {
 	}
 
 	private Optional<Literal> literal(IRI subject, IRI property) {
-		return graph.stream(subject, property, null)
-				.map(t -> t.getObject()).filter(Literal.class::isInstance)
+		return graph.stream(subject, property, null).map(t -> t.getObject()).filter(Literal.class::isInstance)
 				.map(Literal.class::cast).findAny();
 	}
 
 	private Stream<IRI> objects(IRI subject, IRI property) {
-		return graph.stream(subject, property, null)
-				.map(t -> t.getObject()).filter(IRI.class::isInstance)
+		return graph.stream(subject, property, null).map(t -> t.getObject()).filter(IRI.class::isInstance)
+				.map(IRI.class::cast);
+	}
+
+	private Stream<IRI> subjects(IRI property, IRI object) {
+		return graph.stream(null, property, object).map(t -> t.getSubject()).filter(IRI.class::isInstance)
 				.map(IRI.class::cast);
 	}
 
 	private Stream<IRI> classes() {
-		return graph.stream(null, RDF_TYPE, RDFS_CLASS)
-				.map(t -> t.getSubject()).filter(IRI.class::isInstance)
+		return graph.stream(null, RDF_TYPE, RDFS_CLASS).map(t -> t.getSubject()).filter(IRI.class::isInstance)
 				.map(IRI.class::cast);
+	}
+
+	public Stream<ClassDef> rootClasses() {
+		return asClassDef(classes().filter(Predicate.not(iri -> graph.contains(iri, RDFS_SUBCLASSOF, null))));
 	}
 
 	private Stream<IRI> properties() {
-		return graph.stream(null, RDF_TYPE, RDF_PROPERTY)
-				.map(t -> t.getSubject()).filter(IRI.class::isInstance)
+		return graph.stream(null, RDF_TYPE, RDF_PROPERTY).map(t -> t.getSubject()).filter(IRI.class::isInstance)
 				.map(IRI.class::cast);
 	}
 
+	private void printHierarchy(ClassDef classDef, String indent, Set<IRI> seen) {
+		Stream<ClassDef> subs = subclasses(classDef);
+		if (seen.contains(classDef.getID())) {
+			if (subs.findAny().isPresent()) {
+				System.out.println(indent + "+ " +  classDef.getName());
+			} else {
+				System.out.println(indent + "- " +  classDef.getName());				
+			}
+		} else {
+			seen.add(classDef.getID());
+			String props = asPropertyDef(subjects(S_DOMAIN_INCLUDES, classDef.getID()))
+					.map(PropertyDef::getName)
+					.collect(Collectors.joining(", ", "(", ")"));
+			System.out.println(indent + "- " +  classDef.getName() + props);
+			subs.forEach(c -> printHierarchy(c, indent + "  ", seen));
+		}
+	}
+
+	private Stream<ClassDef> subclasses(ClassDef classDef) {
+		return asClassDef(subjects(RDFS_SUBCLASSOF, classDef.getID()));
+	}
+
 	public static void main(String[] args) {
-		new SchemaFromJsonLd();
+		SchemaFromJsonLd schema = new SchemaFromJsonLd();
+
+		schema.rootClasses().forEach(root -> {
+			schema.printHierarchy(root, "", new HashSet<IRI>());
+		});
+
 	}
 
 	private void qaClass(IRI iri, ClassDef classDef) {
@@ -153,36 +190,39 @@ public class SchemaFromJsonLd {
 			}
 			if (!classes.containsKey(superClass)) {
 				throw new IllegalStateException("Can't find superclass " + superClass + " for " + classDef);
-				//System.out.println("Can't find superclass " + superClass + " for " + classDef);
+				// System.out.println("Can't find superclass " + superClass + " for " +
+				// classDef);
 			}
 		});
 	}
 
 	private void qaProperty(IRI iri, PropertyDef propertydef) {
-		if (! iri.equals(propertydef.getID())) { 
+		if (!iri.equals(propertydef.getID())) {
 			throw new IllegalStateException("Expected ID " + iri + " in " + propertydef);
 		}
 
-		for (ClassDef superClassDef : propertydef.getDomainIncludes()) { 
-			IRI superClass = superClassDef.getID();
-			if (superClass.equals(RDF_PROPERTY) || superClass.equals(RDFS_LABEL) || superClass.equals(RDF_TYPE)) {
+		for (PropertyDef propDef : propertydef.getSubPropertyOf()) {
+			IRI property = propDef.getID();
+			if (property.equals(RDF_PROPERTY) || property.equals(RDFS_LABEL) || property.equals(RDF_TYPE)) {
 				return; // Not defined by schema.org, but used structurally in SoSS
 			}
-			if (! properties.containsKey(superClass)) {
-				throw new IllegalStateException("Can't find property " + superClass + " from subPropertyOf in " + propertydef);
+			if (!properties.containsKey(property)) {
+				System.err.println(
+						"Can't find property " + property + " from subPropertyOf in " + propertydef);
 			}
 		}
-		
-		for (ClassDef domainDef : propertydef.getDomainIncludes()) { 
+
+		for (ClassDef domainDef : propertydef.getDomainIncludes()) {
 			IRI domain = domainDef.getID();
-			if (! classes.containsKey(domain)) {
-				throw new IllegalStateException("Can't find class " + domain + " from domainIncludes in " + propertydef);
+			if (!classes.containsKey(domain)) {
+				System.err.println(
+						"Can't find class " + domain + " from domainIncludes in " + propertydef);
 			}
 			// TODO: Ensure domains are subclasses of Thing (type) and not Datatype
 		}
-		for (ClassDef rangeDef : propertydef.getRangeIncludes()) { 
+		for (ClassDef rangeDef : propertydef.getRangeIncludes()) {
 			IRI range = rangeDef.getID();
-			if (! classes.containsKey(range)) {
+			if (!classes.containsKey(range)) {
 				throw new IllegalStateException("Can't find class " + range + " from rangeIncludes in " + propertydef);
 			}
 			// Note: Range may go to both a type and datatype
@@ -190,7 +230,7 @@ public class SchemaFromJsonLd {
 	}
 
 	private ClassDef getClassDef(IRI iri) {
-		if (classes == null || ! classes.containsKey(iri)) {
+		if (classes == null || !classes.containsKey(iri)) {
 			return new ClassDef(iri);
 		} else {
 			return classes.get(iri);
@@ -198,7 +238,7 @@ public class SchemaFromJsonLd {
 	}
 
 	private <R> PropertyDef getPropertyDef(IRI iri) {
-		if (properties == null || ! properties.containsKey(iri)) {
+		if (properties == null || !properties.containsKey(iri)) {
 			return new PropertyDef(iri);
 		} else {
 			return properties.get(iri);
