@@ -90,6 +90,6 @@ dependencies {
 }
 
 application { 
-  mainClass = 'no.s11.wpsld.ui.EntityEditor'
+  mainClass = 'no.s11.wpsld.ui.CrateEditor'
   mainModule = 'no.s11.wpsld.ui'
 }

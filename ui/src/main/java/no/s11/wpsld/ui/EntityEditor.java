@@ -19,118 +19,100 @@ package no.s11.wpsld.ui;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import javafx.application.Application;
-import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
-import javafx.scene.Node;
-import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Control;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TitledPane;
 import javafx.scene.control.Tooltip;
 import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
-import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.stage.Stage;
+import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.form.FormField;
 import no.s11.wpsld.form.FormFields;
-import no.s11.wpsld.form.SchemaOrgFormFields;
 import no.s11.wpsld.form.ValueKind;
 import no.s11.wpsld.soss.ClassDef;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
 /**
- * Editor for a single RO-Crate entity of any type. Which fields are shown is
- * decided by {@link FormFields}; for now every schema.org property of the
- * chosen type, later narrowed down by a profile.
+ * Edits one {@link Entity} of a crate: its type, chosen from a tree of
+ * schema.org types, and a form of its properties.
+ * <p>
+ * Which fields the form shows is decided by {@link FormFields}; for now every
+ * schema.org property of the type, later narrowed down by a profile. The
+ * form reads from and writes to the entity, so changing the type keeps the
+ * values; those the new type doesn't have are listed separately.
  */
-public class EntityEditor extends Application {
+public class EntityEditor extends SplitPane {
 	private static final String S = "http://schema.org/";
-	private static final ObjectMapper MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
-	private CompletableFuture<SchemaFromJsonLd> schemaLoading;
-	private SchemaFromJsonLd schema;
-	private FormFields formFields;
+	private final SchemaFromJsonLd schema;
+	private final FormFields formFields;
+	/** Identifiers of the other entities in the crate, to suggest as references */
+	private final Supplier<List<String>> entityIds;
+	/** Called after the entity is changed */
+	private final Runnable onChange;
 
-	private final TextField idField = new TextField("./");
+	private final TreeView<ClassDef> types;
 	private final VBox form = new VBox(8);
-	private final TextArea preview = new TextArea();
-	private ClassDef type;
-	/** Fields of the shown form and the controls editing them */
-	private final Map<FormField, Control> controls = new LinkedHashMap<>();
+	private Entity entity;
+	/** True while selecting the entity's type in the tree, rather than the user changing it */
+	private boolean selectingType;
 
-	@Override
-	public void init() {
-		// Load the schema while the JavaFX toolkit and window start up
-		schemaLoading = CompletableFuture.supplyAsync(SchemaFromJsonLd::new);
-	}
-
-	@Override
-	public void start(Stage stage) {
-		BorderPane root = new BorderPane(new Label("Loading schema.org " + SchemaFromJsonLd.SCHEMAORG_VERSION + "…"));
-		stage.setScene(new Scene(root, 1200, 750));
-		stage.setTitle("wpsld entity editor");
-		stage.show();
-
-		// The one load started in init(): if it is still running, the editor
-		// replaces the label when it completes; if done, this runs at once
-		schemaLoading.whenComplete((loaded, failure) -> Platform.runLater(() -> {
-			if (failure != null) {
-				root.setCenter(new Label("Can't load schema: " + failure));
-				return;
-			}
-			schema = loaded;
-			formFields = new SchemaOrgFormFields(schema);
-			root.setCenter(editor());
-		}));
-	}
-
-	private Node editor() {
-		TreeView<ClassDef> types = typeTree();
+	public EntityEditor(SchemaFromJsonLd schema, FormFields formFields, Supplier<List<String>> entityIds,
+			Runnable onChange) {
+		this.schema = schema;
+		this.formFields = formFields;
+		this.entityIds = entityIds;
+		this.onChange = onChange;
+		this.types = typeTree();
 		form.setPadding(new Insets(10));
 		ScrollPane formScroll = new ScrollPane(form);
 		formScroll.setFitToWidth(true);
-		preview.setEditable(false);
-		preview.setStyle("-fx-font-family: monospace;");
-		idField.textProperty().addListener((obs, old, id) -> updatePreview());
+		getItems().setAll(types, formScroll);
+		setDividerPositions(0.3);
+	}
 
-		SplitPane split = new SplitPane(types, formScroll, preview);
-		split.setDividerPositions(0.22, 0.65);
-		// Root data entities of RO-Crates are Datasets
-		select(types, "Thing", "CreativeWork", "Dataset");
-		return split;
+	/**
+	 * Show and edit an entity.
+	 */
+	public void edit(Entity entity) {
+		this.entity = Objects.requireNonNull(entity);
+		selectType();
+		showForm();
+	}
+
+	private Optional<ClassDef> classDef(String typeName) {
+		return Optional.ofNullable(schema.getClasses().get(URI.create(S + typeName)));
 	}
 
 	private TreeView<ClassDef> typeTree() {
-		ClassDef thing = schema.getClasses().get(URI.create(S + "Thing"));
+		ClassDef thing = classDef("Thing").orElseThrow();
 		TreeView<ClassDef> tree = new TreeView<>(new ClassTreeItem(thing));
 		tree.setCellFactory(view -> new TreeCell<>() {
 			@Override
@@ -142,27 +124,46 @@ public class EntityEditor extends Application {
 			}
 		});
 		tree.getSelectionModel().selectedItemProperty().addListener((obs, old, item) -> {
-			if (item != null) {
-				showForm(item.getValue());
+			if (item != null && entity != null && !selectingType) {
+				// Only the type changes; values are kept on the entity
+				entity.setTypes(List.of(item.getValue().getName()));
+				showForm();
+				onChange.run();
 			}
 		});
 		return tree;
 	}
 
 	/**
-	 * Expand and select a path of class names from the root of the tree.
+	 * Select the entity's (first) type in the tree, expanding the path to it.
 	 */
-	private static void select(TreeView<ClassDef> tree, String... path) {
-		TreeItem<ClassDef> item = tree.getRoot();
-		for (int i = 1; i < path.length && item != null; i++) {
-			item.setExpanded(true);
-			String name = path[i];
-			item = item.getChildren().stream().filter(c -> c.getValue().getName().equals(name)).findFirst()
-					.orElse(null);
-		}
-		if (item != null) {
-			tree.getSelectionModel().select(item);
-			tree.scrollTo(tree.getRow(item));
+	private void selectType() {
+		selectingType = true;
+		try {
+			Optional<ClassDef> type = classDef(entity.getTypes().get(0));
+			if (type.isEmpty()) {
+				types.getSelectionModel().clearSelection();
+				return;
+			}
+			// Path from Thing, following the first superclass of each class
+			List<String> path = new ArrayList<>();
+			for (ClassDef c = type.get(); c != null; c = c.getSubClassOf().stream().findFirst().orElse(null)) {
+				path.add(0, c.getName());
+			}
+			TreeItem<ClassDef> item = types.getRoot();
+			for (String name : path.subList(1, path.size())) {
+				item.setExpanded(true);
+				item = item.getChildren().stream().filter(c -> c.getValue().getName().equals(name)).findFirst()
+						.orElse(null);
+				if (item == null) {
+					types.getSelectionModel().clearSelection();
+					return;
+				}
+			}
+			types.getSelectionModel().select(item);
+			types.scrollTo(Math.max(0, types.getRow(item) - 5));
+		} finally {
+			selectingType = false;
 		}
 	}
 
@@ -192,39 +193,86 @@ public class EntityEditor extends Application {
 		}
 	}
 
-	private void showForm(ClassDef classDef) {
-		type = classDef;
-		controls.clear();
+	private void showForm() {
 		form.getChildren().clear();
 
 		GridPane header = grid();
-		Label typeLabel = new Label(classDef.getName());
+		Label typeLabel = new Label(String.join(", ", entity.getTypes()));
 		typeLabel.setStyle("-fx-font-weight: bold;");
-		classDef.getComment().map(EntityEditor::tooltip).ifPresent(typeLabel::setTooltip);
+		classDef(entity.getTypes().get(0)).flatMap(ClassDef::getComment).map(EntityEditor::tooltip)
+				.ifPresent(typeLabel::setTooltip);
+		TextField idField = new TextField(entity.getId());
+		// TODO: Renaming should also update references from other entities
+		idField.setEditable(!entity.getId().equals("./"));
+		idField.textProperty().addListener((obs, old, id) -> {
+			if (!id.isBlank()) {
+				entity.setId(id);
+				onChange.run();
+			}
+		});
 		header.addRow(0, new Label("@type"), typeLabel);
 		header.addRow(1, new Label("@id"), idField);
 		form.getChildren().add(header);
 
-		Map<String, List<FormField>> groups = formFields.fieldsFor(Set.of(classDef.getID())).stream()
+		List<FormField> fields = formFields.fieldsFor(entity.getTypes().stream().map(this::classDef)
+				.flatMap(Optional::stream).map(ClassDef::getID).collect(Collectors.toSet()));
+		Set<String> fieldNames = fields.stream().map(FormField::name).collect(Collectors.toSet());
+
+		// Values the current type has no field for, e.g. after changing type
+		List<String> others = entity.getValues().keySet().stream().filter(name -> !fieldNames.contains(name))
+				.toList();
+		if (!others.isEmpty()) {
+			GridPane grid = grid();
+			int row = 0;
+			for (String name : others) {
+				TextField value = new TextField(text(entity.get(name).orElseThrow()));
+				value.setEditable(false);
+				Button remove = new Button("Remove");
+				remove.setOnAction(e -> {
+					entity.set(name, Optional.empty());
+					showForm();
+					onChange.run();
+				});
+				grid.addRow(row++, new Label(name), value, remove);
+			}
+			TitledPane pane = new TitledPane("Not properties of " + String.join(", ", entity.getTypes()) + " ("
+					+ others.size() + ")", grid);
+			form.getChildren().add(pane);
+		}
+
+		Map<String, List<FormField>> groups = fields.stream()
 				.collect(Collectors.groupingBy(FormField::group, LinkedHashMap::new, Collectors.toList()));
 		boolean first = true;
 		for (Map.Entry<String, List<FormField>> group : groups.entrySet()) {
-			GridPane grid = grid();
-			int row = 0;
-			for (FormField field : group.getValue()) {
-				Label label = new Label(field.label() + (field.isRequired() ? " *" : ""));
-				field.comment().map(EntityEditor::tooltip).ifPresent(label::setTooltip);
-				Control control = control(field);
-				controls.put(field, control);
-				grid.addRow(row++, label, control);
+			List<FormField> groupFields = group.getValue();
+			boolean hasValues = groupFields.stream().anyMatch(f -> entity.get(f.name()).isPresent());
+			TitledPane pane = new TitledPane("From " + group.getKey() + " (" + groupFields.size() + ")", null);
+			// Most specific properties and those with values open, the rest
+			// folded away, and only built when first opened
+			if (first || hasValues) {
+				pane.setContent(fieldsGrid(groupFields));
+			} else {
+				pane.setExpanded(false);
+				pane.expandedProperty().addListener((obs, was, expanded) -> {
+					if (expanded && pane.getContent() == null) {
+						pane.setContent(fieldsGrid(groupFields));
+					}
+				});
 			}
-			TitledPane pane = new TitledPane("From " + group.getKey() + " (" + group.getValue().size() + ")", grid);
-			// Most specific properties first, the rest folded away
-			pane.setExpanded(first);
 			first = false;
 			form.getChildren().add(pane);
 		}
-		updatePreview();
+	}
+
+	private GridPane fieldsGrid(List<FormField> fields) {
+		GridPane grid = grid();
+		int row = 0;
+		for (FormField field : fields) {
+			Label label = new Label(field.label() + (field.isRequired() ? " *" : ""));
+			field.comment().map(EntityEditor::tooltip).ifPresent(label::setTooltip);
+			grid.addRow(row++, label, control(field));
+		}
+		return grid;
 	}
 
 	private static GridPane grid() {
@@ -239,29 +287,42 @@ public class EntityEditor extends Application {
 		return grid;
 	}
 
+	/**
+	 * A control for a field, showing the entity's current value and
+	 * updating the entity when edited.
+	 */
 	private Control control(FormField field) {
 		String rangeNames = field.range().stream().map(ClassDef::getName).collect(Collectors.joining(" or "));
+		String current = entity.get(field.name()).map(EntityEditor::text).orElse("");
 		Control control = switch (field.kind()) {
 		case BOOLEAN -> {
 			ComboBox<String> combo = new ComboBox<>(FXCollections.observableArrayList("", "true", "false"));
-			combo.valueProperty().addListener((obs, old, v) -> updatePreview());
+			combo.setValue(current);
+			combo.valueProperty().addListener((obs, old, v) -> update(field, v));
 			yield combo;
 		}
 		case DATE -> {
 			DatePicker picker = new DatePicker();
 			picker.setPromptText("YYYY-MM-DD");
-			picker.getEditor().textProperty().addListener((obs, old, v) -> updatePreview());
-			picker.valueProperty().addListener((obs, old, v) -> updatePreview());
+			picker.getEditor().setText(current);
+			picker.getEditor().textProperty().addListener((obs, old, v) -> update(field, v));
 			yield picker;
 		}
+		case REFERENCE, TEXT_OR_REFERENCE -> {
+			// Suggest the other entities of the crate, like Crate-O
+			ComboBox<String> combo = new ComboBox<>(FXCollections.observableArrayList(
+					entityIds.get().stream().filter(id -> !id.equals(entity.getId())).toList()));
+			combo.setEditable(true);
+			combo.setPromptText(field.kind() == ValueKind.REFERENCE ? "@id of " + rangeNames
+					: rangeNames + " (text, or @id of an entity)");
+			combo.getEditor().setText(current);
+			combo.getEditor().textProperty().addListener((obs, old, v) -> update(field, v));
+			yield combo;
+		}
 		default -> {
-			TextField text = new TextField();
-			text.setPromptText(switch (field.kind()) {
-			case REFERENCE -> "@id of " + rangeNames;
-			case TEXT_OR_REFERENCE -> rangeNames + " (text, or @id of an entity)";
-			default -> rangeNames;
-			});
-			text.textProperty().addListener((obs, old, v) -> updatePreview());
+			TextField text = new TextField(current);
+			text.setPromptText(rangeNames);
+			text.textProperty().addListener((obs, old, v) -> update(field, v));
 			yield text;
 		}
 		};
@@ -269,33 +330,30 @@ public class EntityEditor extends Application {
 		return control;
 	}
 
-	private void updatePreview() {
-		if (type == null) {
-			return;
-		}
-		ObjectNode entity = MAPPER.createObjectNode();
-		entity.put("@id", idField.getText());
-		entity.put("@type", type.getName());
-		controls.forEach((field, control) -> value(field, control).ifPresent(v -> entity.set(field.name(), v)));
-		try {
-			preview.setText(MAPPER.writeValueAsString(entity));
-		} catch (JsonProcessingException e) {
-			preview.setText(e.toString());
-		}
+	private void update(FormField field, String text) {
+		entity.set(field.name(), value(field, text));
+		onChange.run();
 	}
 
 	/**
-	 * The JSON-LD value of a field, if filled in.
+	 * Text to show for a JSON-LD value.
 	 */
-	private static Optional<JsonNode> value(FormField field, Control control) {
+	private static String text(JsonNode value) {
+		if (value.isValueNode()) {
+			return value.asText();
+		}
+		if (value.isObject() && value.size() == 1 && value.has("@id")) {
+			return value.get("@id").asText();
+		}
+		return value.toString();
+	}
+
+	/**
+	 * The JSON-LD value of a field from the text typed, if any.
+	 */
+	private static Optional<JsonNode> value(FormField field, String text) {
 		JsonNodeFactory json = JsonNodeFactory.instance;
-		String text = switch (control) {
-		case TextField t -> t.getText();
-		case DatePicker d -> d.getEditor().getText();
-		case ComboBox<?> c -> c.getValue() == null ? "" : c.getValue().toString();
-		default -> "";
-		};
-		text = text.strip();
+		text = text == null ? "" : text.strip();
 		if (text.isEmpty()) {
 			return Optional.empty();
 		}
@@ -341,14 +399,10 @@ public class EntityEditor extends Application {
 		}
 	}
 
-	private static Tooltip tooltip(String text) {
+	static Tooltip tooltip(String text) {
 		Tooltip tooltip = new Tooltip(text);
 		tooltip.setWrapText(true);
 		tooltip.setMaxWidth(500);
 		return tooltip;
-	}
-
-	public static void main(String[] args) {
-		launch(args);
 	}
 }

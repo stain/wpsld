@@ -22,4 +22,5 @@ module no.s11.wpsld {
     exports no.s11.wpsld.arcp;
     exports no.s11.wpsld.soss;
     exports no.s11.wpsld.form;
+    exports no.s11.wpsld.crate;
 }
