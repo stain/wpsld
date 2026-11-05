@@ -20,6 +20,7 @@ package no.s11.wpsld.soss;
 import static org.junit.Assert.*;
 
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.net.URI;
 import java.security.MessageDigest;
 import java.util.HexFormat;
@@ -77,5 +78,95 @@ public class TestSchemaFromJsonLd {
 		PropertyDef archiveHeld = schema.getProperties().get(URI.create(S + "archiveHeld"));
 		assertNotNull(archiveHeld);
 		assertEquals("archiveHeld", archiveHeld.getName());
+	}
+
+	private static ClassDef classDef(String name) {
+		return schema.getClasses().get(URI.create(S + name));
+	}
+
+	private static PropertyDef property(String name) {
+		return schema.getProperties().get(URI.create(S + name));
+	}
+
+	@Test
+	public void noWarningsForPinnedRelease() {
+		assertEquals(List.of(), schema.getWarnings());
+	}
+
+	@Test
+	public void subclassesDirectAndSorted() {
+		List<String> subclasses = schema.subclasses(classDef("CreativeWork")).map(ClassDef::getName).toList();
+		assertTrue(subclasses.contains("Dataset"));
+		assertTrue(subclasses.contains("SoftwareSourceCode"));
+		// Not the subclasses of subclasses
+		assertFalse(subclasses.contains("DataFeed"));
+		assertEquals(subclasses.stream().sorted().toList(), subclasses);
+		assertEquals(List.of(classDef("CompleteDataFeed")), schema.subclasses(classDef("DataFeed")).toList());
+		assertEquals(List.of(), schema.subclasses(classDef("CompleteDataFeed")).toList());
+	}
+
+	@Test
+	public void propertiesOfDirectOnly() {
+		List<String> properties = schema.propertiesOf(classDef("Dataset")).map(PropertyDef::getName).toList();
+		assertTrue(properties.contains("distribution"));
+		// name is a property of Thing, not listed for Dataset itself
+		assertFalse(properties.contains("name"));
+		assertEquals(properties.stream().sorted().toList(), properties);
+	}
+
+	@Test
+	public void superseded() {
+		assertTrue(schema.isSuperseded(property("fileFormat")));
+		assertFalse(schema.isSuperseded(property("encodingFormat")));
+		assertTrue(schema.isSuperseded(classDef("DeliveryTimeSettings")));
+		assertFalse(schema.isSuperseded(classDef("Dataset")));
+	}
+
+	@Test
+	public void dataTypes() {
+		assertTrue(schema.isDataType(classDef("Text")));
+		// URL is a subclass of Text
+		assertTrue(schema.isDataType(classDef("URL")));
+		assertTrue(schema.isDataType(classDef("Date")));
+		assertTrue(schema.isDataType(classDef("Boolean")));
+		assertTrue(schema.isDataType(classDef("Integer")));
+		assertFalse(schema.isDataType(classDef("Person")));
+		assertFalse(schema.isDataType(classDef("Thing")));
+	}
+
+	@Test
+	public void subPropertyOf() {
+		// A table of contents entry is a part
+		assertEquals(List.of(property("hasPart")), property("tocEntry").getSubPropertyOf());
+		assertEquals(List.of(), property("hasPart").getSubPropertyOf());
+	}
+
+	/**
+	 * Loading builds everything up front: the JSON is dropped and no lazy
+	 * value is left to compute later, when an exception could be lost.
+	 */
+	@Test
+	public void fullyLinkedAfterLoading() throws Exception {
+		Field jsonld = SchemaFromJsonLd.class.getDeclaredField("jsonld");
+		jsonld.setAccessible(true);
+		assertNull("JSON should be dropped after loading", jsonld.get(schema));
+		for (ClassDef classDef : schema.getClasses().values()) {
+			assertComputed(classDef, ClassDef.class, "subClassOf");
+			assertComputed(classDef, ClassDef.class, "selfAndSuperClasses");
+		}
+		for (PropertyDef propertyDef : schema.getProperties().values()) {
+			assertComputed(propertyDef, PropertyDef.class, "domainIncludes");
+			assertComputed(propertyDef, PropertyDef.class, "rangeIncludes");
+			assertComputed(propertyDef, PropertyDef.class, "subPropertyOf");
+		}
+	}
+
+	private static void assertComputed(Object term, Class<?> type, String fieldName) throws Exception {
+		Field field = type.getDeclaredField(fieldName);
+		field.setAccessible(true);
+		Object lazy = field.get(term);
+		Field supplier = lazy.getClass().getDeclaredField("supplier");
+		supplier.setAccessible(true);
+		assertNull(fieldName + " of " + term + " not computed while loading", supplier.get(lazy));
 	}
 }

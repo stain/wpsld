@@ -95,7 +95,23 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   properties and of references to local `@id`s not in the crate, with "Save
   anyway". Proper validation will come from MASP rules in Java (no Python).
   Next: open an existing `ro-crate-metadata.json`.
-- Remove the old tutorial classes (`HelloFX`, `SearchController`, `Person`).
+- **Opening an existing `ro-crate-metadata.json`.** Crates come from any
+  tool, so loading needs many sanity checks so that unexpected input never
+  breaks the UI: not JSON, or JSON-LD that is not flattened (nested objects,
+  no `@graph`), `@context` arrays and extra terms (resolve against bundled
+  RO-Crate 1.0–1.3 contexts), a missing or different-version metadata
+  descriptor, no root data entity, duplicate or missing `@id`, missing or
+  unknown `@type`s, values the form can't edit (`{"@value", "@language"}`,
+  nested objects, numbers where text is expected), references to entities
+  or files that aren't described, and very large crates. Load what can be
+  loaded, keep unsupported values untouched (shown read-only, written back
+  as they were), and report each problem rather than throwing. MASP profile
+  and schema crates are RO-Crates too, so this reader is also the first step
+  of MASP.
+- **More RO-Crate requirements in the save checks**, e.g. scripts and
+  workflows (`SoftwareSourceCode`, `ComputationalWorkflow`) MUST have a
+  `name`, found by rocrate-validator; better covered by validation from the
+  MASP RO-Crate profile than by hand-written checks.
 
 ### Storage backends
 
@@ -108,16 +124,29 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   data streams; probe what works (sizes, names, copying, FAT/exFAT, network
   shares, OneDrive) with a small program run on Windows.
 - Decide how contextual entities are stored when crates live as xattrs.
+- **Evaluate the `arcp://` file system** (`no.s11.wpsld.arcp`) when mapping
+  crates to the file system with Java NIO: it gives files in a crate (folder,
+  zip, BagIt) stable `arcp://` identifiers. Today most of
+  `ARCPFileSystemProvider` is unimplemented stubs, it has no tests, and it is
+  not registered as a provider (no `provides` in `module-info`), so decide
+  its role before testing or finishing it.
 
 ### Testing
 
-- `lib`: JUnit 4 unit tests (`./gradlew :lib:test`).
+- `lib`: JUnit 4 unit tests (`./gradlew :lib:test`), including that loading
+  is complete (JSON dropped, no lazy value left to compute later where an
+  exception could be lost), that `Value.lazy` reports a failure and retries
+  and computes once across threads, that schema.org loads without QA
+  warnings (`getWarnings()`, also logged), and a golden file of the JSON
+  written for a crate, checked with rocrate-validator.
 - `ui`: GUI tests with [TestFX](https://github.com/TestFX/TestFX) 4.0.18
   (`TestEntityEditor`, `TestCrateEditor`), run **headless** with JavaFX's own
   headless platform (JavaFX 26+; `-Dglass.platform=headless
   -Dtestfx.robot=glass -Dprism.order=sw`, see `ui/build.gradle`), so they run
   in the conda env, the container and CI without a display or Monocle. On
   Linux they need Pango (`libpangoft2`) for text layout, as on any desktop.
+- `TestCrateEditorFailure`: a failure while loading the schema (or building
+  the editor) is shown in the window, not lost in the background loading.
 - Controls the tests use have ids: `entityId`, `propertySearch`, `addType`,
   `type-<Type>`, `removeType-<Type>`, `label-<property>`, `field-<property>`,
   `value-<property>-<n>`, `add-<property>`, `new-<property>`,

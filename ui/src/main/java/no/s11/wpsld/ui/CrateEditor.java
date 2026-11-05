@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.function.Supplier;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -64,6 +66,7 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
 public class CrateEditor extends Application {
 	private static final ObjectMapper MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
+	private final Supplier<SchemaFromJsonLd> loadSchema;
 	private CompletableFuture<SchemaFromJsonLd> schemaLoading;
 	private final Crate crate = new Crate();
 	private final ListView<Entity> entities = new ListView<>();
@@ -73,10 +76,21 @@ public class CrateEditor extends Application {
 	/** Where the crate was last saved, to start the next save there */
 	private File lastSaved;
 
+	public CrateEditor() {
+		this(SchemaFromJsonLd::new);
+	}
+
+	/**
+	 * With another way to load the schema, e.g. failing in tests.
+	 */
+	CrateEditor(Supplier<SchemaFromJsonLd> loadSchema) {
+		this.loadSchema = loadSchema;
+	}
+
 	@Override
 	public void init() {
 		// Load the schema while the JavaFX toolkit and window start up
-		schemaLoading = CompletableFuture.supplyAsync(SchemaFromJsonLd::new);
+		schemaLoading = CompletableFuture.supplyAsync(loadSchema);
 	}
 
 	@Override
@@ -90,10 +104,16 @@ public class CrateEditor extends Application {
 		// replaces the label when it completes; if done, this runs at once
 		schemaLoading.whenComplete((schema, failure) -> Platform.runLater(() -> {
 			if (failure != null) {
-				root.setCenter(new Label("Can't load schema: " + failure));
+				showFailure(root, "Can't load schema", failure);
 				return;
 			}
-			root.setCenter(editor(schema));
+			try {
+				root.setCenter(editor(schema));
+			} catch (RuntimeException e) {
+				// Otherwise lost in the CompletableFuture, leaving "Loading…"
+				showFailure(root, "Can't show the editor", e);
+				return;
+			}
 			Button save = new Button("Save RO-Crate Metadata File…");
 			save.setId("save");
 			save.setOnAction(e -> save(stage));
@@ -161,6 +181,16 @@ public class CrateEditor extends Application {
 		entities.getSelectionModel().select(crate.getRoot());
 		changed();
 		return split;
+	}
+
+	private static void showFailure(BorderPane root, String what, Throwable failure) {
+		Throwable cause = failure instanceof CompletionException && failure.getCause() != null ? failure.getCause()
+				: failure;
+		System.getLogger(CrateEditor.class.getName()).log(System.Logger.Level.ERROR, what, cause);
+		Label label = new Label(what + ": " + cause);
+		label.setId("failure");
+		label.setWrapText(true);
+		root.setCenter(label);
 	}
 
 	/**

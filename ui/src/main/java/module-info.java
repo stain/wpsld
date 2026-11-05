@@ -18,10 +18,9 @@
 module no.s11.wpsld.ui {
 	requires javafx.graphics;
 	requires javafx.controls;
-    //requires javafx.base;
-    requires javafx.fxml;
     requires no.s11.wpsld;
     requires com.fasterxml.jackson.databind;
-    opens no.s11.wpsld.ui to javafx.fxml,javafx.graphics;
+    // JavaFX creates the Application by reflection
+    opens no.s11.wpsld.ui to javafx.graphics;
 
 }

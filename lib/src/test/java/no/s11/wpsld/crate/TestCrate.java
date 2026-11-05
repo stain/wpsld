@@ -22,9 +22,14 @@ import static org.junit.Assert.*;
 import java.util.List;
 import java.util.Optional;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+
 import org.junit.Test;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
 public class TestCrate {
@@ -182,5 +187,76 @@ public class TestCrate {
 		assertEquals("Dataset", graph.get(1).get("@type").asText());
 		assertEquals("#person-1", graph.get(1).get("author").get("@id").asText());
 		assertEquals(2, graph.get(2).get("@type").size());
+	}
+
+	@Test(expected = IllegalArgumentException.class)
+	public void typeRequired() {
+		new Entity("#x", "Thing").setTypes(List.of());
+	}
+
+	@Test(expected = IllegalArgumentException.class)
+	public void idNotAProperty() {
+		new Entity("#x", "Thing").set("@id", Optional.of(JSON.textNode("#y")));
+	}
+
+	@Test
+	public void labelFallsBackToId() {
+		Entity entity = new Entity("#x", "Thing");
+		entity.set("name", Optional.of(JSON.objectNode().put("@id", "#name")));
+		assertEquals("#x", entity.getLabel());
+		entity.set("name", Optional.of(JSON.textNode("  ")));
+		assertEquals("#x", entity.getLabel());
+	}
+
+	@Test
+	public void identifiersFromProfileTypes() {
+		// No colon from a compact type name like ldac:Speaker in the @id
+		assertEquals("#ldac-speaker-1", new Crate().add("ldac:Speaker").getId());
+	}
+
+	@Test
+	public void renameToSameIdChangesNothing() {
+		Crate crate = new Crate();
+		Entity alice = crate.add("Person");
+		crate.rename(alice, alice.getId());
+		assertEquals("#person-1", alice.getId());
+	}
+
+	@Test
+	public void mergeWithItselfChangesNothing() {
+		Crate crate = new Crate();
+		Entity alice = crate.add("Person");
+		alice.setAll("name", List.of(JSON.textNode("Alice")));
+		crate.merge(alice, alice);
+		assertEquals(2, crate.getEntities().size());
+		assertEquals(List.of(JSON.textNode("Alice")), alice.getAll("name"));
+	}
+
+	/**
+	 * The exact JSON written, so that changes to the output are noticed.
+	 */
+	@Test
+	public void goldenFile() throws Exception {
+		Crate crate = new Crate();
+		Entity root = crate.getRoot();
+		root.setAll("name", List.of(JSON.textNode("Example crate")));
+		root.setAll("description", List.of(JSON.textNode("An example, with ÆØÅ")));
+		root.setAll("datePublished", List.of(JSON.textNode("2026-11-05")));
+		root.setAll("license", List.of(JSON.objectNode().put("@id", "http://spdx.org/licenses/CC0-1.0")));
+		Entity alice = crate.add("Person");
+		alice.setAll("name", List.of(JSON.textNode("Alice")));
+		Entity file = crate.add("File");
+		file.setTypes(List.of("File", "SoftwareSourceCode"));
+		// Scripts MUST have a name (RO-Crate 1.3)
+		file.setAll("name", List.of(JSON.textNode("Example script")));
+		crate.rename(file, "code.py");
+		root.setAll("author", List.of(JSON.objectNode().put("@id", alice.getId())));
+		root.setAll("hasPart", List.of(JSON.objectNode().put("@id", "code.py")));
+		String written = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT)
+				.writeValueAsString(crate.toJson());
+		try (InputStream expected = getClass().getResourceAsStream("expected-ro-crate-metadata.json")) {
+			assertNotNull(expected);
+			assertEquals(new String(expected.readAllBytes(), StandardCharsets.UTF_8).strip(), written.strip());
+		}
 	}
 }

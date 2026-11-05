@@ -5,7 +5,9 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.lang.System.Logger;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -60,6 +62,8 @@ public class SchemaFromJsonLd {
 	 * retained (about 2.5 MB rather than 14 MB for schema.org).
 	 */
 	private JsonLdGraph jsonld;
+	private static final Logger LOGGER = System.getLogger(SchemaFromJsonLd.class.getName());
+	private final List<String> warnings = new ArrayList<>();
 	private final Map<URI, ClassDef> classes;
 	private final Map<URI, PropertyDef> properties;
 	private final Map<URI, List<ClassDef>> subclasses;
@@ -122,6 +126,20 @@ public class SchemaFromJsonLd {
 				.collect(Collectors.groupingByConcurrent(Map.Entry::getKey, Collectors.collectingAndThen(
 						Collectors.mapping(Map.Entry::getValue, Collectors.toList()),
 						list -> list.stream().sorted(Comparator.comparing(DefinedTerm::getName)).toList()))));
+	}
+
+	/**
+	 * Problems the quality checks found while loading that did not stop it,
+	 * e.g. a property whose domain is not a known class. Also logged, as
+	 * there may be no console to see them (e.g. javaw on Windows).
+	 */
+	public List<String> getWarnings() {
+		return Collections.unmodifiableList(warnings);
+	}
+
+	private void warn(String warning) {
+		warnings.add(warning);
+		LOGGER.log(Logger.Level.WARNING, warning);
 	}
 
 	public Map<URI, ClassDef> getClasses() {
@@ -301,16 +319,14 @@ public class SchemaFromJsonLd {
 				continue; // Not defined by schema.org, but used structurally in SoSS
 			}
 			if (!properties.containsKey(property)) {
-				System.err.println(
-						"Can't find property " + property + " from subPropertyOf in " + propertydef);
+				warn("Can't find property " + property + " from subPropertyOf in " + propertydef);
 			}
 		}
 
 		for (ClassDef domainDef : propertydef.getDomainIncludes()) {
 			URI domain = domainDef.getID();
 			if (!classes.containsKey(domain)) {
-				System.err.println(
-						"Can't find class " + domain + " from domainIncludes in " + propertydef);
+				warn("Can't find class " + domain + " from domainIncludes in " + propertydef);
 			}
 			// TODO: Ensure domains are subclasses of Thing (type) and not Datatype
 		}

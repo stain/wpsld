@@ -20,6 +20,7 @@ package no.s11.wpsld.crate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -62,7 +63,8 @@ public class Crate {
 	 * Add an entity with a new local identifier like <code>#person-1</code>.
 	 */
 	public Entity add(String type) {
-		String prefix = "#" + type.toLowerCase() + "-";
+		// e.g. #person-1, or #ldac-speaker-1 for ldac:Speaker
+		String prefix = "#" + type.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-") + "-";
 		int n = 1;
 		while (get(prefix + n).isPresent()) {
 			n++;

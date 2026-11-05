@@ -77,7 +77,7 @@ crossTargets.keySet().each { target ->
 
 javafx {
     version = "27.0.1"
-    modules = [ 'javafx.controls', 'javafx.fxml' ]
+    modules = [ 'javafx.controls' ]
 }
 
 dependencies {

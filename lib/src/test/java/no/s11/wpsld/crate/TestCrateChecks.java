@@ -63,4 +63,35 @@ public class TestCrateChecks {
 		List<String> dangling = CrateChecks.check(crate).stream().filter(p -> p.contains("not an entity")).toList();
 		assertEquals(List.of("./ has distribution dat, which is not an entity in the crate"), dangling);
 	}
+
+	private static Crate completeCrate() {
+		Crate crate = new Crate();
+		Entity root = crate.getRoot();
+		root.setAll("name", List.of(JSON.textNode("My crate")));
+		root.setAll("description", List.of(JSON.textNode("Some data")));
+		root.setAll("license", List.of(JSON.objectNode().put("@id", "http://spdx.org/licenses/CC0-1.0")));
+		root.setAll("datePublished", List.of(JSON.textNode("2026-11-05")));
+		return crate;
+	}
+
+	@Test
+	public void singleDatePublished() {
+		Crate crate = completeCrate();
+		crate.getRoot().setAll("datePublished", List.of(JSON.textNode("2026-11-05"), JSON.textNode("2026-11-06")));
+		assertEquals(List.of("The root data entity must have a single datePublished"), CrateChecks.check(crate));
+	}
+
+	@Test
+	public void absoluteReferencesAreFine() {
+		Crate crate = completeCrate();
+		crate.getRoot().setAll("author", List.of(JSON.objectNode().put("@id", "https://orcid.org/0000-0002-1825-0097")));
+		assertEquals(List.of(), CrateChecks.check(crate));
+	}
+
+	@Test
+	public void rootMayHaveMoreTypes() {
+		Crate crate = completeCrate();
+		crate.getRoot().setTypes(List.of("Dataset", "Profile"));
+		assertEquals(List.of(), CrateChecks.check(crate));
+	}
 }

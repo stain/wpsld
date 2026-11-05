@@ -76,4 +76,47 @@ public class TestSchemaOrgFormFields {
 		assertTrue(new SchemaOrgFormFields(new SchemaFromJsonLd())
 				.fieldsFor(Set.of(URI.create("http://example.com/Unknown"))).isEmpty());
 	}
+
+	@Test
+	public void severalTypesShareGroups() {
+		List<FormField> fields = new SchemaOrgFormFields(new SchemaFromJsonLd())
+				.fieldsFor(Set.of(URI.create(S + "Dataset"), URI.create(S + "SoftwareSourceCode")));
+		List<String> names = fields.stream().map(FormField::name).toList();
+		// Each property once, though both types are CreativeWorks
+		assertEquals(names.size(), Set.copyOf(names).size());
+		assertTrue(names.contains("distribution"));
+		assertTrue(names.contains("programmingLanguage"));
+		List<String> groups = fields.stream().map(FormField::group).distinct().toList();
+		assertEquals(1, groups.stream().filter("CreativeWork"::equals).count());
+		// The shared superclasses come after both types
+		assertTrue(groups.indexOf("CreativeWork") > groups.indexOf("Dataset"));
+		assertTrue(groups.indexOf("CreativeWork") > groups.indexOf("SoftwareSourceCode"));
+		assertEquals("Thing", groups.get(groups.size() - 1));
+	}
+
+	@Test
+	public void numberKind() {
+		FormField pages = new SchemaOrgFormFields(new SchemaFromJsonLd())
+				.fieldsFor(Set.of(URI.create(S + "Book"))).stream().filter(f -> f.name().equals("numberOfPages"))
+				.findFirst().orElseThrow();
+		assertEquals(ValueKind.NUMBER, pages.kind());
+	}
+
+	@Test
+	public void schemaOrgHasNoCardinality() {
+		// 0..*: nothing required, no maximum
+		for (FormField field : datasetFields) {
+			assertEquals(0, field.minCount());
+			assertFalse(field.isRequired());
+			assertTrue(field.maxCount().isEmpty());
+		}
+	}
+
+	@Test
+	public void supersededTypesLeftOutOfRanges() {
+		SchemaFromJsonLd schema = new SchemaFromJsonLd();
+		for (FormField field : datasetFields) {
+			assertTrue(field.name(), field.range().stream().noneMatch(schema::isSuperseded));
+		}
+	}
 }
