@@ -65,7 +65,10 @@ def imageZips = tasks.register('imageZips')
 crossTargets.keySet().each { target ->
     def imageZip = tasks.register("imageZip-${target}", Zip) {
         dependsOn tasks.named('jlink')
-        from(layout.buildDirectory.dir("image/wpsld-${target}"))
+        from(layout.buildDirectory.dir("image/wpsld-${target}")) {
+            // jlink writes both launchers for every platform; keep only this one's
+            exclude(target.startsWith('windows') ? 'bin/wpsld' : 'bin/*.bat')
+        }
         into("wpsld-${target}")
         archiveFileName = "wpsld-${target}.zip"
         destinationDirectory = layout.buildDirectory.dir('image-zip')
