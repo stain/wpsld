@@ -364,6 +364,30 @@ superclass where the profile gives one (`rdfs:subClassOf`, e.g. `Event`), or
 otherwise a default such as `CreativeWork` or `Thing`. Superclasses of a
 selected type need not be added, as elsewhere (see PLAN.md).
 
+### Later: converting MASP to SHACL
+
+A converter from MASP rules to SHACL shapes should be fairly direct for the
+constraints: unroll the `prov:specializationOf` intermediaries (a class rule
+becomes a node shape for the vocabulary type, a property rule a property
+shape with `sh:path` the specialised property), and map the rest to existing
+SHACL terms: `sh:minCount`/`sh:maxCount` as they are, class-rule ranges as
+`sh:node`/`sh:class`, data types as `sh:datatype`, `PropertyValue` literals as
+`sh:hasValue`/`sh:in`, regexes as `sh:pattern` (with `sh:flags`), and
+`ItemList`/`DefinedTermSet` values as `sh:in`.
+
+The tricky part is **selecting the focus nodes**: RO-Crate types are not
+specific enough. `Dataset` is the type of both the root data entity and every
+folder, so `sh:targetClass schema:Dataset` would apply the root's rules to
+all folders. The root must be found by a pattern instead: it is what the
+metadata descriptor is `about`. In SHACL Core that could be a shape targeting
+the descriptor (`sh:targetNode`, its `@id` being fixed) with a property shape
+`sh:path schema:about` and `sh:node` to the root's shape, though the
+descriptor's IRI depends on the base the crate is parsed with; otherwise
+SPARQL-based targets (SHACL-AF) are needed. MASP's class-rule cardinality on
+instances in the whole crate also has no direct SHACL Core counterpart.
+rocrate-validator uses SHACL for the RO-Crate profiles and is worth comparing
+for how it selects the root.
+
 ### Open questions
 
 - MASP is still a prototype, so how stable are the rule shapes? Which MASP
