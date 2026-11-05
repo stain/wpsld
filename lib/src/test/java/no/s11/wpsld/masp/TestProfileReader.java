@@ -66,6 +66,9 @@ public class TestProfileReader {
 		assertEquals(29, profile.propertyRules().size());
 		assertEquals("#class_MetadataDescriptor", profile.descriptorRule().orElseThrow());
 		assertEquals("#class_ProfileDataset", profile.rootRule().orElseThrow());
+		// The absolute root @id and the conformance indicator
+		assertTrue(profile.identifiers().contains(profile.id()));
+		assertTrue(profile.identifiers().contains(profile.id() + "#profile"));
 
 		ClassRule root = profile.classRule("#class_ProfileDataset").orElseThrow();
 		assertEquals(new Cardinality(OptionalInt.of(1), OptionalInt.of(1)), root.instances());
@@ -107,6 +110,10 @@ public class TestProfileReader {
 		assertEquals(3, profile.classRules().size());
 		assertEquals(6, profile.propertyRules().size());
 		assertEquals("#Root_Data_Entity", profile.rootRule().orElseThrow());
+		// The root is ./, the identifier comes from the conformance indicators
+		assertEquals("./", profile.id());
+		assertEquals(List.of("https://language-research-technology.github.io/ro-crate-masp/profiles/ro-crate/profile-crate/"),
+				profile.identifiers());
 		assertEquals(List.of("datePublished", "description", "license", "name"),
 				labels(profile.propertiesOf("#Root_Data_Entity")));
 		// A rule whose @id is the schema.org property itself, and a range
@@ -175,6 +182,13 @@ public class TestProfileReader {
 		assertTrue(profile.hasErrors());
 		assertTrue(reports(profile, Severity.ERROR, "so the profile has no rules"));
 		assertTrue(profile.classRules().isEmpty());
+	}
+
+	@Test
+	public void noIdentifiersReported() {
+		Profile profile = profile("");
+		assertEquals(List.of(), profile.identifiers());
+		assertTrue(reports(profile, Severity.WARNING, "crates can't say they conform to this profile"));
 	}
 
 	@Test

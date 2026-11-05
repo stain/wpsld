@@ -75,6 +75,7 @@ public class ProfileReader {
 	private static final String PROV_SPECIALIZATION_OF = "http://www.w3.org/ns/prov#specializationOf";
 	private static final String S = "http://schema.org/";
 	private static final String SCHEMA_ROLE = PROF + "role/schema";
+	private static final String CONFORMANCE_ROLE = "https://w3id.org/ro/conformance-indicators";
 	/** A constraint written like a JavaScript regular expression, e.g. /^readme\.md$/i */
 	private static final Pattern JS_REGEX = Pattern.compile("^/(.*)/([a-z]*)$", Pattern.DOTALL);
 
@@ -118,7 +119,8 @@ public class ProfileReader {
 			Optional<Crate> crate = document.crate();
 			if (crate.isEmpty()) {
 				error("The profile crate could not be read, see its problems");
-				return profile("", Optional.empty(), Optional.empty(), List.of(), Optional.empty(), Optional.empty());
+				return profile("", List.of(), Optional.empty(), Optional.empty(), List.of(), Optional.empty(),
+						Optional.empty());
 			}
 			Entity root = crate.get().getRoot();
 			if (!document.hasType(root, PROF + "Profile")) {
@@ -127,6 +129,7 @@ public class ProfileReader {
 			Optional<String> name = text(root, S + "name");
 			Optional<String> version = text(root, S + "version");
 			List<String> isProfileOf = document.references(root, PROF + "isProfileOf");
+			List<String> identifiers = identifiers(root);
 
 			Set<String> ruleIds = ruleIds(root);
 			for (String id : ruleIds) {
@@ -144,14 +147,38 @@ public class ProfileReader {
 			checkDomains();
 			Optional<String> descriptorRule = descriptorRule();
 			Optional<String> rootRule = descriptorRule.flatMap(this::rootRule);
-			return profile(root.getId(), name, version, isProfileOf, descriptorRule, rootRule);
+			return profile(root.getId(), identifiers, name, version, isProfileOf, descriptorRule, rootRule);
 		}
 
-		private Profile profile(String id, Optional<String> name, Optional<String> version, List<String> isProfileOf,
-				Optional<String> descriptorRule, Optional<String> rootRule) {
-			return new Profile(id, name, version, isProfileOf, Collections.unmodifiableMap(classRules),
+		private Profile profile(String id, List<String> identifiers, Optional<String> name, Optional<String> version,
+				List<String> isProfileOf, Optional<String> descriptorRule, Optional<String> rootRule) {
+			return new Profile(id, identifiers, name, version, isProfileOf, Collections.unmodifiableMap(classRules),
 					Collections.unmodifiableMap(propertyRules), descriptorRule, rootRule, document,
 					problems);
+		}
+
+		/**
+		 * The profile's identifiers: the elements of the ItemList that the
+		 * conformance indicators resource points to, and the root's @id if
+		 * absolute (a profile crate's root is often ./).
+		 */
+		private List<String> identifiers(Entity root) {
+			Set<String> identifiers = new LinkedHashSet<>();
+			if (isAbsolute(root.getId())) {
+				identifiers.add(root.getId());
+			}
+			for (String resourceId : document.references(root, PROF + "hasResource")) {
+				document.entity(resourceId)
+						.filter(r -> document.references(r, PROF + "hasRole").contains(CONFORMANCE_ROLE))
+						.ifPresent(r -> document.references(r, PROF + "hasArtifact").stream()
+								.map(document::entity).flatMap(Optional::stream)
+								.forEach(list -> identifiers.addAll(document.references(list, S + "itemListElement"))));
+			}
+			if (identifiers.isEmpty()) {
+				warn("No conformance indicators, and the root's @id " + root.getId()
+						+ " is not absolute, so crates can't say they conform to this profile");
+			}
+			return List.copyOf(identifiers);
 		}
 
 		/**

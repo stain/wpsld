@@ -23,3 +23,11 @@ dependencies {
     testImplementation 'junit:junit:4.13'
 
 }
+
+// The tests serve profile crates with the JDK's HTTP server
+tasks.named('compileTestJava') {
+    options.compilerArgs += ['--add-modules', 'jdk.httpserver', '--add-reads', 'no.s11.wpsld=jdk.httpserver']
+}
+tasks.named('test') {
+    jvmArgs '--add-modules', 'jdk.httpserver', '--add-reads', 'no.s11.wpsld=jdk.httpserver'
+}

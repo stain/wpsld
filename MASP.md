@@ -364,6 +364,42 @@ superclass where the profile gives one (`rdfs:subClassOf`, e.g. `Event`), or
 otherwise a default such as `CreativeWork` or `Thing`. Superclasses of a
 selected type need not be added, as elsewhere (see PLAN.md).
 
+### Bundled and dynamic profiles
+
+- **Bundled:** the core RO-Crate profile (`profiles/ro-crate`) is bundled in
+  `lib/src/main/resources/masp-profiles/`, listed in `masp-profiles.json`
+  with its identifiers, source, commit and SHA-256. Upstream has no releases,
+  so profiles are pinned to a commit with `scripts/update-masp-profiles.sh
+  <commit> [profile...]`, and updates are reviewed as a diff. Tests check
+  the checksums and that each bundled profile reads.
+- **Identifiers:** a profile crate's root is often `./`, so crates name it in
+  `conformsTo` by its conformance indicators (an `ItemList` under the role
+  `https://w3id.org/ro/conformance-indicators`), which `ProfileReader` reads
+  as `Profile.identifiers()`.
+- **Dynamic:** other profiles (e.g. LDAC) are loaded when needed with
+  `ProfileCache.load(URI)` (`https:`, `http:` or `file:`, of the crate or its
+  folder): time limits, never throws, failures not cached so they can be
+  retried; loaded profiles are kept for the session and found by identifier.
+- **Next, caching like JSON-LD Java:** its default client is Apache
+  HttpClient 4's `CachingHttpClientBuilder` (in memory, 500 entries of up to
+  256 kB, HTTP caching headers honoured, else one day), with the
+  `jarcache.json` documents layered in front as cached responses. Rather than
+  adding HttpClient (not modular, see the SHACL survey), keep Java's
+  `HttpClient` and add our own disk cache layer: bundled → memory → disk
+  (`ETag`, `Last-Modified`, `max-age`) → network with conditional requests
+  (`304` reuses the copy), and a stored copy used when offline, with a
+  warning that it may be out of date.
+
+### Testing with Jena
+
+Generating SHACL from MASP (below) needs no library. To run the generated
+shapes, and to validate our own `ro-crate-metadata.json` independently of our
+code, Apache Jena 6.2 (`jena-shacl`, with JSON-LD parsing) can be a
+**test-only** Gradle dependency: it runs on the module path with a few fixes
+(see the survey), and keeping it out of the application avoids its ~15 MB and
+the module descriptors jlink would need. The tests can run in the Temurin
+container rather than the conda env.
+
 ### Later: converting MASP to SHACL
 
 A converter from MASP rules to SHACL shapes should be fairly direct for the
