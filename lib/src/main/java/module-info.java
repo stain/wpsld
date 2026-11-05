@@ -19,5 +19,10 @@ module no.s11.wpsld {
     
     requires edu.kit.datamanager.ro_crate;
     requires com.fasterxml.jackson.databind;
+    requires org.apache.commons.rdf.api;
+    requires org.apache.jena.commonsrdf;
+    requires org.apache.jena.arq;
     exports no.s11.wpsld;
+    exports no.s11.wpsld.arcp;
+    exports no.s11.wpsld.soss;
 }

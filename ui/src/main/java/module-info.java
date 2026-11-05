@@ -20,6 +20,8 @@ module no.s11.wpsld.ui {
 	requires javafx.controls;
     //requires javafx.base;
     requires javafx.fxml;
+    requires java.net.http;
+    requires jakarta.json;
     opens no.s11.wpsld.ui to javafx.fxml,javafx.graphics;
 
 }

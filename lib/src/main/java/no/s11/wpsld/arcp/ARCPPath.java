@@ -1,0 +1,199 @@
+/*
+ * Copyright 2023 The University of Manchester, UK
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+package no.s11.wpsld.arcp;
+
+import java.io.IOException;
+import java.net.URI;
+import java.nio.file.FileSystem;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.WatchEvent.Kind;
+import java.nio.file.WatchEvent.Modifier;
+import java.util.Optional;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
+
+import no.s11.wpsld.WPSLDPath;
+import no.s11.wpsld.util.Value;
+
+/**
+ * Path using the arcp:// URI scheme from a base directory.
+ * <p>
+ * This path functions as an alias of another path that 
+ * is promoted into a root directory. This means that relative
+ * paths like ".." and symbolic links can't resolve
+ * outside the given root directory. 
+ */
+public final class ARCPPath implements Path,WPSLDPath {
+    private ARCPFileSystem filesystem;
+    private String path;
+    private URI uri;
+
+    ARCPPath(ARCPFileSystem fs) {
+        this.filesystem = fs;
+        this.path = "/";
+        this.uri = fs.getRootURI();
+    }
+
+    ARCPPath(ARCPFileSystem fs, URI uri) {
+        this.filesystem = fs;
+        this.path = uri.getPath(); // decoded
+        this.uri = uri;
+    }
+
+
+    ARCPPath(ARCPFileSystem fs, String path) {
+        this.filesystem = fs;
+        this.path = path;
+        this.uri = new URIFromPath(path, fs.getRootURI()).get();
+    }
+
+    public ARCPPath getPath() { 
+        return this;
+    }
+
+    @Override
+    public FileSystem getFileSystem() {
+       return filesystem;
+    }
+
+    @Override
+    public boolean isAbsolute() {
+        return uri.isAbsolute();
+    }
+
+    @Override
+    public Path getRoot() {
+        if (! isAbsolute()) { 
+            return null;
+        }
+        return new ARCPPath(filesystem);
+    }
+
+    @Override
+    public Path getFileName() {
+        Value<Optional<Path>> filename = new FileNamePath(filesystem, path);
+        if (filename.get().isPresent()) {
+            return filename.get().get();
+        } else {
+            return null;
+        }
+    }
+
+    @Override
+    public Path getParent() {
+        Value<Optional<Path>> parent = new ParentPath(filesystem, uri);
+        if (parent.get().isPresent()) {
+            return parent.get().get();
+        } else {
+            return null;
+        }
+    }
+
+    @Override
+    public int getNameCount() {
+        if (this.path.equals("/")) {
+            return 0;
+        }
+        String[] split = this.path.split("/");
+        if (isAbsolute()) {
+            return split.length - 1;
+        } else { 
+            return split.length;
+        }
+    }
+
+    @Override
+    public Path getName(int index) {
+        String[] split = this.path.split("/");
+        if (isAbsolute()) {
+            // There's nothing before first /
+            index++;
+        }
+        if (index < 0 || index > split.length-1) {
+            throw new IllegalArgumentException("Invalid path index");
+        }
+        return new ARCPPath(filesystem, split[index]);
+    }
+
+    @Override
+    public Path subpath(int beginIndex, int endIndex) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'subpath'");
+    }
+
+    @Override
+    public boolean startsWith(Path other) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'startsWith'");
+    }
+
+    @Override
+    public boolean endsWith(Path other) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'endsWith'");
+    }
+
+    @Override
+    public Path normalize() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'normalize'");
+    }
+
+    @Override
+    public Path resolve(Path other) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'resolve'");
+    }
+
+    @Override
+    public Path relativize(Path other) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'relativize'");
+    }
+
+    @Override
+    public URI toUri() {
+        return uri;
+    }
+
+    @Override
+    public Path toAbsolutePath() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'toAbsolutePath'");
+    }
+
+    @Override
+    public Path toRealPath(LinkOption... options) throws IOException {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'toRealPath'");
+    }
+
+    @Override
+    public WatchKey register(WatchService watcher, Kind<?>[] events, Modifier... modifiers) throws IOException {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'register'");
+    }
+
+    @Override
+    public int compareTo(Path other) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'compareTo'");
+    }
+    
+}
