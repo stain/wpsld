@@ -36,6 +36,8 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.VPos;
+import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
@@ -43,6 +45,8 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Control;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TitledPane;
@@ -81,16 +85,19 @@ public class EntityEditor extends ScrollPane {
 	private final Supplier<List<String>> entityIds;
 	/** Called after the entity is changed */
 	private final Runnable onChange;
+	/** Creates a new entity of the given type in the crate */
+	private final Function<String, Entity> newEntity;
 
 	private final VBox form = new VBox(8);
 	private Entity entity;
 
 	public EntityEditor(SchemaFromJsonLd schema, FormFields formFields, Supplier<List<String>> entityIds,
-			Runnable onChange) {
+			Runnable onChange, Function<String, Entity> newEntity) {
 		this.schema = schema;
 		this.formFields = formFields;
 		this.entityIds = entityIds;
 		this.onChange = onChange;
+		this.newEntity = newEntity;
 		form.setPadding(new Insets(10));
 		setContent(form);
 		setFitToWidth(true);
@@ -272,7 +279,9 @@ public class EntityEditor extends ScrollPane {
 		for (FormField field : fields) {
 			Label label = new Label(field.label() + (field.isRequired() ? " *" : ""));
 			field.comment().map(EntityEditor::tooltip).ifPresent(label::setTooltip);
-			grid.addRow(row++, label, control(field));
+			GridPane.setValignment(label, VPos.TOP);
+			label.setPadding(new Insets(4, 0, 0, 0));
+			grid.addRow(row++, label, new FieldEditor(field).node());
 		}
 		return grid;
 	}
@@ -290,51 +299,138 @@ public class EntityEditor extends ScrollPane {
 	}
 
 	/**
-	 * A control for a field, showing the entity's current value and
-	 * updating the entity when edited.
+	 * Edits the values of one field: a row per value, a button to add
+	 * another value (up to the field's maximum), and for references, a menu
+	 * to create a new entity of the field's range and link it.
 	 */
-	private Control control(FormField field) {
-		String rangeNames = field.range().stream().map(ClassDef::getName).collect(Collectors.joining(" or "));
-		String current = entity.get(field.name()).map(EntityEditor::text).orElse("");
-		Control control = switch (field.kind()) {
-		case BOOLEAN -> {
-			ComboBox<String> combo = new ComboBox<>(FXCollections.observableArrayList("", "true", "false"));
-			combo.setValue(current);
-			combo.valueProperty().addListener((obs, old, v) -> update(field, v));
-			yield combo;
-		}
-		case DATE -> {
-			DatePicker picker = new DatePicker();
-			picker.setPromptText("YYYY-MM-DD");
-			picker.getEditor().setText(current);
-			picker.getEditor().textProperty().addListener((obs, old, v) -> update(field, v));
-			yield picker;
-		}
-		case REFERENCE, TEXT_OR_REFERENCE -> {
-			// Suggest the other entities of the crate, like Crate-O
-			ComboBox<String> combo = new ComboBox<>(FXCollections.observableArrayList(
-					entityIds.get().stream().filter(id -> !id.equals(entity.getId())).toList()));
-			combo.setEditable(true);
-			combo.setPromptText(field.kind() == ValueKind.REFERENCE ? "@id of " + rangeNames
-					: rangeNames + " (text, or @id of an entity)");
-			combo.getEditor().setText(current);
-			combo.getEditor().textProperty().addListener((obs, old, v) -> update(field, v));
-			yield combo;
-		}
-		default -> {
-			TextField text = new TextField(current);
-			text.setPromptText(rangeNames);
-			text.textProperty().addListener((obs, old, v) -> update(field, v));
-			yield text;
-		}
-		};
-		control.setMaxWidth(Double.MAX_VALUE);
-		return control;
-	}
+	private class FieldEditor {
+		private final FormField field;
+		private final List<Row> rows = new ArrayList<>();
+		private final VBox rowsBox = new VBox(4);
+		private final Button addValue = new Button("+");
+		private final VBox node;
 
-	private void update(FormField field, String text) {
-		entity.set(field.name(), value(field, text));
-		onChange.run();
+		/** A value row: its control and how to get the text typed in it */
+		private record Row(HBox node, Supplier<String> text) {
+		}
+
+		FieldEditor(FormField field) {
+			this.field = field;
+			List<JsonNode> values = entity.getAll(field.name());
+			if (values.isEmpty()) {
+				addRow("");
+			} else {
+				values.forEach(v -> addRow(text(v)));
+			}
+			addValue.setTooltip(new Tooltip("Add another value"));
+			addValue.setOnAction(e -> addRow(""));
+			HBox actions = new HBox(4, addValue);
+			List<ClassDef> entityTypes = field.range().stream().filter(c -> !schema.isDataType(c)).toList();
+			if (!entityTypes.isEmpty()) {
+				MenuButton create = new MenuButton("New");
+				create.setTooltip(new Tooltip("Create a new entity and link it"));
+				for (ClassDef type : entityTypes) {
+					MenuItem item = new MenuItem(type.getName());
+					item.setOnAction(e -> link(newEntity.apply(type.getName()).getId()));
+					create.getItems().add(item);
+				}
+				actions.getChildren().add(create);
+			}
+			node = new VBox(4, rowsBox, actions);
+		}
+
+		Node node() {
+			return node;
+		}
+
+		private boolean full() {
+			return field.maxCount().isPresent() && rows.size() >= field.maxCount().getAsInt();
+		}
+
+		/**
+		 * Link an entity: in the first empty row, or a new row.
+		 */
+		private void link(String id) {
+			Optional<Row> empty = rows.stream().filter(r -> r.text().get().isBlank()).findFirst();
+			if (empty.isPresent()) {
+				((ComboBox<?>) empty.get().node().getChildren().get(0)).getEditor().setText(id);
+			} else if (!full()) {
+				addRow(id);
+				update();
+			}
+		}
+
+		private void addRow(String current) {
+			String rangeNames = field.range().stream().map(ClassDef::getName).collect(Collectors.joining(" or "));
+			Control control;
+			Supplier<String> text;
+			switch (field.kind()) {
+			case BOOLEAN -> {
+				ComboBox<String> combo = new ComboBox<>(FXCollections.observableArrayList("", "true", "false"));
+				combo.setValue(current);
+				combo.valueProperty().addListener((obs, old, v) -> update());
+				control = combo;
+				text = combo::getValue;
+			}
+			case DATE -> {
+				DatePicker picker = new DatePicker();
+				picker.setPromptText("YYYY-MM-DD");
+				picker.getEditor().setText(current);
+				picker.getEditor().textProperty().addListener((obs, old, v) -> update());
+				control = picker;
+				text = picker.getEditor()::getText;
+			}
+			case REFERENCE, TEXT_OR_REFERENCE -> {
+				// Suggest the other entities of the crate, like Crate-O
+				ComboBox<String> combo = new ComboBox<>(FXCollections.observableArrayList(
+						entityIds.get().stream().filter(id -> !id.equals(entity.getId())).toList()));
+				combo.setEditable(true);
+				combo.setPromptText(field.kind() == ValueKind.REFERENCE ? "@id of " + rangeNames
+						: rangeNames + " (text, or @id of an entity)");
+				combo.getEditor().setText(current);
+				combo.getEditor().textProperty().addListener((obs, old, v) -> update());
+				control = combo;
+				text = combo.getEditor()::getText;
+			}
+			default -> {
+				TextField textField = new TextField(current);
+				textField.setPromptText(rangeNames);
+				textField.textProperty().addListener((obs, old, v) -> update());
+				control = textField;
+				text = textField::getText;
+			}
+			}
+			control.setMaxWidth(Double.MAX_VALUE);
+			HBox.setHgrow(control, Priority.ALWAYS);
+			Button remove = new Button("×");
+			remove.setTooltip(new Tooltip("Remove this value"));
+			HBox rowNode = new HBox(4, control, remove);
+			Row row = new Row(rowNode, text);
+			remove.setOnAction(e -> {
+				rows.remove(row);
+				rowsBox.getChildren().remove(rowNode);
+				if (rows.isEmpty()) {
+					addRow("");
+				}
+				update();
+			});
+			rows.add(row);
+			rowsBox.getChildren().add(rowNode);
+			addValue.setDisable(full());
+			// A single value field needs no button to add more
+			addValue.setVisible(field.maxCount().orElse(Integer.MAX_VALUE) > 1);
+			addValue.setManaged(addValue.isVisible());
+		}
+
+		/**
+		 * Set all the field's values on the entity, skipping empty rows.
+		 */
+		private void update() {
+			entity.setAll(field.name(), rows.stream().map(r -> value(field, r.text().get()))
+					.flatMap(Optional::stream).toList());
+			addValue.setDisable(full());
+			onChange.run();
+		}
 	}
 
 	/**

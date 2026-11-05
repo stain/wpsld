@@ -83,7 +83,12 @@ public class CrateEditor extends Application {
 
 	private Node editor(SchemaFromJsonLd schema) {
 		EntityEditor entityEditor = new EntityEditor(schema, new SchemaOrgFormFields(schema),
-				() -> crate.getEntities().stream().map(Entity::getId).toList(), this::changed);
+				() -> crate.getEntities().stream().map(Entity::getId).toList(), this::changed, type -> {
+					// Created from a reference field, which then links to it
+					Entity entity = crate.add(type);
+					entities.getItems().add(entity);
+					return entity;
+				});
 
 		entities.getItems().setAll(crate.getEntities());
 		entities.setCellFactory(view -> new ListCell<>() {

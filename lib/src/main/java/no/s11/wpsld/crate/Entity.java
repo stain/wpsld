@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.StreamSupport;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -88,6 +89,27 @@ public class Entity {
 			throw new IllegalArgumentException("Use setId/setTypes for " + property);
 		}
 		value.ifPresentOrElse(v -> values.put(property, v), () -> values.remove(property));
+	}
+
+	/**
+	 * All values of a property: the elements of a JSON array, the single
+	 * value, or none.
+	 */
+	public List<JsonNode> getAll(String property) {
+		return get(property).map(v -> v.isArray() ? StreamSupport.stream(v.spliterator(), false).toList() : List.of(v))
+				.orElse(List.of());
+	}
+
+	/**
+	 * Set all values of a property: removed if none, a single value as is
+	 * and several as a JSON array, as in flattened RO-Crate JSON-LD.
+	 */
+	public void setAll(String property, List<JsonNode> values) {
+		set(property, switch (values.size()) {
+		case 0 -> Optional.empty();
+		case 1 -> Optional.of(values.get(0));
+		default -> Optional.of(JsonNodeFactory.instance.arrayNode().addAll(values));
+		});
 	}
 
 	/**

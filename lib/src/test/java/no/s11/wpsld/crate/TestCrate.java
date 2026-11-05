@@ -73,6 +73,23 @@ public class TestCrate {
 	}
 
 	@Test
+	public void severalValues() {
+		Entity root = new Crate().getRoot();
+		assertEquals(List.of(), root.getAll("hasPart"));
+		JsonNode a = JSON.objectNode().put("@id", "a.txt");
+		JsonNode b = JSON.objectNode().put("@id", "b.txt");
+		root.setAll("hasPart", List.of(a));
+		// A single value is not wrapped in an array
+		assertTrue(root.get("hasPart").get().isObject());
+		assertEquals(List.of(a), root.getAll("hasPart"));
+		root.setAll("hasPart", List.of(a, b));
+		assertTrue(root.get("hasPart").get().isArray());
+		assertEquals(List.of(a, b), root.getAll("hasPart"));
+		root.setAll("hasPart", List.of());
+		assertFalse(root.get("hasPart").isPresent());
+	}
+
+	@Test
 	public void label() {
 		Entity entity = new Entity("#person-1", "Person");
 		assertEquals("#person-1", entity.getLabel());

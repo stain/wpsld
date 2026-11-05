@@ -85,9 +85,15 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   suggest a default such as `CreativeWork` or `Thing` to add alongside.
 - **Warn about RO-Crate's required types**, e.g. the root data entity
   MUST be a `Dataset`; today removing `Dataset` from `./` is allowed.
-- **Several values per property** (JSON arrays).
-- **Linked entities**: reference fields suggest the crate's entities; add
-  creating a new entity of the property's range from the field, like Crate-O.
+- **Several values per property** (JSON arrays). *Done:* each value is a
+  row with ×, "+" adds another unless the field's `maxCount` is reached
+  (schema.org gives no cardinality, so 0..*; MASP profiles will give
+  `sh:minCount`/`sh:maxCount`), and one value is written as a plain value,
+  several as an array.
+- **Linked entities from reference fields.** *Done:* "New ▾" lists the
+  entity types of the field's range and creates one in the crate, linked
+  from the field. Next: open the new entity for editing, show references by
+  the entity's name rather than `@id`.
 - Open and save `ro-crate-metadata.json`.
 - Remove the old tutorial classes (`HelloFX`, `SearchController`, `Person`).
 
