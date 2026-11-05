@@ -202,6 +202,38 @@ or profile crate.
    and schema; test that rules, cardinalities and specialisations resolve to our
    schema.org 30.0 terms.
 
+### Caching once profiles are involved
+
+Today `SchemaFromJsonLd` loads one vocabulary, schema.org 30.0, and caches its
+traversals (superclasses, domains, ranges) lazily in the `ClassDef` and
+`PropertyDef` objects, which is safe because that vocabulary never changes once
+loaded. Measured: about 14 MB retained heap, mostly the Jackson tree kept for
+lookups; the model objects themselves are well under 1 MB.
+
+With MASP that single cache is no longer enough:
+
+- **Each profile has its own view.** Which properties apply to a class,
+  which are required, their cardinality, allowed values and even labels and
+  descriptions differ per profile. Profile-specific information must never
+  be stored on the shared vocabulary objects; the profile layer (`ClassRule`,
+  `PropertyRule`) refers to vocabulary terms and adds its own rules on top.
+- **Profiles may target different schema versions.** A profile written for
+  the RO-Crate 1.2 context implies schema.org 22.0 (1.3 implies 30.0), and
+  MASP's own schema.org schema crate uses `https://` IRIs. Terms can be added,
+  superseded or retired between releases, so a profile must be resolved
+  against the vocabulary version it was written for, not silently against
+  ours. That means several vocabulary instances side by side, each pinned,
+  checksummed and cached by (vocabulary IRI, version), and shared by all
+  profiles bound to that version.
+- **Cache per view, not per term.** Results such as
+  `fieldsFor(types)` are cached per profile (or per set of profiles, when a
+  crate conforms to several and their rules are combined), keyed by profile
+  IRI and version, and lazily filled per set of types.
+- **Memory.** Holding several schema.org versions at ~14 MB each is fine, but
+  if it adds up, the Jackson tree can be dropped once a vocabulary's model is
+  fully built (every lazy value forced, e.g. by the QA checks), keeping only
+  the model objects.
+
 ### Open questions
 
 - MASP is still a prototype, so how stable are the rule shapes? Which MASP
