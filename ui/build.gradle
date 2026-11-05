@@ -20,6 +20,12 @@ jlink {
     launcher {
         name = 'hello'
     }
+    // Link JavaFX from its jmods (-PjavafxJmods=<dir>), which install the
+    // native libraries into the image; linked from the JavaFX jars they
+    // end up inside lib/modules, and JavaFX fails with "no glass".
+    if (project.hasProperty('javafxJmods')) {
+        addExtraModulePath(project.property('javafxJmods'))
+    }
 }
 
 javafx {
