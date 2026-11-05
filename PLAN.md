@@ -53,15 +53,29 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   it, re-binding it to whichever entity is edited (needs the binding above).
 - **Type selector as a pop-up**, with a search box beside the tree: search
   labels and descriptions, and trim the tree down to the matches and their
-  parents. Frees the space now taken by the tree.
-- **Changing an `@id` must update every reference to it.** The editor lets
-  you edit an entity's `@id` (except the root `./`), but today the other
+  parents. Frees the space now taken by the tree. Allows selecting several
+  types (see below).
+- **Changing an `@id` must update every reference to it.** Today the other
   entities' `{"@id": ...}` values pointing to it are left dangling. Renaming
   has to update the references in every other entity's model too (and, with
   the file system backend, possibly rename the file itself), ideally as one
   undoable change. Until then, edits of `@id` should at least warn when the
   entity is referenced.
-- **Several values per property** (JSON arrays) and multiple `@type`s.
+- **The root `@id` can change too.** RO-Crate allows the root data entity to
+  be `./` or an absolute URI (e.g. a detached crate's DOI or web address); the
+  editor currently locks it to `./`. The metadata descriptor's `about` must
+  follow the root's `@id` (today `Crate.toJson()` always writes `./`).
+- **Changing an `@id` to one that already exists** must warn, and, if the user
+  confirms, merge the two entities (types and values combined, with a choice
+  where both have a value for the same property) and repoint references.
+- **Several `@type`s.** The type selector should allow choosing more than one
+  type, making `@type` an array. A type's superclass needn't be added as well
+  (e.g. not both `CreativeWork` and `Dataset`); the selector can warn about
+  such redundant parents. Required combinations from RO-Crate still apply,
+  and are not parent and child: files MUST include `File` (e.g.
+  `["File", "SoftwareSourceCode"]`), directories `Dataset`, and a profile
+  crate's root is `["Dataset", "Profile"]`.
+- **Several values per property** (JSON arrays).
 - **Linked entities**: reference fields suggest the crate's entities; add
   creating a new entity of the property's range from the field, like Crate-O.
 - Open and save `ro-crate-metadata.json`.
