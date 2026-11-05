@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,11 +49,15 @@ public class SchemaFromJsonLd {
 	private static final URI S_RANGE_INCLUDES = URI.create(S + "rangeIncludes");
 	private static final URI S_NAME = URI.create(S + "name");
 	private static final URI S_DESCRIPTION = URI.create(S + "description");
+	private static final URI S_SUPERSEDED_BY = URI.create(S + "supersededBy");
+	private static final URI S_DATA_TYPE = URI.create(S + "DataType");
 
 	/** Prefixes from the @context of the schema.org JSON-LD */
 	private final Map<String, String> prefixes = new LinkedHashMap<>();
 	/** Nodes of the flat @graph, as subject -> property -> values */
 	private final Map<URI, Map<URI, List<JsonNode>>> graph;
+	/** Reverse links, as property -> object -> subjects, e.g. to find subclasses */
+	private final Map<URI, Map<URI, List<URI>>> inverse = new HashMap<>();
 	private final Map<URI, ClassDef> classes;
 	private final Map<URI, PropertyDef> properties;
 
@@ -69,6 +75,9 @@ public class SchemaFromJsonLd {
 		jsonld.get("@context").properties().forEach(e -> prefixes.put(e.getKey(), e.getValue().asText()));
 		this.graph = StreamSupport.stream(jsonld.get("@graph").spliterator(), false)
 				.collect(Collectors.toUnmodifiableMap(node -> expand(node.get("@id").asText()), this::propertyValues));
+		graph.forEach((subject, values) -> values.keySet().forEach(property -> objects(subject, property)
+				.forEach(object -> inverse.computeIfAbsent(property, p -> new HashMap<>())
+						.computeIfAbsent(object, o -> new ArrayList<>()).add(subject))));
 		this.classes = classes().collect(Collectors.toUnmodifiableMap(Function.identity(), this::classDef));
 		this.properties = properties().collect(Collectors.toUnmodifiableMap(Function.identity(), this::propertyDef));
 		qualityCheck();
@@ -106,6 +115,40 @@ public class SchemaFromJsonLd {
 
 	public Map<URI, PropertyDef> getProperties() {
 		return properties;
+	}
+
+	/**
+	 * Direct subclasses of a class.
+	 */
+	public Stream<ClassDef> subclasses(ClassDef classDef) {
+		return asClassDef(subjects(RDFS_SUBCLASSOF, classDef.getID()));
+	}
+
+	/**
+	 * Properties that list the class in their <code>domainIncludes</code>,
+	 * not including properties of its superclasses.
+	 */
+	public Stream<PropertyDef> propertiesOf(ClassDef classDef) {
+		return asPropertyDef(subjects(S_DOMAIN_INCLUDES, classDef.getID()));
+	}
+
+	/**
+	 * True if schema.org has retired the term in favour of another
+	 * (<code>schema:supersededBy</code>). Such terms are kept as the RO-Crate
+	 * context still includes them, but should not be used in new metadata.
+	 */
+	public boolean isSuperseded(DefinedTerm term) {
+		return objects(term.getID(), S_SUPERSEDED_BY).findAny().isPresent();
+	}
+
+	/**
+	 * True if the class is a schema.org data type like Text, URL, Date or
+	 * Boolean (or a subclass of one), whose values are literals rather than
+	 * entities.
+	 */
+	public boolean isDataType(ClassDef classDef) {
+		return objects(classDef.getID(), RDF_TYPE).anyMatch(S_DATA_TYPE::equals)
+				|| classDef.getSubClassOf().stream().anyMatch(this::isDataType);
 	}
 
 	private void qualityCheck() {
@@ -186,7 +229,7 @@ public class SchemaFromJsonLd {
 	}
 
 	private Stream<URI> subjects(URI property, URI object) {
-		return graph.keySet().stream().filter(subject -> objects(subject, property).anyMatch(object::equals));
+		return inverse.getOrDefault(property, Map.of()).getOrDefault(object, List.of()).stream();
 	}
 
 	private Stream<URI> classes() {
@@ -211,16 +254,12 @@ public class SchemaFromJsonLd {
 			}
 		} else {
 			seen.add(classDef.getID());
-			String props = asPropertyDef(subjects(S_DOMAIN_INCLUDES, classDef.getID()))
+			String props = propertiesOf(classDef)
 					.map(PropertyDef::getName)
 					.collect(Collectors.joining(", ", "(", ")"));
 			System.out.println(indent + "- " +  classDef.getName() + props);
 			subs.forEach(c -> printHierarchy(c, indent + "  ", seen));
 		}
-	}
-
-	private Stream<ClassDef> subclasses(ClassDef classDef) {
-		return asClassDef(subjects(RDFS_SUBCLASSOF, classDef.getID()));
 	}
 
 	public static void main(String[] args) {
