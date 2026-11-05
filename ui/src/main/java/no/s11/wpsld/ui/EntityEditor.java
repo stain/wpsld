@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -34,9 +35,9 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -75,6 +76,7 @@ public class EntityEditor extends Application {
 	private static final String S = "http://schema.org/";
 	private static final ObjectMapper MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
+	private CompletableFuture<SchemaFromJsonLd> schemaLoading;
 	private SchemaFromJsonLd schema;
 	private FormFields formFields;
 
@@ -86,27 +88,29 @@ public class EntityEditor extends Application {
 	private final Map<FormField, Control> controls = new LinkedHashMap<>();
 
 	@Override
+	public void init() {
+		// Load the schema while the JavaFX toolkit and window start up
+		schemaLoading = CompletableFuture.supplyAsync(SchemaFromJsonLd::new);
+	}
+
+	@Override
 	public void start(Stage stage) {
 		BorderPane root = new BorderPane(new Label("Loading schema.org " + SchemaFromJsonLd.SCHEMAORG_VERSION + "…"));
 		stage.setScene(new Scene(root, 1200, 750));
 		stage.setTitle("wpsld entity editor");
 		stage.show();
 
-		Task<SchemaFromJsonLd> loading = new Task<>() {
-			@Override
-			protected SchemaFromJsonLd call() {
-				return new SchemaFromJsonLd();
+		// The one load started in init(): if it is still running, the editor
+		// replaces the label when it completes; if done, this runs at once
+		schemaLoading.whenComplete((loaded, failure) -> Platform.runLater(() -> {
+			if (failure != null) {
+				root.setCenter(new Label("Can't load schema: " + failure));
+				return;
 			}
-		};
-		loading.setOnSucceeded(e -> {
-			schema = loading.getValue();
+			schema = loaded;
 			formFields = new SchemaOrgFormFields(schema);
 			root.setCenter(editor());
-		});
-		loading.setOnFailed(e -> root.setCenter(new Label("Can't load schema: " + loading.getException())));
-		Thread thread = new Thread(loading, "schema loader");
-		thread.setDaemon(true);
-		thread.start();
+		}));
 	}
 
 	private Node editor() {

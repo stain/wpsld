@@ -5,6 +5,8 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -12,8 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -52,61 +54,74 @@ public class SchemaFromJsonLd {
 	private static final URI S_SUPERSEDED_BY = URI.create(S + "supersededBy");
 	private static final URI S_DATA_TYPE = URI.create(S + "DataType");
 
-	/** Prefixes from the @context of the schema.org JSON-LD */
-	private final Map<String, String> prefixes = new LinkedHashMap<>();
-	/** Nodes of the flat @graph, as subject -> property -> values */
-	private final Map<URI, Map<URI, List<JsonNode>>> graph;
-	/** Reverse links, as property -> object -> subjects, e.g. to find subclasses */
-	private final Map<URI, Map<URI, List<URI>>> inverse = new HashMap<>();
+	/**
+	 * The parsed JSON-LD, only kept while loading. Once every class and
+	 * property is created and linked it is dropped, so only the model is
+	 * retained (about 2.5 MB rather than 14 MB for schema.org).
+	 */
+	private JsonLdGraph jsonld;
 	private final Map<URI, ClassDef> classes;
 	private final Map<URI, PropertyDef> properties;
+	private final Map<URI, List<ClassDef>> subclasses;
+	private final Map<URI, List<PropertyDef>> domainProperties;
+	private final Set<URI> superseded;
+	/** Classes typed directly as schema:DataType */
+	private final Set<URI> dataTypes;
 
 	public SchemaFromJsonLd() {
-		JsonNode jsonld;
+		JsonNode tree;
 		try (InputStream in = getClass().getResourceAsStream(SCHEMAORG_JSONLD)) {
 			if (in == null) {
 				throw new IllegalStateException("Can't find resource " + SCHEMAORG_JSONLD);
 			}
-			jsonld = new ObjectMapper().readTree(in);
+			tree = new ObjectMapper().readTree(in);
 		} catch (IOException e) {
 			throw new UncheckedIOException("Can't read " + SCHEMAORG_JSONLD, e);
 		}
-		// schema.org's own @context is a plain prefix map
-		jsonld.get("@context").properties().forEach(e -> prefixes.put(e.getKey(), e.getValue().asText()));
-		this.graph = StreamSupport.stream(jsonld.get("@graph").spliterator(), false)
-				.collect(Collectors.toUnmodifiableMap(node -> expand(node.get("@id").asText()), this::propertyValues));
-		graph.forEach((subject, values) -> values.keySet().forEach(property -> objects(subject, property)
-				.forEach(object -> inverse.computeIfAbsent(property, p -> new HashMap<>())
-						.computeIfAbsent(object, o -> new ArrayList<>()).add(subject))));
-		this.classes = classes().collect(Collectors.toUnmodifiableMap(Function.identity(), this::classDef));
-		this.properties = properties().collect(Collectors.toUnmodifiableMap(Function.identity(), this::propertyDef));
+		jsonld = new JsonLdGraph(tree);
+		// Create all classes and properties first; their references to each
+		// other are resolved lazily, so the order in the JSON-LD and any
+		// circular references don't matter
+		this.classes = classes().parallel().collect(Collectors.toUnmodifiableMap(Function.identity(), this::classDef));
+		this.properties = properties().parallel()
+				.collect(Collectors.toUnmodifiableMap(Function.identity(), this::propertyDef));
+		this.superseded = jsonld.graph.keySet().parallelStream()
+				.filter(iri -> jsonld.objects(iri, S_SUPERSEDED_BY).findAny().isPresent())
+				.collect(Collectors.toUnmodifiableSet());
+		this.dataTypes = jsonld.subjects(RDF_TYPE, S_DATA_TYPE).collect(Collectors.toUnmodifiableSet());
+		link();
+		this.subclasses = reverse(classes.values(), ClassDef::getSubClassOf);
+		this.domainProperties = reverse(properties.values(), PropertyDef::getDomainIncludes);
 		qualityCheck();
+		// Everything is resolved, the JSON is no longer needed
+		jsonld = null;
 	}
 
 	/**
-	 * Expand a compact URI like <code>schema:Thing</code> using the
-	 * prefixes of the JSON-LD context.
+	 * Resolve all references between classes and properties now, in
+	 * parallel, as the schema won't change after loading. (Resolving one
+	 * lazy list only looks up other terms, it never waits on another list.)
 	 */
-	private URI expand(String compact) {
-		int colon = compact.indexOf(':');
-		if (colon > 0 && prefixes.containsKey(compact.substring(0, colon))) {
-			return URI.create(prefixes.get(compact.substring(0, colon)) + compact.substring(colon + 1));
-		}
-		return URI.create(compact);
+	private void link() {
+		classes.values().parallelStream().forEach(ClassDef::getSelfAndSuperClasses);
+		properties.values().parallelStream().forEach(propertyDef -> {
+			propertyDef.getSubPropertyOf();
+			propertyDef.getDomainIncludes();
+			propertyDef.getRangeIncludes();
+		});
 	}
 
-	private Map<URI, List<JsonNode>> propertyValues(JsonNode node) {
-		Map<URI, List<JsonNode>> values = new LinkedHashMap<>();
-		node.properties().forEach(e -> {
-			if (e.getKey().equals("@id")) {
-				return;
-			}
-			URI property = e.getKey().equals("@type") ? RDF_TYPE : expand(e.getKey());
-			JsonNode value = e.getValue();
-			values.put(property, value.isArray() ? StreamSupport.stream(value.spliterator(), false).toList()
-					: List.of(value));
-		});
-		return values;
+	/**
+	 * Index terms by the classes they link to, e.g. subclasses by their
+	 * superclass, sorted by name.
+	 */
+	private static <T extends DefinedTerm> Map<URI, List<T>> reverse(Collection<T> terms,
+			Function<T, List<ClassDef>> links) {
+		return Map.copyOf(terms.parallelStream()
+				.flatMap(term -> links.apply(term).stream().map(linked -> Map.entry(linked.getID(), term)))
+				.collect(Collectors.groupingByConcurrent(Map.Entry::getKey, Collectors.collectingAndThen(
+						Collectors.mapping(Map.Entry::getValue, Collectors.toList()),
+						list -> list.stream().sorted(Comparator.comparing(DefinedTerm::getName)).toList()))));
 	}
 
 	public Map<URI, ClassDef> getClasses() {
@@ -121,7 +136,7 @@ public class SchemaFromJsonLd {
 	 * Direct subclasses of a class.
 	 */
 	public Stream<ClassDef> subclasses(ClassDef classDef) {
-		return asClassDef(subjects(RDFS_SUBCLASSOF, classDef.getID()));
+		return subclasses.getOrDefault(classDef.getID(), List.of()).stream();
 	}
 
 	/**
@@ -129,7 +144,7 @@ public class SchemaFromJsonLd {
 	 * not including properties of its superclasses.
 	 */
 	public Stream<PropertyDef> propertiesOf(ClassDef classDef) {
-		return asPropertyDef(subjects(S_DOMAIN_INCLUDES, classDef.getID()));
+		return domainProperties.getOrDefault(classDef.getID(), List.of()).stream();
 	}
 
 	/**
@@ -138,7 +153,7 @@ public class SchemaFromJsonLd {
 	 * context still includes them, but should not be used in new metadata.
 	 */
 	public boolean isSuperseded(DefinedTerm term) {
-		return objects(term.getID(), S_SUPERSEDED_BY).findAny().isPresent();
+		return superseded.contains(term.getID());
 	}
 
 	/**
@@ -147,8 +162,7 @@ public class SchemaFromJsonLd {
 	 * entities.
 	 */
 	public boolean isDataType(ClassDef classDef) {
-		return classDef.getSelfAndSuperClasses().stream()
-				.anyMatch(c -> objects(c.getID(), RDF_TYPE).anyMatch(S_DATA_TYPE::equals));
+		return classDef.getSelfAndSuperClasses().stream().map(ClassDef::getID).anyMatch(dataTypes::contains);
 	}
 
 	private void qualityCheck() {
@@ -211,38 +225,25 @@ public class SchemaFromJsonLd {
 		return literal(iri, RDFS_COMMENT);
 	}
 
-	private Stream<JsonNode> values(URI subject, URI property) {
-		return graph.getOrDefault(subject, Map.of()).getOrDefault(property, List.of()).stream();
-	}
-
 	private Optional<String> literal(URI subject, URI property) {
-		// Plain strings, or {"@language": "en", "@value": ".."}
-		return values(subject, property)
-				.map(v -> v.isTextual() ? v.asText() : v.path("@value").asText(null))
-				.filter(v -> v != null).findFirst();
+		return jsonld.literal(subject, property);
 	}
 
 	private Stream<URI> objects(URI subject, URI property) {
-		// {"@id": ".."}, or plain compact IRIs for @type
-		return values(subject, property)
-				.map(v -> property.equals(RDF_TYPE) ? v.asText(null) : v.path("@id").asText(null))
-				.filter(v -> v != null).map(this::expand);
-	}
-
-	private Stream<URI> subjects(URI property, URI object) {
-		return inverse.getOrDefault(property, Map.of()).getOrDefault(object, List.of()).stream();
+		return jsonld.objects(subject, property);
 	}
 
 	private Stream<URI> classes() {
-		return subjects(RDF_TYPE, RDFS_CLASS);
+		return jsonld.subjects(RDF_TYPE, RDFS_CLASS);
 	}
 
 	public Stream<ClassDef> rootClasses() {
-		return asClassDef(classes().filter(Predicate.not(iri -> objects(iri, RDFS_SUBCLASSOF).findAny().isPresent())));
+		return classes.values().stream().filter(c -> c.getSubClassOf().isEmpty())
+				.sorted(Comparator.comparing(DefinedTerm::getName));
 	}
 
 	private Stream<URI> properties() {
-		return subjects(RDF_TYPE, RDF_PROPERTY);
+		return jsonld.subjects(RDF_TYPE, RDF_PROPERTY);
 	}
 
 	private void printHierarchy(ClassDef classDef, String indent, Set<URI> seen) {
@@ -297,7 +298,7 @@ public class SchemaFromJsonLd {
 		for (PropertyDef propDef : propertydef.getSubPropertyOf()) {
 			URI property = propDef.getID();
 			if (property.equals(RDF_PROPERTY) || property.equals(RDFS_LABEL) || property.equals(RDF_TYPE)) {
-				return; // Not defined by schema.org, but used structurally in SoSS
+				continue; // Not defined by schema.org, but used structurally in SoSS
 			}
 			if (!properties.containsKey(property)) {
 				System.err.println(
@@ -335,6 +336,92 @@ public class SchemaFromJsonLd {
 			return new PropertyDef(iri);
 		} else {
 			return properties.get(iri);
+		}
+	}
+
+	/**
+	 * The flat <code>@graph</code> of schema.org's JSON-LD, indexed for
+	 * lookups while the model is built.
+	 */
+	private static class JsonLdGraph {
+		/** Prefixes from the @context of the schema.org JSON-LD */
+		private final Map<String, String> prefixes = new LinkedHashMap<>();
+		/** Nodes of the flat @graph, as subject -> property -> values */
+		private final Map<URI, Map<URI, List<JsonNode>>> graph;
+		/** Reverse links, as property -> object -> subjects, e.g. to find classes */
+		private final Map<URI, Map<URI, List<URI>>> inverse;
+		/**
+		 * Compact IRIs already expanded; the same few thousand terms are
+		 * referenced over and over, and parsing URIs is not cheap
+		 */
+		private final Map<String, URI> expanded = new ConcurrentHashMap<>();
+
+		JsonLdGraph(JsonNode jsonld) {
+			// schema.org's own @context is a plain prefix map
+			jsonld.get("@context").properties().forEach(e -> prefixes.put(e.getKey(), e.getValue().asText()));
+			List<JsonNode> nodes = new ArrayList<>();
+			jsonld.get("@graph").forEach(nodes::add);
+			this.graph = nodes.parallelStream()
+					.collect(Collectors.toUnmodifiableMap(node -> expand(node.get("@id").asText()), this::propertyValues));
+			record Link(URI property, URI object, URI subject) {
+			}
+			this.inverse = graph.entrySet().parallelStream()
+					.flatMap(node -> node.getValue().keySet().stream().flatMap(
+							property -> objects(node.getKey(), property).map(o -> new Link(property, o, node.getKey()))))
+					.collect(Collectors.groupingByConcurrent(Link::property, Collectors.groupingBy(Link::object,
+							Collectors.mapping(Link::subject, Collectors.toList()))));
+		}
+
+		/**
+		 * Expand a compact URI like <code>schema:Thing</code> using the
+		 * prefixes of the JSON-LD context.
+		 */
+		private URI expand(String compact) {
+			return expanded.computeIfAbsent(compact, this::expandUncached);
+		}
+
+		private URI expandUncached(String compact) {
+			int colon = compact.indexOf(':');
+			if (colon > 0 && prefixes.containsKey(compact.substring(0, colon))) {
+				return URI.create(prefixes.get(compact.substring(0, colon)) + compact.substring(colon + 1));
+			}
+			return URI.create(compact);
+		}
+
+		private Map<URI, List<JsonNode>> propertyValues(JsonNode node) {
+			Map<URI, List<JsonNode>> values = new LinkedHashMap<>();
+			node.properties().forEach(e -> {
+				if (e.getKey().equals("@id")) {
+					return;
+				}
+				URI property = e.getKey().equals("@type") ? RDF_TYPE : expand(e.getKey());
+				JsonNode value = e.getValue();
+				values.put(property, value.isArray() ? StreamSupport.stream(value.spliterator(), false).toList()
+						: List.of(value));
+			});
+			return values;
+		}
+
+		private Stream<JsonNode> values(URI subject, URI property) {
+			return graph.getOrDefault(subject, Map.of()).getOrDefault(property, List.of()).stream();
+		}
+
+		Optional<String> literal(URI subject, URI property) {
+			// Plain strings, or {"@language": "en", "@value": ".."}
+			return values(subject, property)
+					.map(v -> v.isTextual() ? v.asText() : v.path("@value").asText(null))
+					.filter(v -> v != null).findFirst();
+		}
+
+		Stream<URI> objects(URI subject, URI property) {
+			// {"@id": ".."}, or plain compact IRIs for @type
+			return values(subject, property)
+					.map(v -> property.equals(RDF_TYPE) ? v.asText(null) : v.path("@id").asText(null))
+					.filter(v -> v != null).map(this::expand);
+		}
+
+		Stream<URI> subjects(URI property, URI object) {
+			return inverse.getOrDefault(property, Map.of()).getOrDefault(object, List.of()).stream();
 		}
 	}
 }
