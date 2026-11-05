@@ -83,10 +83,19 @@ javafx {
 dependencies {
     // Use JUnit test framework.
     testImplementation 'junit:junit:4.13'
+    // GUI tests, run headless with JavaFX's own headless platform (JavaFX 26+)
+    testImplementation 'org.testfx:testfx-junit:4.0.18'
 
     implementation project(':lib')
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.4'
 
+}
+
+test {
+    systemProperty 'glass.platform', 'headless'
+    systemProperty 'testfx.robot', 'glass'
+    systemProperty 'prism.order', 'sw'
+    jvmArgs '--enable-native-access=javafx.graphics'
 }
 
 application { 

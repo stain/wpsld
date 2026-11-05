@@ -197,17 +197,20 @@ public class EntityEditor extends ScrollPane {
 			name.setStyle("-fx-font-weight: bold;");
 			classDef(type).flatMap(ClassDef::getComment).map(EntityEditor::tooltip).ifPresent(name::setTooltip);
 			Button remove = new Button("×");
+			remove.setId(id("removeType", type));
 			remove.setStyle("-fx-padding: 0 4 0 4;");
 			// Removing the last type falls back to Thing, so a lone Thing stays
 			remove.setDisable(!entityTypes.canRemove(entity.getTypes(), type));
 			remove.setOnAction(e -> removeType(type));
 			HBox chip = new HBox(4, name, remove);
+			chip.setId(id("type", type));
 			chip.setAlignment(Pos.CENTER_LEFT);
 			chip.setStyle("-fx-background-color: -fx-control-inner-background; -fx-border-color: -fx-box-border;"
 					+ " -fx-border-radius: 3; -fx-padding: 2 4 2 6;");
 			chips.getChildren().add(chip);
 		}
 		Button add = new Button("Add type…");
+		add.setId("addType");
 		add.setOnAction(e -> chooseType());
 		chips.getChildren().add(add);
 		return chips;
@@ -231,6 +234,7 @@ public class EntityEditor extends ScrollPane {
 
 		GridPane header = grid();
 		TextField idField = new TextField(entity.getId());
+		idField.setId("entityId");
 		// Applied when done (Enter or leaving the field), not on every key,
 		// as intermediate identifiers could clash with other entities
 		// The entity of this form, even if focus leaves the field because
@@ -263,6 +267,7 @@ public class EntityEditor extends ScrollPane {
 		header.addRow(0, new Label("@type"), typeChips());
 		header.addRow(1, new Label("@id"), idField);
 		TextField search = new TextField(propertyQuery);
+		search.setId("propertySearch");
 		search.setPromptText("Search properties, e.g. hasPart");
 		search.textProperty().addListener((obs, old, query) -> {
 			boolean starting = old.isBlank() && !query.isBlank();
@@ -303,6 +308,7 @@ public class EntityEditor extends ScrollPane {
 				for (Map.Entry<ClassDef, Long> suggestion : suggestions) {
 					Button addSuggested = new Button("Add type " + suggestion.getKey().getName() + " ("
 							+ suggestion.getValue() + " of " + others.size() + ")");
+					addSuggested.setId(id("suggestType", suggestion.getKey().getName()));
 					suggestion.getKey().getComment().map(EntityEditor::tooltip).ifPresent(addSuggested::setTooltip);
 					addSuggested.setOnAction(e -> addType(suggestion.getKey()));
 					suggest.getChildren().add(addSuggested);
@@ -311,6 +317,7 @@ public class EntityEditor extends ScrollPane {
 			}
 			TitledPane pane = new TitledPane("Not properties of " + String.join(", ", entity.getTypes()) + " ("
 					+ others.size() + ")", grid);
+			pane.setId("otherProperties");
 			pane.setAnimated(false);
 			form.getChildren().add(pane);
 		}
@@ -387,6 +394,7 @@ public class EntityEditor extends ScrollPane {
 			int row = 0;
 			for (FormField field : fields) {
 				Label label = new Label(field.label() + (field.isRequired() ? " *" : ""));
+				label.setId(id("label", field.name()));
 				field.comment().map(EntityEditor::tooltip).ifPresent(label::setTooltip);
 				GridPane.setValignment(label, VPos.TOP);
 				label.setPadding(new Insets(4, 0, 0, 0));
@@ -467,12 +475,14 @@ public class EntityEditor extends ScrollPane {
 			} else {
 				values.forEach(v -> addRow(text(v)));
 			}
+			addValue.setId(id("add", field.name()));
 			addValue.setTooltip(new Tooltip("Add another value"));
 			addValue.setOnAction(e -> addRow(""));
 			HBox actions = new HBox(4, addValue);
 			List<ClassDef> entityTypes = field.range().stream().filter(c -> !schema.isDataType(c)).toList();
 			if (!entityTypes.isEmpty()) {
 				MenuButton create = new MenuButton("New");
+				create.setId(id("new", field.name()));
 				create.setTooltip(new Tooltip("Create a new entity and link it"));
 				for (ClassDef type : entityTypes) {
 					MenuItem item = new MenuItem(type.getName());
@@ -482,6 +492,7 @@ public class EntityEditor extends ScrollPane {
 				actions.getChildren().add(create);
 			}
 			node = new VBox(4, rowsBox, actions);
+			node.setId(id("field", field.name()));
 		}
 
 		Node node() {
@@ -538,6 +549,7 @@ public class EntityEditor extends ScrollPane {
 			}
 			}
 			control.setMaxWidth(Double.MAX_VALUE);
+			control.setId(id("value", field.name()) + "-" + rows.size());
 			HBox.setHgrow(control, Priority.ALWAYS);
 			Button remove = new Button("×");
 			remove.setTooltip(new Tooltip("Remove this value"));
@@ -681,6 +693,14 @@ public class EntityEditor extends ScrollPane {
 		} catch (URISyntaxException e) {
 			return false;
 		}
+	}
+
+	/**
+	 * A node id from a property or type name, for tests and styling; CSS ids
+	 * can't contain e.g. the colon of <code>ldac:Speaker</code>.
+	 */
+	static String id(String prefix, String name) {
+		return prefix + "-" + name.replaceAll("[^A-Za-z0-9_-]", "_");
 	}
 
 	static Tooltip tooltip(String text) {

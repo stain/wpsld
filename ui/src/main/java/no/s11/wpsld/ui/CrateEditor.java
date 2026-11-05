@@ -95,6 +95,7 @@ public class CrateEditor extends Application {
 			}
 			root.setCenter(editor(schema));
 			Button save = new Button("Save RO-Crate Metadata File…");
+			save.setId("save");
 			save.setOnAction(e -> save(stage));
 			root.setTop(new ToolBar(save));
 		}));
@@ -110,6 +111,7 @@ public class CrateEditor extends Application {
 					return entity;
 				}, this::rename);
 
+		entities.setId("entities");
 		entities.getItems().setAll(crate.getEntities());
 		entities.setCellFactory(view -> new ListCell<>() {
 			@Override
@@ -126,6 +128,7 @@ public class CrateEditor extends Application {
 		});
 
 		Button add = new Button("Add entity");
+		add.setId("addEntity");
 		add.setOnAction(e -> {
 			// A Thing to start with, and straight away choose its type, which
 			// replaces Thing (not needed for entities added from a property)
@@ -136,6 +139,7 @@ public class CrateEditor extends Application {
 			Platform.runLater(entityEditor::chooseType);
 		});
 		Button remove = new Button("Remove");
+		remove.setId("removeEntity");
 		remove.disableProperty().bind(entities.getSelectionModel().selectedIndexProperty().lessThanOrEqualTo(0));
 		remove.setOnAction(e -> {
 			Entity entity = entities.getSelectionModel().getSelectedItem();
@@ -148,6 +152,7 @@ public class CrateEditor extends Application {
 		VBox.setVgrow(entities, Priority.ALWAYS);
 		VBox entityList = new VBox(new Label(" Entities"), entities, buttons);
 
+		preview.setId("preview");
 		preview.setEditable(false);
 		preview.setStyle("-fx-font-family: monospace;");
 

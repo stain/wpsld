@@ -18,6 +18,10 @@ FROM docker.io/library/eclipse-temurin:${TEMURIN_VERSION}_${TEMURIN_BUILD}-jdk A
 ARG TEMURIN_VERSION
 ARG TEMURIN_BUILD
 
+# Pango for JavaFX text layout, needed by the headless GUI tests
+RUN apt-get update && apt-get install -y --no-install-recommends libpangoft2-1.0-0 \
+ && rm -rf /var/lib/apt/lists/*
+
 # Keep in sync with javafx.version in ui/build.gradle
 ARG JAVAFX_VERSION=27.0.1
 ARG JAVAFX_LINUX_JMODS_SHA256=323ceb45b938485f6921d7c31c994cc649adb1f75b16192580ff84a3119694ba

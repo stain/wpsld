@@ -109,6 +109,21 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   shares, OneDrive) with a small program run on Windows.
 - Decide how contextual entities are stored when crates live as xattrs.
 
+### Testing
+
+- `lib`: JUnit 4 unit tests (`./gradlew :lib:test`).
+- `ui`: GUI tests with [TestFX](https://github.com/TestFX/TestFX) 4.0.18
+  (`TestEntityEditor`, `TestCrateEditor`), run **headless** with JavaFX's own
+  headless platform (JavaFX 26+; `-Dglass.platform=headless
+  -Dtestfx.robot=glass -Dprism.order=sw`, see `ui/build.gradle`), so they run
+  in the conda env, the container and CI without a display or Monocle. On
+  Linux they need Pango (`libpangoft2`) for text layout, as on any desktop.
+- Controls the tests use have ids: `entityId`, `propertySearch`, `addType`,
+  `type-<Type>`, `removeType-<Type>`, `label-<property>`, `field-<property>`,
+  `value-<property>-<n>`, `add-<property>`, `new-<property>`,
+  `otherProperties`, `suggestType-<Type>`, `typeSearch`, `typeTree`,
+  `entities`, `addEntity`, `removeEntity`, `save`, `preview`.
+
 ### Start-up
 
 - Try AppCDS (`-XX:+AutoCreateSharedArchive`) or the Java 25 AOT cache in the

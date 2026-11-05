@@ -62,9 +62,11 @@ public class TypeSelector extends Dialog<ClassDef> {
 		setResizable(true);
 
 		TextField search = new TextField();
+		search.setId("typeSearch");
 		search.setPromptText("Search type names and descriptions");
 		search.textProperty().addListener((obs, old, query) -> filter(query));
 
+		tree.setId("typeTree");
 		tree.setCellFactory(view -> new TreeCell<>() {
 			@Override
 			protected void updateItem(ClassDef classDef, boolean empty) {
