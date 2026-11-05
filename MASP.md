@@ -232,6 +232,24 @@ or profile crate.
    ordered property rules (required first), falling back to the vocabulary's
    `domainIncludes` (including superclasses) for "other properties" when no
    profile or no rule applies.
+
+   With a profile, the form distinguishes three kinds of properties for an
+   entity's type(s):
+
+   | Kind | From | In the form |
+   |------|------|-------------|
+   | **Required** | property rules of the matching class rule with `sh:minCount` ≥ 1 | first, open, marked as required, using the profile's label and description; saving warns while they are missing |
+   | **Optional, named by the profile** | property rules without `sh:minCount` (or 0) | next, open: what the profile suggests describing |
+   | **Other properties of the type** | the vocabulary (e.g. schema.org `domainIncludes`) of the type and its superclasses, not named by the profile | last, folded (and searchable), grouped by defining class as today, so nothing schema.org allows is out of reach |
+
+   `sh:maxCount` limits the values of the first two kinds ("+" hidden at the
+   maximum; 1 means a single value); range constraints (`PropertyValue`,
+   `ItemList`) shape their controls. For the third kind the vocabulary is the
+   one the profile is bound to (see caching above), and for a class rule
+   specialising a term outside schema.org (e.g. `ldac:CollectionEvent`), its
+   `rdfs:subClassOf` superclasses and any schema crate defining it. Values the
+   entity has outside all three stay under "Not properties of …" as today.
+   Without a profile (the default) there is only the third kind, as now.
    In the editor, a **profile drop-down** chooses the `FormFields` used: the
    default is today's schema.org fields (`SchemaOrgFormFields`, in effect
    "no profile"), and the MASP profiles that can be loaded are listed after
