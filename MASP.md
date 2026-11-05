@@ -177,6 +177,19 @@ then ranges over the root data entity's class rule.
   `http://schema.org/`; MASP's own schema.org *schema crate* uses
   `https://schema.org/`. Treat them as the same namespace and normalise to
   `http://schema.org/` (as our pinned 30.0 file and the RO-Crate 1.3 context do).
+- **`sh:` is not defined.** MASP crates use `sh:minCount`/`sh:maxCount`, but
+  their context (`["https://w3id.org/ro/crate/1.2/context", {"@vocab":
+  "http://schema.org/"}]`) doesn't define the `sh` prefix, so in JSON-LD
+  they are absolute IRIs with the scheme `sh`, not SHACL terms. The MASP
+  JavaScript tools match the written key. `CrateReader` reports the undefined
+  prefix once; the profile reader should accept both `sh:minCount` and
+  `http://www.w3.org/ns/shacl#minCount` (and suggest MASP define the prefix).
+- **Reading profile crates.** `CrateReader` reads them into a `CrateDocument`
+  whose `types()`, `values()` and `references()` work by expanded IRI (so
+  `domainIncludes` and `schema:domainIncludes` match, `https://schema.org/`
+  taken as `http://`). The MASP profile crate (13 classes, 29 properties) and
+  the minimal RO-Crate profile (3, 6) load without errors; test fixtures
+  pinned to commit `6d7a018`.
 - **Loose literals.** `sh:minCount` appears both as numbers and strings (`"1"`);
   values can be single objects or arrays; regexes are JavaScript-style `/…/flags`
   and need translating to `java.util.regex`.

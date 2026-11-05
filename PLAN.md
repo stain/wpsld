@@ -107,7 +107,12 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   loaded, keep unsupported values untouched (shown read-only, written back
   as they were), and report each problem rather than throwing. MASP profile
   and schema crates are RO-Crates too, so this reader is also the first step
-  of MASP.
+  of MASP. *Reader done* (`CrateReader` → `CrateDocument`, on the `masp`
+  branch): never throws, ERROR/WARNING problems (errors first), unknown terms
+  and undefined prefixes reported once each, duplicates merged, values kept as
+  written; reads our own output back unchanged. Next: open crates in the
+  editor, showing the problems, and keep the read `@context` and descriptor
+  when writing back (today `Crate.toJson()` writes RO-Crate 1.3's).
 - **More RO-Crate requirements in the save checks**, e.g. scripts and
   workflows (`SoftwareSourceCode`, `ComputationalWorkflow`) MUST have a
   `name`, found by rocrate-validator; better covered by validation from the
