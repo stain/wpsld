@@ -28,6 +28,9 @@ import java.nio.file.attribute.UserDefinedFileAttributeView;
 
 import org.junit.Test;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import no.s11.wpsld.WPSLD;
 import no.s11.wpsld.WPSLDPath;
 
@@ -49,5 +52,28 @@ public class TestWrittenMetadata {
         Path writtenMetadata = written.getPath().resolve(RO_CRATE_METADATA_JSON);
         assertTrue("metadata should now be written", 
         		Files.exists(writtenMetadata));
+    }
+
+    @Test
+    public void metadataContent() throws IOException {
+        WPSLDPath root = WPSLD.Factory.create().newRoot();
+        UserDefinedFileAttributeView view = Files.getFileAttributeView(root.getPath(), UserDefinedFileAttributeView.class);
+        view.write("wpsld.name", ByteBuffer.wrap("Blåbærsyltetøy".getBytes("UTF-8")));
+        view.write("unrelated.attribute", ByteBuffer.wrap("ignored".getBytes("UTF-8")));
+        new WrittenMetadata(root);
+
+        JsonNode crate = new ObjectMapper().readTree(root.getPath().resolve(RO_CRATE_METADATA_JSON).toFile());
+        assertEquals("https://w3id.org/ro/crate/1.3/context", crate.get("@context").asText());
+        JsonNode descriptor = crate.get("@graph").get(0);
+        assertEquals(RO_CRATE_METADATA_JSON, descriptor.get("@id").asText());
+        assertEquals("CreativeWork", descriptor.get("@type").asText());
+        assertEquals("./", descriptor.get("about").get("@id").asText());
+        assertEquals("https://w3id.org/ro/crate/1.3", descriptor.get("conformsTo").get("@id").asText());
+        JsonNode rootDataEntity = crate.get("@graph").get(1);
+        assertEquals("./", rootDataEntity.get("@id").asText());
+        assertEquals("Dataset", rootDataEntity.get("@type").asText());
+        assertEquals("Blåbærsyltetøy", rootDataEntity.get("name").asText());
+        assertFalse(rootDataEntity.has("attribute"));
+        assertFalse(rootDataEntity.has("unrelated.attribute"));
     }
 }
