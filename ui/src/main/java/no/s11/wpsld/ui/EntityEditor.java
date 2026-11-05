@@ -66,6 +66,7 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
 import no.s11.wpsld.crate.CrateTerms;
@@ -118,6 +119,8 @@ public class EntityEditor extends ScrollPane {
 	private final List<Notebook.Tab> notebookTabs = new ArrayList<>();
 	/** Fields on each page of the notebook */
 	static final int FIELDS_PER_PAGE = 8;
+	/** Properties shown fixed under @id rather than in the groups */
+	static final List<String> FIXED = List.of("name", "description");
 	/** The form's groups of fields */
 	private final List<FieldGroup> groups = new ArrayList<>();
 	/** Text of the property search, kept while the same entity is shown */
@@ -243,7 +246,35 @@ public class EntityEditor extends ScrollPane {
 		add.setId("addType");
 		add.setOnAction(e -> chooseType());
 		chips.getChildren().add(add);
+		// Types the profile requires, e.g. Dataset for the root; a subtype will do
+		for (URI required : formFields.requiredTypes(typeIris(), entity == root.get())) {
+			Optional<ClassDef> requiredClass = Optional.ofNullable(schema.getClasses().get(required));
+			boolean has = requiredClass.map(c -> entityTypes.isA(entity.getTypes(), c))
+					.orElse(typeIris().contains(required));
+			if (!has) {
+				String name = requiredClass.map(terms::name).orElse(required.toString());
+				Label notice = new Label("Required type: " + name);
+				notice.setId(id("requiredType", name));
+				notice.setStyle("-fx-text-fill: #b00000; -fx-font-weight: bold;");
+				notice.setTooltip(tooltip("The profile " + formFields.getName() + " requires this entity to be a "
+						+ name + " (or a kind of " + name + ")"));
+				chips.getChildren().add(notice);
+				requiredClass.ifPresent(c -> {
+					Button addRequired = new Button("Add " + name);
+					addRequired.setId(id("addRequiredType", name));
+					addRequired.setOnAction(e -> addType(c));
+					chips.getChildren().add(addRequired);
+				});
+			}
+		}
 		return chips;
+	}
+
+	/**
+	 * The entity's types as IRIs, also those outside schema.org.
+	 */
+	private Set<URI> typeIris() {
+		return entity.getTypes().stream().map(terms::iri).flatMap(Optional::stream).collect(Collectors.toSet());
 	}
 
 	/**
@@ -295,17 +326,6 @@ public class EntityEditor extends ScrollPane {
 		});
 		header.addRow(0, new Label("@type"), typeChips());
 		header.addRow(1, new Label("@id"), idField);
-		TextField search = new TextField(propertyQuery);
-		search.setId("propertySearch");
-		search.setPromptText("Search properties, e.g. hasPart");
-		search.textProperty().addListener((obs, old, query) -> {
-			boolean starting = old.isBlank() && !query.isBlank();
-			propertyQuery = query;
-			applySearch(starting);
-		});
-		if (!notebookMode) {
-			header.addRow(2, new Label("Properties"), search);
-		}
 		form.getChildren().add(header);
 		noMatches.setVisible(false);
 		noMatches.setManaged(false);
@@ -313,9 +333,39 @@ public class EntityEditor extends ScrollPane {
 		groups.clear();
 
 		notebookTabs.clear();
-		List<FormField> fields = formFields.fieldsFor(entity.getTypes().stream().map(this::classDef)
-				.flatMap(Optional::stream).map(ClassDef::getID).collect(Collectors.toSet()), entity == root.get());
-		Set<String> fieldNames = fields.stream().map(FormField::name).collect(Collectors.toSet());
+		List<FormField> allFields = formFields.fieldsFor(typeIris(), entity == root.get());
+		// name and description fixed under @id, as every entity should have
+		// a name, rather than among Thing's properties
+		List<FormField> fields = new ArrayList<>(allFields);
+		int headerRow = 2;
+		for (String fixed : FIXED) {
+			Optional<FormField> field = allFields.stream().filter(f -> f.name().equals(fixed)).findFirst();
+			if (field.isPresent()) {
+				fields.remove(field.get());
+				Map<FormField, List<Node>> nodes = new LinkedHashMap<>();
+				GridPane one = fieldsGrid(List.of(field.get()), nodes);
+				List<Node> labelAndEditor = nodes.get(field.get());
+				one.getChildren().removeAll(labelAndEditor);
+				header.addRow(headerRow++, labelAndEditor.get(0), labelAndEditor.get(1));
+			}
+		}
+		if (!notebookMode) {
+			// A search, not a field to fill in: small, on the right
+			TextField search = new TextField(propertyQuery);
+			search.setId("propertySearch");
+			search.setPromptText("Search properties");
+			search.setPrefColumnCount(14);
+			search.textProperty().addListener((obs, old, query) -> {
+				boolean starting = old.isBlank() && !query.isBlank();
+				propertyQuery = query;
+				applySearch(starting);
+			});
+			Region spacer = new Region();
+			HBox.setHgrow(spacer, Priority.ALWAYS);
+			HBox searchBar = new HBox(spacer, search);
+			form.getChildren().add(searchBar);
+		}
+		Set<String> fieldNames = allFields.stream().map(FormField::name).collect(Collectors.toSet());
 
 		// Values the current type has no field for, e.g. after changing type
 		List<String> others = entity.getValues().keySet().stream().filter(name -> !fieldNames.contains(name))

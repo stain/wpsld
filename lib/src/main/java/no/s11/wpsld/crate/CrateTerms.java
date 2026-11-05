@@ -93,6 +93,14 @@ public class CrateTerms {
 	}
 
 	/**
+	 * The IRI of a type or property name as written in a crate, through the
+	 * RO-Crate context, also for terms outside schema.org (e.g. Profile).
+	 */
+	public Optional<URI> iri(String term) {
+		return context.expandTerm(term).map(URI::create);
+	}
+
+	/**
 	 * The schema.org class for a type name as written in a crate, e.g.
 	 * <code>MediaObject</code> for <code>File</code>.
 	 */

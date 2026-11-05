@@ -26,7 +26,9 @@ import org.junit.Test;
 import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
+import javafx.scene.Node;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
@@ -123,8 +125,9 @@ public class TestCrateEditor extends ApplicationTest {
 		ComboBox<FormFields> profile = lookup("#profile").queryComboBox();
 		assertEquals("RO-Crate Machine Actionable Profile 0.1.0", profile.getValue().getName());
 		List<String> labels = visibleProperties();
-		assertEquals(List.of("datePublished *", "description *", "license *", "name *"), labels.subList(0, 4));
-		assertTrue(lookup("Required by RO-Crate Machine Actionable Profile 0.1.0 (4)").tryQuery().isPresent());
+		// name and description fixed under @id, then the other required ones
+		assertEquals(List.of("name *", "description *", "datePublished *", "license *"), labels.subList(0, 4));
+		assertTrue(lookup("Required by RO-Crate Machine Actionable Profile 0.1.0 (2)").tryQuery().isPresent());
 	}
 
 	@Test
@@ -167,5 +170,74 @@ public class TestCrateEditor extends ApplicationTest {
 		clickOn("#viewList");
 		assertTrue(lookup("#notebook").tryQuery().isEmpty());
 		assertTrue(visibleProperties().contains("name *"));
+	}
+
+	private Hyperlink previewLink(String containerId, String text) {
+		return from(lookup(containerId).queryAs(Node.class)).lookup(".hyperlink").queryAllAs(Hyperlink.class).stream()
+				.filter(l -> l.getText().equals(text)).findFirst().orElseThrow(() -> new AssertionError(text));
+	}
+
+	/**
+	 * The preview shows the selected entity, with links that open the
+	 * entities it refers to, and those referring to it.
+	 */
+	@Test
+	public void previewLinks() {
+		entities();
+		assertTrue(lookup("#previewTab").tryQuery().isPresent());
+		assertEquals("./", lookup("#previewName").queryAs(Label.class).getText());
+		// Link the root to a new DataDownload
+		clickOn("#propertySearch").write("distribution");
+		clickOn("#new-distribution");
+		clickOn("DataDownload");
+		Entity download = entities().getItems().get(1);
+		clickOn(previewLink("#previewProperties", download.getId()));
+		// Opened for editing, and previewed
+		assertSame(download, entities().getSelectionModel().getSelectedItem());
+		assertEquals(download.getId(), lookup("#previewName").queryAs(Label.class).getText());
+		assertEquals(download.getId(), lookup("#entityId").queryAs(TextField.class).getText());
+		// Back via the entity referring to it
+		clickOn(previewLink("#previewReferencedBy", "./ (distribution)"));
+		assertSame(entities().getItems().get(0), entities().getSelectionModel().getSelectedItem());
+		// And the link to the crate's root from any other entity
+		interact(() -> entities().getSelectionModel().select(download));
+		clickOn("#previewRoot");
+		assertSame(entities().getItems().get(0), entities().getSelectionModel().getSelectedItem());
+	}
+
+	@Test
+	public void previewUpdatesWhileEditing() {
+		entities();
+		clickOn("#propertySearch").write("name");
+		TextField name = lookup("#value-name-0").queryAs(TextField.class);
+		clickOn(name).write("My crate");
+		assertEquals("My crate", lookup("#previewName").queryAs(Label.class).getText());
+		clickOn("#propertySearch").eraseText(4).write("license");
+		clickOn(lookup("#value-license-0").queryAs(ComboBox.class).getEditor())
+				.write("http://spdx.org/licenses/CC0-1.0");
+		// A web address, not an entity of the crate, opens in the browser
+		Hyperlink license = previewLink("#previewProperties", "http://spdx.org/licenses/CC0-1.0");
+		assertEquals("Open in the browser", license.getTooltip().getText());
+	}
+
+	/**
+	 * The profile requires the root to be a Dataset; a subtype would do.
+	 */
+	@Test
+	public void requiredTypeNotice() {
+		entities();
+		clickOn("#value-name-0").write("My crate");
+		assertFalse(lookup("#requiredType-Dataset").tryQuery().isPresent());
+		clickOn("#addType");
+		clickOn("#typeSearch").write("person").type(KeyCode.ENTER);
+		clickOn("#removeType-Dataset");
+		Entity root = entities().getItems().get(0);
+		assertEquals(List.of("Person"), root.getTypes());
+		assertTrue(lookup("#requiredType-Dataset").tryQuery().isPresent());
+		// name is fixed under @id, a property of any type
+		assertFalse(lookup("#otherProperties").tryQuery().isPresent());
+		clickOn("#addRequiredType-Dataset");
+		assertEquals(List.of("Person", "Dataset"), root.getTypes());
+		assertFalse(lookup("#requiredType-Dataset").tryQuery().isPresent());
 	}
 }

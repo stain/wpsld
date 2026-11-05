@@ -134,4 +134,11 @@ public class TestProfileFormFields {
 	public void schemaOrgOnlyRequiresNothing() {
 		assertEquals(List.of(), RequiredFields.check(new Crate(), new SchemaOrgFormFields(terms), terms));
 	}
+
+	@Test
+	public void requiredTypeOfRoot() {
+		assertEquals(List.of(URI.create(S + "Dataset")), core.requiredTypes(Set.of(), true));
+		assertEquals(List.of(), core.requiredTypes(DATASET, false));
+		assertEquals(List.of(), new SchemaOrgFormFields(terms).requiredTypes(Set.of(), true));
+	}
 }

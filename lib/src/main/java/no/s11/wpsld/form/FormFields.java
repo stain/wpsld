@@ -46,6 +46,14 @@ public interface FormFields {
 	}
 
 	/**
+	 * Types the entity must have (or a subtype of one), e.g. Dataset for the
+	 * root data entity by a profile; none by default.
+	 */
+	default List<URI> requiredTypes(Set<URI> types, boolean root) {
+		return List.of();
+	}
+
+	/**
 	 * A name to show for this choice of fields, e.g. in a drop-down.
 	 */
 	String getName();

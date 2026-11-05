@@ -46,6 +46,8 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
@@ -85,6 +87,7 @@ public class CrateEditor extends Application {
 	private final Crate crate = new Crate();
 	private final ListView<Entity> entities = new ListView<>();
 	private final TextArea preview = new TextArea();
+	private EntityPreview entityPreview;
 	private EntityEditor entityEditor;
 	private EntityTypes entityTypes;
 	private CrateTerms terms;
@@ -223,6 +226,7 @@ public class CrateEditor extends Application {
 		entities.getSelectionModel().selectedItemProperty().addListener((obs, old, entity) -> {
 			if (entity != null) {
 				entityEditor.edit(entity);
+				entityPreview.show(entity);
 			}
 		});
 
@@ -255,7 +259,17 @@ public class CrateEditor extends Application {
 		preview.setEditable(false);
 		preview.setStyle("-fx-font-family: monospace;");
 
-		SplitPane split = new SplitPane(entityList, entityEditor, preview);
+		// On the right, a preview of the entity (with links to the entities it
+		// refers to, which open them) and the crate's JSON-LD
+		entityPreview = new EntityPreview(() -> crate, entities.getSelectionModel()::select,
+				address -> getHostServices().showDocument(address));
+		Tab previewTab = new Tab("Preview", entityPreview);
+		previewTab.setId("previewTab");
+		Tab jsonTab = new Tab("JSON-LD", preview);
+		jsonTab.setId("jsonTab");
+		TabPane views = new TabPane(previewTab, jsonTab);
+		views.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+		SplitPane split = new SplitPane(entityList, entityEditor, views);
 		split.setDividerPositions(0.2, 0.66);
 		entities.getSelectionModel().select(crate.getRoot());
 		changed();
@@ -356,6 +370,9 @@ public class CrateEditor extends Application {
 	 */
 	private void changed() {
 		entities.refresh();
+		if (entityPreview != null) {
+			entityPreview.refresh();
+		}
 		try {
 			preview.setText(MAPPER.writeValueAsString(crate.toJson()));
 		} catch (JsonProcessingException e) {

@@ -27,7 +27,6 @@ import java.util.stream.Collectors;
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
-import no.s11.wpsld.soss.ClassDef;
 
 /**
  * Checks that the crate's entities have the values their form fields
@@ -44,8 +43,8 @@ public class RequiredFields {
 		for (Entity entity : crate.getEntities()) {
 			boolean root = entity == crate.getRoot();
 			String who = root ? "The root data entity" : entity.getLabel();
-			Set<URI> types = entity.getTypes().stream().map(terms::classDef).flatMap(Optional::stream)
-					.map(ClassDef::getID).collect(Collectors.toSet());
+			Set<URI> types = entity.getTypes().stream().map(terms::iri).flatMap(Optional::stream)
+					.collect(Collectors.toSet());
 			for (FormField field : fields.fieldsFor(types, root)) {
 				int values = entity.getAll(field.name()).size();
 				if (values < field.minCount()) {

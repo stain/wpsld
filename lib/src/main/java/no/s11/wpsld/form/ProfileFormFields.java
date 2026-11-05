@@ -93,6 +93,19 @@ public class ProfileFormFields implements FormFields {
 		return fields;
 	}
 
+	/**
+	 * For the root data entity, the types its rule specialises (the core
+	 * RO-Crate profile: Dataset).
+	 */
+	@Override
+	public List<URI> requiredTypes(Set<URI> types, boolean root) {
+		if (!root) {
+			return List.of();
+		}
+		return profile.rootRule().flatMap(profile::classRule).stream()
+				.flatMap(r -> r.specializationOf().stream()).map(URI::create).toList();
+	}
+
 	private List<ClassRule> rulesFor(Set<URI> types, boolean root) {
 		if (root && profile.rootRule().isPresent()) {
 			return profile.rootRule().flatMap(profile::classRule).stream().toList();

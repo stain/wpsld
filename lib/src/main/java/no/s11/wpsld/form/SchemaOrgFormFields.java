@@ -40,6 +40,7 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
  */
 public class SchemaOrgFormFields implements FormFields {
 	private static final String S = "http://schema.org/";
+	private static final URI S_THING = URI.create(S + "Thing");
 	private static final URI S_BOOLEAN = URI.create(S + "Boolean");
 	private static final URI S_NUMBER = URI.create(S + "Number");
 	private static final URI S_DATE = URI.create(S + "Date");
@@ -61,11 +62,22 @@ public class SchemaOrgFormFields implements FormFields {
 		this.schema = terms.getSchema();
 	}
 
+	/**
+	 * All properties of the types and their superclasses. Types that are not
+	 * schema.org Things (e.g. from a profile's own vocabulary) are taken as
+	 * Things, so every entity has Thing's properties, like name.
+	 */
 	@Override
 	public List<FormField> fieldsFor(Set<URI> types) {
 		List<FormField> fields = new ArrayList<>();
 		Set<URI> seenProperties = new HashSet<>();
-		for (ClassDef classDef : classAndSuperclasses(types)) {
+		Set<URI> withThing = new LinkedHashSet<>(types);
+		boolean anyThing = types.stream().map(schema.getClasses()::get).filter(Objects::nonNull)
+				.anyMatch(c -> isA(c, S_THING));
+		if (!anyThing) {
+			withThing.add(S_THING);
+		}
+		for (ClassDef classDef : classAndSuperclasses(withThing)) {
 			schema.propertiesOf(classDef)
 				.filter(p -> !schema.isSuperseded(p))
 				.filter(p -> seenProperties.add(p.getID()))

@@ -99,6 +99,10 @@ test {
     systemProperty 'testfx.robot', 'glass'
     systemProperty 'prism.order', 'sw'
     jvmArgs '--enable-native-access=javafx.graphics'
+    // A JVM per test class: TestFX shares one JavaFX toolkit between the
+    // classes of a JVM, and after TestCrateEditor the software renderer
+    // slowed TestEntityEditor down until it stalled
+    forkEvery = 1
 }
 
 application { 
