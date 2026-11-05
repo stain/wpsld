@@ -128,11 +128,30 @@ public record CrateDocument(String source, Optional<Crate> crate, JsonLdContext 
 	 */
 	public List<String> references(Entity entity, String propertyIri) {
 		return values(entity, propertyIri).stream().filter(v -> v.isObject() && v.path("@id").isTextual())
-				.map(v -> normalise(context.expandId(v.get("@id").asText()))).toList();
+				.map(v -> expandId(v.get("@id").asText())).toList();
 	}
 
+	/**
+	 * The entity with an <code>@id</code>, also if one of them is written as
+	 * a compact IRI (e.g. <code>ldac:Speaker</code> for
+	 * <code>https://w3id.org/ldac/terms#Speaker</code>).
+	 */
 	public Optional<Entity> entity(String id) {
-		return crate.flatMap(c -> c.get(id));
+		Optional<Entity> exact = crate.flatMap(c -> c.get(id));
+		if (exact.isPresent()) {
+			return exact;
+		}
+		String expanded = expandId(id);
+		return crate.flatMap(c -> c.getEntities().stream().filter(e -> expandId(e.getId()).equals(expanded))
+				.findFirst());
+	}
+
+	/**
+	 * An <code>@id</code> expanded with the context (compact IRIs) and
+	 * https://schema.org/ as http://; relative references as they are.
+	 */
+	public String expandId(String id) {
+		return normalise(context.expandId(id));
 	}
 
 	/**

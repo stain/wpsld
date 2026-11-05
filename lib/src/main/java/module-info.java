@@ -24,4 +24,5 @@ module no.s11.wpsld {
     exports no.s11.wpsld.form;
     exports no.s11.wpsld.crate;
     exports no.s11.wpsld.jsonld;
+    exports no.s11.wpsld.masp;
 }

@@ -190,6 +190,21 @@ then ranges over the root data entity's class rule.
   taken as `http://`). The MASP profile crate (13 classes, 29 properties) and
   the minimal RO-Crate profile (3, 6) load without errors; test fixtures
   pinned to commit `6d7a018`.
+- **Reading the rules.** `ProfileReader` (package `no.s11.wpsld.masp`) reads
+  a profile crate into a `Profile` of `ClassRule`s and `PropertyRule`s (label,
+  description, `prov:specializationOf`, `rdfs:subClassOf`, domain, range,
+  `Cardinality`), with ranges as class rules, IRIs, `PropertyValue`
+  constraints (literal, `@id` or `/regex/flags`) or allowed values
+  (`ItemList` elements, or the terms of a `DefinedTermSet`), and finds the
+  descriptor and root class rules. The MASP, minimal RO-Crate and LDAC
+  profiles read without problems (13/29, 3/6 and 30/99 rules, as in MASP's
+  catalogue). Findings on the way:
+  - Rule `@id`s can be absolute IRIs (`http://schema.org/name` in the
+    RO-Crate profile) or compact IRIs (`ldac:AccessTypes` in LDAC, referred
+    to expanded elsewhere), so rules are identified by expanded `@id`.
+  - Ranges are written as words, `{"@id": "Text"}`: in JSON-LD a relative
+    IRI, but meant as `schema:Text`, so read as a vocabulary term.
+  - Cardinalities are numbers or strings (`"1"`).
 - **Loose literals.** `sh:minCount` appears both as numbers and strings (`"1"`);
   values can be single objects or arrays; regexes are JavaScript-style `/…/flags`
   and need translating to `java.util.regex`.

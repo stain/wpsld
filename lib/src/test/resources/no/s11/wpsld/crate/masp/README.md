@@ -9,6 +9,7 @@ licensed Apache-2.0, at commit
 |------|--------|
 | `ro-crate-masp-profile.json` | `profiles/ro-crate-masp/profile-crate/ro-crate-metadata.json` |
 | `ro-crate-profile.json` | `profiles/ro-crate/profile-crate/ro-crate-metadata.json` |
+| `ldac-profile.json` | `profiles/ldac/profile-crate/ro-crate-metadata.json` |
 
 They are examples whose upstream copies may move or change; these pinned
 copies keep the tests stable.
