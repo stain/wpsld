@@ -20,6 +20,7 @@ package no.s11.wpsld.ui;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -32,6 +33,10 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.beans.InvalidationListener;
+import javafx.beans.WeakInvalidationListener;
+import javafx.beans.property.LongProperty;
+import javafx.beans.property.SimpleLongProperty;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -79,6 +84,8 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
  */
 public class CrateEditor extends Application {
 	private static final ObjectMapper MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+	/** Incremented on changes, to update the labels of the entity list */
+	private final LongProperty labels = new SimpleLongProperty();
 
 	private final Supplier<SchemaFromJsonLd> loadSchema;
 	private final Supplier<JsonLdContext> loadContext;
@@ -216,11 +223,25 @@ public class CrateEditor extends Application {
 		entities.setId("entities");
 		entities.getItems().setAll(crate.getEntities());
 		entities.setCellFactory(view -> new ListCell<>() {
+			// Update the text in place on changes: refreshing the whole list
+			// on each key typed made it flicker
+			private final InvalidationListener relabel = obs -> label(getItem());
+			{
+				labels.addListener(new WeakInvalidationListener(relabel));
+			}
+
 			@Override
 			protected void updateItem(Entity entity, boolean empty) {
 				super.updateItem(entity, empty);
-				setText(empty || entity == null ? null
-						: entity.getLabel() + "\n" + String.join(", ", entity.getTypes()) + "  " + entity.getId());
+				label(empty ? null : entity);
+			}
+
+			private void label(Entity entity) {
+				String text = entity == null ? null
+						: entity.getLabel() + "\n" + String.join(", ", entity.getTypes()) + "  " + entity.getId();
+				if (!Objects.equals(text, getText())) {
+					setText(text);
+				}
 			}
 		});
 		entities.getSelectionModel().selectedItemProperty().addListener((obs, old, entity) -> {
@@ -369,7 +390,7 @@ public class CrateEditor extends Application {
 	 * Refresh the entity list and the preview after a change.
 	 */
 	private void changed() {
-		entities.refresh();
+		labels.set(labels.get() + 1);
 		if (entityPreview != null) {
 			entityPreview.refresh();
 		}

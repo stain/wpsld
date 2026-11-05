@@ -30,6 +30,7 @@ import javafx.scene.Node;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
@@ -239,5 +240,19 @@ public class TestCrateEditor extends ApplicationTest {
 		clickOn("#addRequiredType-Dataset");
 		assertEquals(List.of("Person", "Dataset"), root.getTypes());
 		assertFalse(lookup("#requiredType-Dataset").tryQuery().isPresent());
+	}
+
+	/**
+	 * Typing updates the entity's label in the list without rebuilding the
+	 * list's cells, which made the list flicker.
+	 */
+	@Test
+	public void listUpdatesInPlace() {
+		entities();
+		ListCell<?> cell = from(entities()).lookup(".list-cell").queryAs(ListCell.class);
+		clickOn("#value-name-0").write("My crate");
+		ListCell<?> after = from(entities()).lookup(".list-cell").queryAs(ListCell.class);
+		assertSame(cell, after);
+		assertTrue(after.getText().startsWith("My crate\n"));
 	}
 }
