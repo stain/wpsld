@@ -17,7 +17,6 @@
  */
 module no.s11.wpsld {
     
-    requires edu.kit.datamanager.ro_crate;
     requires com.fasterxml.jackson.databind;
     exports no.s11.wpsld;
     exports no.s11.wpsld.arcp;

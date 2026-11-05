@@ -18,21 +18,28 @@
 package no.s11.wpsld.impl;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.System;
 import java.lang.System.Logger;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.UserDefinedFileAttributeView;
 import no.s11.wpsld.WPSLDPath;
 
-import edu.kit.datamanager.ro_crate.RoCrate;
-import edu.kit.datamanager.ro_crate.RoCrate.RoCrateBuilder;
-import edu.kit.datamanager.ro_crate.writer.CrateWriter;
-import edu.kit.datamanager.ro_crate.writer.Writers;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class WrittenMetadata implements WPSLDPath {
+	public static final String RO_CRATE_METADATA_JSON = "ro-crate-metadata.json";
+	public static final String RO_CRATE_1_3 = "https://w3id.org/ro/crate/1.3";
+	public static final String RO_CRATE_1_3_CONTEXT = RO_CRATE_1_3 + "/context";
+
 	private static Logger logger = System.getLogger(WrittenMetadata.class.getName());
+	private static final ObjectMapper MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 	private WPSLDPath root;
 
 	public WrittenMetadata(WPSLDPath root) throws IOException {
@@ -41,7 +48,21 @@ public class WrittenMetadata implements WPSLDPath {
 	}
 
 	private void writeMetadata() throws IOException {
-		RoCrate roCrate = new RoCrateBuilder().addName("name").addDescription("").build();
+		// Flattened, compacted JSON-LD as required by RO-Crate
+		ObjectNode crate = MAPPER.createObjectNode();
+		crate.put("@context", RO_CRATE_1_3_CONTEXT);
+		ArrayNode graph = crate.putArray("@graph");
+		ObjectNode descriptor = graph.addObject();
+		descriptor.put("@id", RO_CRATE_METADATA_JSON);
+		descriptor.put("@type", "CreativeWork");
+		descriptor.putObject("about").put("@id", "./");
+		descriptor.putObject("conformsTo").put("@id", RO_CRATE_1_3);
+		ObjectNode rootDataEntity = graph.addObject();
+		rootDataEntity.put("@id", "./");
+		rootDataEntity.put("@type", "Dataset");
+		rootDataEntity.put("name", "name");
+		rootDataEntity.put("description", "");
+
 		if (! Files.getFileStore(getPath()).supportsFileAttributeView(UserDefinedFileAttributeView.class)) {
 			throw new IOException("File system does not support extended attributes (UserDefinedFileAttributeView): " + getPath());
 		}
@@ -60,14 +81,13 @@ public class WrittenMetadata implements WPSLDPath {
 			} catch (IOException e) {
 				logger.log(Logger.Level.WARNING, "Can't read file attribute {0} from path {1}: {2}", key, getPath(), e);
 			}
-			roCrate.getRootDataEntity().addProperty(key.replaceFirst("^wpsld\\.", ""), 
+			rootDataEntity.put(key.replaceFirst("^wpsld\\.", ""), 
 			// TODO: Support { objects } and numbers etc.
-			// FIXME: Don't assume default charset
-				new String(buff.array()));
+				new String(buff.array(), StandardCharsets.UTF_8));
 		});
-		CrateWriter<String> folderRoCrateWriter = Writers.newFolderWriter();
-		// FIXME: Below assumes path is on local file system!
-		folderRoCrateWriter.save(roCrate, root.getPath().toString());
+		try (OutputStream out = Files.newOutputStream(getPath().resolve(RO_CRATE_METADATA_JSON))) {
+			MAPPER.writeValue(out, crate);
+		}
 	}
 
 	@Override
