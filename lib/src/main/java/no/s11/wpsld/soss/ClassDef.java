@@ -4,20 +4,19 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import org.apache.commons.rdf.api.IRI;
-import org.apache.commons.rdf.api.Literal;
+import java.net.URI;
 
 public class ClassDef extends DefinedTerm {
 
 	private final Stream<ClassDef> subClassOfFutures;
 	private List<ClassDef> subClassOf = null;
 
-	ClassDef(IRI iri) {
+	ClassDef(URI iri) {
 		this(iri, Optional.empty(), Optional.empty(), Stream.empty());
 	}
 
 	
-	public ClassDef(IRI iri, Optional<Literal> name, Optional<Literal> comment, Stream<ClassDef> subClassOfFutures) {
+	public ClassDef(URI iri, Optional<String> name, Optional<String> comment, Stream<ClassDef> subClassOfFutures) {
 		super(iri, name, comment);
 		this.subClassOfFutures = subClassOfFutures;
 	}

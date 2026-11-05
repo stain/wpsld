@@ -3,22 +3,21 @@ package no.s11.wpsld.soss;
 import java.util.Objects;
 import java.util.Optional;
 
-import org.apache.commons.rdf.api.IRI;
-import org.apache.commons.rdf.api.Literal;
+import java.net.URI;
 
 public class DefinedTerm {
-	private final IRI id;
+	private final URI id;
 	private final String name;
 	private final Optional<String> comment;
 
 
-	public DefinedTerm(IRI id, Optional<Literal> label, Optional<Literal> comment) {
+	public DefinedTerm(URI id, Optional<String> label, Optional<String> comment) {
 		this.id = Objects.requireNonNull(id);
-		this.name = label.map(Literal::getLexicalForm).orElse(id.getIRIString());
-		this.comment = comment.map(Literal::getLexicalForm);		
+		this.name = label.orElse(id.toString());
+		this.comment = comment;		
 	}
 	
-	public IRI getID() {
+	public URI getID() {
 		return id;
 	}
 

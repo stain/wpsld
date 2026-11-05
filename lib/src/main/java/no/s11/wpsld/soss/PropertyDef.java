@@ -4,8 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import org.apache.commons.rdf.api.IRI;
-import org.apache.commons.rdf.api.Literal;
+import java.net.URI;
 
 public class PropertyDef extends DefinedTerm {
 
@@ -16,11 +15,11 @@ public class PropertyDef extends DefinedTerm {
 	private final Stream<ClassDef> domainIncludesFutures;
 	private final Stream<ClassDef> rangeIncludesFutures;
 
-	PropertyDef(IRI id) { 
+	PropertyDef(URI id) { 
 		this(id, Optional.empty(), Optional.empty(), Stream.empty(), Stream.empty(), Stream.empty());
 	}
 	
-	PropertyDef(IRI id, Optional<Literal> name, Optional<Literal> comment,  Stream<PropertyDef> subPropertyOf, 
+	PropertyDef(URI id, Optional<String> name, Optional<String> comment,  Stream<PropertyDef> subPropertyOf, 
 			Stream<ClassDef> domainIncludes,  Stream<ClassDef> rangeIncludes) {
 		super(id, name, comment);
 		this.subPropertyOfFutures = subPropertyOf;
