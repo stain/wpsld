@@ -118,6 +118,21 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   `name`, found by rocrate-validator; better covered by validation from the
   MASP RO-Crate profile than by hand-written checks.
 
+### Look: the OS/2 Workplace Shell notebook
+
+"WPS" is named after the OS/2 Workplace Shell, whose objects each had a
+Settings (Warp 4: Properties) notebook, the Presentation Manager notebook
+control (`WC_NOTEBOOK`). `Notebook` (in `ui`, styled by `notebook.css`) is a
+prototype of Warp 4's tabbed style: overlapping pastel tabs with the selected
+one in front (`viewOrder`), selected when pressed; scroll arrows when the tabs
+don't fit; a page header with title, "Page n of m" and a dog-ear corner to
+turn the pages of a tab; optional buttons along the bottom (Undo, Default,
+Help); pages built when first shown; Ctrl+PageUp/PageDown and
+PageUp/PageDown. The entity form can be shown as a notebook (toolbar: View
+List / Notebook): groups as tabs, 8 properties per page; no property search
+there yet. Next: Undo/Default/Help, mnemonics on tabs, the Warp 3 style
+(tabs on the right, minor tabs), and whether the notebook becomes the default.
+
 ### Storage backends
 
 - `Entity` and `Crate` should become interfaces over a backend: **RO-Crate

@@ -107,6 +107,12 @@ public class EntityEditor extends ScrollPane {
 	private Entity entity;
 	/** True while an @id change is applied */
 	private boolean renaming;
+	/** Show the groups as a notebook rather than a list */
+	private boolean notebookMode;
+	/** The tabs of the notebook while building it */
+	private final List<Notebook.Tab> notebookTabs = new ArrayList<>();
+	/** Fields on each page of the notebook */
+	static final int FIELDS_PER_PAGE = 8;
 	/** The form's groups of fields */
 	private final List<FieldGroup> groups = new ArrayList<>();
 	/** Text of the property search, kept while the same entity is shown */
@@ -292,13 +298,16 @@ public class EntityEditor extends ScrollPane {
 			propertyQuery = query;
 			applySearch(starting);
 		});
-		header.addRow(2, new Label("Properties"), search);
+		if (!notebookMode) {
+			header.addRow(2, new Label("Properties"), search);
+		}
 		form.getChildren().add(header);
 		noMatches.setVisible(false);
 		noMatches.setManaged(false);
 		form.getChildren().add(noMatches);
 		groups.clear();
 
+		notebookTabs.clear();
 		List<FormField> fields = formFields.fieldsFor(entity.getTypes().stream().map(this::classDef)
 				.flatMap(Optional::stream).map(ClassDef::getID).collect(Collectors.toSet()), entity == root.get());
 		Set<String> fieldNames = fields.stream().map(FormField::name).collect(Collectors.toSet());
@@ -333,15 +342,24 @@ public class EntityEditor extends ScrollPane {
 				}
 				grid.add(suggest, 0, row, 3, 1);
 			}
-			TitledPane pane = new TitledPane("Not properties of " + String.join(", ", entity.getTypes()) + " ("
-					+ others.size() + ")", grid);
-			pane.setId("otherProperties");
-			pane.setAnimated(false);
-			form.getChildren().add(pane);
+			String title = "Not properties of " + String.join(", ", entity.getTypes()) + " (" + others.size() + ")";
+			if (notebookMode) {
+				grid.setId("otherProperties");
+				notebookTabs.add(new Notebook.Tab("Not of type", new Notebook.Page(title, () -> grid)));
+			} else {
+				TitledPane pane = new TitledPane(title, grid);
+				pane.setId("otherProperties");
+				pane.setAnimated(false);
+				form.getChildren().add(pane);
+			}
 		}
 
 		Map<String, List<FormField>> byGroup = fields.stream()
 				.collect(Collectors.groupingBy(FormField::group, LinkedHashMap::new, Collectors.toList()));
+		if (notebookMode) {
+			showNotebook(byGroup);
+			return;
+		}
 		// Groups of a profile's required and suggested properties first and
 		// open; then the vocabulary's, of which only the most specific opens
 		// when there are none of the profile's
@@ -364,6 +382,41 @@ public class EntityEditor extends ScrollPane {
 		if (!propertyQuery.isBlank()) {
 			// Still searching, e.g. after adding a type
 			applySearch(true);
+		}
+	}
+
+	/**
+	 * The groups as tabs of a notebook in the style of OS/2's Properties
+	 * notebook, each with pages of {@link #FIELDS_PER_PAGE} fields.
+	 */
+	private void showNotebook(Map<String, List<FormField>> byGroup) {
+		for (Map.Entry<String, List<FormField>> group : byGroup.entrySet()) {
+			List<FormField> groupFields = group.getValue();
+			boolean other = groupFields.get(0).tier() == FieldTier.OTHER;
+			String title = other ? "From " + group.getKey() : group.getKey() + " by " + formFields.getName();
+			List<Notebook.Page> pages = new ArrayList<>();
+			for (int from = 0; from < groupFields.size(); from += FIELDS_PER_PAGE) {
+				List<FormField> page = groupFields.subList(from, Math.min(from + FIELDS_PER_PAGE, groupFields.size()));
+				pages.add(new Notebook.Page(title, () -> fieldsGrid(page, new LinkedHashMap<>())));
+			}
+			notebookTabs.add(new Notebook.Tab(group.getKey(), pages));
+		}
+		Notebook notebook = new Notebook();
+		notebook.setId("notebook");
+		notebook.getTabs().setAll(notebookTabs);
+		VBox.setVgrow(notebook, Priority.ALWAYS);
+		form.getChildren().add(notebook);
+	}
+
+	/**
+	 * Show the form as a notebook of tabs and pages (true) or as a list of
+	 * folding groups (false).
+	 */
+	public void setNotebookMode(boolean notebookMode) {
+		this.notebookMode = notebookMode;
+		setFitToHeight(notebookMode);
+		if (entity != null) {
+			showForm();
 		}
 	}
 
@@ -413,22 +466,9 @@ public class EntityEditor extends ScrollPane {
 		}
 
 		private void build() {
-			if (pane.getContent() != null) {
-				return;
+			if (pane.getContent() == null) {
+				pane.setContent(fieldsGrid(fields, rows));
 			}
-			GridPane grid = grid();
-			int row = 0;
-			for (FormField field : fields) {
-				Label label = new Label(field.label() + (field.isRequired() ? " *" : ""));
-				label.setId(id("label", field.name()));
-				field.comment().map(EntityEditor::tooltip).ifPresent(label::setTooltip);
-				GridPane.setValignment(label, VPos.TOP);
-				label.setPadding(new Insets(4, 0, 0, 0));
-				Node editor = new FieldEditor(field).node();
-				grid.addRow(row++, label, editor);
-				rows.put(field, List.of(label, editor));
-			}
-			pane.setContent(grid);
 		}
 
 		boolean hasMatches(String query) {
@@ -463,6 +503,27 @@ public class EntityEditor extends ScrollPane {
 				node.setManaged(visible);
 			});
 		}
+	}
+
+	/**
+	 * A grid with a row of label and editor for each field.
+	 *
+	 * @param rows Filled with each field's label and editor
+	 */
+	private GridPane fieldsGrid(List<FormField> fields, Map<FormField, List<Node>> rows) {
+		GridPane grid = grid();
+		int row = 0;
+		for (FormField field : fields) {
+			Label label = new Label(field.label() + (field.isRequired() ? " *" : ""));
+			label.setId(id("label", field.name()));
+			field.comment().map(EntityEditor::tooltip).ifPresent(label::setTooltip);
+			GridPane.setValignment(label, VPos.TOP);
+			label.setPadding(new Insets(4, 0, 0, 0));
+			Node editor = new FieldEditor(field).node();
+			grid.addRow(row++, label, editor);
+			rows.put(field, List.of(label, editor));
+		}
+		return grid;
 	}
 
 	private static GridPane grid() {

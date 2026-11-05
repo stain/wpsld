@@ -147,4 +147,25 @@ public class TestCrateEditor extends ApplicationTest {
 		assertEquals(List.of("Dataset"), entities().getItems().get(1).getTypes());
 		assertTrue(visibleProperties().stream().noneMatch(l -> l.endsWith(" *")));
 	}
+
+	/**
+	 * The form's groups as the tabs of an OS/2-style notebook, with pages.
+	 */
+	@Test
+	public void notebookView() {
+		entities();
+		clickOn("#viewNotebook");
+		assertTrue(lookup("#notebook").tryQuery().isPresent());
+		assertEquals(List.of("Required", "Dataset", "CreativeWork", "Thing"),
+				lookup(".notebook-tab").queryAllAs(Label.class).stream().map(Label::getText).toList());
+		assertTrue(lookup("#propertySearch").tryQuery().isEmpty() || !lookup("#propertySearch").query().isVisible());
+		// CreativeWork's properties on pages
+		clickOn(lookup(".notebook-tab").queryAllAs(Label.class).stream().filter(l -> l.getText().equals("CreativeWork"))
+				.findFirst().orElseThrow());
+		assertTrue(lookup(".notebook-status").queryAs(Label.class).getText().matches("Page 1 of \\d+"));
+		// Back to the list
+		clickOn("#viewList");
+		assertTrue(lookup("#notebook").tryQuery().isEmpty());
+		assertTrue(visibleProperties().contains("name *"));
+	}
 }

@@ -47,6 +47,8 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.ToolBar;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -164,7 +166,26 @@ public class CrateEditor extends Application {
 					entityEditor.setFormFields(fields);
 				}
 			});
-			root.setTop(new ToolBar(save, new Separator(), new Label("Profile"), profiles));
+			// The form as a list of folding groups, or as a notebook in the style
+			// of the OS/2 Workplace Shell's Properties notebook
+			ToggleGroup view = new ToggleGroup();
+			ToggleButton list = new ToggleButton("List");
+			list.setId("viewList");
+			ToggleButton notebook = new ToggleButton("Notebook");
+			notebook.setId("viewNotebook");
+			list.setToggleGroup(view);
+			notebook.setToggleGroup(view);
+			list.setSelected(true);
+			view.selectedToggleProperty().addListener((obs, old, selected) -> {
+				if (selected == null) {
+					// Keep one selected
+					old.setSelected(true);
+				} else {
+					entityEditor.setNotebookMode(selected == notebook);
+				}
+			});
+			root.setTop(new ToolBar(save, new Separator(), new Label("Profile"), profiles, new Separator(),
+					new Label("View"), list, notebook));
 		}));
 	}
 
