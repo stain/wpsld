@@ -388,6 +388,16 @@ instances in the whole crate also has no direct SHACL Core counterpart.
 rocrate-validator uses SHACL for the RO-Crate profiles and is worth comparing
 for how it selects the root.
 
+Simpler: make the shapes **profile-specific and layered**. The core RO-Crate
+profile is validated first, and only its shapes need the descriptor pattern
+to find the root (and tell the root from other `Dataset`s, data entities
+from contextual entities). A profile's own shapes can then assume a crate
+that passed the core profile, as MASP profiles are profiles of RO-Crate
+(`isProfileOf`). The core layer could also mark what it found, e.g. give
+the root a specific class through a SHACL rule (SHACL-AF), so later layers
+target it with `sh:targetClass`; to check whether rocrate-validator already
+does this for its RO-Crate classes.
+
 ### Open questions
 
 - MASP is still a prototype, so how stable are the rule shapes? Which MASP
