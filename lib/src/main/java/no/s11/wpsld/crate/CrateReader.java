@@ -156,15 +156,45 @@ public class CrateReader {
 			Map<String, Entity> entities = readEntities(graph);
 
 			// The metadata descriptor says which entity is the root
-			Optional<Entity> descriptor = DESCRIPTOR_IDS.stream().map(entities::get)
-					.filter(e -> e != null).findFirst();
-			List<String> conformsTo = List.of();
+			// As "Finding the Root Data Entity" in the RO-Crate specification:
+			// the descriptor ro-crate-metadata.json, else RO-Crate 1.0's
+			// ro-crate-metadata.jsonld, whichever's about resolves first; and,
+			// though not allowed, absolute @ids ending in those names, as left
+			// by tools that resolved @ids against a base
+			List<Entity> descriptors = descriptors(entities);
+			if (descriptors.size() > 1) {
+				warn("More than one metadata descriptor: " + descriptors.stream().map(Entity::getId).toList());
+			}
+			Optional<Entity> descriptor = Optional.empty();
 			String rootId = null;
+			for (Entity candidate : descriptors) {
+				List<JsonNode> about = candidate.getAll("about");
+				if (about.size() == 1 && about.get(0).path("@id").isTextual()) {
+					String id = about.get(0).get("@id").asText();
+					if (entities.containsKey(id)) {
+						descriptor = Optional.of(candidate);
+						rootId = id;
+						break;
+					}
+					warn("The metadata descriptor " + candidate.getId() + " is about " + id
+							+ ", which is not an entity in @graph");
+				} else {
+					warn("The metadata descriptor " + candidate.getId()
+							+ " has no single about reference to the root data entity");
+				}
+			}
+			if (descriptor.isEmpty() && !descriptors.isEmpty()) {
+				descriptor = Optional.of(descriptors.get(0));
+			}
+			List<String> conformsTo = List.of();
 			if (descriptor.isEmpty()) {
 				warn("No metadata descriptor (@id " + Crate.RO_CRATE_METADATA_JSON + ")");
 			} else {
-				if (descriptor.get().getId().equals("ro-crate-metadata.jsonld")) {
+				String id = descriptor.get().getId();
+				if (id.equals("ro-crate-metadata.jsonld")) {
 					warn("Metadata descriptor uses RO-Crate 1.0's name ro-crate-metadata.jsonld");
+				} else if (!id.equals(Crate.RO_CRATE_METADATA_JSON)) {
+					warn("Metadata descriptor has the @id " + id + ", which MUST be " + Crate.RO_CRATE_METADATA_JSON);
 				}
 				conformsTo = descriptor.get().getAll("conformsTo").stream()
 						.filter(v -> v.isObject() && v.path("@id").isTextual()).map(v -> v.get("@id").asText())
@@ -172,17 +202,9 @@ public class CrateReader {
 				if (conformsTo.stream().noneMatch(c -> c.startsWith(RO_CRATE_SPEC))) {
 					warn("Metadata descriptor doesn't declare an RO-Crate version in conformsTo");
 				}
-				List<JsonNode> about = descriptor.get().getAll("about");
-				if (about.size() == 1 && about.get(0).path("@id").isTextual()) {
-					rootId = about.get(0).get("@id").asText();
-				} else {
-					warn("Metadata descriptor has no single about reference to the root data entity");
-				}
 			}
-			if (rootId == null || !entities.containsKey(rootId)) {
-				if (rootId != null) {
-					warn("The metadata descriptor's about, " + rootId + ", is not an entity in @graph");
-				}
+			if (rootId == null) {
+				// Not in the specification, which fails here: be lenient
 				if (entities.containsKey(Crate.ROOT_ID)) {
 					warn("Using " + Crate.ROOT_ID + " as the root data entity");
 					rootId = Crate.ROOT_ID;
@@ -195,9 +217,22 @@ public class CrateReader {
 			if (!root.getTypes().contains("Dataset")) {
 				warn("The root data entity " + rootId + " is not a Dataset");
 			}
-			List<Entity> others = entities.values().stream()
-					.filter(e -> e != root && !DESCRIPTOR_IDS.contains(e.getId())).toList();
+			List<Entity> others = entities.values().stream().filter(e -> e != root && !descriptors.contains(e))
+					.toList();
 			return document(Optional.of(Crate.of(root, others)), descriptor, conformsTo);
+		}
+
+		/**
+		 * Metadata descriptor candidates, in the order to try them.
+		 */
+		private List<Entity> descriptors(Map<String, Entity> entities) {
+			List<Entity> descriptors = new ArrayList<>();
+			DESCRIPTOR_IDS.stream().map(entities::get).filter(e -> e != null).forEach(descriptors::add);
+			for (String name : DESCRIPTOR_IDS) {
+				entities.values().stream().filter(e -> e.getId().endsWith("/" + name) && e.getId().contains("://"))
+						.forEach(descriptors::add);
+			}
+			return descriptors;
 		}
 
 		private Map<String, Entity> readEntities(JsonNode graph) {

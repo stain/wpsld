@@ -52,7 +52,7 @@ public class TestEntityEditor extends ApplicationTest {
 
 	@Override
 	public void start(Stage stage) {
-		editor = new EntityEditor(SCHEMA, new SchemaOrgFormFields(SCHEMA), crate::getEntities, () -> {
+		editor = new EntityEditor(SCHEMA, new SchemaOrgFormFields(SCHEMA), crate::getEntities, crate::getRoot, () -> {
 		}, crate::add, crate::rename);
 		stage.setScene(new Scene(editor, 900, 700));
 		stage.show();

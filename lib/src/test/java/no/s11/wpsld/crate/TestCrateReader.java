@@ -251,7 +251,7 @@ public class TestCrateReader {
 		CrateDocument document = json("{" + CONTEXT + ", \"@graph\": [{\"@id\": \"ro-crate-metadata.json\","
 				+ " \"@type\": \"CreativeWork\", \"about\": {\"@id\": \"https://example.com/missing\"}}]}");
 		assertTrue(document.crate().isEmpty());
-		assertTrue(reports(document, Severity.WARNING, "https://example.com/missing, is not an entity"));
+		assertTrue(reports(document, Severity.WARNING, "is about https://example.com/missing, which is not an entity"));
 		assertTrue(reports(document, Severity.ERROR, "No root data entity"));
 		assertTrue(reports(document, Severity.WARNING, "doesn't declare an RO-Crate version"));
 	}
@@ -287,5 +287,37 @@ public class TestCrateReader {
 		CrateDocument document = graph("{\"@id\": \"#x\", \"@type\": \"https://schema.org/Person\"}");
 		assertEquals(Optional.of(document.entity("#x").orElseThrow()),
 				document.entitiesOfType(S + "Person").stream().findFirst());
+	}
+
+	/**
+	 * As the specification: if ro-crate-metadata.json's about doesn't
+	 * resolve, the legacy ro-crate-metadata.jsonld is tried.
+	 */
+	@Test
+	public void legacyRootWhenRootDoesNotResolve() {
+		CrateDocument document = json("{" + CONTEXT + ", \"@graph\": ["
+				+ "{\"@id\": \"ro-crate-metadata.json\", \"@type\": \"CreativeWork\", \"about\": {\"@id\": \"#gone\"}},"
+				+ "{\"@id\": \"ro-crate-metadata.jsonld\", \"@type\": \"CreativeWork\", \"about\": {\"@id\": \"#legacy\"}},"
+				+ "{\"@id\": \"#legacy\", \"@type\": \"Dataset\"}]}");
+		assertEquals("#legacy", document.crate().orElseThrow().getRoot().getId());
+		assertTrue(reports(document, Severity.WARNING, "is about #gone, which is not an entity"));
+		// Neither descriptor is an entity of the crate
+		assertEquals(1, document.crate().orElseThrow().getEntities().size());
+	}
+
+	/**
+	 * Not allowed, but found, as by the specification's SPARQL for finding
+	 * roots: an absolute descriptor @id.
+	 */
+	@Test
+	public void absoluteDescriptorId() {
+		CrateDocument document = json("{" + CONTEXT + ", \"@graph\": ["
+				+ "{\"@id\": \"https://example.com/crate/ro-crate-metadata.json\", \"@type\": \"CreativeWork\","
+				+ " \"about\": {\"@id\": \"https://example.com/crate/\"},"
+				+ " \"conformsTo\": {\"@id\": \"https://w3id.org/ro/crate/1.3\"}},"
+				+ "{\"@id\": \"https://example.com/crate/\", \"@type\": \"Dataset\"}]}");
+		assertEquals("https://example.com/crate/", document.crate().orElseThrow().getRoot().getId());
+		assertTrue(reports(document, Severity.WARNING, "which MUST be ro-crate-metadata.json"));
+		assertFalse(document.hasErrors());
 	}
 }

@@ -66,6 +66,7 @@ import javafx.scene.layout.VBox;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.form.EntityTypes;
+import no.s11.wpsld.form.FieldTier;
 import no.s11.wpsld.form.FormField;
 import no.s11.wpsld.form.FormFields;
 import no.s11.wpsld.form.ValueKind;
@@ -87,7 +88,9 @@ public class EntityEditor extends ScrollPane {
 	private static final int SUGGESTIONS = 3;
 
 	private final SchemaFromJsonLd schema;
-	private final FormFields formFields;
+	private FormFields formFields;
+	/** The crate's root data entity, whose form may differ (profile rules for the root) */
+	private final Supplier<Entity> root;
 	private final EntityTypes entityTypes;
 	/** Type and property names as written in RO-Crates, e.g. File */
 	private final CrateTerms terms;
@@ -111,18 +114,31 @@ public class EntityEditor extends ScrollPane {
 	private final Label noMatches = new Label("No matching properties");
 
 	public EntityEditor(SchemaFromJsonLd schema, FormFields formFields, Supplier<List<Entity>> crateEntities,
-			Runnable onChange, Function<String, Entity> newEntity, BiConsumer<Entity, String> renameEntity) {
+			Supplier<Entity> root, Runnable onChange, Function<String, Entity> newEntity,
+			BiConsumer<Entity, String> renameEntity) {
 		this.schema = schema;
 		this.formFields = formFields;
 		this.terms = new CrateTerms(schema);
 		this.entityTypes = new EntityTypes(terms);
 		this.crateEntities = crateEntities;
+		this.root = root;
 		this.onChange = onChange;
 		this.newEntity = newEntity;
 		this.renameEntity = renameEntity;
 		form.setPadding(new Insets(10));
 		setContent(form);
 		setFitToWidth(true);
+	}
+
+	/**
+	 * Use other form fields, e.g. another profile, for the entity shown and
+	 * those edited after.
+	 */
+	public void setFormFields(FormFields formFields) {
+		this.formFields = Objects.requireNonNull(formFields);
+		if (entity != null) {
+			showForm();
+		}
 	}
 
 	/**
@@ -284,7 +300,7 @@ public class EntityEditor extends ScrollPane {
 		groups.clear();
 
 		List<FormField> fields = formFields.fieldsFor(entity.getTypes().stream().map(this::classDef)
-				.flatMap(Optional::stream).map(ClassDef::getID).collect(Collectors.toSet()));
+				.flatMap(Optional::stream).map(ClassDef::getID).collect(Collectors.toSet()), entity == root.get());
 		Set<String> fieldNames = fields.stream().map(FormField::name).collect(Collectors.toSet());
 
 		// Values the current type has no field for, e.g. after changing type
@@ -326,14 +342,22 @@ public class EntityEditor extends ScrollPane {
 
 		Map<String, List<FormField>> byGroup = fields.stream()
 				.collect(Collectors.groupingBy(FormField::group, LinkedHashMap::new, Collectors.toList()));
+		// Groups of a profile's required and suggested properties first and
+		// open; then the vocabulary's, of which only the most specific opens
+		// when there are none of the profile's
+		boolean profileGroups = fields.stream().anyMatch(f -> f.tier() != FieldTier.OTHER);
 		boolean first = true;
 		for (Map.Entry<String, List<FormField>> group : byGroup.entrySet()) {
 			List<FormField> groupFields = group.getValue();
 			boolean hasValues = groupFields.stream().anyMatch(f -> entity.get(f.name()).isPresent());
-			// Most specific properties and those with values open, the rest folded away
-			FieldGroup fieldGroup = new FieldGroup("From " + group.getKey() + " (" + groupFields.size() + ")",
-					groupFields, first || hasValues);
-			first = false;
+			boolean other = groupFields.get(0).tier() == FieldTier.OTHER;
+			String title = (other ? "From " + group.getKey() : group.getKey() + " by " + formFields.getName())
+					+ " (" + groupFields.size() + ")";
+			FieldGroup fieldGroup = new FieldGroup(title, groupFields,
+					!other || hasValues || (first && !profileGroups));
+			if (other) {
+				first = false;
+			}
 			groups.add(fieldGroup);
 			form.getChildren().add(fieldGroup.pane);
 		}

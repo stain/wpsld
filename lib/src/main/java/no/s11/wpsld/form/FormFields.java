@@ -35,4 +35,18 @@ public interface FormFields {
 	 * they should be shown.
 	 */
 	List<FormField> fieldsFor(Set<URI> types);
+
+	/**
+	 * Fields for an entity, knowing whether it is the crate's root data
+	 * entity: a profile's rules for the root only apply to it, not to other
+	 * entities of the same type (e.g. a folder's Dataset).
+	 */
+	default List<FormField> fieldsFor(Set<URI> types, boolean root) {
+		return fieldsFor(types);
+	}
+
+	/**
+	 * A name to show for this choice of fields, e.g. in a drop-down.
+	 */
+	String getName();
 }

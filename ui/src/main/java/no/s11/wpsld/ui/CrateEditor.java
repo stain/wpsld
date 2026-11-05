@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,11 +38,13 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.ButtonBar.ButtonData;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.ToolBar;
@@ -50,14 +53,19 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
+import javafx.util.StringConverter;
 import javafx.stage.Stage;
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.CrateChecks;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.form.EntityTypes;
+import no.s11.wpsld.form.FormFields;
+import no.s11.wpsld.form.ProfileFormFields;
+import no.s11.wpsld.form.RequiredFields;
 import no.s11.wpsld.form.SchemaOrgFormFields;
 import no.s11.wpsld.jsonld.JsonLdContext;
+import no.s11.wpsld.masp.ProfileCache;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
 /**
@@ -77,6 +85,9 @@ public class CrateEditor extends Application {
 	private final TextArea preview = new TextArea();
 	private EntityEditor entityEditor;
 	private EntityTypes entityTypes;
+	private CrateTerms terms;
+	/** Which profile's fields the form shows */
+	private final ComboBox<FormFields> profiles = new ComboBox<>();
 	/** Where the crate was last saved, to start the next save there */
 	private File lastSaved;
 
@@ -136,14 +147,40 @@ public class CrateEditor extends Application {
 			Button save = new Button("Save RO-Crate Metadata File…");
 			save.setId("save");
 			save.setOnAction(e -> save(stage));
-			root.setTop(new ToolBar(save));
+			profiles.setId("profile");
+			profiles.setConverter(new StringConverter<>() {
+				@Override
+				public String toString(FormFields fields) {
+					return fields == null ? "" : fields.getName();
+				}
+
+				@Override
+				public FormFields fromString(String name) {
+					return profiles.getItems().stream().filter(f -> f.getName().equals(name)).findFirst().orElse(null);
+				}
+			});
+			profiles.valueProperty().addListener((obs, old, fields) -> {
+				if (fields != null) {
+					entityEditor.setFormFields(fields);
+				}
+			});
+			root.setTop(new ToolBar(save, new Separator(), new Label("Profile"), profiles));
 		}));
 	}
 
 	private Node editor(SchemaFromJsonLd schema) {
 		entityTypes = new EntityTypes(schema);
-		entityEditor = new EntityEditor(schema, new SchemaOrgFormFields(schema),
-				crate::getEntities, this::changed, type -> {
+		terms = new CrateTerms(schema);
+		SchemaOrgFormFields schemaOrg = new SchemaOrgFormFields(terms);
+		// The core RO-Crate profile by default: the same schema.org fields,
+		// with those RO-Crate requires first; or schema.org without a profile
+		profiles.getItems().setAll(ProfileCache.bundled().bundledIdentifiers().stream()
+				.map(ProfileCache.bundled()::bundled).flatMap(Optional::stream).distinct()
+				.map(p -> (FormFields) new ProfileFormFields(p, schemaOrg)).toList());
+		profiles.getItems().add(schemaOrg);
+		profiles.getSelectionModel().selectFirst();
+		entityEditor = new EntityEditor(schema, profiles.getValue(), crate::getEntities, crate::getRoot,
+				this::changed, type -> {
 					// Created from a reference field, which then links to it
 					Entity entity = crate.add(type);
 					entities.getItems().add(entity);
@@ -255,7 +292,10 @@ public class CrateEditor extends Application {
 	 * requirements and asking whether to save anyway if any are not met.
 	 */
 	private void save(Stage stage) {
-		List<String> problems = CrateChecks.check(crate);
+		// The profile's required properties, then RO-Crate's own checks
+		// (worded alike, so each problem only once)
+		List<String> problems = Stream.concat(RequiredFields.check(crate, profiles.getValue(), terms).stream(),
+				CrateChecks.check(crate).stream()).distinct().toList();
 		if (!problems.isEmpty()) {
 			ButtonType saveAnyway = new ButtonType("Save anyway", ButtonData.OK_DONE);
 			Alert alert = new Alert(AlertType.WARNING,

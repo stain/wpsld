@@ -26,11 +26,14 @@ import org.junit.Test;
 import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.form.FormFields;
 
 /**
  * GUI tests of the crate window, run headless (see ui/build.gradle).
@@ -101,5 +104,47 @@ public class TestCrateEditor extends ApplicationTest {
 		assertTrue(lookup("The crate does not yet meet the RO-Crate requirements").tryQuery().isPresent());
 		clickOn("Cancel");
 		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
+	}
+
+	/** Visible labels of the form's property rows */
+	private List<String> visibleProperties() {
+		return lookup(n -> n.getId() != null && n.getId().startsWith("label-")).queryAllAs(Label.class).stream()
+				.filter(Label::isVisible).filter(l -> l.getParent() != null && l.getParent().isVisible())
+				.map(Label::getText).toList();
+	}
+
+	/**
+	 * The core RO-Crate profile is chosen by default: the root's required
+	 * properties come first, marked.
+	 */
+	@Test
+	public void coreProfileByDefault() {
+		entities();
+		ComboBox<FormFields> profile = lookup("#profile").queryComboBox();
+		assertEquals("RO-Crate Machine Actionable Profile 0.1.0", profile.getValue().getName());
+		List<String> labels = visibleProperties();
+		assertEquals(List.of("datePublished *", "description *", "license *", "name *"), labels.subList(0, 4));
+		assertTrue(lookup("Required by RO-Crate Machine Actionable Profile 0.1.0 (4)").tryQuery().isPresent());
+	}
+
+	@Test
+	public void schemaOrgWithoutProfile() {
+		entities();
+		ComboBox<FormFields> profile = lookup("#profile").queryComboBox();
+		interact(() -> profile.getSelectionModel().select(profile.getItems().size() - 1));
+		assertEquals("schema.org (no profile)", profile.getValue().getName());
+		assertFalse(visibleProperties().contains("name *"));
+		assertTrue(visibleProperties().contains("distribution"));
+	}
+
+	/**
+	 * Only the root has the root's required properties, not a folder Dataset.
+	 */
+	@Test
+	public void rootRulesForRootOnly() {
+		entities();
+		addEntity("dataset");
+		assertEquals(List.of("Dataset"), entities().getItems().get(1).getTypes());
+		assertTrue(visibleProperties().stream().noneMatch(l -> l.endsWith(" *")));
 	}
 }

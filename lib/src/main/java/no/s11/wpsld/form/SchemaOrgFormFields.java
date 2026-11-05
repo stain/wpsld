@@ -48,6 +48,10 @@ public class SchemaOrgFormFields implements FormFields {
 	private final SchemaFromJsonLd schema;
 	private final CrateTerms terms;
 
+	public CrateTerms getTerms() {
+		return terms;
+	}
+
 	public SchemaOrgFormFields(SchemaFromJsonLd schema) {
 		this(new CrateTerms(schema));
 	}
@@ -99,10 +103,18 @@ public class SchemaOrgFormFields implements FormFields {
 		// Names as written in RO-Crates, e.g. the group File for MediaObject
 		String name = terms.name(property);
 		return new FormField(name, property.getID(), name, property.getComment(), terms.name(group), range,
-				kind(range), 0, OptionalInt.empty());
+				kindOf(range), 0, OptionalInt.empty(), FieldTier.OTHER);
 	}
 
-	private ValueKind kind(List<ClassDef> range) {
+	@Override
+	public String getName() {
+		return "schema.org (no profile)";
+	}
+
+	/**
+	 * The kind of values for a property with this range.
+	 */
+	public ValueKind kindOf(List<ClassDef> range) {
 		if (range.isEmpty()) {
 			return ValueKind.TEXT;
 		}

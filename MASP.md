@@ -364,6 +364,22 @@ superclass where the profile gives one (`rdfs:subClassOf`, e.g. `Event`), or
 otherwise a default such as `CreativeWork` or `Thing`. Superclasses of a
 selected type need not be added, as elsewhere (see PLAN.md).
 
+### Profiles in the editor
+
+- `ProfileFormFields` gives a profile's three tiers (Required, Suggested,
+  then the other schema.org properties), using the profile's labels,
+  descriptions and cardinality; `FieldTier` on each `FormField`.
+- The root's rules apply to the root only: `FormFields.fieldsFor(types,
+  root)`, the editor knowing the root as `Crate.getRoot()` (found when
+  reading as in "Finding the Root Data Entity", see `CrateReader`), as
+  RO-Crate types can't tell it from other Datasets.
+- A **Profile** drop-down in the toolbar: the bundled core RO-Crate profile
+  by default (the same schema.org fields, those RO-Crate requires first), or
+  schema.org without a profile. Saving checks the selected profile's
+  required properties (`RequiredFields`) with `CrateChecks`.
+- Next: value constraints and allowed values in the controls; remote
+  profiles (with the caveats below).
+
 ### Bundled and dynamic profiles
 
 - **Bundled:** the core RO-Crate profile (`profiles/ro-crate`) is bundled in
