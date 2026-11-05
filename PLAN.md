@@ -75,6 +75,16 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   and are not parent and child: files MUST include `File` (e.g.
   `["File", "SoftwareSourceCode"]`), directories `Dataset`, and a profile
   crate's root is `["Dataset", "Profile"]`.
+  *Done:* types are chips with × and "Add type…" opens the pop-up
+  selector; adding a superclass of an existing type is refused as implied, a
+  subclass replaces its superclasses (Thing → Person), unrelated types are
+  kept side by side.
+- **Types from outside the RO-Crate context** (e.g. a profile's own
+  vocabulary): an entity SHOULD still have a schema.org type from the
+  RO-Crate context, so warn when only non-schema.org types are selected and
+  suggest a default such as `CreativeWork` or `Thing` to add alongside.
+- **Warn about RO-Crate's required types**, e.g. the root data entity
+  MUST be a `Dataset`; today removing `Dataset` from `./` is allowed.
 - **Several values per property** (JSON arrays).
 - **Linked entities**: reference fields suggest the crate's entities; add
   creating a new entity of the property's range from the field, like Crate-O.

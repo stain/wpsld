@@ -266,6 +266,16 @@ network, need more care, and must never leave the editor waiting forever:
   with warnings, failed (with the reason and a retry button) or fell back, so
   a slow or broken profile is never a silent, endless spinner.
 
+### Types from profile vocabularies
+
+A profile may offer classes from its own vocabulary (e.g. `ldac:CollectionEvent`)
+that are not in the RO-Crate context. In RO-Crate an entity SHOULD have a
+schema.org type, so when the user picks only such types the editor should
+warn and suggest adding a schema.org type too — the class's schema.org
+superclass where the profile gives one (`rdfs:subClassOf`, e.g. `Event`), or
+otherwise a default such as `CreativeWork` or `Thing`. Superclasses of a
+selected type need not be added, as elsewhere (see PLAN.md).
+
 ### Open questions
 
 - MASP is still a prototype, so how stable are the rule shapes? Which MASP

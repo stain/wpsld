@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -33,23 +34,23 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
 import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Control;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TitledPane;
 import javafx.scene.control.Tooltip;
-import javafx.scene.control.TreeCell;
-import javafx.scene.control.TreeItem;
-import javafx.scene.control.TreeView;
 import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import no.s11.wpsld.crate.Entity;
@@ -60,16 +61,19 @@ import no.s11.wpsld.soss.ClassDef;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
 /**
- * Edits one {@link Entity} of a crate: its type, chosen from a tree of
- * schema.org types, and a form of its properties.
+ * Edits one {@link Entity} of a crate: its types, chosen with a
+ * {@link TypeSelector}, its <code>@id</code> and a form of its properties.
  * <p>
  * Which fields the form shows is decided by {@link FormFields}; for now every
- * schema.org property of the type, later narrowed down by a profile. The
- * form reads from and writes to the entity, so changing the type keeps the
- * values; those the new type doesn't have are listed separately.
+ * schema.org property of the types, later narrowed down by a profile. The
+ * form reads from and writes to the entity, so changing the types keeps the
+ * values; those the types don't have are listed separately, with suggestions
+ * of types that have them.
  */
-public class EntityEditor extends SplitPane {
+public class EntityEditor extends ScrollPane {
 	private static final String S = "http://schema.org/";
+	/** How many types to suggest for values without fields */
+	private static final int SUGGESTIONS = 3;
 
 	private final SchemaFromJsonLd schema;
 	private final FormFields formFields;
@@ -78,11 +82,8 @@ public class EntityEditor extends SplitPane {
 	/** Called after the entity is changed */
 	private final Runnable onChange;
 
-	private final TreeView<ClassDef> types;
 	private final VBox form = new VBox(8);
 	private Entity entity;
-	/** True while selecting the entity's type in the tree, rather than the user changing it */
-	private boolean selectingType;
 
 	public EntityEditor(SchemaFromJsonLd schema, FormFields formFields, Supplier<List<String>> entityIds,
 			Runnable onChange) {
@@ -90,12 +91,9 @@ public class EntityEditor extends SplitPane {
 		this.formFields = formFields;
 		this.entityIds = entityIds;
 		this.onChange = onChange;
-		this.types = typeTree();
 		form.setPadding(new Insets(10));
-		ScrollPane formScroll = new ScrollPane(form);
-		formScroll.setFitToWidth(true);
-		getItems().setAll(types, formScroll);
-		setDividerPositions(0.3);
+		setContent(form);
+		setFitToWidth(true);
 	}
 
 	/**
@@ -103,7 +101,6 @@ public class EntityEditor extends SplitPane {
 	 */
 	public void edit(Entity entity) {
 		this.entity = Objects.requireNonNull(entity);
-		selectType();
 		showForm();
 	}
 
@@ -111,98 +108,91 @@ public class EntityEditor extends SplitPane {
 		return Optional.ofNullable(schema.getClasses().get(URI.create(S + typeName)));
 	}
 
-	private TreeView<ClassDef> typeTree() {
-		ClassDef thing = classDef("Thing").orElseThrow();
-		TreeView<ClassDef> tree = new TreeView<>(new ClassTreeItem(thing));
-		tree.setCellFactory(view -> new TreeCell<>() {
-			@Override
-			protected void updateItem(ClassDef classDef, boolean empty) {
-				super.updateItem(classDef, empty);
-				setText(empty || classDef == null ? null : classDef.getName());
-				setTooltip(empty || classDef == null ? null
-						: classDef.getComment().map(EntityEditor::tooltip).orElse(null));
-			}
-		});
-		tree.getSelectionModel().selectedItemProperty().addListener((obs, old, item) -> {
-			if (item != null && entity != null && !selectingType) {
-				// Only the type changes; values are kept on the entity
-				entity.setTypes(List.of(item.getValue().getName()));
-				showForm();
-				onChange.run();
-			}
-		});
-		return tree;
+	/**
+	 * Add a type to the entity. A superclass of a type the entity already
+	 * has is not added, as it is implied; a subclass replaces its
+	 * superclasses, e.g. Person replaces Thing. Unrelated types are kept
+	 * side by side, making <code>@type</code> an array.
+	 */
+	private void addType(ClassDef added) {
+		List<String> types = new ArrayList<>(entity.getTypes());
+		if (types.contains(added.getName())) {
+			return;
+		}
+		Optional<String> implying = types.stream()
+				.filter(t -> classDef(t).map(c -> c.getSelfAndSuperClasses().contains(added)).orElse(false))
+				.findFirst();
+		if (implying.isPresent()) {
+			Alert alert = new Alert(AlertType.INFORMATION,
+					implying.get() + " is already a kind of " + added.getName() + ", so it is not added.");
+			alert.initOwner(getScene().getWindow());
+			alert.setHeaderText(null);
+			alert.showAndWait();
+			return;
+		}
+		types.removeIf(t -> classDef(t).map(added.getSelfAndSuperClasses()::contains).orElse(false));
+		types.add(added.getName());
+		changeTypes(types);
+	}
+
+	private void removeType(String type) {
+		List<String> types = new ArrayList<>(entity.getTypes());
+		types.remove(type);
+		changeTypes(types);
+	}
+
+	private void changeTypes(List<String> types) {
+		// Only the types change; values are kept on the entity
+		entity.setTypes(types);
+		showForm();
+		onChange.run();
 	}
 
 	/**
-	 * Select the entity's (first) type in the tree, expanding the path to it.
+	 * The entity's types as removable chips, and a button to add more.
 	 */
-	private void selectType() {
-		selectingType = true;
-		try {
-			Optional<ClassDef> type = classDef(entity.getTypes().get(0));
-			if (type.isEmpty()) {
-				types.getSelectionModel().clearSelection();
-				return;
-			}
-			// Path from Thing, following the first superclass of each class
-			List<String> path = new ArrayList<>();
-			for (ClassDef c = type.get(); c != null; c = c.getSubClassOf().stream().findFirst().orElse(null)) {
-				path.add(0, c.getName());
-			}
-			TreeItem<ClassDef> item = types.getRoot();
-			for (String name : path.subList(1, path.size())) {
-				item.setExpanded(true);
-				item = item.getChildren().stream().filter(c -> c.getValue().getName().equals(name)).findFirst()
-						.orElse(null);
-				if (item == null) {
-					types.getSelectionModel().clearSelection();
-					return;
-				}
-			}
-			types.getSelectionModel().select(item);
-			types.scrollTo(Math.max(0, types.getRow(item) - 5));
-		} finally {
-			selectingType = false;
+	private FlowPane typeChips() {
+		FlowPane chips = new FlowPane(6, 6);
+		for (String type : entity.getTypes()) {
+			Label name = new Label(type);
+			name.setStyle("-fx-font-weight: bold;");
+			classDef(type).flatMap(ClassDef::getComment).map(EntityEditor::tooltip).ifPresent(name::setTooltip);
+			Button remove = new Button("×");
+			remove.setStyle("-fx-padding: 0 4 0 4;");
+			// An entity needs at least one type
+			remove.setDisable(entity.getTypes().size() == 1);
+			remove.setOnAction(e -> removeType(type));
+			HBox chip = new HBox(4, name, remove);
+			chip.setAlignment(Pos.CENTER_LEFT);
+			chip.setStyle("-fx-background-color: -fx-control-inner-background; -fx-border-color: -fx-box-border;"
+					+ " -fx-border-radius: 3; -fx-padding: 2 4 2 6;");
+			chips.getChildren().add(chip);
 		}
+		Button add = new Button("Add type…");
+		add.setOnAction(e -> new TypeSelector(schema, getScene().getWindow()).showAndWait().ifPresent(this::addType));
+		chips.getChildren().add(add);
+		return chips;
 	}
 
 	/**
-	 * Tree item creating the subclasses (except superseded ones) when first expanded.
+	 * Types that have the given properties, those having the most first.
 	 */
-	private class ClassTreeItem extends TreeItem<ClassDef> {
-		private boolean childrenLoaded;
-
-		ClassTreeItem(ClassDef classDef) {
-			super(classDef);
-		}
-
-		@Override
-		public ObservableList<TreeItem<ClassDef>> getChildren() {
-			if (!childrenLoaded) {
-				childrenLoaded = true;
-				super.getChildren().setAll(schema.subclasses(getValue()).filter(c -> !schema.isSuperseded(c))
-						.map(ClassTreeItem::new).toList());
-			}
-			return super.getChildren();
-		}
-
-		@Override
-		public boolean isLeaf() {
-			return childrenLoaded ? super.getChildren().isEmpty() : schema.subclasses(getValue()).findAny().isEmpty();
-		}
+	private List<Map.Entry<ClassDef, Long>> suggestTypes(List<String> propertyNames) {
+		return propertyNames.stream().map(name -> schema.getProperties().get(URI.create(S + name)))
+				.filter(Objects::nonNull).flatMap(p -> p.getDomainIncludes().stream())
+				.filter(c -> !schema.isSuperseded(c))
+				.collect(Collectors.groupingBy(Function.identity(), Collectors.counting())).entrySet().stream()
+				.sorted(Map.Entry.<ClassDef, Long>comparingByValue().reversed()
+						.thenComparing(e -> e.getKey().getName()))
+				.limit(SUGGESTIONS).toList();
 	}
 
 	private void showForm() {
 		form.getChildren().clear();
 
 		GridPane header = grid();
-		Label typeLabel = new Label(String.join(", ", entity.getTypes()));
-		typeLabel.setStyle("-fx-font-weight: bold;");
-		classDef(entity.getTypes().get(0)).flatMap(ClassDef::getComment).map(EntityEditor::tooltip)
-				.ifPresent(typeLabel::setTooltip);
 		TextField idField = new TextField(entity.getId());
-		// TODO: Renaming should also update references from other entities
+		// TODO: Renaming should also update references from other entities, see PLAN.md
 		idField.setEditable(!entity.getId().equals("./"));
 		idField.textProperty().addListener((obs, old, id) -> {
 			if (!id.isBlank()) {
@@ -210,7 +200,7 @@ public class EntityEditor extends SplitPane {
 				onChange.run();
 			}
 		});
-		header.addRow(0, new Label("@type"), typeLabel);
+		header.addRow(0, new Label("@type"), typeChips());
 		header.addRow(1, new Label("@id"), idField);
 		form.getChildren().add(header);
 
@@ -234,6 +224,18 @@ public class EntityEditor extends SplitPane {
 					onChange.run();
 				});
 				grid.addRow(row++, new Label(name), value, remove);
+			}
+			List<Map.Entry<ClassDef, Long>> suggestions = suggestTypes(others);
+			if (!suggestions.isEmpty()) {
+				FlowPane suggest = new FlowPane(6, 6, new Label("Suggest type:"));
+				for (Map.Entry<ClassDef, Long> suggestion : suggestions) {
+					Button addSuggested = new Button("Add type " + suggestion.getKey().getName() + " ("
+							+ suggestion.getValue() + " of " + others.size() + ")");
+					suggestion.getKey().getComment().map(EntityEditor::tooltip).ifPresent(addSuggested::setTooltip);
+					addSuggested.setOnAction(e -> addType(suggestion.getKey()));
+					suggest.getChildren().add(addSuggested);
+				}
+				grid.add(suggest, 0, row, 3, 1);
 			}
 			TitledPane pane = new TitledPane("Not properties of " + String.join(", ", entity.getTypes()) + " ("
 					+ others.size() + ")", grid);

@@ -125,7 +125,7 @@ public class CrateEditor extends Application {
 		preview.setStyle("-fx-font-family: monospace;");
 
 		SplitPane split = new SplitPane(entityList, entityEditor, preview);
-		split.setDividerPositions(0.18, 0.72);
+		split.setDividerPositions(0.2, 0.66);
 		entities.getSelectionModel().select(crate.getRoot());
 		changed();
 		return split;
