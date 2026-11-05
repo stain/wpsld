@@ -147,8 +147,8 @@ public class SchemaFromJsonLd {
 	 * entities.
 	 */
 	public boolean isDataType(ClassDef classDef) {
-		return objects(classDef.getID(), RDF_TYPE).anyMatch(S_DATA_TYPE::equals)
-				|| classDef.getSubClassOf().stream().anyMatch(this::isDataType);
+		return classDef.getSelfAndSuperClasses().stream()
+				.anyMatch(c -> objects(c.getID(), RDF_TYPE).anyMatch(S_DATA_TYPE::equals));
 	}
 
 	private void qualityCheck() {

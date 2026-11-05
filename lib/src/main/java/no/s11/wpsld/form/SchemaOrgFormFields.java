@@ -117,6 +117,6 @@ public class SchemaOrgFormFields implements FormFields {
 	}
 
 	private boolean isA(ClassDef classDef, URI type) {
-		return classDef.getID().equals(type) || classDef.getSubClassOf().stream().anyMatch(c -> isA(c, type));
+		return classDef.getSelfAndSuperClasses().stream().anyMatch(c -> c.getID().equals(type));
 	}
 }
