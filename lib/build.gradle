@@ -9,11 +9,11 @@
 plugins {
     // Apply the java-library plugin for API and implementation separation.
     id 'java-library'
-    id 'org.gradlex.extra-java-module-info' version "1.4"
+    id 'org.gradlex.extra-java-module-info' version "1.14.2"
 }
 
 repositories {
-    jcenter()
+    mavenCentral()
 }
 
 extraJavaModuleInfo {
@@ -33,8 +33,8 @@ extraJavaModuleInfo {
 
 dependencies {
 
-    implementation 'edu.kit.datamanager:ro-crate-java:1.1.0'
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+    implementation 'edu.kit.datamanager:ro-crate-java:2.1.3'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.4'
 
     // Use JUnit test framework.
     testImplementation 'junit:junit:4.13'

@@ -8,13 +8,12 @@
 
 plugins {
   id 'application'
-  id 'org.openjfx.javafxplugin' version '0.0.14'
-  id 'org.beryx.jlink' version '2.25.0'
+  id 'org.openjfx.javafxplugin' version '0.1.0'
+  id 'org.beryx.jlink' version '4.2.0'
 }
 
 repositories {
-    // Use JCenter for resolving dependencies.
-    jcenter()
+    mavenCentral()
 }
 
 jlink {
@@ -24,7 +23,7 @@ jlink {
 }
 
 javafx {
-    version = "17.0.8"
+    version = "27.0.1"
     modules = [ 'javafx.controls', 'javafx.fxml' ]
 }
 
@@ -35,6 +34,6 @@ dependencies {
 }
 
 application { 
-  mainClassName = 'no.s11.wpsld.ui.HelloFX'
+  mainClass = 'no.s11.wpsld.ui.HelloFX'
   mainModule = 'no.s11.wpsld.ui'
 }
