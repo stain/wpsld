@@ -158,6 +158,16 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   `otherProperties`, `suggestType-<Type>`, `typeSearch`, `typeTree`,
   `entities`, `addEntity`, `removeEntity`, `save`, `preview`.
 
+### User folders
+
+`AppDirectories` (in `lib`) gives the folders for cache, data, settings and
+state, and where to look for data installed for all users: XDG on Linux and
+other Unix (`$XDG_CACHE_HOME`… with their defaults, invalid values ignored),
+`%LOCALAPPDATA%`/`%APPDATA%`/`%PROGRAMDATA%` on Windows, and `~/Library/Caches`
+and `~/Library/Application Support` on macOS, each with a `wpsld` folder.
+First use: a disk cache of downloaded profiles (see MASP.md); later settings
+and user-added profiles.
+
 ### Start-up
 
 - Try AppCDS (`-XX:+AutoCreateSharedArchive`) or the Java 25 AOT cache in the
