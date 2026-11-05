@@ -1,0 +1,17 @@
+# Conda environment for building and running wpsld (lib + JavaFX ui).
+# Build with the Gradle wrapper:  ./gradlew build   /   ./gradlew :ui:run
+#
+# OpenJDK 11: the wrapper pins Gradle 7.0.2, which cannot run on JDK 17+.
+# JavaFX itself is fetched by the org.openjfx Gradle plugin; gtk3 and the
+# X11/GL libraries below are what its native code needs at runtime.
+name: wpsld
+channels:
+  - conda-forge
+dependencies:
+  - openjdk=11
+  - gtk3
+  - libgl
+  - xorg-libxtst
+  - xorg-libxxf86vm
+  - fontconfig
+  - freetype
