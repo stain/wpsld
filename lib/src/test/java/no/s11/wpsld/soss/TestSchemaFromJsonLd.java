@@ -169,4 +169,50 @@ public class TestSchemaFromJsonLd {
 		supplier.setAccessible(true);
 		assertNull(fieldName + " of " + term + " not computed while loading", supplier.get(lazy));
 	}
+
+	private static List<String> names(List<? extends DefinedTerm> terms) {
+		return terms.stream().map(DefinedTerm::getName).toList();
+	}
+
+	private static void assertProperty(String name, List<String> domains, List<String> ranges) {
+		PropertyDef property = property(name);
+		assertNotNull(name, property);
+		assertEquals(URI.create(S + name), property.getID());
+		assertEquals(name, property.getName());
+		// Sorted by name
+		assertEquals(name + " domainIncludes", domains, names(property.getDomainIncludes()));
+		assertEquals(name + " rangeIncludes", ranges, names(property.getRangeIncludes()));
+		for (String domain : domains) {
+			assertTrue(name + " listed for " + domain, schema.propertiesOf(classDef(domain)).anyMatch(property::equals));
+		}
+	}
+
+	/**
+	 * The usual suspects of RO-Crates come out of loading as defined in
+	 * schema.org 30.0 (descriptions not compared).
+	 */
+	@Test
+	public void usualSuspects() {
+		for (String type : List.of("CreativeWork", "Person", "Organization")) {
+			ClassDef classDef = classDef(type);
+			assertNotNull(type, classDef);
+			assertEquals(type, classDef.getName());
+			assertTrue(classDef.getComment().isPresent());
+			assertEquals(List.of(classDef("Thing")), classDef.getSubClassOf());
+			assertFalse(schema.isSuperseded(classDef));
+			assertFalse(schema.isDataType(classDef));
+		}
+		assertEquals(List.of(classDef("CreativeWork")), classDef("Dataset").getSubClassOf());
+		assertEquals(List.of(classDef("Dataset"), classDef("CreativeWork"), classDef("Thing")),
+				List.copyOf(classDef("Dataset").getSelfAndSuperClasses()));
+
+		assertProperty("affiliation", List.of("Person"), List.of("Organization"));
+		assertProperty("author", List.of("CreativeWork", "Rating"), List.of("Organization", "Person"));
+		assertProperty("name", List.of("Thing"), List.of("Text"));
+		assertProperty("license", List.of("CreativeWork"), List.of("CreativeWork", "URL"));
+		assertProperty("datePublished", List.of("Certification", "CreativeWork"), List.of("Date", "DateTime"));
+		assertProperty("hasPart", List.of("CreativeWork"), List.of("CreativeWork"));
+		assertProperty("email", List.of("ContactPoint", "Organization", "Person"), List.of("Text"));
+		assertProperty("givenName", List.of("Person"), List.of("Text"));
+	}
 }

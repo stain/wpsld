@@ -119,4 +119,20 @@ public class TestSchemaOrgFormFields {
 			assertTrue(field.name(), field.range().stream().noneMatch(schema::isSuperseded));
 		}
 	}
+
+	@Test
+	public void personFields() {
+		Map<String, FormField> person = new SchemaOrgFormFields(new SchemaFromJsonLd())
+				.fieldsFor(Set.of(URI.create(S + "Person"))).stream()
+				.collect(Collectors.toMap(FormField::name, Function.identity()));
+		assertEquals("Person", person.get("affiliation").group());
+		assertEquals(ValueKind.REFERENCE, person.get("affiliation").kind());
+		assertEquals(ValueKind.TEXT, person.get("givenName").kind());
+		assertEquals(ValueKind.TEXT, person.get("email").kind());
+		assertEquals(ValueKind.DATE, person.get("birthDate").kind());
+		assertEquals("Thing", person.get("name").group());
+		// Properties of CreativeWork are not offered for a Person
+		assertFalse(person.containsKey("author"));
+		assertFalse(person.containsKey("license"));
+	}
 }
