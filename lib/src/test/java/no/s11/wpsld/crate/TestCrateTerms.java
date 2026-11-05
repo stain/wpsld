@@ -20,11 +20,13 @@ package no.s11.wpsld.crate;
 import static org.junit.Assert.*;
 
 import java.net.URI;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import no.s11.wpsld.jsonld.JsonLdContext;
 import no.s11.wpsld.soss.ClassDef;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
@@ -84,5 +86,13 @@ public class TestCrateTerms {
 			assertEquals(p.getName(), terms.name(p));
 			assertEquals(Optional.of(p), terms.propertyDef(p.getName()));
 		});
+	}
+
+	@Test
+	public void prewarmedOnce() {
+		JsonLdContext context = CrateTerms.prewarm();
+		assertSame(context, CrateTerms.prewarm());
+		assertEquals(List.of(), context.getProblems());
+		assertEquals(Optional.of("http://schema.org/MediaObject"), context.expandTerm("File"));
 	}
 }

@@ -232,6 +232,10 @@ or profile crate.
    ordered property rules (required first), falling back to the vocabulary's
    `domainIncludes` (including superclasses) for "other properties" when no
    profile or no rule applies.
+   In the editor, a **profile drop-down** chooses the `FormFields` used: the
+   default is today's schema.org fields (`SchemaOrgFormFields`, in effect
+   "no profile"), and the MASP profiles that can be loaded are listed after
+   it; a crate's root `conformsTo` can preselect one.
 4. **Validation (later)**: port the MASP algorithm on top of the same model,
    reporting per entity and property, so the editor can show problems inline.
 5. **Profile resolution**: a crate's root `conformsTo` names its profiles; start

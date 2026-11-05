@@ -53,9 +53,11 @@ import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.CrateChecks;
+import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.form.EntityTypes;
 import no.s11.wpsld.form.SchemaOrgFormFields;
+import no.s11.wpsld.jsonld.JsonLdContext;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
 /**
@@ -67,7 +69,9 @@ public class CrateEditor extends Application {
 	private static final ObjectMapper MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
 	private final Supplier<SchemaFromJsonLd> loadSchema;
+	private final Supplier<JsonLdContext> loadContext;
 	private CompletableFuture<SchemaFromJsonLd> schemaLoading;
+	private CompletableFuture<JsonLdContext> contextLoading;
 	private final Crate crate = new Crate();
 	private final ListView<Entity> entities = new ListView<>();
 	private final TextArea preview = new TextArea();
@@ -84,13 +88,25 @@ public class CrateEditor extends Application {
 	 * With another way to load the schema, e.g. failing in tests.
 	 */
 	CrateEditor(Supplier<SchemaFromJsonLd> loadSchema) {
+		this(loadSchema, CrateTerms::prewarm);
+	}
+
+	/**
+	 * With other ways to load the schema and the RO-Crate context, e.g. in
+	 * tests.
+	 */
+	CrateEditor(Supplier<SchemaFromJsonLd> loadSchema, Supplier<JsonLdContext> loadContext) {
 		this.loadSchema = loadSchema;
+		this.loadContext = loadContext;
 	}
 
 	@Override
 	public void init() {
-		// Load the schema while the JavaFX toolkit and window start up
+		// Load the schema while the JavaFX toolkit and window start up, and in
+		// parallel the RO-Crate context that naming types and properties needs,
+		// so that building the editor on the JavaFX thread doesn't load it
 		schemaLoading = CompletableFuture.supplyAsync(loadSchema);
+		contextLoading = CompletableFuture.supplyAsync(loadContext);
 	}
 
 	@Override
@@ -100,11 +116,14 @@ public class CrateEditor extends Application {
 		stage.setTitle("wpsld");
 		stage.show();
 
-		// The one load started in init(): if it is still running, the editor
-		// replaces the label when it completes; if done, this runs at once
-		schemaLoading.whenComplete((schema, failure) -> Platform.runLater(() -> {
+		// The loads started in init(): while still running, the editor
+		// replaces the label when both complete; if done, this runs at once
+		schemaLoading.thenCombine(contextLoading, (schema, context) -> schema)
+				.whenComplete((schema, failure) -> Platform.runLater(() -> {
 			if (failure != null) {
-				showFailure(root, "Can't load schema", failure);
+				boolean contextFailed = contextLoading.isCompletedExceptionally()
+						&& !schemaLoading.isCompletedExceptionally();
+				showFailure(root, contextFailed ? "Can't load the RO-Crate context" : "Can't load schema", failure);
 				return;
 			}
 			try {

@@ -57,6 +57,16 @@ public class CrateTerms {
 		this(schema, RO_CRATE_1_3.get());
 	}
 
+	/**
+	 * Load and process the RO-Crate 1.3 context now, e.g. in the background
+	 * while the application starts, so that creating CrateTerms later doesn't
+	 * have to (about 150 ms on a cold JVM). Loaded once, however often or from
+	 * however many threads this is called.
+	 */
+	public static JsonLdContext prewarm() {
+		return RO_CRATE_1_3.get();
+	}
+
 	public CrateTerms(SchemaFromJsonLd schema, JsonLdContext context) {
 		this.schema = Objects.requireNonNull(schema);
 		this.context = Objects.requireNonNull(context);
