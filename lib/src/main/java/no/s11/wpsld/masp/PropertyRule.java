@@ -28,13 +28,15 @@ import java.util.Optional;
  * @param label            The property as written in crates (its
  *                         <code>rdfs:label</code>), e.g. <code>author</code>,
  *                         or <code>@id</code> for a constraint on identifiers
+ * @param name             Human readable name, if the profile gives one other
+ *                         than the label (its <code>name</code>)
  * @param comment          Description in the profile
  * @param specializationOf The vocabulary properties the rule specialises
  * @param domain           Ids of the class rules it applies to
  * @param range            What the values may be
  * @param values           How many values each matching entity must/may have
  */
-public record PropertyRule(String id, String label, Optional<String> comment, List<String> specializationOf,
+public record PropertyRule(String id, String label, Optional<String> name, Optional<String> comment, List<String> specializationOf,
 		List<String> domain, List<RangeItem> range, Cardinality values) {
 
 	public boolean isRequired() {

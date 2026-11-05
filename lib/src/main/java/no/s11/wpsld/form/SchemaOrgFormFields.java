@@ -114,7 +114,7 @@ public class SchemaOrgFormFields implements FormFields {
 				.filter(c -> !schema.isSuperseded(c)).toList();
 		// Names as written in RO-Crates, e.g. the group File for MediaObject
 		String name = terms.name(property);
-		return new FormField(name, property.getID(), name, property.getComment(), terms.name(group), range,
+		return new FormField(name, property.getID(), Labels.fromTerm(name), property.getComment(), terms.name(group), range,
 				kindOf(range), 0, OptionalInt.empty(), FieldTier.OTHER);
 	}
 

@@ -109,11 +109,13 @@ public class TestCrateEditor extends ApplicationTest {
 		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
 	}
 
-	/** Visible labels of the form's property rows */
+	/** Properties of the form's visible rows */
 	private List<String> visibleProperties() {
 		return lookup(n -> n.getId() != null && n.getId().startsWith("label-")).queryAllAs(Label.class).stream()
 				.filter(Label::isVisible).filter(l -> l.getParent() != null && l.getParent().isVisible())
-				.map(Label::getText).toList();
+				// The property, not its human readable label; * if required
+				.map(l -> l.getId().substring("label-".length()) + (l.getText().endsWith(" *") ? " *" : ""))
+				.toList();
 	}
 
 	/**
@@ -126,9 +128,10 @@ public class TestCrateEditor extends ApplicationTest {
 		ComboBox<FormFields> profile = lookup("#profile").queryComboBox();
 		assertEquals("RO-Crate Machine Actionable Profile 0.1.0", profile.getValue().getName());
 		List<String> labels = visibleProperties();
-		// name and description fixed under @id, then the other required ones
-		assertEquals(List.of("name *", "description *", "datePublished *", "license *"), labels.subList(0, 4));
-		assertTrue(lookup("Required by RO-Crate Machine Actionable Profile 0.1.0 (2)").tryQuery().isPresent());
+		// name and description under @id, then the required ones
+		assertEquals(List.of("name *", "description *", "datePublished *", "description *", "license *", "name *"),
+				labels.subList(0, 6));
+		assertTrue(lookup("Required by RO-Crate Machine Actionable Profile 0.1.0 (4)").tryQuery().isPresent());
 	}
 
 	@Test
@@ -210,12 +213,15 @@ public class TestCrateEditor extends ApplicationTest {
 	public void previewUpdatesWhileEditing() {
 		entities();
 		clickOn("#propertySearch").write("name");
-		TextField name = lookup("#value-name-0").queryAs(TextField.class);
+		TextField name = lookup("#header-name").queryAs(TextField.class);
 		clickOn(name).write("My crate");
 		assertEquals("My crate", lookup("#previewName").queryAs(Label.class).getText());
 		clickOn("#propertySearch").eraseText(4).write("license");
 		clickOn(lookup("#value-license-0").queryAs(ComboBox.class).getEditor())
 				.write("http://spdx.org/licenses/CC0-1.0");
+		// Human readable labels of the properties
+		assertTrue(from(lookup("#previewProperties").queryAs(Node.class)).lookup(".label").queryAllAs(Label.class)
+				.stream().anyMatch(l -> l.getText().equals("License")));
 		// A web address, not an entity of the crate, opens in the browser
 		Hyperlink license = previewLink("#previewProperties", "http://spdx.org/licenses/CC0-1.0");
 		assertEquals("Open in the browser", license.getTooltip().getText());
@@ -227,7 +233,7 @@ public class TestCrateEditor extends ApplicationTest {
 	@Test
 	public void requiredTypeNotice() {
 		entities();
-		clickOn("#value-name-0").write("My crate");
+		clickOn("#header-name").write("My crate");
 		assertFalse(lookup("#requiredType-Dataset").tryQuery().isPresent());
 		clickOn("#addType");
 		clickOn("#typeSearch").write("person").type(KeyCode.ENTER);
@@ -250,7 +256,7 @@ public class TestCrateEditor extends ApplicationTest {
 	public void listUpdatesInPlace() {
 		entities();
 		ListCell<?> cell = from(entities()).lookup(".list-cell").queryAs(ListCell.class);
-		clickOn("#value-name-0").write("My crate");
+		clickOn("#header-name").write("My crate");
 		ListCell<?> after = from(entities()).lookup(".list-cell").queryAs(ListCell.class);
 		assertSame(cell, after);
 		assertTrue(after.getText().startsWith("My crate\n"));

@@ -129,7 +129,7 @@ public class ProfileFormFields implements FormFields {
 		URI iri = property.map(PropertyDef::getID)
 				.orElseGet(() -> URI.create(rule.specializationOf().stream().findFirst().orElse(rule.id())));
 		FieldTier tier = rule.isRequired() ? FieldTier.REQUIRED : FieldTier.SUGGESTED;
-		return new FormField(rule.label(), iri, rule.label(),
+		return new FormField(rule.label(), iri, rule.name().orElseGet(() -> Labels.fromTerm(rule.label())),
 				rule.comment().or(() -> property.flatMap(PropertyDef::getComment)),
 				tier == FieldTier.REQUIRED ? REQUIRED : SUGGESTED, range, vocabulary.kindOf(range),
 				rule.values().min().orElse(0), rule.values().max(), tier);

@@ -37,6 +37,7 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
+import javafx.scene.layout.GridPane;
 import javafx.stage.Stage;
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.Entity;
@@ -65,11 +66,13 @@ public class TestEntityEditor extends ApplicationTest {
 		interact(() -> editor.edit(entity));
 	}
 
-	/** Visible labels of the form's property rows */
+	/** Properties of the form's visible rows */
 	private List<String> visibleProperties() {
 		return lookup(n -> n.getId() != null && n.getId().startsWith("label-")).queryAllAs(Label.class).stream()
 				.filter(Node::isVisible).filter(l -> l.getParent() != null && l.getParent().isVisible())
-				.map(Label::getText).toList();
+				// The property, not its human readable label; * if required
+				.map(l -> l.getId().substring("label-".length()) + (l.getText().endsWith(" *") ? " *" : ""))
+				.toList();
 	}
 
 	private TextField value(String property, int row) {
@@ -279,5 +282,56 @@ public class TestEntityEditor extends ApplicationTest {
 		assertTrue(EntityEditor.isoDate("11/12/2026").isEmpty());
 		assertTrue(EntityEditor.isoDate("2026-13-01").isEmpty());
 		assertTrue(EntityEditor.isoDate("").isEmpty());
+	}
+
+	/**
+	 * Labels are human readable names, with the property as tooltip, and a
+	 * [?] button shows its description.
+	 */
+	@Test
+	public void labelsAndDescriptions() {
+		clickOn("#propertySearch").write("datePublished");
+		Label label = lookup("#label-datePublished").queryAs(Label.class);
+		assertEquals("Date published", label.getText());
+		assertEquals("datePublished", label.getTooltip().getText());
+		Label description = lookup("#description-datePublished").queryAs(Label.class);
+		assertFalse(description.isVisible());
+		clickOn("#help-datePublished");
+		assertTrue(description.isVisible());
+		assertTrue(description.getText().startsWith("Date of first publication"));
+	}
+
+	/**
+	 * name and description under @id edit their first value, as text only,
+	 * and stay in step with their fields under Thing.
+	 */
+	@Test
+	public void nameUnderIdAndThing() {
+		clickOn("#header-name").write("Rain");
+		assertEquals(List.of("Rain"), crate.getRoot().getAll("name").stream().map(JsonNode::asText).toList());
+		// Only text: no buttons to add values or entities
+		assertTrue(lookup("#header-name").queryAs(Node.class).getParent() instanceof GridPane);
+		clickOn("#propertySearch").write("name");
+		TextField inThing = lookup("#value-name-0").queryAs(TextField.class);
+		assertEquals("Rain", inThing.getText());
+		clickOn(inThing).write("fall");
+		assertEquals("Rainfall", lookup("#header-name").queryAs(TextField.class).getText());
+		// A second name, only under Thing; the first stays under @id
+		clickOn("#add-name");
+		clickOn("#value-name-1").write("Precipitation");
+		assertEquals(List.of("Rainfall", "Precipitation"),
+				crate.getRoot().getAll("name").stream().map(JsonNode::asText).toList());
+		clickOn("#header-name").type(KeyCode.END).write("s");
+		assertEquals(List.of("Rainfalls", "Precipitation"),
+				crate.getRoot().getAll("name").stream().map(JsonNode::asText).toList());
+		assertEquals("Rainfalls", lookup("#value-name-0").queryAs(TextField.class).getText());
+	}
+
+	/** Tab leaves the description at the top, rather than typing a tab */
+	@Test
+	public void tabLeavesDescription() {
+		clickOn("#header-description").write("Rain").type(KeyCode.TAB);
+		assertEquals(List.of("Rain"), crate.getRoot().getAll("description").stream().map(JsonNode::asText).toList());
+		assertFalse(lookup("#header-description").queryAs(Node.class).isFocused());
 	}
 }

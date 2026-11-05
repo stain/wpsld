@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -46,6 +47,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.VPos;
 import javafx.scene.Node;
+import javafx.scene.TraversalDirection;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
@@ -53,14 +55,19 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Control;
 import javafx.scene.control.DatePicker;
+import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputControl;
 import javafx.scene.control.TitledPane;
 import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
@@ -75,6 +82,7 @@ import no.s11.wpsld.form.EntityTypes;
 import no.s11.wpsld.form.FieldTier;
 import no.s11.wpsld.form.FormField;
 import no.s11.wpsld.form.FormFields;
+import no.s11.wpsld.form.Labels;
 import no.s11.wpsld.form.ValueKind;
 import no.s11.wpsld.soss.ClassDef;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
@@ -119,8 +127,19 @@ public class EntityEditor extends ScrollPane {
 	private final List<Notebook.Tab> notebookTabs = new ArrayList<>();
 	/** Fields on each page of the notebook */
 	static final int FIELDS_PER_PAGE = 8;
-	/** Properties shown fixed under @id rather than in the groups */
-	static final List<String> FIXED = List.of("name", "description");
+	/**
+	 * Properties also shown under @id, as simple text fields for their first
+	 * value; all their values are edited in their group (Thing)
+	 */
+	static final List<String> HEADER = List.of("name", "description");
+	/** Labels of the fields of the entity shown, by property */
+	private final Map<String, String> labels = new HashMap<>();
+	/** How to show the current values again, for the editors of each property */
+	private final Map<String, List<Reload>> reloads = new HashMap<>();
+
+	/** Shows the entity's values again, unless they were edited in source */
+	private record Reload(Object source, Runnable reload) {
+	}
 	/** The form's groups of fields */
 	private final List<FieldGroup> groups = new ArrayList<>();
 	/** Text of the property search, kept while the same entity is shown */
@@ -333,20 +352,17 @@ public class EntityEditor extends ScrollPane {
 		groups.clear();
 
 		notebookTabs.clear();
-		List<FormField> allFields = formFields.fieldsFor(typeIris(), entity == root.get());
-		// name and description fixed under @id, as every entity should have
-		// a name, rather than among Thing's properties
-		List<FormField> fields = new ArrayList<>(allFields);
+		reloads.clear();
+		List<FormField> fields = formFields.fieldsFor(typeIris(), entity == root.get());
+		labels.clear();
+		fields.forEach(f -> labels.putIfAbsent(f.name(), f.label()));
+		// name and description under @id too, as every entity should have a
+		// name: plain text, while their group allows several values or links
 		int headerRow = 2;
-		for (String fixed : FIXED) {
-			Optional<FormField> field = allFields.stream().filter(f -> f.name().equals(fixed)).findFirst();
+		for (String property : HEADER) {
+			Optional<FormField> field = fields.stream().filter(f -> f.name().equals(property)).findFirst();
 			if (field.isPresent()) {
-				fields.remove(field.get());
-				Map<FormField, List<Node>> nodes = new LinkedHashMap<>();
-				GridPane one = fieldsGrid(List.of(field.get()), nodes);
-				List<Node> labelAndEditor = nodes.get(field.get());
-				one.getChildren().removeAll(labelAndEditor);
-				header.addRow(headerRow++, labelAndEditor.get(0), labelAndEditor.get(1));
+				header.addRow(headerRow++, fieldLabel(field.get()), headerEditor(field.get()));
 			}
 		}
 		if (!notebookMode) {
@@ -365,7 +381,7 @@ public class EntityEditor extends ScrollPane {
 			HBox searchBar = new HBox(spacer, search);
 			form.getChildren().add(searchBar);
 		}
-		Set<String> fieldNames = allFields.stream().map(FormField::name).collect(Collectors.toSet());
+		Set<String> fieldNames = fields.stream().map(FormField::name).collect(Collectors.toSet());
 
 		// Values the current type has no field for, e.g. after changing type
 		List<String> others = entity.getValues().keySet().stream().filter(name -> !fieldNames.contains(name))
@@ -569,16 +585,119 @@ public class EntityEditor extends ScrollPane {
 		GridPane grid = grid();
 		int row = 0;
 		for (FormField field : fields) {
-			Label label = new Label(field.label() + (field.isRequired() ? " *" : ""));
-			label.setId(id("label", field.name()));
-			field.comment().map(EntityEditor::tooltip).ifPresent(label::setTooltip);
-			GridPane.setValignment(label, VPos.TOP);
-			label.setPadding(new Insets(4, 0, 0, 0));
-			Node editor = new FieldEditor(field).node();
+			Label label = fieldLabel(field);
+			// The description, shown with the [?] button
+			VBox editor = new VBox(4, new FieldEditor(field).node());
+			field.comment().ifPresent(comment -> {
+				Label description = new Label(comment);
+				description.setId(id("description", field.name()));
+				description.setWrapText(true);
+				description.setStyle("-fx-text-fill: #505050;");
+				description.setVisible(false);
+				description.setManaged(false);
+				Button help = new Button("?");
+				help.setId(id("help", field.name()));
+				help.setTooltip(new Tooltip("What " + field.label() + " is for"));
+				help.setStyle("-fx-padding: 0 5 0 5; -fx-font-size: 0.85em;");
+				help.setFocusTraversable(false);
+				help.setOnAction(e -> {
+					description.setVisible(!description.isVisible());
+					description.setManaged(description.isVisible());
+				});
+				editor.getChildren().add(description);
+				label.setGraphic(help);
+				label.setContentDisplay(ContentDisplay.RIGHT);
+			});
 			grid.addRow(row++, label, editor);
 			rows.put(field, List.of(label, editor));
 		}
 		return grid;
+	}
+
+	/**
+	 * A field's label: its human readable name, with the property itself as
+	 * tooltip.
+	 */
+	private static Label fieldLabel(FormField field) {
+		Label label = new Label(field.label() + (field.isRequired() ? " *" : ""));
+		label.setId(id("label", field.name()));
+		label.setTooltip(new Tooltip(field.name()));
+		GridPane.setValignment(label, VPos.TOP);
+		label.setPadding(new Insets(4, 0, 0, 0));
+		return label;
+	}
+
+	/**
+	 * The label of a property of the entity shown: as its field, or else from
+	 * the property itself.
+	 */
+	public String label(String property) {
+		return labels.getOrDefault(property, Labels.fromTerm(property));
+	}
+
+	/**
+	 * A text field for the first value of name or description, which must
+	 * be text: no more values, links or new entities, which are in its group.
+	 */
+	private Node headerEditor(FormField field) {
+		TextInputControl text;
+		if (field.name().equals("description")) {
+			TextArea area = new TextArea();
+			area.setWrapText(true);
+			area.setPrefRowCount(3);
+			// Tab moves on, as from the other fields, rather than typing a tab
+			area.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
+				if (e.getCode() == KeyCode.TAB && !e.isControlDown()) {
+					e.consume();
+					area.requestFocusTraversal(e.isShiftDown() ? TraversalDirection.PREVIOUS : TraversalDirection.NEXT);
+				}
+			});
+			text = area;
+		} else {
+			text = new TextField();
+		}
+		text.setId(id("header", field.name()));
+		text.setPromptText("Text");
+		Runnable show = () -> {
+			List<JsonNode> values = entity.getAll(field.name());
+			boolean editable = values.isEmpty() || values.get(0).isTextual();
+			String current = values.isEmpty() ? "" : text(values.get(0));
+			if (!text.getText().equals(current)) {
+				text.setText(current);
+			}
+			text.setEditable(editable);
+			text.setTooltip(editable ? null : new Tooltip("Not text: edit it under " + field.group()));
+		};
+		show.run();
+		text.textProperty().addListener((obs, old, typed) -> {
+			List<JsonNode> values = entity.getAll(field.name());
+			// Unchanged, e.g. shown again after editing in the group
+			String current = values.isEmpty() ? "" : text(values.get(0));
+			if (!text.isEditable() || typed.equals(current)) {
+				return;
+			}
+			List<JsonNode> updated = new ArrayList<>(values);
+			if (!updated.isEmpty()) {
+				updated.remove(0);
+			}
+			if (!typed.isBlank()) {
+				updated.add(0, JsonNodeFactory.instance.textNode(typed));
+			}
+			entity.setAll(field.name(), updated);
+			reloadOthers(field.name(), text);
+			onChange.run();
+		});
+		reloads.computeIfAbsent(field.name(), k -> new ArrayList<>()).add(new Reload(text, show));
+		return text;
+	}
+
+	/**
+	 * Show a property's values again in its other editors, after source
+	 * changed them.
+	 */
+	private void reloadOthers(String property, Object source) {
+		reloads.getOrDefault(property, List.of()).stream().filter(r -> r.source() != source)
+				.forEach(r -> r.reload().run());
 	}
 
 	private static final PseudoClass INVALID = PseudoClass.getPseudoClass("invalid");
@@ -625,11 +744,13 @@ public class EntityEditor extends ScrollPane {
 
 		FieldEditor(FormField field) {
 			this.field = field;
-			List<JsonNode> values = entity.getAll(field.name());
-			if (values.isEmpty()) {
-				addRow("");
-			} else {
-				values.forEach(v -> addRow(text(v)));
+			showValues();
+			if (HEADER.contains(field.name())) {
+				reloads.computeIfAbsent(field.name(), k -> new ArrayList<>()).add(new Reload(this, () -> {
+					rows.clear();
+					rowsBox.getChildren().clear();
+					showValues();
+				}));
 			}
 			addValue.setId(id("add", field.name()));
 			addValue.setTooltip(new Tooltip("Add another value"));
@@ -653,6 +774,15 @@ public class EntityEditor extends ScrollPane {
 
 		Node node() {
 			return node;
+		}
+
+		private void showValues() {
+			List<JsonNode> values = entity.getAll(field.name());
+			if (values.isEmpty()) {
+				addRow("");
+			} else {
+				values.forEach(v -> addRow(text(v)));
+			}
 		}
 
 		private boolean full() {
@@ -820,6 +950,7 @@ public class EntityEditor extends ScrollPane {
 			entity.setAll(field.name(), rows.stream().map(r -> value(field, r.text().get()))
 					.flatMap(Optional::stream).toList());
 			addValue.setDisable(full());
+			reloadOthers(field.name(), this);
 			onChange.run();
 		}
 	}

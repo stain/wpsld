@@ -99,10 +99,11 @@ test {
     systemProperty 'testfx.robot', 'glass'
     systemProperty 'prism.order', 'sw'
     jvmArgs '--enable-native-access=javafx.graphics'
-    // A JVM per test class: TestFX shares one JavaFX toolkit between the
-    // classes of a JVM, and after TestCrateEditor the software renderer
-    // slowed TestEntityEditor down until it stalled
+    // TestFX registers each test's application in a static JavaFX map
+    // (ParametersImpl), so every test's scene and form stay in memory until
+    // the JVM ends: one JVM per test class, with room for ~25 MB per test
     forkEvery = 1
+    maxHeapSize = '1536m'
 }
 
 application { 

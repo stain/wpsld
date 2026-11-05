@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -55,13 +56,17 @@ public class EntityPreview extends ScrollPane {
 	private final Consumer<Entity> open;
 	/** Opens a web address, e.g. in the browser */
 	private final Consumer<String> browse;
+	/** Human readable label of a property */
+	private final Function<String, String> label;
 	private final VBox content = new VBox(8);
 	private Entity entity;
 
-	public EntityPreview(Supplier<Crate> crate, Consumer<Entity> open, Consumer<String> browse) {
+	public EntityPreview(Supplier<Crate> crate, Consumer<Entity> open, Consumer<String> browse,
+			Function<String, String> label) {
 		this.crate = Objects.requireNonNull(crate);
 		this.open = Objects.requireNonNull(open);
 		this.browse = Objects.requireNonNull(browse);
+		this.label = Objects.requireNonNull(label);
 		content.setPadding(new Insets(12));
 		content.setId("entityPreview");
 		setContent(content);
@@ -156,8 +161,9 @@ public class EntityPreview extends ScrollPane {
 		return table;
 	}
 
-	private static Label propertyLabel(String property) {
-		Label label = new Label(property);
+	private Label propertyLabel(String property) {
+		Label label = new Label(this.label.apply(property));
+		label.setTooltip(new Tooltip(property));
 		label.setStyle("-fx-font-weight: bold;");
 		GridPane.setValignment(label, VPos.TOP);
 		label.setPadding(new Insets(3, 0, 0, 0));

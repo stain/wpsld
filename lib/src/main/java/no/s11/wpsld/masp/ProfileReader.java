@@ -225,7 +225,9 @@ public class ProfileReader {
 					range.add(rangeItem(entity.getId(), ref, ruleIds));
 				}
 			}
-			return new PropertyRule(id, label(entity), comment(entity),
+			String label = label(entity);
+			return new PropertyRule(id, label, text(entity, S + "name").filter(name -> !name.equals(label)),
+					comment(entity),
 					document.references(entity, PROV_SPECIALIZATION_OF), domain, range, cardinality(entity));
 		}
 
