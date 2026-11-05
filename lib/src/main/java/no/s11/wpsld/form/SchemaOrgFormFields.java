@@ -28,6 +28,7 @@ import java.util.OptionalInt;
 import java.util.Queue;
 import java.util.Set;
 
+import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.soss.ClassDef;
 import no.s11.wpsld.soss.PropertyDef;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
@@ -45,9 +46,15 @@ public class SchemaOrgFormFields implements FormFields {
 	private static final URI S_DATE_TIME = URI.create(S + "DateTime");
 
 	private final SchemaFromJsonLd schema;
+	private final CrateTerms terms;
 
 	public SchemaOrgFormFields(SchemaFromJsonLd schema) {
-		this.schema = Objects.requireNonNull(schema);
+		this(new CrateTerms(schema));
+	}
+
+	public SchemaOrgFormFields(CrateTerms terms) {
+		this.terms = Objects.requireNonNull(terms);
+		this.schema = terms.getSchema();
 	}
 
 	@Override
@@ -89,8 +96,10 @@ public class SchemaOrgFormFields implements FormFields {
 	private FormField field(PropertyDef property, ClassDef group) {
 		List<ClassDef> range = property.getRangeIncludes().stream()
 				.filter(c -> !schema.isSuperseded(c)).toList();
-		return new FormField(property.getName(), property.getID(), property.getName(), property.getComment(),
-				group.getName(), range, kind(range), 0, OptionalInt.empty());
+		// Names as written in RO-Crates, e.g. the group File for MediaObject
+		String name = terms.name(property);
+		return new FormField(name, property.getID(), name, property.getComment(), terms.name(group), range,
+				kind(range), 0, OptionalInt.empty());
 	}
 
 	private ValueKind kind(List<ClassDef> range) {

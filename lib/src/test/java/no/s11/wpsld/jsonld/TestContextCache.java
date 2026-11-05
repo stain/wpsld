@@ -93,4 +93,17 @@ public class TestContextCache {
 			assertTrue(cache.get("https://w3id.org/ro/crate/1.3/context").isPresent());
 		}
 	}
+
+	/**
+	 * Each RO-Crate context declares the schema.org release it is based on.
+	 */
+	@Test
+	public void schemaOrgVersions() {
+		ContextCache cache = ContextCache.bundled();
+		assertEquals(Optional.of("5.0"), cache.schemaOrgVersion("https://w3id.org/ro/crate/1.0/context"));
+		assertEquals(Optional.of("10.0"), cache.schemaOrgVersion("https://w3id.org/ro/crate/1.1/context"));
+		assertEquals(Optional.of("22.0"), cache.schemaOrgVersion("https://w3id.org/ro/crate/1.2/context"));
+		assertEquals(Optional.of("30.0"), cache.schemaOrgVersion("https://w3id.org/ro/crate/1.3/context"));
+		assertEquals(Optional.empty(), cache.schemaOrgVersion("https://example.com/not-cached"));
+	}
 }

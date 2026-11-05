@@ -204,4 +204,28 @@ public class TestEntityEditor extends ApplicationTest {
 		assertEquals(List.of(ref("#dl")), crate.getRoot().getAll("distribution"));
 		assertEquals(Optional.of(download), crate.get("#dl"));
 	}
+
+	/**
+	 * schema:MediaObject is shown and written as RO-Crate's File, and found
+	 * by either name.
+	 */
+	@Test
+	public void fileForMediaObject() {
+		Entity entity = crate.add("Thing");
+		edit(entity);
+		chooseType("file");
+		assertEquals(List.of("File"), entity.getTypes());
+		assertNotNull(lookup("#type-File").query());
+		assertEquals("File", entity.toJson().get("@type").asText());
+		// Its own properties, grouped as File
+		assertTrue(visibleProperties().contains("encodingFormat"));
+	}
+
+	@Test
+	public void mediaObjectSearchGivesFile() {
+		Entity entity = crate.add("Thing");
+		edit(entity);
+		chooseType("mediaobject");
+		assertEquals(List.of("File"), entity.getTypes());
+	}
 }

@@ -36,6 +36,7 @@ import javafx.scene.control.TreeView;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
+import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.soss.ClassDef;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
@@ -48,6 +49,7 @@ public class TypeSelector extends Dialog<ClassDef> {
 	private static final String S = "http://schema.org/";
 
 	private final SchemaFromJsonLd schema;
+	private final CrateTerms terms;
 	private final ClassDef thing;
 	private final TreeView<ClassDef> tree = new TreeView<>();
 	private final Label status = new Label();
@@ -56,6 +58,7 @@ public class TypeSelector extends Dialog<ClassDef> {
 
 	public TypeSelector(SchemaFromJsonLd schema, Window owner) {
 		this.schema = schema;
+		this.terms = new CrateTerms(schema);
 		this.thing = schema.getClasses().get(URI.create(S + "Thing"));
 		initOwner(owner);
 		setTitle("Add type");
@@ -71,7 +74,7 @@ public class TypeSelector extends Dialog<ClassDef> {
 			@Override
 			protected void updateItem(ClassDef classDef, boolean empty) {
 				super.updateItem(classDef, empty);
-				setText(empty || classDef == null ? null : classDef.getName());
+				setText(empty || classDef == null ? null : label(classDef));
 				setStyle(!empty && matches.contains(classDef) ? "-fx-font-weight: bold;" : "");
 				setTooltip(empty || classDef == null ? null
 						: classDef.getComment().map(EntityEditor::tooltip).orElse(null));
@@ -111,6 +114,7 @@ public class TypeSelector extends Dialog<ClassDef> {
 		matches = schema.getClasses().values().stream()
 				.filter(c -> !schema.isSuperseded(c))
 				.filter(c -> c.getName().toLowerCase(Locale.ROOT).contains(q)
+						|| terms.name(c).toLowerCase(Locale.ROOT).contains(q)
 						|| c.getComment().map(t -> t.toLowerCase(Locale.ROOT).contains(q)).orElse(false))
 				.collect(Collectors.toSet());
 		// The matches and the paths to them
@@ -120,9 +124,18 @@ public class TypeSelector extends Dialog<ClassDef> {
 		status.setText(matches.size() + " matching types");
 		// Select the best match: name starting with the query, else any match
 		matches.stream()
-				.sorted(Comparator.comparing((ClassDef c) -> !c.getName().toLowerCase(Locale.ROOT).startsWith(q))
-						.thenComparing(ClassDef::getName))
+				.sorted(Comparator.comparing((ClassDef c) -> !terms.name(c).toLowerCase(Locale.ROOT).startsWith(q)
+						&& !c.getName().toLowerCase(Locale.ROOT).startsWith(q)).thenComparing(terms::name))
 				.findFirst().ifPresent(this::select);
+	}
+
+	/**
+	 * The name as written in RO-Crates, with the schema.org name if
+	 * different, e.g. "File (MediaObject)".
+	 */
+	private String label(ClassDef classDef) {
+		String name = terms.name(classDef);
+		return name.equals(classDef.getName()) ? name : name + " (" + classDef.getName() + ")";
 	}
 
 	private TreeItem<ClassDef> filteredItem(ClassDef classDef, Set<ClassDef> shown) {

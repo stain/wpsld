@@ -63,6 +63,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.form.EntityTypes;
 import no.s11.wpsld.form.FormField;
@@ -82,13 +83,14 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
  * of types that have them.
  */
 public class EntityEditor extends ScrollPane {
-	private static final String S = "http://schema.org/";
 	/** How many types to suggest for values without fields */
 	private static final int SUGGESTIONS = 3;
 
 	private final SchemaFromJsonLd schema;
 	private final FormFields formFields;
 	private final EntityTypes entityTypes;
+	/** Type and property names as written in RO-Crates, e.g. File */
+	private final CrateTerms terms;
 	/** The crate's entities, to suggest as references */
 	private final Supplier<List<Entity>> crateEntities;
 	/** Called after the entity is changed */
@@ -112,7 +114,8 @@ public class EntityEditor extends ScrollPane {
 			Runnable onChange, Function<String, Entity> newEntity, BiConsumer<Entity, String> renameEntity) {
 		this.schema = schema;
 		this.formFields = formFields;
-		this.entityTypes = new EntityTypes(schema);
+		this.terms = new CrateTerms(schema);
+		this.entityTypes = new EntityTypes(terms);
 		this.crateEntities = crateEntities;
 		this.onChange = onChange;
 		this.newEntity = newEntity;
@@ -141,7 +144,7 @@ public class EntityEditor extends ScrollPane {
 	}
 
 	private Optional<ClassDef> classDef(String typeName) {
-		return Optional.ofNullable(schema.getClasses().get(URI.create(S + typeName)));
+		return terms.classDef(typeName);
 	}
 
 	/**
@@ -161,11 +164,11 @@ public class EntityEditor extends ScrollPane {
 		ButtonType replace = new ButtonType("Replace");
 		String existing = String.join(" and ", implying);
 		Alert alert = new Alert(AlertType.CONFIRMATION,
-				existing + (implying.size() == 1 ? " is" : " are") + " already a kind of " + added.getName()
-						+ ". Add " + added.getName() + " anyway, or replace " + existing + " with it?",
+				existing + (implying.size() == 1 ? " is" : " are") + " already a kind of " + terms.name(added)
+						+ ". Add " + terms.name(added) + " anyway, or replace " + existing + " with it?",
 				addAnyway, replace, ButtonType.CANCEL);
 		alert.initOwner(getScene().getWindow());
-		alert.setHeaderText("Add " + added.getName());
+		alert.setHeaderText("Add " + terms.name(added));
 		alert.showAndWait().ifPresent(choice -> {
 			if (choice == addAnyway) {
 				changeTypes(entityTypes.add(types, added));
@@ -220,12 +223,11 @@ public class EntityEditor extends ScrollPane {
 	 * Types that have the given properties, those having the most first.
 	 */
 	private List<Map.Entry<ClassDef, Long>> suggestTypes(List<String> propertyNames) {
-		return propertyNames.stream().map(name -> schema.getProperties().get(URI.create(S + name)))
-				.filter(Objects::nonNull).flatMap(p -> p.getDomainIncludes().stream())
+		return propertyNames.stream().map(terms::propertyDef).flatMap(Optional::stream).flatMap(p -> p.getDomainIncludes().stream())
 				.filter(c -> !schema.isSuperseded(c))
 				.collect(Collectors.groupingBy(Function.identity(), Collectors.counting())).entrySet().stream()
 				.sorted(Map.Entry.<ClassDef, Long>comparingByValue().reversed()
-						.thenComparing(e -> e.getKey().getName()))
+						.thenComparing(e -> terms.name(e.getKey())))
 				.limit(SUGGESTIONS).toList();
 	}
 
@@ -306,9 +308,9 @@ public class EntityEditor extends ScrollPane {
 			if (!suggestions.isEmpty()) {
 				FlowPane suggest = new FlowPane(6, 6, new Label("Suggest type:"));
 				for (Map.Entry<ClassDef, Long> suggestion : suggestions) {
-					Button addSuggested = new Button("Add type " + suggestion.getKey().getName() + " ("
+					Button addSuggested = new Button("Add type " + terms.name(suggestion.getKey()) + " ("
 							+ suggestion.getValue() + " of " + others.size() + ")");
-					addSuggested.setId(id("suggestType", suggestion.getKey().getName()));
+					addSuggested.setId(id("suggestType", terms.name(suggestion.getKey())));
 					suggestion.getKey().getComment().map(EntityEditor::tooltip).ifPresent(addSuggested::setTooltip);
 					addSuggested.setOnAction(e -> addType(suggestion.getKey()));
 					suggest.getChildren().add(addSuggested);
@@ -485,8 +487,8 @@ public class EntityEditor extends ScrollPane {
 				create.setId(id("new", field.name()));
 				create.setTooltip(new Tooltip("Create a new entity and link it"));
 				for (ClassDef type : entityTypes) {
-					MenuItem item = new MenuItem(type.getName());
-					item.setOnAction(e -> link(newEntity.apply(type.getName()).getId()));
+					MenuItem item = new MenuItem(terms.name(type));
+					item.setOnAction(e -> link(newEntity.apply(terms.name(type)).getId()));
 					create.getItems().add(item);
 				}
 				actions.getChildren().add(create);
@@ -517,7 +519,7 @@ public class EntityEditor extends ScrollPane {
 		}
 
 		private void addRow(String current) {
-			String rangeNames = field.range().stream().map(ClassDef::getName).collect(Collectors.joining(" or "));
+			String rangeNames = field.range().stream().map(terms::name).collect(Collectors.joining(" or "));
 			Control control;
 			Supplier<String> text;
 			switch (field.kind()) {

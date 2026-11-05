@@ -154,6 +154,15 @@ then ranges over the root data entity's class rule.
   1.0–1.3 contexts (CC0); `JsonLdContext` processes a `@context` (arrays,
   `@vocab`, prefixes, term definitions in any order) without fetching and
   without throwing. Profiles will get their own loading and cache.
+- **RO-Crate names and terms outside schema.org.** `CrateTerms` names
+  schema.org terms as RO-Crates write them, through the RO-Crate 1.3 context:
+  the schema.org name, except `File` for `schema:MediaObject` (checked over
+  all of schema.org 30.0: no other name differs). The context also maps terms
+  outside schema.org (`conformsTo`, `Profile`, `hasResource`… from Dublin
+  Core, dx-prof, PAV, PCDM, CodeMeta, Bioschemas, GeoSPARQL, PROV, IANA link
+  relations, RO terms); the schema model has no definitions for them, so the
+  editor keeps their values but offers no fields. The core MASP RO-Crate
+  profile should cover them.
 - **JSON-LD 1.0.** RO-Crate 1.2/1.3: the metadata document "MUST be a
   document which is valid JSON-LD 1.0 in flattened and compacted form", so
   JSON-LD 1.1 context features (scoped contexts, `@import`, `@protected`,
@@ -235,8 +244,19 @@ With MASP that single cache is no longer enough:
   descriptions differ per profile. Profile-specific information must never
   be stored on the shared vocabulary objects; the profile layer (`ClassRule`,
   `PropertyRule`) refers to vocabulary terms and adds its own rules on top.
-- **Profiles may target different schema versions.** A profile written for
-  the RO-Crate 1.2 context implies schema.org 22.0 (1.3 implies 30.0), and
+- **Profiles may target different schema versions.** Each RO-Crate context
+  declares the schema.org release it is based on in its `schemaVersion`
+  (read with `ContextCache.schemaOrgVersion`):
+
+  | RO-Crate context | `schemaVersion` | schema.org |
+  |---|---|---|
+  | 1.0 | `http://schema.org/version/5.0/` | 5.0 |
+  | 1.1 | `http://schema.org/version/10.0/` | 10.0 |
+  | 1.2 | `https://schema.org/docs/releases.html#v22.0` | 22.0 |
+  | 1.3 | `https://schema.org/docs/releases.html#v30.0` | 30.0 |
+
+  So a profile written for the RO-Crate 1.2 context implies schema.org 22.0
+  (1.3 implies 30.0, the one bundled today), and
   MASP's own schema.org schema crate uses `https://` IRIs. Terms can be added,
   superseded or retired between releases, so a profile must be resolved
   against the vocabulary version it was written for, not silently against

@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -127,6 +128,21 @@ public class ContextCache {
 	public Optional<JsonNode> get(String url) {
 		return loaded.computeIfAbsent(url, this::load);
 	}
+
+	/**
+	 * The schema.org release a cached context declares it is based on, in
+	 * its <code>schemaVersion</code>, as RO-Crate contexts do: e.g.
+	 * <code>30.0</code> from <code>https://schema.org/docs/releases.html#v30.0</code>
+	 * (RO-Crate 1.3) or <code>5.0</code> from
+	 * <code>http://schema.org/version/5.0/</code> (RO-Crate 1.0).
+	 */
+	public Optional<String> schemaOrgVersion(String url) {
+		return get(url).map(document -> document.path("schemaVersion"))
+				.map(v -> v.isObject() ? v.path("@id").asText("") : v.asText(""))
+				.flatMap(id -> SCHEMA_VERSION.matcher(id).results().map(m -> m.group(1)).reduce((a, b) -> b));
+	}
+
+	private static final Pattern SCHEMA_VERSION = Pattern.compile("(\\d+\\.\\d+)");
 
 	private Optional<JsonNode> load(String url) {
 		URL resource = locations.get(url);
