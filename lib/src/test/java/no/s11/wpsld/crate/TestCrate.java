@@ -90,6 +90,73 @@ public class TestCrate {
 	}
 
 	@Test
+	public void renameUpdatesReferences() {
+		Crate crate = new Crate();
+		Entity alice = crate.add("Person");
+		Entity file = crate.add("File");
+		crate.getRoot().setAll("author", List.of(ref(alice)));
+		file.setAll("author", List.of(ref(alice), JSON.objectNode().put("@id", "#bob")));
+		crate.rename(alice, "https://orcid.org/0000-0002-1825-0097");
+		assertEquals("https://orcid.org/0000-0002-1825-0097", alice.getId());
+		assertEquals(List.of(ref(alice)), crate.getRoot().getAll("author"));
+		assertEquals(List.of(ref(alice), JSON.objectNode().put("@id", "#bob")), file.getAll("author"));
+	}
+
+	@Test
+	public void renameRootUpdatesDescriptor() {
+		Crate crate = new Crate();
+		Entity part = crate.add("File");
+		part.setAll("isPartOf", List.of(ref(crate.getRoot())));
+		crate.rename(crate.getRoot(), "https://example.com/crate/");
+		JsonNode graph = crate.toJson().get("@graph");
+		assertEquals("https://example.com/crate/", graph.get(0).get("about").get("@id").asText());
+		assertEquals("https://example.com/crate/", graph.get(1).get("@id").asText());
+		assertEquals("https://example.com/crate/", part.get("isPartOf").get().get("@id").asText());
+	}
+
+	@Test(expected = IllegalArgumentException.class)
+	public void renameToExistingNotAllowed() {
+		Crate crate = new Crate();
+		Entity a = crate.add("Person");
+		Entity b = crate.add("Person");
+		crate.rename(a, b.getId());
+	}
+
+	@Test
+	public void merge() {
+		Crate crate = new Crate();
+		Entity alice = crate.add("Person");
+		Entity duplicate = crate.add("Researcher");
+		alice.setAll("name", List.of(JSON.textNode("Alice")));
+		duplicate.setAll("name", List.of(JSON.textNode("Alice"), JSON.textNode("A. Smith")));
+		duplicate.setAll("email", List.of(JSON.textNode("alice@example.com")));
+		crate.getRoot().setAll("author", List.of(ref(duplicate)));
+
+		crate.merge(alice, duplicate);
+		assertEquals(List.of(crate.getRoot(), alice), crate.getEntities());
+		assertEquals(List.of("Person", "Researcher"), alice.getTypes());
+		assertEquals(List.of(JSON.textNode("Alice"), JSON.textNode("A. Smith")), alice.getAll("name"));
+		assertEquals(List.of(JSON.textNode("alice@example.com")), alice.getAll("email"));
+		assertEquals(List.of(ref(alice)), crate.getRoot().getAll("author"));
+	}
+
+	@Test
+	public void mergeRootKeepsItFirst() {
+		Crate crate = new Crate();
+		Entity other = crate.add("Dataset");
+		Entity file = crate.add("File");
+		file.setAll("isPartOf", List.of(ref(crate.getRoot())));
+		crate.merge(other, crate.getRoot());
+		assertSame(other, crate.getRoot());
+		assertEquals(2, crate.getEntities().size());
+		assertEquals(List.of(ref(other)), file.getAll("isPartOf"));
+	}
+
+	private static JsonNode ref(Entity entity) {
+		return JSON.objectNode().put("@id", entity.getId());
+	}
+
+	@Test
 	public void label() {
 		Entity entity = new Entity("#person-1", "Person");
 		assertEquals("#person-1", entity.getLabel());

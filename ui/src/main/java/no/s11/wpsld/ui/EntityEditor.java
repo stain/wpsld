@@ -22,10 +22,12 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -33,7 +35,9 @@ import java.util.stream.Collectors;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.VPos;
@@ -41,10 +45,12 @@ import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Control;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
@@ -58,6 +64,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.form.EntityTypes;
 import no.s11.wpsld.form.FormField;
 import no.s11.wpsld.form.FormFields;
 import no.s11.wpsld.form.ValueKind;
@@ -81,23 +88,30 @@ public class EntityEditor extends ScrollPane {
 
 	private final SchemaFromJsonLd schema;
 	private final FormFields formFields;
-	/** Identifiers of the other entities in the crate, to suggest as references */
-	private final Supplier<List<String>> entityIds;
+	private final EntityTypes entityTypes;
+	/** The crate's entities, to suggest as references */
+	private final Supplier<List<Entity>> crateEntities;
 	/** Called after the entity is changed */
 	private final Runnable onChange;
 	/** Creates a new entity of the given type in the crate */
 	private final Function<String, Entity> newEntity;
+	/** Changes an entity's @id in the crate, updating references (or merging) */
+	private final BiConsumer<Entity, String> renameEntity;
 
 	private final VBox form = new VBox(8);
 	private Entity entity;
+	/** True while an @id change is applied */
+	private boolean renaming;
 
-	public EntityEditor(SchemaFromJsonLd schema, FormFields formFields, Supplier<List<String>> entityIds,
-			Runnable onChange, Function<String, Entity> newEntity) {
+	public EntityEditor(SchemaFromJsonLd schema, FormFields formFields, Supplier<List<Entity>> crateEntities,
+			Runnable onChange, Function<String, Entity> newEntity, BiConsumer<Entity, String> renameEntity) {
 		this.schema = schema;
 		this.formFields = formFields;
-		this.entityIds = entityIds;
+		this.entityTypes = new EntityTypes(schema);
+		this.crateEntities = crateEntities;
 		this.onChange = onChange;
 		this.newEntity = newEntity;
+		this.renameEntity = renameEntity;
 		form.setPadding(new Insets(10));
 		setContent(form);
 		setFitToWidth(true);
@@ -116,36 +130,39 @@ public class EntityEditor extends ScrollPane {
 	}
 
 	/**
-	 * Add a type to the entity. A superclass of a type the entity already
-	 * has is not added, as it is implied; a subclass replaces its
-	 * superclasses, e.g. Person replaces Thing. Unrelated types are kept
-	 * side by side, making <code>@type</code> an array.
+	 * Add a type to the entity, following {@link EntityTypes}: a subclass
+	 * replaces its superclasses, unrelated types are kept side by side. If
+	 * existing types already imply the added type (it is a superclass of
+	 * them), ask whether to add it anyway or replace those types with it.
 	 */
 	private void addType(ClassDef added) {
-		List<String> types = new ArrayList<>(entity.getTypes());
-		if (types.contains(added.getName())) {
+		List<String> types = entity.getTypes();
+		List<String> implying = entityTypes.implying(types, added);
+		if (implying.isEmpty()) {
+			changeTypes(entityTypes.add(types, added));
 			return;
 		}
-		Optional<String> implying = types.stream()
-				.filter(t -> classDef(t).map(c -> c.getSelfAndSuperClasses().contains(added)).orElse(false))
-				.findFirst();
-		if (implying.isPresent()) {
-			Alert alert = new Alert(AlertType.INFORMATION,
-					implying.get() + " is already a kind of " + added.getName() + ", so it is not added.");
-			alert.initOwner(getScene().getWindow());
-			alert.setHeaderText(null);
-			alert.showAndWait();
-			return;
-		}
-		types.removeIf(t -> classDef(t).map(added.getSelfAndSuperClasses()::contains).orElse(false));
-		types.add(added.getName());
-		changeTypes(types);
+		ButtonType addAnyway = new ButtonType("Add anyway");
+		ButtonType replace = new ButtonType("Replace");
+		String existing = String.join(" and ", implying);
+		Alert alert = new Alert(AlertType.CONFIRMATION,
+				existing + (implying.size() == 1 ? " is" : " are") + " already a kind of " + added.getName()
+						+ ". Add " + added.getName() + " anyway, or replace " + existing + " with it?",
+				addAnyway, replace, ButtonType.CANCEL);
+		alert.initOwner(getScene().getWindow());
+		alert.setHeaderText("Add " + added.getName());
+		alert.showAndWait().ifPresent(choice -> {
+			if (choice == addAnyway) {
+				changeTypes(entityTypes.add(types, added));
+			} else if (choice == replace) {
+				changeTypes(entityTypes.replaceImplying(types, added));
+			}
+		});
 	}
 
 	private void removeType(String type) {
-		List<String> types = new ArrayList<>(entity.getTypes());
-		types.remove(type);
-		changeTypes(types);
+		// Removing the last type falls back to Thing
+		changeTypes(entityTypes.remove(entity.getTypes(), type));
 	}
 
 	private void changeTypes(List<String> types) {
@@ -166,8 +183,8 @@ public class EntityEditor extends ScrollPane {
 			classDef(type).flatMap(ClassDef::getComment).map(EntityEditor::tooltip).ifPresent(name::setTooltip);
 			Button remove = new Button("×");
 			remove.setStyle("-fx-padding: 0 4 0 4;");
-			// An entity needs at least one type
-			remove.setDisable(entity.getTypes().size() == 1);
+			// Removing the last type falls back to Thing, so a lone Thing stays
+			remove.setDisable(!entityTypes.canRemove(entity.getTypes(), type));
 			remove.setOnAction(e -> removeType(type));
 			HBox chip = new HBox(4, name, remove);
 			chip.setAlignment(Pos.CENTER_LEFT);
@@ -199,12 +216,33 @@ public class EntityEditor extends ScrollPane {
 
 		GridPane header = grid();
 		TextField idField = new TextField(entity.getId());
-		// TODO: Renaming should also update references from other entities, see PLAN.md
-		idField.setEditable(!entity.getId().equals("./"));
-		idField.textProperty().addListener((obs, old, id) -> {
-			if (!id.isBlank()) {
-				entity.setId(id);
-				onChange.run();
+		// Applied when done (Enter or leaving the field), not on every key,
+		// as intermediate identifiers could clash with other entities
+		// The entity of this form, even if focus leaves the field because
+		// another entity was selected
+		Entity edited = entity;
+		Runnable applyId = () -> {
+			// Skip if another entity is shown now (e.g. after merging), or
+			// while already renaming: a confirmation dialog takes the focus
+			if (edited != entity || renaming) {
+				return;
+			}
+			String id = idField.getText().strip();
+			if (id.isEmpty() || id.equals(edited.getId())) {
+				idField.setText(edited.getId());
+				return;
+			}
+			renaming = true;
+			try {
+				renameEntity.accept(edited, id);
+			} finally {
+				renaming = false;
+			}
+		};
+		idField.setOnAction(e -> applyId.run());
+		idField.focusedProperty().addListener((obs, was, focused) -> {
+			if (!focused) {
+				applyId.run();
 			}
 		});
 		header.addRow(0, new Label("@type"), typeChips());
@@ -246,6 +284,7 @@ public class EntityEditor extends ScrollPane {
 			}
 			TitledPane pane = new TitledPane("Not properties of " + String.join(", ", entity.getTypes()) + " ("
 					+ others.size() + ")", grid);
+			pane.setAnimated(false);
 			form.getChildren().add(pane);
 		}
 
@@ -256,6 +295,8 @@ public class EntityEditor extends ScrollPane {
 			List<FormField> groupFields = group.getValue();
 			boolean hasValues = groupFields.stream().anyMatch(f -> entity.get(f.name()).isPresent());
 			TitledPane pane = new TitledPane("From " + group.getKey() + " (" + groupFields.size() + ")", null);
+			// Meant to be fast, not pretty
+			pane.setAnimated(false);
 			// Most specific properties and those with values open, the rest
 			// folded away, and only built when first opened
 			if (first || hasValues) {
@@ -381,16 +422,8 @@ public class EntityEditor extends ScrollPane {
 				text = picker.getEditor()::getText;
 			}
 			case REFERENCE, TEXT_OR_REFERENCE -> {
-				// Suggest the other entities of the crate, like Crate-O
-				ComboBox<String> combo = new ComboBox<>(FXCollections.observableArrayList(
-						entityIds.get().stream().filter(id -> !id.equals(entity.getId())).toList()));
-				combo.setEditable(true);
-				combo.setPromptText(field.kind() == ValueKind.REFERENCE ? "@id of " + rangeNames
-						: rangeNames + " (text, or @id of an entity)");
-				combo.getEditor().setText(current);
-				combo.getEditor().textProperty().addListener((obs, old, v) -> update());
-				control = combo;
-				text = combo.getEditor()::getText;
+				control = referenceCombo(field, rangeNames, current);
+				text = ((ComboBox<?>) control).getEditor()::getText;
 			}
 			default -> {
 				TextField textField = new TextField(current);
@@ -420,6 +453,55 @@ public class EntityEditor extends ScrollPane {
 			// A single value field needs no button to add more
 			addValue.setVisible(field.maxCount().orElse(Integer.MAX_VALUE) > 1);
 			addValue.setManaged(addValue.isVisible());
+		}
+
+		/**
+		 * An editable drop-down of the crate's entities fitting the field's
+		 * range (like Crate-O), filtered by @id and name while typing.
+		 */
+		private ComboBox<String> referenceCombo(FormField field, String rangeNames, String current) {
+			List<ClassDef> entityRange = field.range().stream().filter(c -> !schema.isDataType(c)).toList();
+			Map<String, Entity> candidates = new LinkedHashMap<>();
+			crateEntities.get().stream().filter(e -> e != entity)
+					.filter(e -> entityRange.stream().anyMatch(range -> entityTypes.isA(e.getTypes(), range)))
+					.forEach(e -> candidates.put(e.getId(), e));
+			FilteredList<String> suggestions = new FilteredList<>(
+					FXCollections.observableArrayList(candidates.keySet()));
+			ComboBox<String> combo = new ComboBox<>(suggestions);
+			combo.setEditable(true);
+			combo.setPromptText(field.kind() == ValueKind.REFERENCE ? "@id of " + rangeNames
+					: rangeNames + " (text, or @id of an entity)");
+			// Show the entity's name and type, not just its @id
+			combo.setCellFactory(view -> new ListCell<>() {
+				@Override
+				protected void updateItem(String id, boolean empty) {
+					super.updateItem(id, empty);
+					Entity e = empty || id == null ? null : candidates.get(id);
+					setText(e == null ? id
+							: (e.getLabel().equals(id) ? id : e.getLabel() + "  " + id) + "  ("
+									+ String.join(", ", e.getTypes()) + ")");
+				}
+			});
+			combo.getEditor().setText(current);
+			combo.getEditor().textProperty().addListener((obs, old, typed) -> {
+				update();
+				if (!combo.getEditor().isFocused()) {
+					// Set by choosing from the list or linking, not typed
+					return;
+				}
+				String query = typed.strip().toLowerCase(Locale.ROOT);
+				// Changing the list while the editor is being updated would reset it
+				Platform.runLater(() -> {
+					suggestions.setPredicate(id -> query.isEmpty() || id.toLowerCase(Locale.ROOT).contains(query)
+							|| candidates.get(id).getLabel().toLowerCase(Locale.ROOT).contains(query));
+					if (suggestions.isEmpty()) {
+						combo.hide();
+					} else if (!combo.isShowing()) {
+						combo.show();
+					}
+				});
+			});
+			return combo;
 		}
 
 		/**

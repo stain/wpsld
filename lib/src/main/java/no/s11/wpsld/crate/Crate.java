@@ -22,6 +22,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -35,6 +37,7 @@ public class Crate {
 	public static final String RO_CRATE_METADATA_JSON = "ro-crate-metadata.json";
 	public static final String RO_CRATE_1_3 = "https://w3id.org/ro/crate/1.3";
 	public static final String RO_CRATE_1_3_CONTEXT = RO_CRATE_1_3 + "/context";
+	/** Identifier of a new crate's root data entity; it may also be an absolute URI */
 	public static final String ROOT_ID = "./";
 
 	private final List<Entity> entities = new ArrayList<>();
@@ -80,6 +83,70 @@ public class Crate {
 	}
 
 	/**
+	 * Change an entity's <code>@id</code>, updating all references to it from
+	 * the crate's entities. Use {@link #merge} if another entity already has
+	 * that identifier.
+	 *
+	 * @throws IllegalArgumentException if another entity has the new identifier
+	 */
+	public void rename(Entity entity, String newId) {
+		String oldId = entity.getId();
+		if (oldId.equals(newId)) {
+			return;
+		}
+		if (get(newId).isPresent()) {
+			throw new IllegalArgumentException("Another entity already has @id " + newId);
+		}
+		entity.setId(newId);
+		replaceReferences(oldId, newId);
+	}
+
+	/**
+	 * Merge another entity into this one: its types and values are added
+	 * (values of the same property are combined, without duplicates), it is
+	 * removed from the crate, and references to it now point to the entity.
+	 */
+	public void merge(Entity entity, Entity other) {
+		if (entity == other) {
+			return;
+		}
+		List<String> types = new ArrayList<>(entity.getTypes());
+		other.getTypes().stream().filter(t -> !types.contains(t)).forEach(types::add);
+		entity.setTypes(types);
+		other.getValues().keySet().forEach(property -> {
+			List<JsonNode> values = new ArrayList<>(entity.getAll(property));
+			other.getAll(property).stream().filter(v -> !values.contains(v)).forEach(values::add);
+			entity.setAll(property, values);
+		});
+		if (other == getRoot()) {
+			// The root data entity stays first, now as the merged entity
+			entities.set(0, entity);
+			entities.remove(entities.lastIndexOf(entity));
+		} else {
+			entities.remove(other);
+		}
+		replaceReferences(other.getId(), entity.getId());
+	}
+
+	private void replaceReferences(String oldId, String newId) {
+		for (Entity entity : entities) {
+			for (String property : List.copyOf(entity.getValues().keySet())) {
+				entity.setAll(property, entity.getAll(property).stream()
+						.map(v -> replaceReference(v, oldId, newId)).toList());
+			}
+		}
+	}
+
+	private static JsonNode replaceReference(JsonNode value, String oldId, String newId) {
+		if (value.isObject() && value.path("@id").asText("").equals(oldId)) {
+			ObjectNode copy = ((ObjectNode) value).deepCopy();
+			copy.put("@id", newId);
+			return copy;
+		}
+		return value;
+	}
+
+	/**
 	 * The crate as flattened RO-Crate 1.3 JSON-LD, with the metadata
 	 * descriptor first.
 	 */
@@ -90,7 +157,7 @@ public class Crate {
 		ObjectNode descriptor = graph.addObject();
 		descriptor.put("@id", RO_CRATE_METADATA_JSON);
 		descriptor.put("@type", "CreativeWork");
-		descriptor.putObject("about").put("@id", ROOT_ID);
+		descriptor.putObject("about").put("@id", getRoot().getId());
 		descriptor.putObject("conformsTo").put("@id", RO_CRATE_1_3);
 		entities.forEach(e -> graph.add(e.toJson()));
 		return crate;

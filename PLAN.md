@@ -55,19 +55,13 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   labels and descriptions, and trim the tree down to the matches and their
   parents. Frees the space now taken by the tree. Allows selecting several
   types (see below).
-- **Changing an `@id` must update every reference to it.** Today the other
-  entities' `{"@id": ...}` values pointing to it are left dangling. Renaming
-  has to update the references in every other entity's model too (and, with
-  the file system backend, possibly rename the file itself), ideally as one
-  undoable change. Until then, edits of `@id` should at least warn when the
-  entity is referenced.
-- **The root `@id` can change too.** RO-Crate allows the root data entity to
-  be `./` or an absolute URI (e.g. a detached crate's DOI or web address); the
-  editor currently locks it to `./`. The metadata descriptor's `about` must
-  follow the root's `@id` (today `Crate.toJson()` always writes `./`).
-- **Changing an `@id` to one that already exists** must warn, and, if the user
-  confirms, merge the two entities (types and values combined, with a choice
-  where both have a value for the same property) and repoint references.
+- **Changing an `@id`** *(done)*: applied on Enter or leaving the field,
+  updating every reference to it (`Crate.rename`); the root's `@id` can be
+  changed too (e.g. to an absolute URI), with the descriptor's `about`
+  following. Changing to an `@id` that already exists asks to merge the two
+  entities (`Crate.merge`: types and values combined, references repointed,
+  redundant supertypes dropped). Next: undo, and with the file system backend
+  possibly renaming the file itself.
 - **Several `@type`s.** The type selector should allow choosing more than one
   type, making `@type` an array. A type's superclass needn't be added as well
   (e.g. not both `CreativeWork` and `Dataset`); the selector can warn about
@@ -76,9 +70,10 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   `["File", "SoftwareSourceCode"]`), directories `Dataset`, and a profile
   crate's root is `["Dataset", "Profile"]`.
   *Done:* types are chips with × and "Add type…" opens the pop-up
-  selector; adding a superclass of an existing type is refused as implied, a
-  subclass replaces its superclasses (Thing → Person), unrelated types are
-  kept side by side.
+  selector (`EntityTypes`): a subclass replaces its superclasses
+  (Thing → Person), adding a superclass of existing types asks to add anyway
+  or replace them, unrelated types are kept side by side, and removing the
+  last type falls back to Thing.
 - **Types from outside the RO-Crate context** (e.g. a profile's own
   vocabulary): an entity SHOULD still have a schema.org type from the
   RO-Crate context, so warn when only non-schema.org types are selected and
@@ -92,9 +87,14 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   several as an array.
 - **Linked entities from reference fields.** *Done:* "New ▾" lists the
   entity types of the field's range and creates one in the crate, linked
-  from the field. Next: open the new entity for editing, show references by
-  the entity's name rather than `@id`.
-- Open and save `ro-crate-metadata.json`.
+  from the field. Suggestions only list entities fitting the field's range
+  (or subclasses), with name and type, filtered while typing. Next: open the
+  new entity for editing, show the linked entity's name in the field.
+- **Save** *(done)*: "Save RO-Crate Metadata File…" (default
+  `ro-crate-metadata.json`), after `CrateChecks` of the root's required
+  properties and of references to local `@id`s not in the crate, with "Save
+  anyway". Proper validation will come from MASP rules in Java (no Python).
+  Next: open an existing `ro-crate-metadata.json`.
 - Remove the old tutorial classes (`HelloFX`, `SearchController`, `Person`).
 
 ### Storage backends
