@@ -1,36 +1,28 @@
 package no.s11.wpsld.soss;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
+import java.util.function.Supplier;
 
-import java.net.URI;
+import no.s11.wpsld.util.Value;
 
 public class ClassDef extends DefinedTerm {
 
-	private final Stream<ClassDef> subClassOfFutures;
-	private List<ClassDef> subClassOf = null;
+	private final Value<List<ClassDef>> subClassOf;
 
 	ClassDef(URI iri) {
-		this(iri, Optional.empty(), Optional.empty(), Stream.empty());
+		this(iri, Optional.empty(), Optional.empty(), List::of);
 	}
 
 	
-	public ClassDef(URI iri, Optional<String> name, Optional<String> comment, Stream<ClassDef> subClassOfFutures) {
+	public ClassDef(URI iri, Optional<String> name, Optional<String> comment, Supplier<List<ClassDef>> subClassOf) {
 		super(iri, name, comment);
-		this.subClassOfFutures = subClassOfFutures;
+		this.subClassOf = Value.lazy(subClassOf);
 	}
 	
 	public List<ClassDef> getSubClassOf() {
-		if (subClassOf == null) {
-			synchronized (subClassOfFutures) {
-				if (subClassOf == null) { 
-					// Ensure we only process the stream once
-					subClassOf = subClassOfFutures.toList();
-				}
-			}
-		}
-		return subClassOf;
+		return subClassOf.get();
 	}
 
 	@Override

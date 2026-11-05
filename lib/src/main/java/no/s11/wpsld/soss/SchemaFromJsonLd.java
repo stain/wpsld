@@ -159,13 +159,14 @@ public class SchemaFromJsonLd {
 	private PropertyDef propertyDef(URI iri) {
 		Optional<String> label = label(iri).or(() -> name(iri));
 		Optional<String> comment = comment(iri).or(() -> description(iri));
-		return new PropertyDef(iri, label, comment, superProperties(iri), domainIncludes(iri), rangeIncludes(iri));
+		return new PropertyDef(iri, label, comment, () -> superProperties(iri).toList(), () -> domainIncludes(iri).toList(),
+				() -> rangeIncludes(iri).toList());
 	}
 
 	private ClassDef classDef(URI iri) {
 		Optional<String> label = label(iri).or(() -> name(iri));
 		Optional<String> comment = comment(iri).or(() -> description(iri));
-		return new ClassDef(iri, label, comment, superClasses(iri));
+		return new ClassDef(iri, label, comment, () -> superClasses(iri).toList());
 	}
 
 	private Optional<String> name(URI iri) {

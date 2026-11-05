@@ -1,66 +1,40 @@
 package no.s11.wpsld.soss;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
+import java.util.function.Supplier;
 
-import java.net.URI;
+import no.s11.wpsld.util.Value;
 
 public class PropertyDef extends DefinedTerm {
 
-	private List<ClassDef> domainIncludes;
-	private List<ClassDef> rangeIncludes;
-	private List<PropertyDef> subPropertyOf;
-	private final Stream<PropertyDef> subPropertyOfFutures;
-	private final Stream<ClassDef> domainIncludesFutures;
-	private final Stream<ClassDef> rangeIncludesFutures;
+	private final Value<List<ClassDef>> domainIncludes;
+	private final Value<List<ClassDef>> rangeIncludes;
+	private final Value<List<PropertyDef>> subPropertyOf;
 
 	PropertyDef(URI id) { 
-		this(id, Optional.empty(), Optional.empty(), Stream.empty(), Stream.empty(), Stream.empty());
+		this(id, Optional.empty(), Optional.empty(), List::of, List::of, List::of);
 	}
 	
-	PropertyDef(URI id, Optional<String> name, Optional<String> comment,  Stream<PropertyDef> subPropertyOf, 
-			Stream<ClassDef> domainIncludes,  Stream<ClassDef> rangeIncludes) {
+	PropertyDef(URI id, Optional<String> name, Optional<String> comment,  Supplier<List<PropertyDef>> subPropertyOf, 
+			Supplier<List<ClassDef>> domainIncludes,  Supplier<List<ClassDef>> rangeIncludes) {
 		super(id, name, comment);
-		this.subPropertyOfFutures = subPropertyOf;
-		this.domainIncludesFutures = domainIncludes;
-		this.rangeIncludesFutures = rangeIncludes;
+		this.subPropertyOf = Value.lazy(subPropertyOf);
+		this.domainIncludes = Value.lazy(domainIncludes);
+		this.rangeIncludes = Value.lazy(rangeIncludes);
 	}
 
 	public List<ClassDef> getDomainIncludes() {
-		if (domainIncludes == null) {
-			synchronized (domainIncludesFutures) {
-				if (domainIncludes == null) { 
-					// Ensure we only process the stream once
-					domainIncludes = domainIncludesFutures.toList();
-				}
-			}
-		}
-		return domainIncludes;
+		return domainIncludes.get();
 	}
 
 	public List<ClassDef> getRangeIncludes() {
-		if (rangeIncludes == null) {
-			synchronized (rangeIncludesFutures) {
-				if (rangeIncludes == null) { 
-					// Ensure we only process the stream once
-					rangeIncludes = rangeIncludesFutures.toList();
-				}
-			}
-		}
-		return rangeIncludes;
+		return rangeIncludes.get();
 	}
 
 	public List<PropertyDef> getSubPropertyOf() {
-		if (subPropertyOf == null) {
-			synchronized (subPropertyOfFutures) {
-				if (subPropertyOf == null) { 
-					// Ensure we only process the stream once
-					subPropertyOf = subPropertyOfFutures.toList();
-				}
-			}
-		}
-		return subPropertyOf;
+		return subPropertyOf.get();
 	}
 	
 	@Override
