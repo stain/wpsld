@@ -234,6 +234,38 @@ With MASP that single cache is no longer enough:
   fully built (every lazy value forced, e.g. by the QA checks), keeping only
   the model objects.
 
+### Loading profiles and handling errors
+
+Today the only schema is bundled in the application (pinned schema.org 30.0,
+checksum tested), so a load failure can only be a corrupt file or a bug, which
+would fail the same way again; the editor shows the error instead of retrying.
+Profiles loaded dynamically, from a crate's `conformsTo`, a local file or the
+network, need more care, and must never leave the editor waiting forever:
+
+- **Never block the editor on a profile.** Load each profile (and the schema
+  crates and vocabulary versions it needs) asynchronously, and keep editing
+  possible meanwhile with the plain schema.org fields; switch to the profile's
+  fields when it arrives, and say which profile is in use.
+- **Time limits and cancellation.** Every fetch has a timeout (e.g.
+  `CompletableFuture.orTimeout`), and loading can be cancelled when the user
+  opens another crate or closes the window.
+- **Transient vs. permanent errors.** Retry with back-off only for transient
+  failures (network down, timeout, HTTP 5xx). Do not retry deterministic ones:
+  not found (404), not a valid RO-Crate, not a MASP profile, wrong checksum.
+- **Partial results.** A profile with some broken rules (unresolvable
+  `prov:specializationOf`, unknown vocabulary version, malformed cardinality,
+  invalid regex) should still load what it can, with each problem reported as a
+  warning against that rule, rather than failing the whole profile.
+- **Missing dependencies.** If a profile's schema crate or vocabulary version
+  can't be loaded, fall back to the closest available (e.g. our bundled
+  schema.org 30.0) and warn that terms may differ.
+- **Offline first.** Bundle the commonly used profiles, and cache fetched
+  profile crates locally (by IRI, version and checksum), so a crate opened
+  before can be edited offline; fetching is then only for new or updated ones.
+- **Visible status.** Show per profile whether it is loading, loaded, loaded
+  with warnings, failed (with the reason and a retry button) or fell back, so
+  a slow or broken profile is never a silent, endless spinner.
+
 ### Open questions
 
 - MASP is still a prototype, so how stable are the rule shapes? Which MASP
