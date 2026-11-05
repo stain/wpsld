@@ -248,8 +248,8 @@ public class Notebook extends BorderPane {
 	}
 
 	/**
-	 * The folded page corner: its lower half turns to the next page, its
-	 * upper half to the previous one.
+	 * The folded page corner: its upper half ("+") turns to the next page, its
+	 * lower half ("-") to the previous one.
 	 */
 	private Node dogEar() {
 		Region fold = new Region();
@@ -265,7 +265,8 @@ public class Notebook extends BorderPane {
 		StackPane ear = new StackPane(fold, plus, minus);
 		ear.setId("dogEar");
 		ear.getStyleClass().add("notebook-dog-ear-area");
-		ear.setOnMouseClicked(e -> turnPage(e.getY() > e.getX() ? 1 : -1));
+		// Above the fold (the "+" corner) forward, below it (the "-") back
+		ear.setOnMouseClicked(e -> turnPage(e.getY() < e.getX() ? 1 : -1));
 		return ear;
 	}
 

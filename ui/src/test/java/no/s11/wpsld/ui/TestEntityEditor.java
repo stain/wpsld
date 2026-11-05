@@ -19,6 +19,7 @@ package no.s11.wpsld.ui;
 
 import static org.junit.Assert.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,6 +33,7 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
@@ -227,5 +229,55 @@ public class TestEntityEditor extends ApplicationTest {
 		edit(entity);
 		chooseType("mediaobject");
 		assertEquals(List.of("File"), entity.getTypes());
+	}
+
+	private DatePicker datePicker(String property) {
+		return lookup("#value-" + property + "-0").queryAs(DatePicker.class);
+	}
+
+	/**
+	 * Typed ISO 8601 dates are kept, also after leaving the field.
+	 */
+	@Test
+	public void isoDateTyped() {
+		clickOn("#propertySearch").write("datePublished");
+		DatePicker picker = datePicker("datePublished");
+		clickOn(picker.getEditor()).write("2026-11-05");
+		// Leave the field, which commits the date picker
+		clickOn("#propertySearch");
+		assertEquals("2026-11-05", crate.getRoot().get("datePublished").orElseThrow().asText());
+		assertEquals("2026-11-05", picker.getEditor().getText());
+		assertEquals(LocalDate.of(2026, 11, 5), picker.getValue());
+	}
+
+	/**
+	 * Dates chosen in the calendar are ISO 8601, not the locale's format.
+	 */
+	@Test
+	public void isoDateChosen() {
+		clickOn("#propertySearch").write("datePublished");
+		DatePicker picker = datePicker("datePublished");
+		interact(() -> picker.setValue(LocalDate.of(2026, 11, 12)));
+		assertEquals("2026-11-12", picker.getEditor().getText());
+		assertEquals("2026-11-12", crate.getRoot().get("datePublished").orElseThrow().asText());
+	}
+
+	@Test
+	public void invalidDateNotStored() {
+		clickOn("#propertySearch").write("datePublished");
+		DatePicker picker = datePicker("datePublished");
+		clickOn(picker.getEditor()).write("11/12/2026");
+		assertFalse(crate.getRoot().get("datePublished").isPresent());
+		assertTrue(picker.getEditor().getPseudoClassStates().stream()
+				.anyMatch(p -> p.getPseudoClassName().equals("invalid")));
+		assertNotNull(picker.getTooltip());
+	}
+
+	@Test
+	public void isoDates() {
+		assertEquals(java.util.Optional.of("2026-11-05"), EntityEditor.isoDate(" 2026-11-05 "));
+		assertTrue(EntityEditor.isoDate("11/12/2026").isEmpty());
+		assertTrue(EntityEditor.isoDate("2026-13-01").isEmpty());
+		assertTrue(EntityEditor.isoDate("").isEmpty());
 	}
 }

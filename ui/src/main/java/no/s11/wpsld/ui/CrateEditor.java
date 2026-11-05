@@ -126,6 +126,8 @@ public class CrateEditor extends Application {
 	public void start(Stage stage) {
 		BorderPane root = new BorderPane(new Label("Loading schema.org " + SchemaFromJsonLd.SCHEMAORG_VERSION + "…"));
 		stage.setScene(new Scene(root, 1400, 800));
+		// Also if the window showed another scene before (as in tests)
+		stage.sizeToScene();
 		stage.setTitle("wpsld");
 		stage.show();
 

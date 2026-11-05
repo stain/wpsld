@@ -101,17 +101,17 @@ public class TestNotebook extends ApplicationTest {
 	public void dogEarTurnsPages() {
 		clickOn(tab("Window"));
 		Node dogEar = lookup("#dogEar").query();
-		// The lower half turns forward
-		clickOn(point(dogEar).atPosition(Pos.BOTTOM_LEFT).atOffset(new Point2D(4, -4)));
+		// The upper half, with "+", turns forward
+		clickOn(point(dogEar).atPosition(Pos.TOP_RIGHT).atOffset(new Point2D(-4, 4)));
 		assertEquals("Page 2 of 3", status());
 		assertTrue(lookup("window 2").tryQuery().isPresent());
-		clickOn(point(dogEar).atPosition(Pos.BOTTOM_LEFT).atOffset(new Point2D(4, -4)));
+		clickOn(point(dogEar).atPosition(Pos.TOP_RIGHT).atOffset(new Point2D(-4, 4)));
 		assertEquals("Page 3 of 3", status());
 		// Not past the last page
-		clickOn(point(dogEar).atPosition(Pos.BOTTOM_LEFT).atOffset(new Point2D(4, -4)));
-		assertEquals("Page 3 of 3", status());
-		// The upper half turns back
 		clickOn(point(dogEar).atPosition(Pos.TOP_RIGHT).atOffset(new Point2D(-4, 4)));
+		assertEquals("Page 3 of 3", status());
+		// The lower half, with "-", turns back
+		clickOn(point(dogEar).atPosition(Pos.BOTTOM_LEFT).atOffset(new Point2D(4, -4)));
 		assertEquals("Page 2 of 3", status());
 	}
 

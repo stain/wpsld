@@ -19,6 +19,9 @@ package no.s11.wpsld.ui;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,6 +40,7 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.css.PseudoClass;
 import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -63,6 +67,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.util.StringConverter;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.form.EntityTypes;
@@ -526,6 +531,20 @@ public class EntityEditor extends ScrollPane {
 		return grid;
 	}
 
+	private static final PseudoClass INVALID = PseudoClass.getPseudoClass("invalid");
+
+	/**
+	 * The text as an ISO 8601 date (YYYY-MM-DD), if it is one.
+	 */
+	static Optional<String> isoDate(String text) {
+		String date = text == null ? "" : text.strip();
+		try {
+			return Optional.of(LocalDate.parse(date, DateTimeFormatter.ISO_LOCAL_DATE).toString());
+		} catch (DateTimeParseException e) {
+			return Optional.empty();
+		}
+	}
+
 	private static GridPane grid() {
 		GridPane grid = new GridPane();
 		grid.setHgap(10);
@@ -616,12 +635,10 @@ public class EntityEditor extends ScrollPane {
 				text = combo::getValue;
 			}
 			case DATE -> {
-				DatePicker picker = new DatePicker();
-				picker.setPromptText("YYYY-MM-DD");
-				picker.getEditor().setText(current);
-				picker.getEditor().textProperty().addListener((obs, old, v) -> update());
+				DatePicker picker = isoDatePicker(current);
 				control = picker;
-				text = picker.getEditor()::getText;
+				// Only valid ISO 8601 dates are stored
+				text = () -> isoDate(picker.getEditor().getText()).orElse("");
 			}
 			case REFERENCE, TEXT_OR_REFERENCE -> {
 				control = referenceCombo(field, rangeNames, current);
@@ -656,6 +673,45 @@ public class EntityEditor extends ScrollPane {
 			// A single value field needs no button to add more
 			addValue.setVisible(field.maxCount().orElse(Integer.MAX_VALUE) > 1);
 			addValue.setManaged(addValue.isVisible());
+		}
+
+		/**
+		 * A date picker showing and reading ISO 8601 dates (YYYY-MM-DD),
+		 * whatever the locale's date format; invalid text is marked and not
+		 * stored.
+		 */
+		private DatePicker isoDatePicker(String current) {
+			DatePicker picker = new DatePicker();
+			picker.setPromptText("YYYY-MM-DD");
+			picker.setConverter(new StringConverter<>() {
+				@Override
+				public String toString(LocalDate date) {
+					return date == null ? "" : date.toString();
+				}
+
+				@Override
+				public LocalDate fromString(String text) {
+					return isoDate(text).map(LocalDate::parse).orElse(null);
+				}
+			});
+			picker.getEditor().setText(current);
+			isoDate(current).map(LocalDate::parse).ifPresent(picker::setValue);
+			Tooltip invalid = new Tooltip("Not an ISO 8601 date: use YYYY-MM-DD, e.g. " + LocalDate.now());
+			picker.getEditor().textProperty().addListener((obs, old, typed) -> {
+				boolean valid = typed.isBlank() || isoDate(typed).isPresent();
+				picker.getEditor().pseudoClassStateChanged(INVALID, !valid);
+				picker.getEditor().setStyle(valid ? "" : "-fx-border-color: red;");
+				// The editor's tooltip is bound to the picker's
+				picker.setTooltip(valid ? null : invalid);
+				update();
+			});
+			// A date chosen in the calendar, as ISO 8601 text
+			picker.valueProperty().addListener((obs, old, date) -> {
+				if (date != null && !date.toString().equals(picker.getEditor().getText())) {
+					picker.getEditor().setText(date.toString());
+				}
+			});
+			return picker;
 		}
 
 		/**
