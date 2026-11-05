@@ -54,8 +54,14 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
 - **Type selector as a pop-up**, with a search box beside the tree: search
   labels and descriptions, and trim the tree down to the matches and their
   parents. Frees the space now taken by the tree.
-- **Several values per property** (JSON arrays), multiple `@type`s, and
-  renaming an `@id` updating references from other entities.
+- **Changing an `@id` must update every reference to it.** The editor lets
+  you edit an entity's `@id` (except the root `./`), but today the other
+  entities' `{"@id": ...}` values pointing to it are left dangling. Renaming
+  has to update the references in every other entity's model too (and, with
+  the file system backend, possibly rename the file itself), ideally as one
+  undoable change. Until then, edits of `@id` should at least warn when the
+  entity is referenced.
+- **Several values per property** (JSON arrays) and multiple `@type`s.
 - **Linked entities**: reference fields suggest the crate's entities; add
   creating a new entity of the property's range from the field, like Crate-O.
 - Open and save `ro-crate-metadata.json`.
