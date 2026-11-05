@@ -102,6 +102,11 @@ public class EntityEditor extends ScrollPane {
 	private Entity entity;
 	/** True while an @id change is applied */
 	private boolean renaming;
+	/** The form's groups of fields */
+	private final List<FieldGroup> groups = new ArrayList<>();
+	/** Text of the property search, kept while the same entity is shown */
+	private String propertyQuery = "";
+	private final Label noMatches = new Label("No matching properties");
 
 	public EntityEditor(SchemaFromJsonLd schema, FormFields formFields, Supplier<List<Entity>> crateEntities,
 			Runnable onChange, Function<String, Entity> newEntity, BiConsumer<Entity, String> renameEntity) {
@@ -121,8 +126,18 @@ public class EntityEditor extends ScrollPane {
 	 * Show and edit an entity.
 	 */
 	public void edit(Entity entity) {
+		if (entity != this.entity) {
+			propertyQuery = "";
+		}
 		this.entity = Objects.requireNonNull(entity);
 		showForm();
+	}
+
+	/**
+	 * Let the user choose a type to add to the entity, e.g. for a new entity.
+	 */
+	public void chooseType() {
+		new TypeSelector(schema, getScene().getWindow()).showAndWait().ifPresent(this::addType);
 	}
 
 	private Optional<ClassDef> classDef(String typeName) {
@@ -193,7 +208,7 @@ public class EntityEditor extends ScrollPane {
 			chips.getChildren().add(chip);
 		}
 		Button add = new Button("Add type…");
-		add.setOnAction(e -> new TypeSelector(schema, getScene().getWindow()).showAndWait().ifPresent(this::addType));
+		add.setOnAction(e -> chooseType());
 		chips.getChildren().add(add);
 		return chips;
 	}
@@ -247,7 +262,19 @@ public class EntityEditor extends ScrollPane {
 		});
 		header.addRow(0, new Label("@type"), typeChips());
 		header.addRow(1, new Label("@id"), idField);
+		TextField search = new TextField(propertyQuery);
+		search.setPromptText("Search properties, e.g. hasPart");
+		search.textProperty().addListener((obs, old, query) -> {
+			boolean starting = old.isBlank() && !query.isBlank();
+			propertyQuery = query;
+			applySearch(starting);
+		});
+		header.addRow(2, new Label("Properties"), search);
 		form.getChildren().add(header);
+		noMatches.setVisible(false);
+		noMatches.setManaged(false);
+		form.getChildren().add(noMatches);
+		groups.clear();
 
 		List<FormField> fields = formFields.fieldsFor(entity.getTypes().stream().map(this::classDef)
 				.flatMap(Optional::stream).map(ClassDef::getID).collect(Collectors.toSet()));
@@ -288,43 +315,120 @@ public class EntityEditor extends ScrollPane {
 			form.getChildren().add(pane);
 		}
 
-		Map<String, List<FormField>> groups = fields.stream()
+		Map<String, List<FormField>> byGroup = fields.stream()
 				.collect(Collectors.groupingBy(FormField::group, LinkedHashMap::new, Collectors.toList()));
 		boolean first = true;
-		for (Map.Entry<String, List<FormField>> group : groups.entrySet()) {
+		for (Map.Entry<String, List<FormField>> group : byGroup.entrySet()) {
 			List<FormField> groupFields = group.getValue();
 			boolean hasValues = groupFields.stream().anyMatch(f -> entity.get(f.name()).isPresent());
-			TitledPane pane = new TitledPane("From " + group.getKey() + " (" + groupFields.size() + ")", null);
-			// Meant to be fast, not pretty
-			pane.setAnimated(false);
-			// Most specific properties and those with values open, the rest
-			// folded away, and only built when first opened
-			if (first || hasValues) {
-				pane.setContent(fieldsGrid(groupFields));
-			} else {
-				pane.setExpanded(false);
-				pane.expandedProperty().addListener((obs, was, expanded) -> {
-					if (expanded && pane.getContent() == null) {
-						pane.setContent(fieldsGrid(groupFields));
-					}
-				});
-			}
+			// Most specific properties and those with values open, the rest folded away
+			FieldGroup fieldGroup = new FieldGroup("From " + group.getKey() + " (" + groupFields.size() + ")",
+					groupFields, first || hasValues);
 			first = false;
-			form.getChildren().add(pane);
+			groups.add(fieldGroup);
+			form.getChildren().add(fieldGroup.pane);
+		}
+		if (!propertyQuery.isBlank()) {
+			// Still searching, e.g. after adding a type
+			applySearch(true);
 		}
 	}
 
-	private GridPane fieldsGrid(List<FormField> fields) {
-		GridPane grid = grid();
-		int row = 0;
-		for (FormField field : fields) {
-			Label label = new Label(field.label() + (field.isRequired() ? " *" : ""));
-			field.comment().map(EntityEditor::tooltip).ifPresent(label::setTooltip);
-			GridPane.setValignment(label, VPos.TOP);
-			label.setPadding(new Insets(4, 0, 0, 0));
-			grid.addRow(row++, label, new FieldEditor(field).node());
+	/**
+	 * Show only the properties whose name contains the search text, opening
+	 * the groups that have such properties and folding the others; or,
+	 * when the search is cleared, everything as before the search.
+	 */
+	private void applySearch(boolean starting) {
+		String query = propertyQuery.strip().toLowerCase(Locale.ROOT);
+		groups.forEach(g -> g.filter(query.isEmpty() ? null : query, starting));
+		noMatches.setVisible(!query.isEmpty() && groups.stream().noneMatch(g -> g.hasMatches(query)));
+		noMatches.setManaged(noMatches.isVisible());
+	}
+
+	private static boolean matches(FormField field, String query) {
+		return field.name().toLowerCase(Locale.ROOT).contains(query)
+				|| field.label().toLowerCase(Locale.ROOT).contains(query);
+	}
+
+	/**
+	 * A titled group of fields, built when first opened, whose rows can be
+	 * filtered by the property search.
+	 */
+	private class FieldGroup {
+		private final TitledPane pane;
+		private final List<FormField> fields;
+		/** Label and editor of each field, once built */
+		private final Map<FormField, List<Node>> rows = new LinkedHashMap<>();
+		/** Whether the group was open before the search started, to restore it */
+		private boolean expandedBeforeSearch;
+
+		FieldGroup(String title, List<FormField> fields, boolean expanded) {
+			this.fields = fields;
+			pane = new TitledPane(title, null);
+			// Meant to be fast, not pretty
+			pane.setAnimated(false);
+			pane.setExpanded(expanded);
+			if (expanded) {
+				build();
+			}
+			pane.expandedProperty().addListener((obs, was, now) -> {
+				if (now) {
+					build();
+				}
+			});
 		}
-		return grid;
+
+		private void build() {
+			if (pane.getContent() != null) {
+				return;
+			}
+			GridPane grid = grid();
+			int row = 0;
+			for (FormField field : fields) {
+				Label label = new Label(field.label() + (field.isRequired() ? " *" : ""));
+				field.comment().map(EntityEditor::tooltip).ifPresent(label::setTooltip);
+				GridPane.setValignment(label, VPos.TOP);
+				label.setPadding(new Insets(4, 0, 0, 0));
+				Node editor = new FieldEditor(field).node();
+				grid.addRow(row++, label, editor);
+				rows.put(field, List.of(label, editor));
+			}
+			pane.setContent(grid);
+		}
+
+		boolean hasMatches(String query) {
+			return fields.stream().anyMatch(f -> matches(f, query));
+		}
+
+		/**
+		 * Show only the fields matching the query (in lower case), or all
+		 * of them as before the search if the query is null.
+		 */
+		void filter(String query, boolean starting) {
+			if (query == null) {
+				rows.values().forEach(nodes -> show(nodes, true));
+				pane.setExpanded(expandedBeforeSearch);
+				return;
+			}
+			if (starting) {
+				expandedBeforeSearch = pane.isExpanded();
+			}
+			if (!hasMatches(query)) {
+				pane.setExpanded(false);
+				return;
+			}
+			build();
+			rows.forEach((field, nodes) -> show(nodes, matches(field, query)));
+			pane.setExpanded(true);
+		}
+
+		private static void show(List<Node> nodes, boolean visible) {
+			nodes.forEach(node -> {
+				node.setVisible(visible);
+				node.setManaged(visible);
+			});
+		}
 	}
 
 	private static GridPane grid() {

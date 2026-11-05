@@ -127,11 +127,13 @@ public class CrateEditor extends Application {
 
 		Button add = new Button("Add entity");
 		add.setOnAction(e -> {
-			// A Thing to start with; its type can then be chosen
+			// A Thing to start with, and straight away choose its type, which
+			// replaces Thing (not needed for entities added from a property)
 			Entity entity = crate.add("Thing");
 			entities.getItems().add(entity);
 			entities.getSelectionModel().select(entity);
 			changed();
+			Platform.runLater(entityEditor::chooseType);
 		});
 		Button remove = new Button("Remove");
 		remove.disableProperty().bind(entities.getSelectionModel().selectedIndexProperty().lessThanOrEqualTo(0));
