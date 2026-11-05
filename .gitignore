@@ -9,3 +9,6 @@ build
 .classpath
 .project
 .vscode
+
+# Runtime image exported by podman build --output
+/dist

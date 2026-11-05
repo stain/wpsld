@@ -8,23 +8,75 @@
 
 plugins {
   id 'application'
-  id 'org.openjfx.javafxplugin' version '0.0.14'
-  id 'org.beryx.jlink' version '2.25.0'
+  id 'org.openjfx.javafxplugin' version '0.1.0'
+  id 'org.beryx.jlink' version '4.2.0'
 }
 
 repositories {
-    // Use JCenter for resolving dependencies.
-    jcenter()
+    mavenCentral()
 }
 
+// Platforms to cross-link for (see Dockerfile and the jlink block below),
+// as name: [jdkHome, JavaFX jmods]
+def crossTargets = project.hasProperty('windowsJdkHome') ? [
+    'linux-x64'  : [System.getProperty('java.home'), findProperty('javafxJmods')],
+    'windows-x64': [findProperty('windowsJdkHome'), findProperty('windowsJavafxJmods')],
+] : [:]
+
 jlink {
+    options = ['--strip-debug', '--no-header-files', '--no-man-pages']
     launcher {
-        name = 'hello'
+        name = 'wpsld'
+        // Windows .bat launcher starts javaw, without a console window
+        noConsole = true
+    }
+    // Link JavaFX from its jmods (-PjavafxJmods=<dir>), which install the
+    // native libraries into the image; linked from the JavaFX jars they
+    // end up inside lib/modules, and JavaFX fails with "no glass".
+    //
+    // Cross-linking for Windows from Linux (see Dockerfile) additionally takes
+    // -PwindowsJdkHome=<dir with jmods/ of the same JDK build as the one
+    // running jlink> and -PwindowsJavafxJmods=<dir>, and then builds one
+    // image per platform, each linked with its own JavaFX jmods.
+    if (crossTargets) {
+        crossTargets.each { name, paths ->
+            targetPlatform(name) {
+                jdkHome = paths[0]
+                addExtraModulePath(paths[1])
+            }
+        }
+    } else if (project.hasProperty('javafxJmods')) {
+        addExtraModulePath(project.property('javafxJmods'))
+    }
+    // App image folder with a native launcher (wpsld.exe on Windows);
+    // jpackage can only build for the OS it runs on, see
+    // .github/workflows/windows-app-image.yml
+    jpackage {
+        imageName = 'wpsld'
+        skipInstaller = true
+        // jpackage requires a numeric version
+        appVersion = version == 'unspecified' ? '0.1.0' : version
     }
 }
 
+// Zip each cross-linked image as build/image-zip/wpsld-<platform>.zip.
+// Unlike jlinkZip, Gradle's Zip keeps the executable bits of the launchers.
+def imageZips = tasks.register('imageZips')
+crossTargets.keySet().each { target ->
+    def imageZip = tasks.register("imageZip-${target}", Zip) {
+        dependsOn tasks.named('jlink')
+        from(layout.buildDirectory.dir("image/wpsld-${target}"))
+        into("wpsld-${target}")
+        archiveFileName = "wpsld-${target}.zip"
+        destinationDirectory = layout.buildDirectory.dir('image-zip')
+        // Gradle 9 normalises permissions in archives by default
+        useFileSystemPermissions()
+    }
+    imageZips.configure { dependsOn imageZip }
+}
+
 javafx {
-    version = "17.0.8"
+    version = "27.0.1"
     modules = [ 'javafx.controls', 'javafx.fxml' ]
 }
 
@@ -35,6 +87,6 @@ dependencies {
 }
 
 application { 
-  mainClassName = 'no.s11.wpsld.ui.HelloFX'
+  mainClass = 'no.s11.wpsld.ui.HelloFX'
   mainModule = 'no.s11.wpsld.ui'
 }

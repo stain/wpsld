@@ -28,8 +28,8 @@ import no.s11.wpsld.WPSLDPath;
 
 import edu.kit.datamanager.ro_crate.RoCrate;
 import edu.kit.datamanager.ro_crate.RoCrate.RoCrateBuilder;
-import edu.kit.datamanager.ro_crate.writer.RoCrateWriter;
-import edu.kit.datamanager.ro_crate.writer.FolderWriter;
+import edu.kit.datamanager.ro_crate.writer.CrateWriter;
+import edu.kit.datamanager.ro_crate.writer.Writers;
 
 public class WrittenMetadata implements WPSLDPath {
 	private static Logger logger = System.getLogger(WrittenMetadata.class.getName());
@@ -41,7 +41,7 @@ public class WrittenMetadata implements WPSLDPath {
 	}
 
 	private void writeMetadata() throws IOException {
-		RoCrate roCrate = new RoCrateBuilder("name", "").build();
+		RoCrate roCrate = new RoCrateBuilder().addName("name").addDescription("").build();
 		if (! Files.getFileStore(getPath()).supportsFileAttributeView(UserDefinedFileAttributeView.class)) {
 			throw new IOException("File system does not support extended attributes (UserDefinedFileAttributeView): " + getPath());
 		}
@@ -65,7 +65,7 @@ public class WrittenMetadata implements WPSLDPath {
 			// FIXME: Don't assume default charset
 				new String(buff.array()));
 		});
-		RoCrateWriter folderRoCrateWriter = new RoCrateWriter(new FolderWriter());
+		CrateWriter<String> folderRoCrateWriter = Writers.newFolderWriter();
 		// FIXME: Below assumes path is on local file system!
 		folderRoCrateWriter.save(roCrate, root.getPath().toString());
 	}
