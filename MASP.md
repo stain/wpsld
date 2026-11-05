@@ -146,6 +146,24 @@ then ranges over the root data entity's class rule.
   context resolver (context arrays, prefixes, `@vocab`, string and `{"@id"}`
   term definitions) with **bundled, pinned copies** of the RO-Crate 1.2 and 1.3
   contexts, but not full JSON-LD expansion, since crates are flattened.
+- **Contexts and profiles are separate.** JSON-LD contexts only map terms to
+  IRIs; MASP profile and schema crates are RO-Crates (using contexts) that
+  carry rules. `no.s11.wpsld.jsonld` handles contexts: `ContextCache` is a
+  pre-warmed cache of bundled context documents, listed in `jarcache.json`
+  (JSON-LD Java's format, so other jars can add contexts), with the RO-Crate
+  1.0–1.3 contexts (CC0); `JsonLdContext` processes a `@context` (arrays,
+  `@vocab`, prefixes, term definitions in any order) without fetching and
+  without throwing. Profiles will get their own loading and cache.
+- **JSON-LD 1.0.** RO-Crate 1.2/1.3: the metadata document "MUST be a
+  document which is valid JSON-LD 1.0 in flattened and compacted form", so
+  JSON-LD 1.1 context features (scoped contexts, `@import`, `@protected`,
+  `@propagate`, `"@version": 1.1`) are reported as not valid rather than
+  processed. (JSON-LD Java, whose cache format we borrow, is JSON-LD 1.0 only
+  too; we don't use the library.)
+- **Unlicensed contexts.** The Workflow Run, Workflow Testing
+  (`ResearchObject/ro-terms`) and LDAC contexts state no licence, so they are
+  not bundled; ask the maintainers, or fetch them at run time once remote
+  loading is added.
 - **http vs https schema.org.** RO-Crate contexts and profiles (e.g. LDAC) use
   `http://schema.org/`; MASP's own schema.org *schema crate* uses
   `https://schema.org/`. Treat them as the same namespace and normalise to
