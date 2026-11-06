@@ -220,11 +220,23 @@ profiles".
 
 ### Menus
 
-A File menu (New RO-Crate Ctrl+N, which asks before discarding changes not
-saved, Save RO-Crate Metadata File… Ctrl+S, Load Profile…, Exit Ctrl+Q) and an Edit menu (Preferences… Ctrl+,), above the toolbar, which
-keeps its buttons. Next: File > Open for existing crates (then the root's
-`conformsTo` chooses the profile), recent files (in the state folder), and
-Edit's undo/redo.
+A File menu and an Edit menu above the toolbar, which keeps its buttons:
+
+- File > New RO-Crate (Ctrl+N), and File > Open RO-Crate… (Ctrl+O) for an
+  `ro-crate-metadata.json`. Both ask before discarding changes that aren't
+  saved.
+- Opening a crate shows the reader's warnings beside it. A crate it can't
+  read gives an error, and the current crate stays.
+- An opened crate is saved with its own `@context` and metadata descriptor,
+  so it keeps its RO-Crate version and extra terms.
+- The root's `conformsTo` (or, as in 1.1, the descriptor's) chooses the
+  profile. A profile that isn't offered yet is loaded. Without one, the core
+  RO-Crate profile is used.
+- File > Save RO-Crate Metadata File… (Ctrl+S), Load Profile…, Exit (Ctrl+Q).
+- Edit > Preferences… (Ctrl+,).
+
+Next: opening zipped crates and crates from a URL (with `CrateRetriever`),
+recent files (in the state folder), and Edit's undo/redo.
 
 ### Start-up
 

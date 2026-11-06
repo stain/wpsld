@@ -33,6 +33,7 @@ import java.util.Set;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.TextNode;
 
 import no.s11.wpsld.crate.CrateDocument.Problem;
 import no.s11.wpsld.crate.CrateDocument.Severity;
@@ -52,7 +53,6 @@ public class CrateReader {
 	/** RO-Crate 1.0 used this name for the metadata file */
 	private static final List<String> DESCRIPTOR_IDS = List.of(Crate.RO_CRATE_METADATA_JSON,
 			"ro-crate-metadata.jsonld");
-	private static final String RO_CRATE_SPEC = "https://w3id.org/ro/crate/";
 	/** URI schemes expected in RO-Crates; others in a term are probably an undefined prefix */
 	private static final Set<String> KNOWN_SCHEMES = Set.of("http", "https", "urn", "mailto", "file", "arcp", "tag",
 			"data", "ftp", "did", "info", "ark", "doi", "geo");
@@ -199,7 +199,7 @@ public class CrateReader {
 				conformsTo = descriptor.get().getAll("conformsTo").stream()
 						.filter(v -> v.isObject() && v.path("@id").isTextual()).map(v -> v.get("@id").asText())
 						.toList();
-				if (conformsTo.stream().noneMatch(c -> c.startsWith(RO_CRATE_SPEC))) {
+				if (conformsTo.stream().noneMatch(c -> c.startsWith(Crate.RO_CRATE_SPEC))) {
 					warn("Metadata descriptor doesn't declare an RO-Crate version in conformsTo");
 				}
 			}
@@ -219,7 +219,9 @@ public class CrateReader {
 			}
 			List<Entity> others = entities.values().stream().filter(e -> e != root && !descriptors.contains(e))
 					.toList();
-			return document(Optional.of(Crate.of(root, others)), descriptor, conformsTo);
+			JsonNode crateContext = json.has("@context") ? json.get("@context")
+					: TextNode.valueOf(Crate.RO_CRATE_1_3_CONTEXT);
+			return document(Optional.of(Crate.of(root, others, crateContext, descriptor)), descriptor, conformsTo);
 		}
 
 		/**

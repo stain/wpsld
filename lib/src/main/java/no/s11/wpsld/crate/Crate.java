@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 
 /**
  * The entities of an RO-Crate, starting with its root data entity
@@ -36,27 +37,46 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  */
 public class Crate {
 	public static final String RO_CRATE_METADATA_JSON = "ro-crate-metadata.json";
+	/** The RO-Crate specification's versions start with this */
+	public static final String RO_CRATE_SPEC = "https://w3id.org/ro/crate/";
 	public static final String RO_CRATE_1_3 = "https://w3id.org/ro/crate/1.3";
 	public static final String RO_CRATE_1_3_CONTEXT = RO_CRATE_1_3 + "/context";
 	/** Identifier of a new crate's root data entity; it may also be an absolute URI */
 	public static final String ROOT_ID = "./";
 
 	private final List<Entity> entities = new ArrayList<>();
+	/** The <code>@context</code> to write, as read or RO-Crate 1.3's */
+	private final JsonNode context;
+	/** The metadata descriptor as read, to write again; else a new one for 1.3 */
+	private final Optional<Entity> descriptor;
 
 	public Crate() {
 		entities.add(new Entity(ROOT_ID, "Dataset"));
+		context = TextNode.valueOf(RO_CRATE_1_3_CONTEXT);
+		descriptor = Optional.empty();
 	}
 
-	private Crate(Entity root, List<Entity> others) {
+	private Crate(Entity root, List<Entity> others, JsonNode context, Optional<Entity> descriptor) {
 		entities.add(root);
 		entities.addAll(others);
+		this.context = context.deepCopy();
+		this.descriptor = descriptor;
 	}
 
 	/**
-	 * A crate of entities read from a file, with its root data entity first.
+	 * A crate of entities read from a file, with its root data entity first,
+	 * written again with its own <code>@context</code> and metadata
+	 * descriptor, so with the same RO-Crate version and extra terms.
 	 */
-	static Crate of(Entity root, List<Entity> others) {
-		return new Crate(root, others);
+	static Crate of(Entity root, List<Entity> others, JsonNode context, Optional<Entity> descriptor) {
+		return new Crate(root, others, context, descriptor);
+	}
+
+	/**
+	 * The <code>@context</code> the crate is written with.
+	 */
+	public JsonNode getContext() {
+		return context.deepCopy();
 	}
 
 	public Entity getRoot() {
@@ -161,18 +181,26 @@ public class Crate {
 	}
 
 	/**
-	 * The crate as flattened RO-Crate 1.3 JSON-LD, with the metadata
-	 * descriptor first.
+	 * The crate as flattened RO-Crate JSON-LD, with the metadata descriptor
+	 * first: for a new crate RO-Crate 1.3, for one read from a file with its
+	 * own context and descriptor.
 	 */
 	public ObjectNode toJson() {
 		ObjectNode crate = JsonNodeFactory.instance.objectNode();
-		crate.put("@context", RO_CRATE_1_3_CONTEXT);
+		crate.set("@context", context.deepCopy());
 		ArrayNode graph = crate.putArray("@graph");
-		ObjectNode descriptor = graph.addObject();
-		descriptor.put("@id", RO_CRATE_METADATA_JSON);
-		descriptor.put("@type", "CreativeWork");
-		descriptor.putObject("about").put("@id", getRoot().getId());
-		descriptor.putObject("conformsTo").put("@id", RO_CRATE_1_3);
+		if (this.descriptor.isPresent()) {
+			ObjectNode descriptor = this.descriptor.get().toJson();
+			// About the root, also if it was renamed
+			descriptor.putObject("about").put("@id", getRoot().getId());
+			graph.add(descriptor);
+		} else {
+			ObjectNode descriptor = graph.addObject();
+			descriptor.put("@id", RO_CRATE_METADATA_JSON);
+			descriptor.put("@type", "CreativeWork");
+			descriptor.putObject("about").put("@id", getRoot().getId());
+			descriptor.putObject("conformsTo").put("@id", RO_CRATE_1_3);
+		}
 		entities.forEach(e -> graph.add(e.toJson()));
 		return crate;
 	}

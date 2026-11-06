@@ -19,6 +19,8 @@ package no.s11.wpsld.ui;
 
 import static org.junit.Assert.*;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -43,9 +45,11 @@ import no.s11.wpsld.form.FormFields;
  */
 public class TestCrateEditor extends ApplicationTest {
 
+	private CrateEditor app;
+
 	@Override
 	public void start(Stage stage) throws Exception {
-		CrateEditor app = new CrateEditor();
+		app = new CrateEditor();
 		app.init();
 		app.start(stage);
 	}
@@ -139,6 +143,45 @@ public class TestCrateEditor extends ApplicationTest {
 		assertEquals(1, entities().getItems().size());
 		assertNotSame(root, entities().getItems().get(0));
 		assertEquals(entities().getItems().get(0), entities().getSelectionModel().getSelectedItem());
+	}
+
+	@Test
+	public void openCrate() throws Exception {
+		entities();
+		ComboBox<FormFields> profiles = lookup("#profile").queryComboBox();
+		// schema.org chosen, but the crate conforms to the core profile
+		interact(() -> profiles.getSelectionModel().selectLast());
+		Path dir = Files.createTempDirectory("crate");
+		Files.writeString(dir.resolve("ro-crate-metadata.json"), """
+				{"@context": "https://w3id.org/ro/crate/1.2/context",
+				 "@graph": [
+				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.2"}},
+				  {"@id": "./", "@type": "Dataset", "name": "Old crate",
+				   "conformsTo": {"@id": "https://language-research-technology.github.io/ro-crate-masp/profiles/ro-crate/profile-crate/"},
+				   "author": {"@id": "#alice"}},
+				  {"@id": "#alice", "@type": "Person", "name": "Alice"}
+				 ]}""");
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir)).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals(List.of("./", "#alice"), entities().getItems().stream().map(Entity::getId).toList());
+		assertEquals(entities().getItems().get(0), entities().getSelectionModel().getSelectedItem());
+		assertEquals("RO-Crate Machine Actionable Profile 0.1.0", profiles.getValue().getName());
+		assertEquals("wpsld – " + dir.resolve("ro-crate-metadata.json"), stage.getTitle());
+		// Written with its own version, and nothing to discard yet
+		assertTrue(lookup("#preview").queryTextInputControl().getText().contains("https://w3id.org/ro/crate/1.2/context"));
+		push(KeyCode.SHORTCUT, KeyCode.N);
+		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
+		assertEquals(1, entities().getItems().size());
+
+		// Not a crate: an error, and the crate stays
+		Files.writeString(dir.resolve("ro-crate-metadata.json"), "[]");
+		assertFalse(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir)).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup("Can't open " + dir).tryQuery().isPresent());
+		clickOn("OK");
+		assertEquals(1, entities().getItems().size());
 	}
 
 	/** Properties of the form's visible rows */

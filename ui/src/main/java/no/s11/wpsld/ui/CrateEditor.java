@@ -83,7 +83,9 @@ import javafx.stage.Stage;
 import no.s11.wpsld.Settings;
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.CrateChecks;
+import no.s11.wpsld.crate.CrateDocument;
 import no.s11.wpsld.crate.CrateDocument.Problem;
+import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.form.EntityTypes;
@@ -366,6 +368,10 @@ public class CrateEditor extends Application {
 		newCrate.setId("menuNew");
 		newCrate.setAccelerator(new KeyCodeCombination(KeyCode.N, KeyCombination.SHORTCUT_DOWN));
 		newCrate.setOnAction(e -> newCrate(stage));
+		MenuItem open = new MenuItem("Open RO-Crate…");
+		open.setId("menuOpen");
+		open.setAccelerator(new KeyCodeCombination(KeyCode.O, KeyCombination.SHORTCUT_DOWN));
+		open.setOnAction(e -> askToOpen(stage));
 		MenuItem save = new MenuItem("Save RO-Crate Metadata File…");
 		save.setId("menuSave");
 		save.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN));
@@ -378,7 +384,7 @@ public class CrateEditor extends Application {
 		exit.setId("menuExit");
 		exit.setAccelerator(new KeyCodeCombination(KeyCode.Q, KeyCombination.SHORTCUT_DOWN));
 		exit.setOnAction(e -> stage.close());
-		Menu file = new Menu("File", null, newCrate, save, load, new SeparatorMenuItem(), exit);
+		Menu file = new Menu("File", null, newCrate, open, save, load, new SeparatorMenuItem(), exit);
 		file.setId("menuFile");
 
 		MenuItem preferences = new MenuItem("Preferences…");
@@ -397,22 +403,124 @@ public class CrateEditor extends Application {
 	 * to discard the changes to this one.
 	 */
 	void newCrate(Stage stage) {
-		if (!crate.toJson().equals(unchanged)) {
-			ButtonType discard = new ButtonType("Discard", ButtonData.OK_DONE);
-			Alert alert = new Alert(AlertType.CONFIRMATION, "The changes since it was last saved will be lost.",
-					discard, ButtonType.CANCEL);
-			alert.initOwner(stage);
-			alert.setHeaderText("Discard the changes to this crate?");
-			if (alert.showAndWait().orElse(ButtonType.CANCEL) != discard) {
-				return;
-			}
+		if (mayDiscard(stage)) {
+			edit(new Crate());
+			stage.setTitle("wpsld");
 		}
-		crate = new Crate();
+	}
+
+	/**
+	 * Whether the crate has no changes since it was started, opened or saved,
+	 * or the user agrees to discard them.
+	 */
+	private boolean mayDiscard(Stage stage) {
+		if (crate.toJson().equals(unchanged)) {
+			return true;
+		}
+		ButtonType discard = new ButtonType("Discard", ButtonData.OK_DONE);
+		Alert alert = new Alert(AlertType.CONFIRMATION, "The changes since it was last saved will be lost.",
+				discard, ButtonType.CANCEL);
+		alert.initOwner(stage);
+		alert.setHeaderText("Discard the changes to this crate?");
+		return alert.showAndWait().orElse(ButtonType.CANCEL) == discard;
+	}
+
+	/**
+	 * Edit another crate, from its root data entity.
+	 */
+	private void edit(Crate other) {
+		crate = other;
 		entities.getItems().setAll(crate.getEntities());
 		entities.getSelectionModel().select(crate.getRoot());
 		unchanged = crate.toJson();
 		changed();
-		stage.setTitle("wpsld");
+	}
+
+	/**
+	 * Choose an RO-Crate Metadata File (or a folder's) and open it, after
+	 * asking whether to discard the changes to this crate.
+	 */
+	private void askToOpen(Stage stage) {
+		if (!mayDiscard(stage)) {
+			return;
+		}
+		FileChooser chooser = new FileChooser();
+		chooser.setTitle("Open RO-Crate Metadata File");
+		chooser.getExtensionFilters().setAll(
+				new FileChooser.ExtensionFilter("RO-Crate Metadata File", "*.json", "*.jsonld"),
+				new FileChooser.ExtensionFilter("All files", "*"));
+		if (lastSaved != null) {
+			chooser.setInitialDirectory(lastSaved.getParentFile());
+		}
+		File file = chooser.showOpenDialog(stage);
+		if (file != null) {
+			open(stage, file.toPath());
+		}
+	}
+
+	/**
+	 * Open an RO-Crate Metadata File, or the one in a folder, without asking.
+	 * Its problems are shown: errors instead of opening it, warnings beside
+	 * it. The profile it conforms to is chosen, or loaded if not offered yet.
+	 *
+	 * @return Whether it was opened
+	 */
+	boolean open(Stage stage, Path path) {
+		CrateDocument document = new CrateReader().read(path);
+		if (document.crate().isEmpty() || document.hasErrors()) {
+			Alert error = new Alert(AlertType.ERROR, document.problems().stream().map(Problem::toString)
+					.collect(Collectors.joining("\n")), ButtonType.OK);
+			error.initOwner(stage);
+			error.setHeaderText("Can't open " + path);
+			error.show();
+			return false;
+		}
+		edit(document.crate().get());
+		Path file = Path.of(document.source());
+		lastSaved = file.toFile();
+		stage.setTitle("wpsld – " + file);
+		chooseProfile(document);
+		if (!document.problems().isEmpty()) {
+			Alert warnings = new Alert(AlertType.WARNING, document.problems().stream().map(Problem::toString)
+					.collect(Collectors.joining("\n")), ButtonType.OK);
+			warnings.initOwner(stage);
+			warnings.setHeaderText(document.problems().size() + (document.problems().size() == 1 ? " warning" : " warnings")
+					+ " reading " + file);
+			warnings.setResizable(true);
+			// Beside the crate, not in the way of editing it
+			warnings.initModality(javafx.stage.Modality.NONE);
+			warnings.show();
+		}
+		return true;
+	}
+
+	/**
+	 * Choose the profile a crate conforms to: from its root's
+	 * <code>conformsTo</code> (or, as in RO-Crate 1.1, its descriptor's), the
+	 * first offered; else load the first that is not an RO-Crate version.
+	 * Without any, the core RO-Crate profile.
+	 */
+	private void chooseProfile(CrateDocument document) {
+		profiles.getSelectionModel().selectFirst();
+		List<String> conformsTo = Stream.concat(
+				crate.getRoot().getAll("conformsTo").stream().map(v -> v.path("@id").asText("")),
+				document.conformsTo().stream())
+				.filter(id -> !id.isBlank() && !id.startsWith(Crate.RO_CRATE_SPEC)).distinct().toList();
+		for (String id : conformsTo) {
+			Optional<FormFields> offered = profiles.getItems().stream()
+					.filter(f -> f instanceof ProfileFormFields p && p.getProfile().identifiers().stream()
+							.anyMatch(known -> sameIdentifier(known, id)))
+					.findFirst();
+			if (offered.isPresent()) {
+				profiles.getSelectionModel().select(offered.get());
+				return;
+			}
+		}
+		conformsTo.stream().flatMap(id -> profileLocation(id).stream()).findFirst().ifPresent(this::loadProfile);
+	}
+
+	private static boolean sameIdentifier(String a, String b) {
+		return a.replaceFirst("/$", "").equals(b.replaceFirst("/$", ""));
 	}
 
 	/**

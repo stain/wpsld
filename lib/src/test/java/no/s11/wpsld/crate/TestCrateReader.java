@@ -320,4 +320,29 @@ public class TestCrateReader {
 		assertTrue(reports(document, Severity.WARNING, "which MUST be ro-crate-metadata.json"));
 		assertFalse(document.hasErrors());
 	}
+
+	/**
+	 * A crate read is written again as it was: its own @context (RO-Crate
+	 * 1.2 with an extra term here) and descriptor, not RO-Crate 1.3's.
+	 */
+	@Test
+	public void writtenAsRead() throws Exception {
+		String original = """
+				{"@context": ["https://w3id.org/ro/crate/1.2/context", {"ex": "https://example.com/terms#"}],
+				 "@graph": [
+				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.2"}, "ex:note": "kept"},
+				  {"@id": "./", "@type": "Dataset", "name": "Old crate"},
+				  {"@id": "#alice", "@type": "Person", "name": "Alice"}
+				 ]}""";
+		CrateDocument document = json(original);
+		assertEquals(List.of(), document.problems());
+		Crate crate = document.crate().orElseThrow();
+		assertEquals(new ObjectMapper().readTree(original), crate.toJson());
+
+		// Renaming the root keeps the descriptor about it
+		crate.rename(crate.getRoot(), "https://example.com/crate/");
+		assertEquals("https://example.com/crate/", crate.toJson().at("/@graph/0/about/@id").asText());
+		assertEquals("https://w3id.org/ro/crate/1.2", crate.toJson().at("/@graph/0/conformsTo/@id").asText());
+	}
 }
