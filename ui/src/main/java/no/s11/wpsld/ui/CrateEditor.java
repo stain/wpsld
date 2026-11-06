@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
@@ -110,7 +111,10 @@ public class CrateEditor extends Application {
 	private final Supplier<JsonLdContext> loadContext;
 	private CompletableFuture<SchemaFromJsonLd> schemaLoading;
 	private CompletableFuture<JsonLdContext> contextLoading;
-	private final Crate crate = new Crate();
+	/** The crate being edited, replaced by File > New */
+	private Crate crate = new Crate();
+	/** The crate as started or last saved, to tell whether it changed since */
+	private JsonNode unchanged = crate.toJson();
 	private final ListView<Entity> entities = new ListView<>();
 	private final TextArea preview = new TextArea();
 	private EntityPreview entityPreview;
@@ -268,7 +272,7 @@ public class CrateEditor extends Application {
 				.map(p -> (FormFields) new ProfileFormFields(p, schemaOrg)).toList());
 		profiles.getItems().add(schemaOrg);
 		profiles.getSelectionModel().selectFirst();
-		entityEditor = new EntityEditor(schema, profiles.getValue(), crate::getEntities, crate::getRoot,
+		entityEditor = new EntityEditor(schema, profiles.getValue(), () -> crate.getEntities(), () -> crate.getRoot(),
 				this::changed, type -> {
 					// Created from a reference field, which then links to it
 					Entity entity = crate.add(type);
@@ -358,6 +362,10 @@ public class CrateEditor extends Application {
 	 * The File and Edit menus.
 	 */
 	private MenuBar menus(Stage stage) {
+		MenuItem newCrate = new MenuItem("New RO-Crate");
+		newCrate.setId("menuNew");
+		newCrate.setAccelerator(new KeyCodeCombination(KeyCode.N, KeyCombination.SHORTCUT_DOWN));
+		newCrate.setOnAction(e -> newCrate(stage));
 		MenuItem save = new MenuItem("Save RO-Crate Metadata File…");
 		save.setId("menuSave");
 		save.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN));
@@ -370,7 +378,7 @@ public class CrateEditor extends Application {
 		exit.setId("menuExit");
 		exit.setAccelerator(new KeyCodeCombination(KeyCode.Q, KeyCombination.SHORTCUT_DOWN));
 		exit.setOnAction(e -> stage.close());
-		Menu file = new Menu("File", null, save, load, new SeparatorMenuItem(), exit);
+		Menu file = new Menu("File", null, newCrate, save, load, new SeparatorMenuItem(), exit);
 		file.setId("menuFile");
 
 		MenuItem preferences = new MenuItem("Preferences…");
@@ -382,6 +390,29 @@ public class CrateEditor extends Application {
 		MenuBar bar = new MenuBar(file, edit);
 		bar.setId("menuBar");
 		return bar;
+	}
+
+	/**
+	 * Start a new crate with only its root data entity, after asking whether
+	 * to discard the changes to this one.
+	 */
+	void newCrate(Stage stage) {
+		if (!crate.toJson().equals(unchanged)) {
+			ButtonType discard = new ButtonType("Discard", ButtonData.OK_DONE);
+			Alert alert = new Alert(AlertType.CONFIRMATION, "The changes since it was last saved will be lost.",
+					discard, ButtonType.CANCEL);
+			alert.initOwner(stage);
+			alert.setHeaderText("Discard the changes to this crate?");
+			if (alert.showAndWait().orElse(ButtonType.CANCEL) != discard) {
+				return;
+			}
+		}
+		crate = new Crate();
+		entities.getItems().setAll(crate.getEntities());
+		entities.getSelectionModel().select(crate.getRoot());
+		unchanged = crate.toJson();
+		changed();
+		stage.setTitle("wpsld");
 	}
 
 	/**
@@ -649,8 +680,10 @@ public class CrateEditor extends Application {
 			return;
 		}
 		try {
-			MAPPER.writeValue(file, crate.toJson());
+			JsonNode json = crate.toJson();
+			MAPPER.writeValue(file, json);
 			lastSaved = file;
+			unchanged = json;
 			stage.setTitle("wpsld – " + file);
 		} catch (IOException e) {
 			Alert error = new Alert(AlertType.ERROR, "Can't save " + file + ":\n" + e.getMessage());

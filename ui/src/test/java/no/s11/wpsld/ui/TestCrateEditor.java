@@ -109,6 +109,28 @@ public class TestCrateEditor extends ApplicationTest {
 		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
 	}
 
+	@Test
+	public void newCrateAsksToDiscardChanges() {
+		entities();
+		// Nothing changed yet: a new crate at once (with its shortcut, as
+		// moving the mouse over the menu bar may open another menu)
+		push(KeyCode.SHORTCUT, KeyCode.N);
+		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
+		addEntity("person");
+		Entity root = entities().getItems().get(0);
+
+		push(KeyCode.SHORTCUT, KeyCode.N);
+		assertTrue(lookup("Discard the changes to this crate?").tryQuery().isPresent());
+		clickOn("Cancel");
+		assertEquals(2, entities().getItems().size());
+
+		push(KeyCode.SHORTCUT, KeyCode.N);
+		clickOn("Discard");
+		assertEquals(1, entities().getItems().size());
+		assertNotSame(root, entities().getItems().get(0));
+		assertEquals(entities().getItems().get(0), entities().getSelectionModel().getSelectedItem());
+	}
+
 	/** Properties of the form's visible rows */
 	private List<String> visibleProperties() {
 		return lookup(n -> n.getId() != null && n.getId().startsWith("label-")).queryAllAs(Label.class).stream()

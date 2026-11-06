@@ -217,8 +217,8 @@ profiles".
 
 ### Menus
 
-A File menu (Save RO-Crate Metadata File… Ctrl+S, Load Profile…, Exit
-Ctrl+Q) and an Edit menu (Preferences… Ctrl+,), above the toolbar, which
+A File menu (New RO-Crate Ctrl+N, which asks before discarding changes not
+saved, Save RO-Crate Metadata File… Ctrl+S, Load Profile…, Exit Ctrl+Q) and an Edit menu (Preferences… Ctrl+,), above the toolbar, which
 keeps its buttons. Next: File > Open for existing crates (then the root's
 `conformsTo` chooses the profile), recent files (in the state folder), and
 Edit's undo/redo.
