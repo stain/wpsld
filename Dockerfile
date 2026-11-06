@@ -4,7 +4,7 @@
 #
 # Build and test, exporting dist/wpsld-linux-x64.zip and
 # dist/wpsld-windows-x64.zip (unzip and run bin/wpsld or bin\wpsld.bat;
-# for a native wpsld.exe see .github/workflows/windows-app-image.yml):
+# for native launchers on each platform see .github/workflows/release.yml):
 #   podman build --network=host --output type=local,dest=dist .
 #
 # Use the build stage as a development shell with the project mounted:

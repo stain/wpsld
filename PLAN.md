@@ -34,8 +34,11 @@ See also [MASP.md](MASP.md) for profile-aware editing with RO-Crate MASP.
 
 Builds: Java 25, Gradle 9.8; `./gradlew build` in the conda env
 (`environment.yml`), runtime images with the Temurin `Dockerfile`
-(`dist/wpsld-linux-x64.zip`, cross-linked `dist/wpsld-windows-x64.zip`), and a
-draft GitHub Actions workflow for a native Windows `wpsld.exe`.
+(`dist/wpsld-linux-x64.zip`, cross-linked `dist/wpsld-windows-x64.zip`), and
+releases from GitHub Actions (`.github/workflows/release.yml`, on a tag
+`v<version>`): app images with native launchers for Linux x64 and arm64,
+macOS x64 and arm64 and Windows x64, built on each platform, and a portable
+zip without JavaFX (`./gradlew :ui:distZip`, see `ui/src/dist/README.txt`).
 
 Measured for schema.org 30.0: about 430 ms cold / 110 ms warm to load, the
 model about 2.6 MB once the JSON is dropped; the editor is built in about
