@@ -80,6 +80,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.util.StringConverter;
 import javafx.stage.Stage;
+import javafx.stage.WindowEvent;
 import no.s11.wpsld.Settings;
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.CrateChecks;
@@ -195,6 +196,12 @@ public class CrateEditor extends Application {
 		// Also if the window showed another scene before (as in tests)
 		stage.sizeToScene();
 		stage.setTitle("wpsld");
+		// Closing the window, or File > Exit, asks before discarding changes
+		stage.setOnCloseRequest(e -> {
+			if (!mayDiscard(stage)) {
+				e.consume();
+			}
+		});
 		stage.show();
 
 		// The loads started in init(): while still running, the editor
@@ -365,7 +372,8 @@ public class CrateEditor extends Application {
 		MenuItem exit = new MenuItem("Exit");
 		exit.setId("menuExit");
 		exit.setAccelerator(new KeyCodeCombination(KeyCode.Q, KeyCombination.SHORTCUT_DOWN));
-		exit.setOnAction(e -> stage.close());
+		// As closing the window, rather than stage.close(), which doesn't ask
+		exit.setOnAction(e -> stage.fireEvent(new WindowEvent(stage, WindowEvent.WINDOW_CLOSE_REQUEST)));
 		Menu file = new Menu("File", null, newCrate, open, save, load, new SeparatorMenuItem(), exit);
 		file.setId("menuFile");
 
