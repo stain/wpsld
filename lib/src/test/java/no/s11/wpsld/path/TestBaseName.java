@@ -38,7 +38,8 @@ public class TestBaseName {
 
 	@Test
 	public void root() {
-		assertEquals("/", new BaseName(Path.of("/")).toString());
+		// \ on Windows
+		assertEquals(Path.of("/").toString(), new BaseName(Path.of("/")).toString());
 	}
 
 	@Test

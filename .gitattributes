@@ -1,6 +1,10 @@
 #
 # https://help.github.com/articles/dealing-with-line-endings/
 #
+# LF everywhere, also when checked out on Windows: the tests check the
+# SHA-256 of bundled JSON files, and the Windows zips should ship them as is
+* text=auto eol=lf
+
 # These are explicitly windows files and should use crlf
 *.bat           text eol=crlf
 
