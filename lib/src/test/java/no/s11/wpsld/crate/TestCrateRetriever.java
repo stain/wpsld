@@ -64,4 +64,15 @@ public class TestCrateRetriever {
 		assertEquals(Optional.empty(), CrateRetriever.htmlLink("<a rel=describedby href=x.json>"
 				+ "<link rel=describedby href=x.ttl type=text/turtle><link rel=describedby type=application/ld+json>", BASE));
 	}
+
+	@Test
+	public void folderNextToResolvedUrl() {
+		assertEquals(Optional.of(URI.create("https://example.com/profile/0.2/ro-crate-metadata.json")),
+				CrateRetriever.folder(URI.create("https://example.com/profile/0.2/")));
+		// As the specification's example
+		assertEquals(Optional.of(URI.create("https://example.com/Workflow-RO-Crate/1.0/ro-crate-metadata.json")),
+				CrateRetriever.folder(URI.create("https://example.com/Workflow-RO-Crate/1.0/index.html")));
+		assertEquals(Optional.empty(), CrateRetriever.folder(URI.create("https://example.com/profile.ttl")));
+		assertEquals(Optional.empty(), CrateRetriever.folder(URI.create("https://example.com/profile")));
+	}
 }

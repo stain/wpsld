@@ -184,6 +184,26 @@ public class TestProfileReader {
 		assertTrue(profile.classRules().isEmpty());
 	}
 
+	/**
+	 * As FAIRSCAPE's profile: a schema resource, but JSON Schema files rather
+	 * than MASP rules.
+	 */
+	@Test
+	public void noRulesInSchemaResource() {
+		Profile profile = reader.read(crateReader.read(new ByteArrayInputStream("""
+				{"@context": ["https://w3id.org/ro/crate/1.2/context", {"dct": "http://purl.org/dc/terms/"}],
+				 "@graph": [
+				  {"@id": "./", "@type": ["Dataset", "Profile"], "hasResource": {"@id": "#schema"}},
+				  {"@id": "#schema", "@type": "ResourceDescriptor",
+				   "hasRole": {"@id": "http://www.w3.org/ns/dx/prof/role/schema"},
+				   "hasArtifact": {"@id": "https://example.com/schemas/"}, "dct:format": "application/schema+json"}
+				 ]}""".getBytes(StandardCharsets.UTF_8)), "test"));
+		assertTrue(profile.hasErrors());
+		assertTrue(profile.problems().toString(), reports(profile, Severity.ERROR,
+				"lists no MASP rules in hasPart, so the profile has no rules; its schema is"
+						+ " https://example.com/schemas/ (application/schema+json)"));
+	}
+
 	@Test
 	public void noIdentifiersReported() {
 		Profile profile = profile("");

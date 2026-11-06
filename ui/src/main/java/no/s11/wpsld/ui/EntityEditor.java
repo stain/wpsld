@@ -102,6 +102,8 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
  * of types that have them.
  */
 public class EntityEditor extends ScrollPane {
+	/** Key of the property a field's control edits, in its node properties */
+	private static final String PROPERTY = "wpsld.property";
 	/** How many types to suggest for values without fields */
 	private static final int SUGGESTIONS = 3;
 
@@ -116,6 +118,9 @@ public class EntityEditor extends ScrollPane {
 	private final Supplier<List<Entity>> crateEntities;
 	/** Called after the entity is changed */
 	private final Runnable onChange;
+	/** After a change that is a step of its own, see {@link #setOnStep} */
+	private Runnable onStep = () -> {
+	};
 	/** Opens a web address, e.g. in the browser */
 	private Consumer<String> browse = address -> {
 	};
@@ -257,6 +262,7 @@ public class EntityEditor extends ScrollPane {
 		entity.setTypes(types);
 		showForm();
 		onChange.run();
+		onStep.run();
 	}
 
 	/**
@@ -736,6 +742,50 @@ public class EntityEditor extends ScrollPane {
 	}
 
 	/**
+	 * The entity being edited.
+	 */
+	public Entity getEntity() {
+		return entity;
+	}
+
+	/**
+	 * The property a node of the form edits, e.g. the focused one, if any.
+	 */
+	public static Optional<String> propertyOf(Node node) {
+		for (Node n = node; n != null; n = n.getParent()) {
+			if (n.getProperties().get(PROPERTY) instanceof String property) {
+				return Optional.of(property);
+			}
+		}
+		return Optional.empty();
+	}
+
+	/**
+	 * Focus the field of a property, if the form shows it, e.g. to show the
+	 * place of a change undone.
+	 *
+	 * @return Whether it was found
+	 */
+	public boolean focusProperty(String property) {
+		for (String id : List.of(id("header", property), id("value", property) + "-0")) {
+			Node field = lookup("#" + id);
+			if (field != null) {
+				field.requestFocus();
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * What to do after a change that is a step of its own, e.g. an undo
+	 * point after changing the entity's types.
+	 */
+	public void setOnStep(Runnable onStep) {
+		this.onStep = Objects.requireNonNull(onStep);
+	}
+
+	/**
 	 * A small note under a property schema.org has retired.
 	 */
 	private Optional<Label> retiredNote(String property) {
@@ -785,6 +835,7 @@ public class EntityEditor extends ScrollPane {
 			text = new TextField();
 		}
 		text.setId(id("header", field.name()));
+		text.getProperties().put(PROPERTY, field.name());
 		text.setPromptText("Text");
 		Runnable show = () -> {
 			List<JsonNode> values = entity.getAll(field.name());
@@ -962,6 +1013,7 @@ public class EntityEditor extends ScrollPane {
 			}
 			control.setMaxWidth(Double.MAX_VALUE);
 			control.setId(id("value", field.name()) + "-" + rows.size());
+			control.getProperties().put(PROPERTY, field.name());
 			HBox.setHgrow(control, Priority.ALWAYS);
 			Button remove = new Button("×");
 			remove.setTooltip(new Tooltip("Remove this value"));

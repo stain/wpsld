@@ -417,17 +417,49 @@ is left to the Workflow Profile.
   base for its relative ids), when, and its SHA-256. Loading a profile with
   the same location or one of the same identifiers replaces the copy (and the
   drop-down entry); bundled profiles stay. A broken store is ignored.
-- **Retrieval** (`CrateRetriever`, as the RO-Crate spec's "Retrieving an
-  RO-Crate"): follow redirects, then take the first of: the response if JSON
-  (content negotiation asks for `application/ld+json;profile="https://w3id.org/ro/crate"`),
-  a Signposting `Link: rel="describedby"` header (RO-Crate profile preferred,
-  else JSON-LD/JSON), an HTML `<link rel="describedby">` (as MASP's GitHub
-  Pages have, without headers or conneg), or for a folder its
-  `ro-crate-metadata.json`. At most 5 requests and 16 MB; links from the web
-  never lead to `file:`. Checked live: the MASP Pages folders (HTML link),
-  `https://w3id.org/ldac/profile` (302 to another repository's Pages folder,
-  then HTML link), and `https://w3id.org/ro/crate/1.3` (conneg; a crate but
-  not a profile, so refused with "no rules"). Not yet: zip/BagIt (`rel="item"`).
+- **Retrieval** (`CrateRetriever`, in the order of the RO-Crate spec's
+  "Retrieving an RO-Crate"):
+  1. Follow redirects *without* content negotiation, asking as a browser
+     does (`text/html, …, */*`). Take the response if it is JSON. Otherwise
+     use Signposting: a `Link: rel="describedby"` header (RO-Crate profile
+     preferred, else JSON-LD/JSON), or an HTML `<link rel="describedby">`,
+     as MASP's GitHub Pages have, without headers or conneg.
+  2. Content negotiation for `application/ld+json;profile="https://w3id.org/ro/crate"`,
+     and the links of what it gives.
+  3. The heuristic fallback: `ro-crate-metadata.json` next to the resolved
+     URL, for a folder or its `index.html`.
+
+  If none works, the error says what each step got, e.g. "content
+  negotiation gave text/turtle from …". At most 6 requests and 16 MB; links
+  from the web never lead to `file:`.
+
+  Content negotiation first (as before) failed for
+  `https://w3id.org/fairscape/profile/0.2`: w3id answers a JSON-LD request
+  with Turtle (`profile.ttl`), and the HTML page with the crate is only given
+  to browsers. A bare `Accept: */*` doesn't work either, as w3id's
+  `ro/crate` rules return 404 for it.
+
+  Checked live (2026-11-06):
+  - the MASP Pages folders (HTML link);
+  - `https://w3id.org/ldac/profile` (302 to another repository's Pages
+    folder, then HTML link);
+  - `https://w3id.org/fairscape/profile/0.2` (303 to its Pages folder, then
+    HTML link);
+  - `https://w3id.org/ro/crate/1.3` and
+    `https://w3id.org/workflowhub/workflow-ro-crate/1.0` (conneg; crates,
+    but not MASP profiles, so refused with "no rules").
+
+  Not yet: zip/BagIt (`rel="item"`).
+- **Profiles without MASP rules** are refused with an error, both when
+  there is no schema resource and when it lists no rules in `hasPart`.
+  FAIRSCAPE 0.2 is a PROF profile crate whose rules live outside the crate:
+  - an EVI ontology (vocabulary, Turtle);
+  - per-class JSON Schemas (`role:schema`, `application/schema+json`);
+  - SHACL shapes (`role:validation`, Turtle).
+
+  The error names the schema's artifact and format. Reading SHACL shapes
+  (see "Later: converting MASP to SHACL") would be the way to support such
+  profiles.
 - **Registries** (`ProfileRegistry`): the Load profile dialog lists the
   profiles of the known registries, read in the background once a session
   (failures are warnings, tried again next time), and `load` falls back to

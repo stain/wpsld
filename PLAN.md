@@ -155,8 +155,8 @@ one in front (`viewOrder`), selected when pressed; scroll arrows when the tabs
 don't fit; a page header with title, "Page n of m" and a dog-ear corner to
 turn the pages of a tab; optional buttons along the bottom (Undo, Default,
 Help); pages built when first shown; Ctrl+PageUp/PageDown and
-PageUp/PageDown. The entity form can be shown as a notebook (toolbar: View
-List / Notebook): groups as tabs, 8 properties per page; no property search
+PageUp/PageDown. The entity form can be shown as a notebook (View > Notebook,
+Ctrl+2): groups as tabs, 8 properties per page; no property search
 there yet. Next: Undo/Default/Help, mnemonics on tabs, the Warp 3 style
 (tabs on the right, minor tabs), and whether the notebook becomes the default.
 
@@ -220,11 +220,42 @@ profiles".
 
 ### Menus
 
-A File menu (New RO-Crate Ctrl+N, which asks before discarding changes not
-saved, Save RO-Crate Metadata File… Ctrl+S, Load Profile…, Exit Ctrl+Q) and an Edit menu (Preferences… Ctrl+,), above the toolbar, which
-keeps its buttons. Next: File > Open for existing crates (then the root's
-`conformsTo` chooses the profile), recent files (in the state folder), and
-Edit's undo/redo.
+A File menu and an Edit menu above the toolbar, which keeps its buttons:
+
+- File > New RO-Crate (Ctrl+N), and File > Open RO-Crate Metadata File… (Ctrl+O) for an
+  `ro-crate-metadata.json`. Both ask before discarding changes that aren't
+  saved.
+- Opening a crate shows the reader's warnings beside it. A crate it can't
+  read gives an error, and the current crate stays.
+- An opened crate is saved with its own `@context` and metadata descriptor,
+  so it keeps its RO-Crate version and extra terms.
+- The root's `conformsTo` (or, as in 1.1, the descriptor's) chooses the
+  profile. A profile that isn't offered yet is loaded. Without one, the core
+  RO-Crate profile is used.
+- File > Save RO-Crate Metadata File… (Ctrl+S), Load Profile…, Exit (Ctrl+Q).
+- Edit > Undo (Ctrl+Z) and Redo (Ctrl+Shift+Z, Ctrl+Y), through undo points
+  (`UndoHistory`):
+  - A point is the crate's JSON-LD as a string, made after leaving a field,
+    after adding (with the type chosen) or removing an entity or value, after
+    type changes and merges, after `@id` changes and merges, and after
+    choosing a profile.
+  - No changes since the last point means no new point.
+  - Each point remembers where its change was made: undo and redo show that
+    entity again, with the cursor in the property's field.
+  - In a text field, Ctrl+Z first undoes its own typing, then continues with
+    the crate's points.
+  - The history is per crate: File > New and Open clear it.
+- Choosing a profile writes it in the root's `conformsTo`, replacing other
+  offered profiles. The core RO-Crate profile and schema.org aren't written,
+  as they are RO-Crate itself. Undo and redo choose the profile the crate
+  then conforms to.
+- Closing the window, or File > Exit, asks before discarding changes.
+- Edit > Preferences… (Ctrl+,).
+- View > List (Ctrl+1) or Notebook (Ctrl+2), for the form, in place of the
+  toolbar's toggle buttons.
+
+Next: opening zipped crates and crates from a URL (with `CrateRetriever`),
+and recent files (in the state folder).
 
 ### Start-up
 

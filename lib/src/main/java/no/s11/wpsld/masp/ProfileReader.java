@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
+import java.util.stream.Stream;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
@@ -72,6 +73,7 @@ public class ProfileReader {
 	private static final String RDFS = "http://www.w3.org/2000/01/rdf-schema#";
 	private static final String SH = "http://www.w3.org/ns/shacl#";
 	private static final String PROF = "http://www.w3.org/ns/dx/prof/";
+	private static final String DCT = "http://purl.org/dc/terms/";
 	private static final String PROV_SPECIALIZATION_OF = "http://www.w3.org/ns/prov#specializationOf";
 	private static final String S = "http://schema.org/";
 	private static final String SCHEMA_ROLE = PROF + "role/schema";
@@ -186,20 +188,35 @@ public class ProfileReader {
 		 */
 		private Set<String> ruleIds(Entity root) {
 			Set<String> ids = new LinkedHashSet<>();
-			boolean found = false;
+			List<Entity> schemas = new ArrayList<>();
 			for (String resourceId : document.references(root, PROF + "hasResource")) {
 				Optional<Entity> resource = document.entity(resourceId);
 				if (resource.isPresent() && document.references(resource.get(), PROF + "hasRole").contains(SCHEMA_ROLE)) {
-					found = true;
+					schemas.add(resource.get());
 					ids.addAll(document.references(resource.get(), S + "hasPart"));
 				}
 			}
-			if (!found) {
+			if (schemas.isEmpty()) {
 				error("No hasResource with the role " + SCHEMA_ROLE + ", so the profile has no rules");
 			} else if (ids.isEmpty()) {
-				warn("The schema resource lists no rules in hasPart");
+				// e.g. FAIRSCAPE's: JSON Schema files, with SHACL shapes for validation
+				error("The schema resource lists no MASP rules in hasPart, so the profile has no rules"
+						+ schemas.stream().map(this::artifacts).filter(a -> !a.isEmpty())
+								.map(a -> "; its schema is " + a).findFirst().orElse(""));
 			}
 			return ids;
+		}
+
+		/**
+		 * A resource's artifacts and their format, for messages: e.g.
+		 * "https://example.com/schemas/ (application/schema+json)".
+		 */
+		private String artifacts(Entity resource) {
+			String format = Stream.of(DCT + "format", S + "encodingFormat")
+					.flatMap(p -> document.values(resource, p).stream()).filter(JsonNode::isTextual)
+					.map(JsonNode::asText).findFirst().map(f -> " (" + f + ")").orElse("");
+			List<String> artifacts = document.references(resource, PROF + "hasArtifact");
+			return artifacts.isEmpty() ? "" : String.join(", ", artifacts) + format;
 		}
 
 		/**

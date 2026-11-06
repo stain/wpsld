@@ -19,6 +19,8 @@ package no.s11.wpsld.ui;
 
 import static org.junit.Assert.*;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -43,9 +45,11 @@ import no.s11.wpsld.form.FormFields;
  */
 public class TestCrateEditor extends ApplicationTest {
 
+	private CrateEditor app;
+
 	@Override
 	public void start(Stage stage) throws Exception {
-		CrateEditor app = new CrateEditor();
+		app = new CrateEditor();
 		app.init();
 		app.start(stage);
 	}
@@ -141,6 +145,120 @@ public class TestCrateEditor extends ApplicationTest {
 		assertEquals(entities().getItems().get(0), entities().getSelectionModel().getSelectedItem());
 	}
 
+	@Test
+	public void openCrate() throws Exception {
+		entities();
+		ComboBox<FormFields> profiles = lookup("#profile").queryComboBox();
+		// schema.org chosen, but the crate conforms to the core profile
+		interact(() -> profiles.getSelectionModel().selectLast());
+		Path dir = Files.createTempDirectory("crate");
+		Files.writeString(dir.resolve("ro-crate-metadata.json"), """
+				{"@context": "https://w3id.org/ro/crate/1.2/context",
+				 "@graph": [
+				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.2"}},
+				  {"@id": "./", "@type": "Dataset", "name": "Old crate",
+				   "conformsTo": {"@id": "https://language-research-technology.github.io/ro-crate-masp/profiles/ro-crate/profile-crate/"},
+				   "author": {"@id": "#alice"}},
+				  {"@id": "#alice", "@type": "Person", "name": "Alice"}
+				 ]}""");
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir)).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals(List.of("./", "#alice"), entities().getItems().stream().map(Entity::getId).toList());
+		assertEquals(entities().getItems().get(0), entities().getSelectionModel().getSelectedItem());
+		assertEquals("RO-Crate Machine Actionable Profile 0.1.0", profiles.getValue().getName());
+		assertEquals("wpsld – " + dir.resolve("ro-crate-metadata.json"), stage.getTitle());
+		// Written with its own version, and nothing to discard yet
+		assertTrue(lookup("#preview").queryTextInputControl().getText().contains("https://w3id.org/ro/crate/1.2/context"));
+		push(KeyCode.SHORTCUT, KeyCode.N);
+		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
+		assertEquals(1, entities().getItems().size());
+
+		// Not a crate: an error, and the crate stays
+		Files.writeString(dir.resolve("ro-crate-metadata.json"), "[]");
+		assertFalse(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir)).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup("Can't open " + dir).tryQuery().isPresent());
+		clickOn("OK");
+		assertEquals(1, entities().getItems().size());
+	}
+
+	/** Leave the field being edited, by clicking the entity list's first entity, the root */
+	private void leaveField() {
+		clickOn(lookup("#entities .list-cell").nth(0).queryAs(Node.class));
+	}
+
+	/**
+	 * Undo points after leaving a field: Ctrl+Z inside a field is the field's
+	 * own undo of typing.
+	 */
+	@Test
+	public void undoTyping() {
+		entities();
+		clickOn("#header-name").write("My crate");
+		leaveField();
+		Entity root = entities().getItems().get(0);
+		assertEquals("My crate", root.get("name").orElseThrow().asText());
+
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		root = entities().getItems().get(0);
+		assertTrue(root.get("name").isEmpty());
+		assertEquals("", lookup("#header-name").queryAs(TextField.class).getText());
+		// Back in the field changed, where Ctrl+Z goes on with the crate's undo
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals("header-name", entities().getScene().getFocusOwner().getId());
+		// Nothing more to undo
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		assertTrue(entities().getItems().get(0).get("name").isEmpty());
+
+		push(KeyCode.SHORTCUT, KeyCode.SHIFT, KeyCode.Z);
+		assertEquals("My crate", entities().getItems().get(0).get("name").orElseThrow().asText());
+		assertEquals("My crate", lookup("#header-name").queryAs(TextField.class).getText());
+		// Leaving a field without changes is no new point: redo is still there after undo
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		leaveField();
+		push(KeyCode.SHORTCUT, KeyCode.Y);
+		assertEquals("My crate", entities().getItems().get(0).get("name").orElseThrow().asText());
+	}
+
+	/**
+	 * Adding an entity (with its type), and merging by @id, each undone in
+	 * one step; New starts a new history.
+	 */
+	@Test
+	public void undoAddAndMerge() {
+		entities();
+		addEntity("datadownload");
+		addEntity("person");
+		Entity download = entities().getItems().get(1);
+		renameTo(download.getId());
+		clickOn("OK");
+		assertEquals(2, entities().getItems().size());
+
+		leaveField();
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		assertEquals(List.of(List.of("DataDownload"), List.of("Person")), entities().getItems().subList(1, 3)
+				.stream().map(Entity::getTypes).toList());
+		// The entity that changed is shown
+		assertEquals(entities().getItems().get(1).getId(), entities().getSelectionModel().getSelectedItem().getId());
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		assertEquals(2, entities().getItems().size());
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		assertEquals(1, entities().getItems().size());
+
+		push(KeyCode.SHORTCUT, KeyCode.SHIFT, KeyCode.Z);
+		push(KeyCode.SHORTCUT, KeyCode.SHIFT, KeyCode.Z);
+		push(KeyCode.SHORTCUT, KeyCode.SHIFT, KeyCode.Z);
+		assertEquals(2, entities().getItems().size());
+		assertEquals(List.of("DataDownload", "Person"), entities().getItems().get(1).getTypes());
+
+		push(KeyCode.SHORTCUT, KeyCode.N);
+		clickOn("Discard");
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		assertEquals(1, entities().getItems().size());
+	}
+
 	/** Properties of the form's visible rows */
 	private List<String> visibleProperties() {
 		return lookup(n -> n.getId() != null && n.getId().startsWith("label-")).queryAllAs(Label.class).stream()
@@ -193,7 +311,8 @@ public class TestCrateEditor extends ApplicationTest {
 	@Test
 	public void notebookView() {
 		entities();
-		clickOn("#viewNotebook");
+		// View > Notebook, with its shortcut (see newCrateAsksToDiscardChanges)
+		push(KeyCode.SHORTCUT, KeyCode.DIGIT2);
 		assertTrue(lookup("#notebook").tryQuery().isPresent());
 		assertEquals(List.of("Required", "Dataset", "CreativeWork", "Thing"),
 				lookup(".notebook-tab").queryAllAs(Label.class).stream().map(Label::getText).toList());
@@ -202,8 +321,8 @@ public class TestCrateEditor extends ApplicationTest {
 		clickOn(lookup(".notebook-tab").queryAllAs(Label.class).stream().filter(l -> l.getText().equals("CreativeWork"))
 				.findFirst().orElseThrow());
 		assertTrue(lookup(".notebook-status").queryAs(Label.class).getText().matches("Page 1 of \\d+"));
-		// Back to the list
-		clickOn("#viewList");
+		// Back to the list, View > List
+		push(KeyCode.SHORTCUT, KeyCode.DIGIT1);
 		assertTrue(lookup("#notebook").tryQuery().isEmpty());
 		assertTrue(visibleProperties().contains("name *"));
 	}

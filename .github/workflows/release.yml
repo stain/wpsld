@@ -71,8 +71,15 @@ jobs:
         run: |
           curl -fsSLo "$RUNNER_TEMP/javafx-jmods.zip" \
             "https://download2.gluonhq.com/openjfx/${JAVAFX_VERSION}/openjfx-${JAVAFX_VERSION}_${{ matrix.platform }}_bin-jmods.zip"
-          echo "${{ matrix.jmods-sha256 }}  $RUNNER_TEMP/javafx-jmods.zip" | shasum -a 256 -c -
-          unzip -q "$RUNNER_TEMP/javafx-jmods.zip" -d "$RUNNER_TEMP"
+          # Whichever SHA-256 tool the runner has: Git Bash on Windows has no
+          # shasum, and maybe no sha256sum, but OpenSSL; all print the digest first
+          zip="$RUNNER_TEMP/javafx-jmods.zip"
+          digest=$( (sha256sum "$zip" || shasum -a 256 "$zip" || openssl dgst -sha256 -r "$zip") 2> /dev/null | cut -d ' ' -f 1)
+          if [ "$digest" != "${{ matrix.jmods-sha256 }}" ]; then
+            echo "::error::SHA-256 of the JavaFX jmods is '$digest', expected ${{ matrix.jmods-sha256 }}"
+            exit 1
+          fi
+          unzip -q "$zip" -d "$RUNNER_TEMP"
 
       - name: Package
         run: |
