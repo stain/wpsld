@@ -210,8 +210,18 @@ state, and where to look for data installed for all users: XDG on Linux and
 other Unix (`$XDG_CACHE_HOME`… with their defaults, invalid values ignored),
 `%LOCALAPPDATA%`/`%APPDATA%`/`%PROGRAMDATA%` on Windows, and `~/Library/Caches`
 and `~/Library/Application Support` on macOS, each with a `wpsld` folder.
-First use: a disk cache of downloaded profiles (see MASP.md); later settings
-and user-added profiles.
+Profiles the user loads are kept in `profiles/` of the data folder, and
+preferences (`Settings`, now which profile registries to use) in
+`settings.json` of the config folder; see MASP.md, "Bundled and dynamic
+profiles".
+
+### Menus
+
+A File menu (Save RO-Crate Metadata File… Ctrl+S, Load Profile…, Exit
+Ctrl+Q) and an Edit menu (Preferences… Ctrl+,), above the toolbar, which
+keeps its buttons. Next: File > Open for existing crates (then the root's
+`conformsTo` chooses the profile), recent files (in the state folder), and
+Edit's undo/redo.
 
 ### Start-up
 

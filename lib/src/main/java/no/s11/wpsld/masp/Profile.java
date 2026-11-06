@@ -17,6 +17,7 @@
  */
 package no.s11.wpsld.masp;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +55,16 @@ public record Profile(String id, List<String> identifiers, Optional<String> name
 		identifiers = List.copyOf(identifiers);
 		isProfileOf = List.copyOf(isProfileOf);
 		problems = List.copyOf(problems);
+	}
+
+	/**
+	 * The same profile with another problem, e.g. found after reading it.
+	 */
+	public Profile withProblem(Problem problem) {
+		List<Problem> more = new ArrayList<>(problems);
+		more.add(problem);
+		return new Profile(id, identifiers, name, version, isProfileOf, classRules, propertyRules, descriptorRule,
+				rootRule, document, more);
 	}
 
 	public boolean hasErrors() {

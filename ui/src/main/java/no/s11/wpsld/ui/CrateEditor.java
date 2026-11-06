@@ -19,12 +19,17 @@ package no.s11.wpsld.ui;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -44,19 +49,29 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.ButtonBar.ButtonData;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.Separator;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.ToolBar;
+import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -64,8 +79,10 @@ import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.util.StringConverter;
 import javafx.stage.Stage;
+import no.s11.wpsld.Settings;
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.CrateChecks;
+import no.s11.wpsld.crate.CrateDocument.Problem;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.form.EntityTypes;
@@ -74,7 +91,9 @@ import no.s11.wpsld.form.ProfileFormFields;
 import no.s11.wpsld.form.RequiredFields;
 import no.s11.wpsld.form.SchemaOrgFormFields;
 import no.s11.wpsld.jsonld.JsonLdContext;
+import no.s11.wpsld.masp.Profile;
 import no.s11.wpsld.masp.ProfileCache;
+import no.s11.wpsld.masp.ProfileRegistry;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
 /**
@@ -100,11 +119,20 @@ public class CrateEditor extends Application {
 	private CrateTerms terms;
 	/** Which profile's fields the form shows */
 	private final ComboBox<FormFields> profiles = new ComboBox<>();
+	/** Bundled profiles, and those the user loaded before */
+	private final ProfileCache profileCache;
+	private final Button loadProfile = new Button("Load profile…");
+	/** Loading a profile, or why it failed */
+	private final Label profileStatus = new Label();
+	private SchemaOrgFormFields schemaOrg;
+	/** Where the user's preferences are kept, if they are */
+	private final Optional<Path> settingsFile;
+	private Settings settings = Settings.DEFAULT;
 	/** Where the crate was last saved, to start the next save there */
 	private File lastSaved;
 
 	public CrateEditor() {
-		this(SchemaFromJsonLd::new);
+		this(SchemaFromJsonLd::new, CrateTerms::prewarm, ProfileCache.forUser(), Optional.of(Settings.userFile()));
 	}
 
 	/**
@@ -119,8 +147,28 @@ public class CrateEditor extends Application {
 	 * tests.
 	 */
 	CrateEditor(Supplier<SchemaFromJsonLd> loadSchema, Supplier<JsonLdContext> loadContext) {
+		this(loadSchema, loadContext, ProfileCache.bundled());
+	}
+
+	/**
+	 * With other ways to load the schema and the RO-Crate context, and
+	 * another store of profiles, e.g. in tests.
+	 */
+	CrateEditor(Supplier<SchemaFromJsonLd> loadSchema, Supplier<JsonLdContext> loadContext,
+			ProfileCache profileCache) {
+		this(loadSchema, loadContext, profileCache, Optional.empty());
+	}
+
+	/**
+	 * With other ways to load the schema and the RO-Crate context, another
+	 * store of profiles, and another settings file, e.g. in tests.
+	 */
+	CrateEditor(Supplier<SchemaFromJsonLd> loadSchema, Supplier<JsonLdContext> loadContext,
+			ProfileCache profileCache, Optional<Path> settingsFile) {
 		this.loadSchema = loadSchema;
 		this.loadContext = loadContext;
+		this.profileCache = profileCache;
+		this.settingsFile = settingsFile;
 	}
 
 	@Override
@@ -130,6 +178,8 @@ public class CrateEditor extends Application {
 		// so that building the editor on the JavaFX thread doesn't load it
 		schemaLoading = CompletableFuture.supplyAsync(loadSchema);
 		contextLoading = CompletableFuture.supplyAsync(loadContext);
+		settings = settingsFile.map(Settings::load).orElse(Settings.DEFAULT);
+		profileCache.setDisabledRegistries(settings.disabledRegistries());
 	}
 
 	@Override
@@ -177,7 +227,13 @@ public class CrateEditor extends Application {
 				if (fields != null) {
 					entityEditor.setFormFields(fields);
 				}
+				profiles.setTooltip(fields instanceof ProfileFormFields p
+						? new Tooltip("From " + p.getProfile().document().source())
+						: null);
 			});
+			loadProfile.setId("loadProfile");
+			loadProfile.setOnAction(e -> askForProfile(stage));
+			profileStatus.setId("profileStatus");
 			// The form as a list of folding groups, or as a notebook in the style
 			// of the OS/2 Workplace Shell's Properties notebook
 			ToggleGroup view = new ToggleGroup();
@@ -196,19 +252,19 @@ public class CrateEditor extends Application {
 					entityEditor.setNotebookMode(selected == notebook);
 				}
 			});
-			root.setTop(new ToolBar(save, new Separator(), new Label("Profile"), profiles, new Separator(),
-					new Label("View"), list, notebook));
+			root.setTop(new VBox(menus(stage), new ToolBar(save, new Separator(), new Label("Profile"), profiles,
+					loadProfile, profileStatus, new Separator(), new Label("View"), list, notebook)));
 		}));
 	}
 
 	private Node editor(SchemaFromJsonLd schema) {
 		entityTypes = new EntityTypes(schema);
 		terms = new CrateTerms(schema);
-		SchemaOrgFormFields schemaOrg = new SchemaOrgFormFields(terms);
+		schemaOrg = new SchemaOrgFormFields(terms);
 		// The core RO-Crate profile by default: the same schema.org fields,
-		// with those RO-Crate requires first; or schema.org without a profile
-		profiles.getItems().setAll(ProfileCache.bundled().bundledIdentifiers().stream()
-				.map(ProfileCache.bundled()::bundled).flatMap(Optional::stream).distinct()
+		// with those RO-Crate requires first; then the profiles the user loaded
+		// before, or schema.org without a profile
+		profiles.getItems().setAll(profileCache.available().stream()
 				.map(p -> (FormFields) new ProfileFormFields(p, schemaOrg)).toList());
 		profiles.getItems().add(schemaOrg);
 		profiles.getSelectionModel().selectFirst();
@@ -296,6 +352,222 @@ public class CrateEditor extends Application {
 		entities.getSelectionModel().select(crate.getRoot());
 		changed();
 		return split;
+	}
+
+	/**
+	 * The File and Edit menus.
+	 */
+	private MenuBar menus(Stage stage) {
+		MenuItem save = new MenuItem("Save RO-Crate Metadata File…");
+		save.setId("menuSave");
+		save.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN));
+		save.setOnAction(e -> save(stage));
+		MenuItem load = new MenuItem("Load Profile…");
+		load.setId("menuLoadProfile");
+		load.disableProperty().bind(loadProfile.disabledProperty());
+		load.setOnAction(e -> askForProfile(stage));
+		MenuItem exit = new MenuItem("Exit");
+		exit.setId("menuExit");
+		exit.setAccelerator(new KeyCodeCombination(KeyCode.Q, KeyCombination.SHORTCUT_DOWN));
+		exit.setOnAction(e -> stage.close());
+		Menu file = new Menu("File", null, save, load, new SeparatorMenuItem(), exit);
+		file.setId("menuFile");
+
+		MenuItem preferences = new MenuItem("Preferences…");
+		preferences.setId("menuPreferences");
+		preferences.setAccelerator(new KeyCodeCombination(KeyCode.COMMA, KeyCombination.SHORTCUT_DOWN));
+		preferences.setOnAction(e -> showPreferences(stage));
+		Menu edit = new Menu("Edit", null, preferences);
+		edit.setId("menuEdit");
+		MenuBar bar = new MenuBar(file, edit);
+		bar.setId("menuBar");
+		return bar;
+	}
+
+	/**
+	 * Show the preferences, and keep them on OK.
+	 */
+	void showPreferences(Stage stage) {
+		new PreferencesDialog(stage, settings, profileCache, this::forgotten).showAndWait().ifPresent(changed -> {
+			settings = changed;
+			profileCache.setDisabledRegistries(changed.disabledRegistries());
+			if (settingsFile.isPresent()) {
+				try {
+					changed.save(settingsFile.get());
+				} catch (IOException e) {
+					Alert alert = new Alert(AlertType.ERROR, e.toString(), ButtonType.OK);
+					alert.initOwner(stage);
+					alert.setHeaderText("Can't save the preferences in " + settingsFile.get());
+					alert.show();
+				}
+			}
+		});
+	}
+
+	/**
+	 * A kept profile was removed: no longer offer it.
+	 */
+	private void forgotten(Profile profile) {
+		boolean chosen = profiles.getValue() instanceof ProfileFormFields p && p.getProfile() == profile;
+		profiles.getItems().removeIf(f -> f instanceof ProfileFormFields p && p.getProfile() == profile);
+		if (chosen) {
+			profiles.getSelectionModel().selectFirst();
+		}
+	}
+
+	/**
+	 * Ask for a profile's URL or file, and load it.
+	 */
+	private void askForProfile(Stage stage) {
+		Dialog<String> dialog = new Dialog<>();
+		dialog.initOwner(stage);
+		dialog.setTitle("Load profile");
+		dialog.setHeaderText("Load an RO-Crate MASP profile, kept for next time");
+		TextField location = new TextField();
+		location.setId("profileLocation");
+		location.setPromptText("https://… or a file");
+		location.setPrefColumnCount(40);
+		Button file = new Button("File…");
+		file.setId("profileFile");
+		file.setOnAction(e -> {
+			FileChooser chooser = new FileChooser();
+			chooser.setTitle("Profile crate");
+			chooser.getExtensionFilters().setAll(new FileChooser.ExtensionFilter("JSON-LD", "*.json", "*.jsonld"));
+			File chosen = chooser.showOpenDialog(dialog.getOwner());
+			if (chosen != null) {
+				location.setText(chosen.toURI().toString());
+			}
+		});
+		HBox.setHgrow(location, Priority.ALWAYS);
+		Label help = new Label("The profile's identifier, its web page or folder, or its ro-crate-metadata.json; "
+				+ "or choose one listed by the profile registries");
+		help.setWrapText(true);
+		ListView<ProfileRegistry.Entry> listed = registryList(location);
+		Label registryProblems = new Label();
+		registryProblems.setId("registryProblems");
+		registryProblems.setWrapText(true);
+		registryProblems.setStyle("-fx-text-fill: #8a5a00;");
+		VBox content = new VBox(8, new HBox(8, location, file), help, listed, registryProblems);
+		content.setPadding(new Insets(4));
+		dialog.getDialogPane().setContent(content);
+		ButtonType load = new ButtonType("Load", ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().setAll(load, ButtonType.CANCEL);
+		dialog.getDialogPane().lookupButton(load).disableProperty().bind(location.textProperty().isEmpty());
+		dialog.setResultConverter(button -> button == load ? location.getText().strip() : null);
+		listed.setOnMouseClicked(e -> {
+			if (e.getClickCount() == 2 && listed.getSelectionModel().getSelectedItem() != null) {
+				((Button) dialog.getDialogPane().lookupButton(load)).fire();
+			}
+		});
+		CompletableFuture.supplyAsync(profileCache::registryEntries).thenAccept(listing -> Platform.runLater(() -> {
+			listed.getItems().setAll(listing.entries());
+			listed.setPlaceholder(new Label("No profiles listed"));
+			registryProblems.setText(listing.problems().stream().map(Problem::message).collect(Collectors.joining("\n")));
+		}));
+		Platform.runLater(location::requestFocus);
+		dialog.showAndWait().filter(text -> !text.isEmpty()).ifPresent(text -> {
+			Optional<URI> uri = profileLocation(text);
+			if (uri.isEmpty()) {
+				profileStatus.setText("Not a URL or file: " + text);
+				return;
+			}
+			loadProfile(uri.get()).thenAccept(profile -> Platform.runLater(() -> {
+				if (profile.hasErrors()) {
+					Alert alert = new Alert(AlertType.ERROR, problems(profile), ButtonType.OK);
+					alert.initOwner(stage);
+					alert.setHeaderText("Can't load the profile from " + uri.get());
+					alert.show();
+				}
+			}));
+		});
+	}
+
+	/**
+	 * The profiles the registries list, filled in later; choosing one puts
+	 * its location in the field.
+	 */
+	private static ListView<ProfileRegistry.Entry> registryList(TextField location) {
+		ListView<ProfileRegistry.Entry> listed = new ListView<>();
+		listed.setId("registryProfiles");
+		listed.setPrefHeight(220);
+		listed.setPlaceholder(new Label("Looking up profile registries…"));
+		listed.setCellFactory(view -> new ListCell<>() {
+			@Override
+			protected void updateItem(ProfileRegistry.Entry entry, boolean empty) {
+				super.updateItem(entry, empty);
+				setText(empty || entry == null ? null : entry.label() + " \u2014 " + entry.registry());
+				setTooltip(empty || entry == null ? null : new Tooltip(entry.location().toString()));
+			}
+		});
+		listed.getSelectionModel().selectedItemProperty().addListener((obs, old, entry) -> {
+			if (entry != null) {
+				location.setText(entry.location().toString());
+			}
+		});
+		return listed;
+	}
+
+	/**
+	 * A URL, or a file path as typed or pasted.
+	 */
+	static Optional<URI> profileLocation(String text) {
+		// file:, http: and https: URLs; C:\… and /… paths
+		if (text.matches("(?i)(https?|file):.*")) {
+			try {
+				return Optional.of(new URI(text));
+			} catch (URISyntaxException e) {
+				return Optional.empty();
+			}
+		}
+		try {
+			return Optional.of(Path.of(text).toAbsolutePath().toUri());
+		} catch (InvalidPathException e) {
+			return Optional.empty();
+		}
+	}
+
+	private static String problems(Profile profile) {
+		return profile.allProblems().stream().map(p -> p.severity() + ": " + p.message())
+				.collect(Collectors.joining("\n"));
+	}
+
+	/**
+	 * Load a profile in the background, then offer it and choose it.
+	 */
+	CompletableFuture<Profile> loadProfile(URI location) {
+		loadProfile.setDisable(true);
+		profileStatus.setText("Loading profile from " + location + "…");
+		profileStatus.setTooltip(null);
+		return CompletableFuture.supplyAsync(() -> profileCache.load(location)).thenApply(profile -> {
+			Platform.runLater(() -> {
+				loadProfile.setDisable(false);
+				if (profile.hasErrors()) {
+					profileStatus.setText("Can't load the profile");
+					profileStatus.setTooltip(new Tooltip(problems(profile)));
+					return;
+				}
+				// A newer copy of a profile loaded before replaces it
+				profiles.getItems().removeIf(f -> f instanceof ProfileFormFields p && isReplacedBy(p.getProfile(), profile));
+				FormFields fields = new ProfileFormFields(profile, schemaOrg);
+				profiles.getItems().add(profiles.getItems().size() - 1, fields);
+				profiles.getSelectionModel().select(fields);
+				long warnings = profile.allProblems().size();
+				profileStatus.setText(warnings == 0 ? "" : warnings + " warnings loading the profile");
+				profileStatus.setTooltip(warnings == 0 ? null : new Tooltip(problems(profile)));
+			});
+			return profile;
+		});
+	}
+
+	/**
+	 * Whether a profile offered is replaced by one just loaded: the same
+	 * profile from the same place, or with one of its identifiers, unless
+	 * bundled, as those stay.
+	 */
+	private boolean isReplacedBy(Profile old, Profile loaded) {
+		boolean bundled = old.identifiers().stream().anyMatch(id -> profileCache.bundled(id).orElse(null) == old);
+		return !bundled && (old.document().source().equals(loaded.document().source())
+				|| old.identifiers().stream().anyMatch(loaded.identifiers()::contains));
 	}
 
 	private static void showFailure(BorderPane root, String what, Throwable failure) {

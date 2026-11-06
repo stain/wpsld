@@ -392,10 +392,58 @@ selected type need not be added, as elsewhere (see PLAN.md).
   `conformsTo` by its conformance indicators (an `ItemList` under the role
   `https://w3id.org/ro/conformance-indicators`), which `ProfileReader` reads
   as `Profile.identifiers()`.
-- **Dynamic:** other profiles (e.g. LDAC) are loaded when needed with
-  `ProfileCache.load(URI)` (`https:`, `http:` or `file:`, of the crate or its
-  folder): time limits, never throws, failures not cached so they can be
-  retried; loaded profiles are kept for the session and found by identifier.
+- **Dynamic:** other profiles (e.g. LDAC) are loaded with **Load profile…**
+  in the toolbar, from a URL or a file chosen in a dialog, in the background
+  (`ProfileCache.load(URI)`: time limits, never throws, failures not cached so
+  they can be retried, shown in the toolbar and an alert). Once loaded, the
+  profile is chosen and **kept for next time**: copied to `profiles/` in the
+  user's data folder (`AppDirectories.data()`), listed in its `profiles.json`
+  with its identifiers, the location asked for, the source it came from (the
+  base for its relative ids), when, and its SHA-256. Loading a profile with
+  the same location or one of the same identifiers replaces the copy (and the
+  drop-down entry); bundled profiles stay. A broken store is ignored.
+- **Retrieval** (`CrateRetriever`, as the RO-Crate spec's "Retrieving an
+  RO-Crate"): follow redirects, then take the first of: the response if JSON
+  (content negotiation asks for `application/ld+json;profile="https://w3id.org/ro/crate"`),
+  a Signposting `Link: rel="describedby"` header (RO-Crate profile preferred,
+  else JSON-LD/JSON), an HTML `<link rel="describedby">` (as MASP's GitHub
+  Pages have, without headers or conneg), or for a folder its
+  `ro-crate-metadata.json`. At most 5 requests and 16 MB; links from the web
+  never lead to `file:`. Checked live: the MASP Pages folders (HTML link),
+  `https://w3id.org/ldac/profile` (302 to another repository's Pages folder,
+  then HTML link), and `https://w3id.org/ro/crate/1.3` (conneg; a crate but
+  not a profile, so refused with "no rules"). Not yet: zip/BagIt (`rel="item"`).
+- **Registries** (`ProfileRegistry`): the Load profile dialog lists the
+  profiles of the known registries, read in the background once a session
+  (failures are warnings, tried again next time), and `load` falls back to
+  them when an identifier doesn't lead to a crate (e.g. Turtle by content
+  negotiation, GitHub `tree` URLs, a registry's own page for the profile):
+  - `MaspCatalogue`: the RO-Crate MASP examples' `catalogue.json`, the
+    entries with `"kind": "profile"` (not schemas), identified by their
+    `profile-crate/` folder.
+  - `RoCrateProfilesRegistry`: profiles.ro-crate.org through its SPARQL
+    endpoint `https://query.ro-crate.org/rocrate/sparql`, only profiles with
+    MASP rules (a `prof:role/schema` resource whose `hasPart` lists
+    `rdfs:Class`/`rdf:Property`), loaded from their metadata descriptor (what
+    is `about` the profile, `ro-crate-metadata.json`), with the portal's own
+    `…/data/profile/<hash>` pages (`owl:sameAs`) as further identifiers.
+  Checked live (2026-11-06): 10 catalogue profiles and LDAC from
+  profiles.ro-crate.org (of its 57 profiles, the only one with MASP rules;
+  Fairscape's "schema" is JSON Schema). All load except the catalogue's CCA
+  demo, which has vocabulary terms (`DefinedTerm`, `rdfs:Class`) but no
+  rules or schema resource, and whose root `https://w3id.org/cc-crate-profile/0.9`
+  looks like a typo for `cca-crate-profile`.
+- **Preferences** (Edit > Preferences…): which registries to use, kept in
+  `settings.json` of the user's config folder (`Settings`), and the kept
+  profiles with their date and origin, each removable (`ProfileCache.forget`).
+- **Same identifier, different profiles:** the LDAC profile in the MASP repo
+  (30/99 rules) and the one `https://w3id.org/ldac/profile` redirects to (in
+  `ldac-profile`, 30/101) both claim `https://w3id.org/ldac/profile`; the
+  last loaded wins.
+- **Next:** a crate's root `conformsTo` choosing a stored or bundled profile
+  (and offering to load one it names), once crates can be opened; removing a
+  checking a kept profile for updates (below); adding registries of one's
+  own in the preferences.
 - **Next, caching like JSON-LD Java:** its default client is Apache
   HttpClient 4's `CachingHttpClientBuilder` (in memory, 500 entries of up to
   256 kB, HTTP caching headers honoured, else one day), with the
