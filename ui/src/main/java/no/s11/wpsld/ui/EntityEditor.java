@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -388,11 +389,19 @@ public class EntityEditor extends ScrollPane {
 		}
 		Set<String> fieldNames = fields.stream().map(FormField::name).collect(Collectors.toSet());
 
+		// Retired properties of the types: editable when in use, and found by
+		// the search when named exactly, e.g. to add one on purpose
+		List<FormField> retiredFields = formFields.retiredFieldsFor(typeIris()).stream()
+				.filter(f -> !fieldNames.contains(f.name())).toList();
+		retiredFields.forEach(f -> labels.putIfAbsent(f.name(), f.label()));
+		Set<String> retiredNames = retiredFields.stream().map(FormField::name).collect(Collectors.toSet());
+		long retiredInUse = retiredFields.stream().filter(f -> entity.get(f.name()).isPresent()).count();
+
 		// Values the current type has no field for, e.g. after changing type
-		List<String> others = entity.getValues().keySet().stream().filter(name -> !fieldNames.contains(name))
-				.toList();
+		List<String> others = entity.getValues().keySet().stream()
+				.filter(name -> !fieldNames.contains(name) && !retiredNames.contains(name)).toList();
+		GridPane grid = others.isEmpty() ? null : grid();
 		if (!others.isEmpty()) {
-			GridPane grid = grid();
 			int row = 0;
 			for (String name : others) {
 				TextField value = new TextField(text(entity.get(name).orElseThrow()));
@@ -407,14 +416,10 @@ public class EntityEditor extends ScrollPane {
 				label.setId(id("label", name));
 				label.setTooltip(new Tooltip(name));
 				grid.addRow(row++, label, value, remove);
-				retired(name).ifPresent(note -> {
-					Label retired = new Label(note);
-					retired.setId(id("retired", name));
-					retired.setWrapText(true);
-					retired.setStyle("-fx-text-fill: #505050;");
-					grid.add(retired, 1, grid.getRowCount(), 2, 1);
-				});
-				row = grid.getRowCount();
+				Optional<Label> retired = retiredNote(name);
+				if (retired.isPresent()) {
+					grid.add(retired.get(), 1, row++, 2, 1);
+				}
 			}
 			List<Map.Entry<ClassDef, Long>> suggestions = suggestTypes(others);
 			if (!suggestions.isEmpty()) {
@@ -429,16 +434,27 @@ public class EntityEditor extends ScrollPane {
 				}
 				grid.add(suggest, 0, row, 3, 1);
 			}
-			String title = "Not properties of " + String.join(", ", entity.getTypes()) + " (" + others.size() + ")";
-			if (notebookMode) {
-				grid.setId("otherProperties");
-				notebookTabs.add(new Notebook.Tab("Not of type", new Notebook.Page(title, () -> grid)));
-			} else {
-				TitledPane pane = new TitledPane(title, grid);
-				pane.setId("otherProperties");
-				pane.setAnimated(false);
-				form.getChildren().add(pane);
+		}
+		String otherTitle = "Not properties of " + String.join(", ", entity.getTypes()) + " ("
+				+ (others.size() + retiredInUse) + ")";
+		if (notebookMode) {
+			if (grid != null || retiredInUse > 0) {
+				List<FormField> inUse = retiredFields.stream().filter(f -> entity.get(f.name()).isPresent()).toList();
+				VBox page = new VBox(8);
+				page.setId("otherProperties");
+				if (grid != null) {
+					page.getChildren().add(grid);
+				}
+				page.getChildren().add(fieldsGrid(inUse, new LinkedHashMap<>()));
+				notebookTabs.add(new Notebook.Tab("Not of type", new Notebook.Page(otherTitle, () -> page)));
 			}
+		} else if (grid != null || !retiredFields.isEmpty()) {
+			// Hidden while it has nothing to show
+			FieldGroup otherGroup = new FieldGroup(otherTitle, retiredFields, true,
+					f -> entity.get(f.name()).isEmpty(), grid);
+			otherGroup.pane.setId("otherProperties");
+			groups.add(otherGroup);
+			form.getChildren().add(otherGroup.pane);
 		}
 
 		Map<String, List<FormField>> byGroup = fields.stream()
@@ -533,11 +549,23 @@ public class EntityEditor extends ScrollPane {
 		private final List<FormField> fields;
 		/** Label and editor of each field, once built */
 		private final Map<FormField, List<Node>> rows = new LinkedHashMap<>();
+		/** Fields shown only when the search names them, e.g. retired ones not in use */
+		private final Predicate<FormField> onlyWhenNamed;
+		/** Shown above the fields, e.g. values of unknown properties */
+		private final Node before;
 		/** Whether the group was open before the search started, to restore it */
 		private boolean expandedBeforeSearch;
 
 		FieldGroup(String title, List<FormField> fields, boolean expanded) {
+			this(title, fields, expanded, field -> false, null);
+		}
+
+		FieldGroup(String title, List<FormField> fields, boolean expanded, Predicate<FormField> onlyWhenNamed,
+				Node before) {
 			this.fields = fields;
+			this.onlyWhenNamed = onlyWhenNamed;
+			this.before = before;
+			expandedBeforeSearch = expanded;
 			pane = new TitledPane(title, null);
 			// Meant to be fast, not pretty
 			pane.setAnimated(false);
@@ -550,16 +578,38 @@ public class EntityEditor extends ScrollPane {
 					build();
 				}
 			});
+			if (expanded) {
+				filter(null, false);
+			}
 		}
 
 		private void build() {
 			if (pane.getContent() == null) {
-				pane.setContent(fieldsGrid(fields, rows));
+				GridPane grid = fieldsGrid(fields, rows);
+				pane.setContent(before == null ? grid : new VBox(8, before, grid));
 			}
 		}
 
 		boolean hasMatches(String query) {
 			return fields.stream().anyMatch(f -> matches(f, query));
+		}
+
+		private boolean matches(FormField field, String query) {
+			if (!onlyWhenNamed.test(field)) {
+				return EntityEditor.matches(field, query);
+			}
+			return field.name().equalsIgnoreCase(query) || field.label().equalsIgnoreCase(query);
+		}
+
+		/**
+		 * Hide the group while it shows no fields and nothing else.
+		 */
+		private void showIfAny() {
+			// Rows exist once the group was opened
+			boolean any = before != null || (rows.isEmpty() ? fields.stream().anyMatch(f -> !onlyWhenNamed.test(f))
+					: rows.values().stream().anyMatch(nodes -> nodes.get(0).isManaged()));
+			pane.setVisible(any);
+			pane.setManaged(any);
 		}
 
 		/**
@@ -568,8 +618,9 @@ public class EntityEditor extends ScrollPane {
 		 */
 		void filter(String query, boolean starting) {
 			if (query == null) {
-				rows.values().forEach(nodes -> show(nodes, true));
+				rows.forEach((field, nodes) -> show(nodes, !onlyWhenNamed.test(field)));
 				pane.setExpanded(expandedBeforeSearch);
+				showIfAny();
 				return;
 			}
 			if (starting) {
@@ -577,11 +628,14 @@ public class EntityEditor extends ScrollPane {
 			}
 			if (!hasMatches(query)) {
 				pane.setExpanded(false);
+				rows.forEach((field, nodes) -> show(nodes, !onlyWhenNamed.test(field)));
+				showIfAny();
 				return;
 			}
 			build();
 			rows.forEach((field, nodes) -> show(nodes, matches(field, query)));
 			pane.setExpanded(true);
+			showIfAny();
 		}
 
 		private static void show(List<Node> nodes, boolean visible) {
@@ -604,6 +658,7 @@ public class EntityEditor extends ScrollPane {
 			Label label = fieldLabel(field);
 			// The description, shown with the [?] button
 			VBox editor = new VBox(4, new FieldEditor(field).node());
+			retiredNote(field.name()).ifPresent(editor.getChildren()::add);
 			field.comment().ifPresent(comment -> {
 				Label text = new Label(Labels.plainText(comment));
 				text.setWrapText(true);
@@ -663,6 +718,19 @@ public class EntityEditor extends ScrollPane {
 	 */
 	public void setBrowse(Consumer<String> browse) {
 		this.browse = Objects.requireNonNull(browse);
+	}
+
+	/**
+	 * A small note under a property schema.org has retired.
+	 */
+	private Optional<Label> retiredNote(String property) {
+		return retired(property).map(note -> {
+			Label label = new Label("\u2691 " + note);
+			label.setId(id("retired", property));
+			label.setWrapText(true);
+			label.setStyle("-fx-text-fill: #8a5a00; -fx-font-size: 0.9em;");
+			return label;
+		});
 	}
 
 	/**

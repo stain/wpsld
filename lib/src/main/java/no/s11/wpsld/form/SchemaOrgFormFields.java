@@ -69,6 +69,18 @@ public class SchemaOrgFormFields implements FormFields {
 	 */
 	@Override
 	public List<FormField> fieldsFor(Set<URI> types) {
+		return propertyFields(types, false);
+	}
+
+	/**
+	 * The superseded or attic properties of the types and their superclasses.
+	 */
+	@Override
+	public List<FormField> retiredFieldsFor(Set<URI> types) {
+		return propertyFields(types, true);
+	}
+
+	private List<FormField> propertyFields(Set<URI> types, boolean retired) {
 		List<FormField> fields = new ArrayList<>();
 		Set<URI> seenProperties = new HashSet<>();
 		Set<URI> withThing = new LinkedHashSet<>(types);
@@ -79,7 +91,7 @@ public class SchemaOrgFormFields implements FormFields {
 		}
 		for (ClassDef classDef : classAndSuperclasses(withThing)) {
 			schema.propertiesOf(classDef)
-				.filter(p -> !schema.isSuperseded(p))
+				.filter(p -> schema.isSuperseded(p) == retired)
 				.filter(p -> seenProperties.add(p.getID()))
 				.map(p -> field(p, classDef))
 				.forEach(fields::add);

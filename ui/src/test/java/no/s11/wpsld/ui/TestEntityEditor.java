@@ -126,7 +126,7 @@ public class TestEntityEditor extends ApplicationTest {
 		// Suggested types are those having issn, e.g. Dataset
 		clickOn("#suggestType-Dataset");
 		assertEquals(List.of("Dataset"), crate.getRoot().getTypes());
-		assertTrue(lookup("#otherProperties").tryQuery().isEmpty());
+		assertFalse(lookup("#otherProperties").query().isVisible());
 		assertEquals("1234-5678", value("issn", 0).getText());
 	}
 
@@ -355,5 +355,33 @@ public class TestEntityEditor extends ApplicationTest {
 		clickOn("#header-description").write("Rain").type(KeyCode.TAB);
 		assertEquals(List.of("Rain"), crate.getRoot().getAll("description").stream().map(JsonNode::asText).toList());
 		assertFalse(lookup("#header-description").queryAs(Node.class).isFocused());
+	}
+
+	/**
+	 * Retired properties are hidden, unless in use or searched for by their
+	 * full term or name; then they are editable, with a note.
+	 */
+	@Test
+	public void retiredProperties() {
+		Node others = lookup("#otherProperties").query();
+		assertFalse(others.isVisible());
+		clickOn("#propertySearch").write("fileForm");
+		assertFalse(visibleProperties().contains("fileFormat"));
+		write("at");
+		assertTrue(others.isVisible());
+		assertEquals(List.of("fileFormat"), visibleProperties().stream()
+				.filter(p -> !EntityEditor.HEADER.contains(p)).toList());
+		assertEquals("\u2691 Retired by schema.org: use Encoding format instead",
+				lookup("#retired-fileFormat").queryAs(Label.class).getText());
+		clickOn(value("fileFormat", 0)).write("text/csv");
+		assertEquals("text/csv", crate.getRoot().get("fileFormat").orElseThrow().asText());
+
+		// In use, it stays after the search, and after showing the form again
+		clickOn("#propertySearch").eraseText("fileFormat".length());
+		assertTrue(others.isVisible());
+		assertTrue(visibleProperties().contains("fileFormat"));
+		chooseType("SoftwareSourceCode");
+		assertTrue(lookup("#otherProperties").query().isVisible());
+		assertEquals("text/csv", value("fileFormat", 0).getText());
 	}
 }

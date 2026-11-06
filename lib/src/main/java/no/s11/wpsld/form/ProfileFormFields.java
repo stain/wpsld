@@ -76,6 +76,11 @@ public class ProfileFormFields implements FormFields {
 	}
 
 	@Override
+	public List<FormField> retiredFieldsFor(Set<URI> types) {
+		return vocabulary.retiredFieldsFor(types);
+	}
+
+	@Override
 	public List<FormField> fieldsFor(Set<URI> types, boolean root) {
 		List<FormField> fields = new ArrayList<>();
 		Set<String> names = new LinkedHashSet<>();

@@ -46,6 +46,18 @@ public interface FormFields {
 	}
 
 	/**
+	 * Fields of properties the vocabulary has retired (e.g. schema.org's
+	 * superseded <code>fileFormat</code>) for an entity with the given
+	 * <code>@type</code>s, left out of {@link #fieldsFor(Set)}: for values
+	 * already using them, or for adding one on purpose; none by default. A
+	 * field of the same name from {@link #fieldsFor(Set, boolean)}, e.g. as a
+	 * profile names the property, takes precedence.
+	 */
+	default List<FormField> retiredFieldsFor(Set<URI> types) {
+		return List.of();
+	}
+
+	/**
 	 * Types the entity must have (or a subtype of one), e.g. Dataset for the
 	 * root data entity by a profile; none by default.
 	 */

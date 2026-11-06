@@ -71,6 +71,8 @@ public class SchemaFromJsonLd {
 	private final Map<URI, List<ClassDef>> subclasses;
 	private final Map<URI, List<PropertyDef>> domainProperties;
 	private final Set<URI> superseded;
+	/** The replacement of each superseded term */
+	private final Map<URI, URI> supersededBy;
 	/** Classes typed directly as schema:DataType */
 	private final Set<URI> dataTypes;
 
@@ -95,6 +97,9 @@ public class SchemaFromJsonLd {
 				.filter(iri -> jsonld.objects(iri, S_SUPERSEDED_BY).findAny().isPresent()
 						|| jsonld.objects(iri, S_IS_PART_OF).anyMatch(ATTIC::equals))
 				.collect(Collectors.toUnmodifiableSet());
+		this.supersededBy = superseded.stream()
+				.flatMap(iri -> jsonld.objects(iri, S_SUPERSEDED_BY).limit(1).map(by -> Map.entry(iri, by)))
+				.collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
 		this.dataTypes = jsonld.subjects(RDF_TYPE, S_DATA_TYPE).collect(Collectors.toUnmodifiableSet());
 		link();
 		this.subclasses = reverse(classes.values(), ClassDef::getSubClassOf);
@@ -184,7 +189,7 @@ public class SchemaFromJsonLd {
 	 * the attic without a replacement.
 	 */
 	public Optional<URI> supersededBy(DefinedTerm term) {
-		return objects(term.getID(), S_SUPERSEDED_BY).findFirst();
+		return Optional.ofNullable(supersededBy.get(term.getID()));
 	}
 
 	/**

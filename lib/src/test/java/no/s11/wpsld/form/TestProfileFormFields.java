@@ -19,7 +19,10 @@ package no.s11.wpsld.form;
 
 import static org.junit.Assert.*;
 
+import java.io.InputStream;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,13 +32,17 @@ import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.CrateChecks;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.masp.ProfileCache;
+import no.s11.wpsld.masp.ProfileReader;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
 public class TestProfileFormFields {
@@ -140,5 +147,35 @@ public class TestProfileFormFields {
 		assertEquals(List.of(URI.create(S + "Dataset")), core.requiredTypes(Set.of(), true));
 		assertEquals(List.of(), core.requiredTypes(DATASET, false));
 		assertEquals(List.of(), new SchemaOrgFormFields(terms).requiredTypes(Set.of(), true));
+	}
+
+	/**
+	 * A property schema.org has retired stays a field when a profile names
+	 * it, in the profile's group; otherwise it is only among the retired.
+	 */
+	@Test
+	public void retiredPropertyOfProfile() throws Exception {
+		Path dir = Files.createTempDirectory("profile");
+		try (InputStream in = getClass().getResourceAsStream("/masp-profiles/ro-crate.json")) {
+			ObjectNode crate = (ObjectNode) new ObjectMapper().readTree(in);
+			((ArrayNode) crate.get("@graph")).addObject().put("@id", "#prop_fileFormat").put("@type", "rdf:Property")
+				.put("rdfs:label", "fileFormat").put("name", "fileFormat")
+				.put("rdfs:comment", "The format, still")
+				.set("domainIncludes", JSON.objectNode().put("@id", "#Root_Data_Entity"));
+			// Listed among the profile's rules
+			for (var entity : crate.get("@graph")) {
+				if (entity.path("@id").asText().equals("#hasSpecializedSchema")) {
+					((ArrayNode) entity.get("hasPart")).addObject().put("@id", "#prop_fileFormat");
+				}
+			}
+			new ObjectMapper().writeValue(dir.resolve("ro-crate-metadata.json").toFile(), crate);
+		}
+		ProfileFormFields profile = new ProfileFormFields(new ProfileReader().read(dir), new SchemaOrgFormFields(terms));
+		FormField fileFormat = byName(profile.fieldsFor(DATASET, true)).get("fileFormat");
+		assertNotNull(fileFormat);
+		assertNotEquals(FieldTier.OTHER, fileFormat.tier());
+		// Without the profile, a retired property of the types
+		assertFalse(core.fieldsFor(DATASET, true).stream().anyMatch(f -> f.name().equals("fileFormat")));
+		assertTrue(core.retiredFieldsFor(DATASET).stream().anyMatch(f -> f.name().equals("fileFormat")));
 	}
 }

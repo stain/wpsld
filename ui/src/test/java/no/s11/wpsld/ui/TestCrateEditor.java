@@ -242,7 +242,7 @@ public class TestCrateEditor extends ApplicationTest {
 		assertEquals(List.of("Person"), root.getTypes());
 		assertTrue(lookup("#requiredType-Dataset").tryQuery().isPresent());
 		// name is fixed under @id, a property of any type
-		assertFalse(lookup("#otherProperties").tryQuery().isPresent());
+		assertFalse(lookup("#otherProperties").tryQuery().map(Node::isVisible).orElse(false));
 		clickOn("#addRequiredType-Dataset");
 		assertEquals(List.of("Person", "Dataset"), root.getTypes());
 		assertFalse(lookup("#requiredType-Dataset").tryQuery().isPresent());
