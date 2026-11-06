@@ -118,6 +118,30 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   `name`, found by rocrate-validator; better covered by validation from the
   MASP RO-Crate profile than by hand-written checks.
 
+- **Preview, names and descriptions** *(done on `masp`)*: a Preview tab
+  beside JSON-LD, like `ro-crate-preview.html`, with links between entities
+  and to web addresses. Property labels are readable names ("Date
+  published"): the profile's `name` if it differs from the term, else
+  `Labels.fromTerm` (abbreviations in capitals, "Number of …", explicit names
+  for odd terms such as the CDC `cvd…` ones; all 1,530 schema.org properties
+  checked). A [?] beside each label shows the description as plain text
+  (`Labels.plainText` drops schema.org's `[[Term]]`, HTML and Markdown) and a
+  link to the term's schema.org page. Name and Description sit on top as
+  plain text fields for the first value, and in their group in full. The
+  property search matches the term and the name, not descriptions.
+- **Retired schema.org terms** *(done)*: superseded and attic terms are not
+  fields (pending ones are). In use, they are editable in "Not properties
+  of …" with a ⚑ note naming the replacement; searching a full term or name
+  (e.g. `fileFormat`) reveals one there to add. A profile naming one keeps
+  it in the profile's group. Next: offer to move the value to the
+  replacement (e.g. `fileFormat` → `encodingFormat`); search reveal in the
+  notebook view (which has no search box).
+- **Required types** *(done)*: a notice beside "Add type…" when a profile
+  requires a type the entity lacks (subtypes count), with a button to add it.
+- **Later:** an "External types" section in the type dialog; rows per page
+  of the notebook view fitted to its height; report upstream that the core
+  MASP profile's `datePublished` rule points to `schema:datePubished`.
+
 ### Look: the OS/2 Workplace Shell notebook
 
 "WPS" is named after the OS/2 Workplace Shell, whose objects each had a
@@ -167,7 +191,13 @@ there yet. Next: Undo/Default/Help, mnemonics on tabs, the Warp 3 style
   Linux they need Pango (`libpangoft2`) for text layout, as on any desktop.
 - `TestCrateEditorFailure`: a failure while loading the schema (or building
   the editor) is shown in the window, not lost in the background loading.
+- TestFX keeps each test's application in a static map, so every scene stays
+  in memory until the JVM ends (~25 MB per test): `forkEvery = 1` and a
+  1.5 GB test heap in `ui/build.gradle`.
 - Controls the tests use have ids: `entityId`, `propertySearch`, `addType`,
+  `header-<property>`, `help-<property>`, `description-<property>`,
+  `definition-<property>`, `retired-<property>`, `requiredType-<Type>`,
+  `previewName`, `previewProperties`,
   `type-<Type>`, `removeType-<Type>`, `label-<property>`, `field-<property>`,
   `value-<property>-<n>`, `add-<property>`, `new-<property>`,
   `otherProperties`, `suggestType-<Type>`, `typeSearch`, `typeTree`,
