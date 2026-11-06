@@ -233,12 +233,29 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
   profile. A profile that isn't offered yet is loaded. Without one, the core
   RO-Crate profile is used.
 - File > Save RO-Crate Metadata File… (Ctrl+S), Load Profile…, Exit (Ctrl+Q).
+- Edit > Undo (Ctrl+Z) and Redo (Ctrl+Shift+Z, Ctrl+Y), through undo points
+  (`UndoHistory`):
+  - A point is the crate's JSON-LD as a string, made after leaving a field,
+    after adding (with the type chosen) or removing an entity or value, after
+    type changes and merges, after `@id` changes and merges, and after
+    choosing a profile.
+  - No changes since the last point means no new point.
+  - Each point remembers where its change was made: undo and redo show that
+    entity again, with the cursor in the property's field.
+  - In a text field, Ctrl+Z first undoes its own typing, then continues with
+    the crate's points.
+  - The history is per crate: File > New and Open clear it.
+- Choosing a profile writes it in the root's `conformsTo`, replacing other
+  offered profiles. The core RO-Crate profile and schema.org aren't written,
+  as they are RO-Crate itself. Undo and redo choose the profile the crate
+  then conforms to.
+- Closing the window, or File > Exit, asks before discarding changes.
 - Edit > Preferences… (Ctrl+,).
 - View > List (Ctrl+1) or Notebook (Ctrl+2), for the form, in place of the
   toolbar's toggle buttons.
 
 Next: opening zipped crates and crates from a URL (with `CrateRetriever`),
-recent files (in the state folder), and Edit's undo/redo.
+and recent files (in the state folder).
 
 ### Start-up
 

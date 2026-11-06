@@ -45,6 +45,7 @@ import javafx.stage.Stage;
 import no.s11.wpsld.Settings;
 import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
+import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.form.FormFields;
 import no.s11.wpsld.masp.Profile;
 import no.s11.wpsld.masp.ProfileCache;
@@ -221,6 +222,32 @@ public class TestCrateEditorProfiles extends ApplicationTest {
 		clickOn("OK");
 		assertEquals(Set.of("Test registry"), Settings.load(settingsFile).disabledRegistries());
 		assertEquals(List.of(), cache().kept());
+	}
+
+	/**
+	 * A profile chosen is written in the root's conformsTo, so undone as a
+	 * change, and the profile follows the crate.
+	 */
+	@Test
+	public void profileInConformsTo() throws Exception {
+		ComboBox<FormFields> profiles = profiles();
+		assertFalse(load(testProfile("Test Profile").toUri()).hasErrors());
+		ListView<Entity> entities = lookup("#entities").queryListView();
+		Entity root = entities.getItems().get(0);
+		assertEquals(List.of(TEST_PROFILE), root.getAll("conformsTo").stream().map(v -> v.path("@id").asText()).toList());
+
+		// schema.org: not a profile to declare
+		interact(() -> profiles.getSelectionModel().selectLast());
+		assertEquals(List.of(), entities.getItems().get(0).getAll("conformsTo"));
+
+		clickOn(lookup("#entities .list-cell").nth(0).queryAs(javafx.scene.Node.class));
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		assertEquals("Test Profile 0.1.0", profiles.getValue().getName());
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		assertEquals(List.of(), entities.getItems().get(0).getAll("conformsTo"));
+		assertEquals("RO-Crate Machine Actionable Profile 0.1.0", profiles.getValue().getName());
+		push(KeyCode.SHORTCUT, KeyCode.SHIFT, KeyCode.Z);
+		assertEquals("Test Profile 0.1.0", profiles.getValue().getName());
 	}
 
 	@Test

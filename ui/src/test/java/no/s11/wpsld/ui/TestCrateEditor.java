@@ -184,6 +184,81 @@ public class TestCrateEditor extends ApplicationTest {
 		assertEquals(1, entities().getItems().size());
 	}
 
+	/** Leave the field being edited, by clicking the entity list's first entity, the root */
+	private void leaveField() {
+		clickOn(lookup("#entities .list-cell").nth(0).queryAs(Node.class));
+	}
+
+	/**
+	 * Undo points after leaving a field: Ctrl+Z inside a field is the field's
+	 * own undo of typing.
+	 */
+	@Test
+	public void undoTyping() {
+		entities();
+		clickOn("#header-name").write("My crate");
+		leaveField();
+		Entity root = entities().getItems().get(0);
+		assertEquals("My crate", root.get("name").orElseThrow().asText());
+
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		root = entities().getItems().get(0);
+		assertTrue(root.get("name").isEmpty());
+		assertEquals("", lookup("#header-name").queryAs(TextField.class).getText());
+		// Back in the field changed, where Ctrl+Z goes on with the crate's undo
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals("header-name", entities().getScene().getFocusOwner().getId());
+		// Nothing more to undo
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		assertTrue(entities().getItems().get(0).get("name").isEmpty());
+
+		push(KeyCode.SHORTCUT, KeyCode.SHIFT, KeyCode.Z);
+		assertEquals("My crate", entities().getItems().get(0).get("name").orElseThrow().asText());
+		assertEquals("My crate", lookup("#header-name").queryAs(TextField.class).getText());
+		// Leaving a field without changes is no new point: redo is still there after undo
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		leaveField();
+		push(KeyCode.SHORTCUT, KeyCode.Y);
+		assertEquals("My crate", entities().getItems().get(0).get("name").orElseThrow().asText());
+	}
+
+	/**
+	 * Adding an entity (with its type), and merging by @id, each undone in
+	 * one step; New starts a new history.
+	 */
+	@Test
+	public void undoAddAndMerge() {
+		entities();
+		addEntity("datadownload");
+		addEntity("person");
+		Entity download = entities().getItems().get(1);
+		renameTo(download.getId());
+		clickOn("OK");
+		assertEquals(2, entities().getItems().size());
+
+		leaveField();
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		assertEquals(List.of(List.of("DataDownload"), List.of("Person")), entities().getItems().subList(1, 3)
+				.stream().map(Entity::getTypes).toList());
+		// The entity that changed is shown
+		assertEquals(entities().getItems().get(1).getId(), entities().getSelectionModel().getSelectedItem().getId());
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		assertEquals(2, entities().getItems().size());
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		assertEquals(1, entities().getItems().size());
+
+		push(KeyCode.SHORTCUT, KeyCode.SHIFT, KeyCode.Z);
+		push(KeyCode.SHORTCUT, KeyCode.SHIFT, KeyCode.Z);
+		push(KeyCode.SHORTCUT, KeyCode.SHIFT, KeyCode.Z);
+		assertEquals(2, entities().getItems().size());
+		assertEquals(List.of("DataDownload", "Person"), entities().getItems().get(1).getTypes());
+
+		push(KeyCode.SHORTCUT, KeyCode.N);
+		clickOn("Discard");
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		assertEquals(1, entities().getItems().size());
+	}
+
 	/** Properties of the form's visible rows */
 	private List<String> visibleProperties() {
 		return lookup(n -> n.getId() != null && n.getId().startsWith("label-")).queryAllAs(Label.class).stream()
