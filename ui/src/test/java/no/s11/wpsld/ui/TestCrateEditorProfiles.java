@@ -40,6 +40,7 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
+import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
 import no.s11.wpsld.Settings;
 import no.s11.wpsld.crate.CrateReader;
@@ -199,8 +200,9 @@ public class TestCrateEditorProfiles extends ApplicationTest {
 		assertFalse(load(testProfile("Test Profile").toUri()).hasErrors());
 		assertEquals("Test Profile 0.1.0", profiles.getValue().getName());
 
-		clickOn("Edit");
-		clickOn("Preferences…");
+		// Edit > Preferences…, with its shortcut, as moving the mouse over the
+		// menu bar may open another menu
+		push(KeyCode.SHORTCUT, KeyCode.COMMA);
 		clickOn("Kept profiles");
 		ListView<ProfileCache.Kept> kept = lookup("#keptProfiles").queryListView();
 		assertEquals(1, kept.getItems().size());

@@ -236,7 +236,8 @@ public class TestCrateEditor extends ApplicationTest {
 	@Test
 	public void notebookView() {
 		entities();
-		clickOn("#viewNotebook");
+		// View > Notebook, with its shortcut (see newCrateAsksToDiscardChanges)
+		push(KeyCode.SHORTCUT, KeyCode.DIGIT2);
 		assertTrue(lookup("#notebook").tryQuery().isPresent());
 		assertEquals(List.of("Required", "Dataset", "CreativeWork", "Thing"),
 				lookup(".notebook-tab").queryAllAs(Label.class).stream().map(Label::getText).toList());
@@ -245,8 +246,8 @@ public class TestCrateEditor extends ApplicationTest {
 		clickOn(lookup(".notebook-tab").queryAllAs(Label.class).stream().filter(l -> l.getText().equals("CreativeWork"))
 				.findFirst().orElseThrow());
 		assertTrue(lookup(".notebook-status").queryAs(Label.class).getText().matches("Page 1 of \\d+"));
-		// Back to the list
-		clickOn("#viewList");
+		// Back to the list, View > List
+		push(KeyCode.SHORTCUT, KeyCode.DIGIT1);
 		assertTrue(lookup("#notebook").tryQuery().isEmpty());
 		assertTrue(visibleProperties().contains("name *"));
 	}

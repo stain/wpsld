@@ -155,8 +155,8 @@ one in front (`viewOrder`), selected when pressed; scroll arrows when the tabs
 don't fit; a page header with title, "Page n of m" and a dog-ear corner to
 turn the pages of a tab; optional buttons along the bottom (Undo, Default,
 Help); pages built when first shown; Ctrl+PageUp/PageDown and
-PageUp/PageDown. The entity form can be shown as a notebook (toolbar: View
-List / Notebook): groups as tabs, 8 properties per page; no property search
+PageUp/PageDown. The entity form can be shown as a notebook (View > Notebook,
+Ctrl+2): groups as tabs, 8 properties per page; no property search
 there yet. Next: Undo/Default/Help, mnemonics on tabs, the Warp 3 style
 (tabs on the right, minor tabs), and whether the notebook becomes the default.
 
@@ -222,7 +222,7 @@ profiles".
 
 A File menu and an Edit menu above the toolbar, which keeps its buttons:
 
-- File > New RO-Crate (Ctrl+N), and File > Open RO-Crate… (Ctrl+O) for an
+- File > New RO-Crate (Ctrl+N), and File > Open RO-Crate Metadata File… (Ctrl+O) for an
   `ro-crate-metadata.json`. Both ask before discarding changes that aren't
   saved.
 - Opening a crate shows the reader's warnings beside it. A crate it can't
@@ -234,6 +234,8 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
   RO-Crate profile is used.
 - File > Save RO-Crate Metadata File… (Ctrl+S), Load Profile…, Exit (Ctrl+Q).
 - Edit > Preferences… (Ctrl+,).
+- View > List (Ctrl+1) or Notebook (Ctrl+2), for the form, in place of the
+  toolbar's toggle buttons.
 
 Next: opening zipped crates and crates from a URL (with `CrateRetriever`),
 recent files (in the state folder), and Edit's undo/redo.
