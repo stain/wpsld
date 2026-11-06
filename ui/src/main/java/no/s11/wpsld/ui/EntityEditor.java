@@ -32,6 +32,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -56,6 +57,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Control;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.ContentDisplay;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.MenuButton;
@@ -112,6 +114,9 @@ public class EntityEditor extends ScrollPane {
 	private final Supplier<List<Entity>> crateEntities;
 	/** Called after the entity is changed */
 	private final Runnable onChange;
+	/** Opens a web address, e.g. in the browser */
+	private Consumer<String> browse = address -> {
+	};
 	/** Creates a new entity of the given type in the crate */
 	private final Function<String, Entity> newEntity;
 	/** Changes an entity's @id in the crate, updating references (or merging) */
@@ -398,7 +403,18 @@ public class EntityEditor extends ScrollPane {
 					showForm();
 					onChange.run();
 				});
-				grid.addRow(row++, new Label(name), value, remove);
+				Label label = new Label(label(name));
+				label.setId(id("label", name));
+				label.setTooltip(new Tooltip(name));
+				grid.addRow(row++, label, value, remove);
+				retired(name).ifPresent(note -> {
+					Label retired = new Label(note);
+					retired.setId(id("retired", name));
+					retired.setWrapText(true);
+					retired.setStyle("-fx-text-fill: #505050;");
+					grid.add(retired, 1, grid.getRowCount(), 2, 1);
+				});
+				row = grid.getRowCount();
 			}
 			List<Map.Entry<ClassDef, Long>> suggestions = suggestTypes(others);
 			if (!suggestions.isEmpty()) {
@@ -407,7 +423,7 @@ public class EntityEditor extends ScrollPane {
 					Button addSuggested = new Button("Add type " + terms.name(suggestion.getKey()) + " ("
 							+ suggestion.getValue() + " of " + others.size() + ")");
 					addSuggested.setId(id("suggestType", terms.name(suggestion.getKey())));
-					suggestion.getKey().getComment().map(EntityEditor::tooltip).ifPresent(addSuggested::setTooltip);
+					suggestion.getKey().getComment().map(Labels::plainText).map(EntityEditor::tooltip).ifPresent(addSuggested::setTooltip);
 					addSuggested.setOnAction(e -> addType(suggestion.getKey()));
 					suggest.getChildren().add(addSuggested);
 				}
@@ -589,10 +605,21 @@ public class EntityEditor extends ScrollPane {
 			// The description, shown with the [?] button
 			VBox editor = new VBox(4, new FieldEditor(field).node());
 			field.comment().ifPresent(comment -> {
-				Label description = new Label(comment);
+				Label text = new Label(Labels.plainText(comment));
+				text.setWrapText(true);
+				text.setStyle("-fx-text-fill: #505050;");
+				VBox description = new VBox(2, text);
 				description.setId(id("description", field.name()));
-				description.setWrapText(true);
-				description.setStyle("-fx-text-fill: #505050;");
+				// The full definition, e.g. https://schema.org/datePublished
+				String address = field.property().toString();
+				if (address.startsWith("http://schema.org/") || address.startsWith("https://schema.org/")) {
+					String page = "https://schema.org/" + address.substring(address.indexOf("schema.org/") + 11);
+					Hyperlink link = new Hyperlink(page.substring("https://".length()));
+					link.setId(id("definition", field.name()));
+					link.setTooltip(new Tooltip("Open in the browser"));
+					link.setOnAction(e -> browse.accept(page));
+					description.getChildren().add(link);
+				}
 				description.setVisible(false);
 				description.setManaged(false);
 				Button help = new Button("?");
@@ -631,6 +658,24 @@ public class EntityEditor extends ScrollPane {
 	 * The label of a property of the entity shown: as its field, or else from
 	 * the property itself.
 	 */
+	/**
+	 * Set how to open web addresses, such as the definitions of properties.
+	 */
+	public void setBrowse(Consumer<String> browse) {
+		this.browse = Objects.requireNonNull(browse);
+	}
+
+	/**
+	 * A note that schema.org has retired the property, e.g. "Retired by
+	 * schema.org: use Encoding format instead" for <code>fileFormat</code>.
+	 */
+	private Optional<String> retired(String property) {
+		return terms.propertyDef(property).filter(schema::isSuperseded)
+			.map(p -> schema.supersededBy(p).map(schema.getProperties()::get).map(terms::name)
+				.map(replacement -> "Retired by schema.org: use " + label(replacement) + " instead")
+				.orElse("Retired by schema.org"));
+	}
+
 	public String label(String property) {
 		return labels.getOrDefault(property, Labels.fromTerm(property));
 	}

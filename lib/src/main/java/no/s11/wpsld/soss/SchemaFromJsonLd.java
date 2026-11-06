@@ -54,6 +54,8 @@ public class SchemaFromJsonLd {
 	private static final URI S_NAME = URI.create(S + "name");
 	private static final URI S_DESCRIPTION = URI.create(S + "description");
 	private static final URI S_SUPERSEDED_BY = URI.create(S + "supersededBy");
+	private static final URI S_IS_PART_OF = URI.create(S + "isPartOf");
+	private static final URI ATTIC = URI.create("http://attic.schema.org");
 	private static final URI S_DATA_TYPE = URI.create(S + "DataType");
 
 	/**
@@ -90,7 +92,8 @@ public class SchemaFromJsonLd {
 		this.properties = properties().parallel()
 				.collect(Collectors.toUnmodifiableMap(Function.identity(), this::propertyDef));
 		this.superseded = jsonld.graph.keySet().parallelStream()
-				.filter(iri -> jsonld.objects(iri, S_SUPERSEDED_BY).findAny().isPresent())
+				.filter(iri -> jsonld.objects(iri, S_SUPERSEDED_BY).findAny().isPresent()
+						|| jsonld.objects(iri, S_IS_PART_OF).anyMatch(ATTIC::equals))
 				.collect(Collectors.toUnmodifiableSet());
 		this.dataTypes = jsonld.subjects(RDF_TYPE, S_DATA_TYPE).collect(Collectors.toUnmodifiableSet());
 		link();
@@ -167,11 +170,21 @@ public class SchemaFromJsonLd {
 
 	/**
 	 * True if schema.org has retired the term in favour of another
-	 * (<code>schema:supersededBy</code>). Such terms are kept as the RO-Crate
+	 * (<code>schema:supersededBy</code>) or moved it to its attic of retired
+	 * terms (e.g. <code>variablesMeasured</code>). Such terms are kept as the RO-Crate
 	 * context still includes them, but should not be used in new metadata.
 	 */
 	public boolean isSuperseded(DefinedTerm term) {
 		return superseded.contains(term.getID());
+	}
+
+	/**
+	 * The term that replaces a retired term, e.g. <code>encodingFormat</code>
+	 * for <code>fileFormat</code>; empty if it isn't retired, or retired to
+	 * the attic without a replacement.
+	 */
+	public Optional<URI> supersededBy(DefinedTerm term) {
+		return objects(term.getID(), S_SUPERSEDED_BY).findFirst();
 	}
 
 	/**

@@ -34,6 +34,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
@@ -294,11 +295,32 @@ public class TestEntityEditor extends ApplicationTest {
 		Label label = lookup("#label-datePublished").queryAs(Label.class);
 		assertEquals("Date published", label.getText());
 		assertEquals("datePublished", label.getTooltip().getText());
-		Label description = lookup("#description-datePublished").queryAs(Label.class);
+		Node description = lookup("#description-datePublished").query();
 		assertFalse(description.isVisible());
 		clickOn("#help-datePublished");
 		assertTrue(description.isVisible());
-		assertTrue(description.getText().startsWith("Date of first publication"));
+		// As plain text, without schema.org's [[CreativeWork]] markup
+		String text = from(description).lookup(".label").queryAs(Label.class).getText();
+		assertTrue(text, text.startsWith("Date of first publication"));
+		assertFalse(text, text.contains("[["));
+		Hyperlink definition = lookup("#definition-datePublished").queryAs(Hyperlink.class);
+		assertEquals("schema.org/datePublished", definition.getText());
+	}
+
+	/**
+	 * The search finds properties by their term and by their readable name,
+	 * ignoring case.
+	 */
+	@Test
+	public void searchTermOrName() {
+		for (String query : List.of("datepublished", "Date published")) {
+			clickOn("#propertySearch").eraseText(((TextField) lookup("#propertySearch").query()).getText().length())
+				.write(query);
+			// "Structured data date published" too; name and description stay on top
+			assertEquals(query, List.of("datePublished", "sdDatePublished"),
+					visibleProperties().stream().map(p -> p.replace(" *", ""))
+						.filter(p -> !EntityEditor.HEADER.contains(p)).sorted().toList());
+		}
 	}
 
 	/**

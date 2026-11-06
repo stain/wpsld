@@ -37,6 +37,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import no.s11.wpsld.crate.CrateTerms;
+import no.s11.wpsld.form.Labels;
 import no.s11.wpsld.soss.ClassDef;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
@@ -77,7 +78,7 @@ public class TypeSelector extends Dialog<ClassDef> {
 				setText(empty || classDef == null ? null : label(classDef));
 				setStyle(!empty && matches.contains(classDef) ? "-fx-font-weight: bold;" : "");
 				setTooltip(empty || classDef == null ? null
-						: classDef.getComment().map(EntityEditor::tooltip).orElse(null));
+						: classDef.getComment().map(Labels::plainText).map(EntityEditor::tooltip).orElse(null));
 			}
 		});
 		tree.setOnMouseClicked(e -> {

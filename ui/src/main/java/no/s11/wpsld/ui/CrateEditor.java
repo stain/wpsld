@@ -219,6 +219,7 @@ public class CrateEditor extends Application {
 					entities.getItems().add(entity);
 					return entity;
 				}, this::rename);
+		entityEditor.setBrowse(address -> getHostServices().showDocument(address));
 
 		entities.setId("entities");
 		entities.getItems().setAll(crate.getEntities());

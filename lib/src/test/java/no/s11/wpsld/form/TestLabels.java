@@ -30,8 +30,24 @@ public class TestLabels {
 		assertEquals("URL", Labels.fromTerm("url"));
 		assertEquals("Content URL", Labels.fromTerm("contentUrl"));
 		assertEquals("ISBN", Labels.fromTerm("isbn"));
-		assertEquals("GTIN 13", Labels.fromTerm("gtin13"));
+		assertEquals("GTIN-13", Labels.fromTerm("gtin13"));
+		assertEquals("IATA code", Labels.fromTerm("iataCode"));
+		assertEquals("Number of tracks", Labels.fromTerm("numTracks"));
+		assertEquals("Software add-on", Labels.fromTerm("softwareAddOn"));
+		assertEquals("Add-on", Labels.fromTerm("addOn"));
+		assertEquals("COVID-19 ICU beds", Labels.fromTerm("cvdNumICUBeds"));
+		assertEquals("Has POS", Labels.fromTerm("hasPOS"));
 		assertEquals("URL template", Labels.fromTerm("URLTemplate"));
 		assertEquals("@id", Labels.fromTerm("@id"));
+	}
+
+	@Test
+	public void plainText() {
+		assertEquals("Date of first publication or broadcast. For example the date a CreativeWork was broadcast",
+				Labels.plainText("Date of first publication or broadcast. For example the date a [[CreativeWork]] was broadcast"));
+		assertEquals("See the NATO stock number of a Product.", Labels.plainText(
+				"See the [NATO stock number](https://en.wikipedia.org/wiki/NATO_Stock_Number) of a [[Product]]."));
+		assertEquals("The GS1 digital link.\nUse <code>",
+				Labels.plainText("The <a href=\"https://www.gs1.org/\">GS1 digital link</a>.<br/>Use &lt;code&gt;"));
 	}
 }
