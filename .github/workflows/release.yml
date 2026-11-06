@@ -1,0 +1,116 @@
+# Builds wpsld for each platform JavaFX and Eclipse Temurin both support,
+# on that platform's runner, as an app image with a native launcher
+# (jpackage: wpsld.exe, wpsld.app, bin/wpsld) and Java and JavaFX included,
+# plus a portable zip without JavaFX for any platform (see ui/src/dist).
+#
+# A tag v<version> (e.g. v0.2.0) builds that version and makes a draft
+# GitHub release with the zips, to review and publish by hand. Run from
+# Actions -> Run workflow, it only keeps the zips as workflow artifacts.
+#
+# Not built: Windows on Arm, as JavaFX 27 has no windows-aarch64 jmods.
+# The macOS apps are not signed: unzip, then allow them with
+# xattr -dr com.apple.quarantine wpsld.app
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Keep in sync with javafx.version in ui/build.gradle and the Dockerfile
+  JAVAFX_VERSION: 27.0.1
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-24.04
+            jmods-sha256: 323ceb45b938485f6921d7c31c994cc649adb1f75b16192580ff84a3119694ba
+          - platform: linux-aarch64
+            runner: ubuntu-24.04-arm
+            jmods-sha256: 0cc7436da8f57452370ea6ec47132b5111c1866efa1e384277e5d18824440fb2
+          - platform: osx-x64
+            runner: macos-15-intel
+            jmods-sha256: 65217e4ae9fd58aa2c888463a16a68ca8b3eaf435e0bc695d0b35d97d2d95124
+          - platform: osx-aarch64
+            runner: macos-15
+            jmods-sha256: e7ae63514188b5fe2f1f5913e00c6af15d6f753657ce14a41ebc593c67cec3e0
+          - platform: windows-x64
+            runner: windows-2025
+            jmods-sha256: 5c2a69a7ab42da347b0e8bb244a819e94af75d9f21ae4d129695a3ebc81e3979
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION=$(sed -n 's/^version=//p' gradle.properties)" >> "$GITHUB_ENV"
+          fi
+
+      # The jmods, so that jlink installs JavaFX's native libraries in the image
+      - name: Download JavaFX jmods
+        run: |
+          curl -fsSLo "$RUNNER_TEMP/javafx-jmods.zip" \
+            "https://download2.gluonhq.com/openjfx/${JAVAFX_VERSION}/openjfx-${JAVAFX_VERSION}_${{ matrix.platform }}_bin-jmods.zip"
+          echo "${{ matrix.jmods-sha256 }}  $RUNNER_TEMP/javafx-jmods.zip" | shasum -a 256 -c -
+          unzip -q "$RUNNER_TEMP/javafx-jmods.zip" -d "$RUNNER_TEMP"
+
+      - name: Package
+        run: |
+          ./gradlew --no-daemon "-Pversion=$VERSION" "-Pplatform=${{ matrix.platform }}" \
+            "-PjavafxJmods=$RUNNER_TEMP/javafx-jmods-$JAVAFX_VERSION" \
+            :ui:appImageZip ${{ matrix.platform == 'linux-x64' && ':ui:distZip' || '' }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wpsld-${{ matrix.platform }}
+          path: |
+            ui/build/image-zip/*.zip
+            ui/build/distributions/*-portable.zip
+          if-no-files-found: error
+
+      # Required on linux-x64, as in the Dockerfile; elsewhere reported, as
+      # the headless GUI tests have not been tried there yet
+      - name: Test
+        continue-on-error: ${{ matrix.platform != 'linux-x64' }}
+        run: ./gradlew --no-daemon "-Pversion=$VERSION" build
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist
+          sha256sum *.zip > SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" *.zip SHA256SUMS --repo "$GITHUB_REPOSITORY" \
+            --draft --verify-tag --title "wpsld ${GITHUB_REF_NAME#v}" --generate-notes

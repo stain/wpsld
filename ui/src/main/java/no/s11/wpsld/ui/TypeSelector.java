@@ -19,9 +19,11 @@ package no.s11.wpsld.ui;
 
 import java.net.URI;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javafx.application.Platform;
 import javafx.collections.ObservableList;
@@ -36,26 +38,43 @@ import javafx.scene.control.TreeView;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
+import no.s11.wpsld.crate.CrateTerms;
+import no.s11.wpsld.form.Labels;
 import no.s11.wpsld.soss.ClassDef;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
 /**
  * Pop-up to choose a schema.org type: a tree of types under Thing, and a
  * search of type names and descriptions that trims the tree to the matches
- * and their superclasses.
+ * and their superclasses. Types outside schema.org, e.g. a profile's
+ * <code>RepositoryCollection</code> or RO-Crate's
+ * <code>ComputationalWorkflow</code>, come first under Thing.
  */
 public class TypeSelector extends Dialog<ClassDef> {
 	private static final String S = "http://schema.org/";
 
 	private final SchemaFromJsonLd schema;
+	private final CrateTerms terms;
 	private final ClassDef thing;
+	/** Types outside schema.org, as kinds of Thing */
+	private final List<ClassDef> others;
 	private final TreeView<ClassDef> tree = new TreeView<>();
 	private final Label status = new Label();
 	/** Types matching the search, shown in bold */
 	private Set<ClassDef> matches = Set.of();
 
 	public TypeSelector(SchemaFromJsonLd schema, Window owner) {
+		this(schema, List.of(), owner);
+	}
+
+	/**
+	 * @param others Types outside schema.org to offer too, e.g. from
+	 *               {@link CrateTerms#otherClass}
+	 */
+	public TypeSelector(SchemaFromJsonLd schema, List<ClassDef> others, Window owner) {
 		this.schema = schema;
+		this.others = List.copyOf(others);
+		this.terms = new CrateTerms(schema);
 		this.thing = schema.getClasses().get(URI.create(S + "Thing"));
 		initOwner(owner);
 		setTitle("Add type");
@@ -71,10 +90,10 @@ public class TypeSelector extends Dialog<ClassDef> {
 			@Override
 			protected void updateItem(ClassDef classDef, boolean empty) {
 				super.updateItem(classDef, empty);
-				setText(empty || classDef == null ? null : classDef.getName());
+				setText(empty || classDef == null ? null : label(classDef));
 				setStyle(!empty && matches.contains(classDef) ? "-fx-font-weight: bold;" : "");
 				setTooltip(empty || classDef == null ? null
-						: classDef.getComment().map(EntityEditor::tooltip).orElse(null));
+						: classDef.getComment().map(Labels::plainText).map(EntityEditor::tooltip).orElse(null));
 			}
 		});
 		tree.setOnMouseClicked(e -> {
@@ -108,9 +127,10 @@ public class TypeSelector extends Dialog<ClassDef> {
 			status.setText("");
 			return;
 		}
-		matches = schema.getClasses().values().stream()
+		matches = Stream.concat(others.stream(), schema.getClasses().values().stream())
 				.filter(c -> !schema.isSuperseded(c))
 				.filter(c -> c.getName().toLowerCase(Locale.ROOT).contains(q)
+						|| terms.name(c).toLowerCase(Locale.ROOT).contains(q)
 						|| c.getComment().map(t -> t.toLowerCase(Locale.ROOT).contains(q)).orElse(false))
 				.collect(Collectors.toSet());
 		// The matches and the paths to them
@@ -120,17 +140,33 @@ public class TypeSelector extends Dialog<ClassDef> {
 		status.setText(matches.size() + " matching types");
 		// Select the best match: name starting with the query, else any match
 		matches.stream()
-				.sorted(Comparator.comparing((ClassDef c) -> !c.getName().toLowerCase(Locale.ROOT).startsWith(q))
-						.thenComparing(ClassDef::getName))
+				.sorted(Comparator.comparing((ClassDef c) -> !terms.name(c).toLowerCase(Locale.ROOT).startsWith(q)
+						&& !c.getName().toLowerCase(Locale.ROOT).startsWith(q)).thenComparing(terms::name))
 				.findFirst().ifPresent(this::select);
+	}
+
+	/**
+	 * The name as written in RO-Crates, with the schema.org name if
+	 * different, e.g. "File (MediaObject)".
+	 */
+	private String label(ClassDef classDef) {
+		String name = terms.name(classDef);
+		return name.equals(classDef.getName()) ? name : name + " (" + classDef.getName() + ")";
 	}
 
 	private TreeItem<ClassDef> filteredItem(ClassDef classDef, Set<ClassDef> shown) {
 		TreeItem<ClassDef> item = new TreeItem<>(classDef);
 		item.setExpanded(true);
-		schema.subclasses(classDef).filter(shown::contains).map(c -> filteredItem(c, shown))
+		subclasses(classDef).filter(shown::contains).map(c -> filteredItem(c, shown))
 				.forEach(item.getChildren()::add);
 		return item;
+	}
+
+	/**
+	 * The subclasses of a type, with the types outside schema.org under Thing.
+	 */
+	private Stream<ClassDef> subclasses(ClassDef classDef) {
+		return classDef == thing ? Stream.concat(others.stream(), schema.subclasses(thing)) : schema.subclasses(classDef);
 	}
 
 	private void select(ClassDef classDef) {
@@ -168,7 +204,7 @@ public class TypeSelector extends Dialog<ClassDef> {
 		public ObservableList<TreeItem<ClassDef>> getChildren() {
 			if (!childrenLoaded) {
 				childrenLoaded = true;
-				super.getChildren().setAll(schema.subclasses(getValue()).filter(c -> !schema.isSuperseded(c))
+				super.getChildren().setAll(subclasses(getValue()).filter(c -> !schema.isSuperseded(c))
 						.map(LazyClassTreeItem::new).toList());
 			}
 			return super.getChildren();
@@ -176,7 +212,7 @@ public class TypeSelector extends Dialog<ClassDef> {
 
 		@Override
 		public boolean isLeaf() {
-			return childrenLoaded ? super.getChildren().isEmpty() : schema.subclasses(getValue()).findAny().isEmpty();
+			return childrenLoaded ? super.getChildren().isEmpty() : subclasses(getValue()).findAny().isEmpty();
 		}
 	}
 }

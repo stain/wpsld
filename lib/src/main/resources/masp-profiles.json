@@ -1,0 +1,15 @@
+[
+  {
+    "identifiers": [
+      "https://language-research-technology.github.io/ro-crate-masp/profiles/ro-crate/profile-crate/"
+    ],
+    "X-Classpath": "masp-profiles/ro-crate.json",
+    "name": "RO-Crate Machine Actionable Profile",
+    "version": "0.1.0",
+    "repository": "https://github.com/Language-Research-Technology/ro-crate-masp",
+    "commit": "6d7a018baf827b5716d79a17462e3b3edb15725f",
+    "path": "profiles/ro-crate/profile-crate/ro-crate-metadata.json",
+    "source": "https://raw.githubusercontent.com/Language-Research-Technology/ro-crate-masp/6d7a018baf827b5716d79a17462e3b3edb15725f/profiles/ro-crate/profile-crate/ro-crate-metadata.json",
+    "sha256": "bd1c15ca6a255fc9de05a7c1321fd74ae322ba308b17bf122385cac623015454"
+  }
+]

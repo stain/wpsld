@@ -47,6 +47,18 @@ public class Crate {
 		entities.add(new Entity(ROOT_ID, "Dataset"));
 	}
 
+	private Crate(Entity root, List<Entity> others) {
+		entities.add(root);
+		entities.addAll(others);
+	}
+
+	/**
+	 * A crate of entities read from a file, with its root data entity first.
+	 */
+	static Crate of(Entity root, List<Entity> others) {
+		return new Crate(root, others);
+	}
+
 	public Entity getRoot() {
 		return entities.get(0);
 	}

@@ -19,6 +19,7 @@ package no.s11.wpsld.ui;
 
 import static org.junit.Assert.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,9 +33,12 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.DatePicker;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
+import javafx.scene.layout.GridPane;
 import javafx.stage.Stage;
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.Entity;
@@ -52,7 +56,7 @@ public class TestEntityEditor extends ApplicationTest {
 
 	@Override
 	public void start(Stage stage) {
-		editor = new EntityEditor(SCHEMA, new SchemaOrgFormFields(SCHEMA), crate::getEntities, () -> {
+		editor = new EntityEditor(SCHEMA, new SchemaOrgFormFields(SCHEMA), crate::getEntities, crate::getRoot, () -> {
 		}, crate::add, crate::rename);
 		stage.setScene(new Scene(editor, 900, 700));
 		stage.show();
@@ -63,11 +67,13 @@ public class TestEntityEditor extends ApplicationTest {
 		interact(() -> editor.edit(entity));
 	}
 
-	/** Visible labels of the form's property rows */
+	/** Properties of the form's visible rows */
 	private List<String> visibleProperties() {
 		return lookup(n -> n.getId() != null && n.getId().startsWith("label-")).queryAllAs(Label.class).stream()
 				.filter(Node::isVisible).filter(l -> l.getParent() != null && l.getParent().isVisible())
-				.map(Label::getText).toList();
+				// The property, not its human readable label; * if required
+				.map(l -> l.getId().substring("label-".length()) + (l.getText().endsWith(" *") ? " *" : ""))
+				.toList();
 	}
 
 	private TextField value(String property, int row) {
@@ -120,7 +126,7 @@ public class TestEntityEditor extends ApplicationTest {
 		// Suggested types are those having issn, e.g. Dataset
 		clickOn("#suggestType-Dataset");
 		assertEquals(List.of("Dataset"), crate.getRoot().getTypes());
-		assertTrue(lookup("#otherProperties").tryQuery().isEmpty());
+		assertFalse(lookup("#otherProperties").query().isVisible());
 		assertEquals("1234-5678", value("issn", 0).getText());
 	}
 
@@ -203,5 +209,179 @@ public class TestEntityEditor extends ApplicationTest {
 		assertEquals("#dl", download.getId());
 		assertEquals(List.of(ref("#dl")), crate.getRoot().getAll("distribution"));
 		assertEquals(Optional.of(download), crate.get("#dl"));
+	}
+
+	/**
+	 * schema:MediaObject is shown and written as RO-Crate's File, and found
+	 * by either name.
+	 */
+	@Test
+	public void fileForMediaObject() {
+		Entity entity = crate.add("Thing");
+		edit(entity);
+		chooseType("file");
+		assertEquals(List.of("File"), entity.getTypes());
+		assertNotNull(lookup("#type-File").query());
+		assertEquals("File", entity.toJson().get("@type").asText());
+		// Its own properties, grouped as File
+		assertTrue(visibleProperties().contains("encodingFormat"));
+	}
+
+	@Test
+	public void mediaObjectSearchGivesFile() {
+		Entity entity = crate.add("Thing");
+		edit(entity);
+		chooseType("mediaobject");
+		assertEquals(List.of("File"), entity.getTypes());
+	}
+
+	private DatePicker datePicker(String property) {
+		return lookup("#value-" + property + "-0").queryAs(DatePicker.class);
+	}
+
+	/**
+	 * Typed ISO 8601 dates are kept, also after leaving the field.
+	 */
+	@Test
+	public void isoDateTyped() {
+		clickOn("#propertySearch").write("datePublished");
+		DatePicker picker = datePicker("datePublished");
+		clickOn(picker.getEditor()).write("2026-11-05");
+		// Leave the field, which commits the date picker
+		clickOn("#propertySearch");
+		assertEquals("2026-11-05", crate.getRoot().get("datePublished").orElseThrow().asText());
+		assertEquals("2026-11-05", picker.getEditor().getText());
+		assertEquals(LocalDate.of(2026, 11, 5), picker.getValue());
+	}
+
+	/**
+	 * Dates chosen in the calendar are ISO 8601, not the locale's format.
+	 */
+	@Test
+	public void isoDateChosen() {
+		clickOn("#propertySearch").write("datePublished");
+		DatePicker picker = datePicker("datePublished");
+		interact(() -> picker.setValue(LocalDate.of(2026, 11, 12)));
+		assertEquals("2026-11-12", picker.getEditor().getText());
+		assertEquals("2026-11-12", crate.getRoot().get("datePublished").orElseThrow().asText());
+	}
+
+	@Test
+	public void invalidDateNotStored() {
+		clickOn("#propertySearch").write("datePublished");
+		DatePicker picker = datePicker("datePublished");
+		clickOn(picker.getEditor()).write("11/12/2026");
+		assertFalse(crate.getRoot().get("datePublished").isPresent());
+		assertTrue(picker.getEditor().getPseudoClassStates().stream()
+				.anyMatch(p -> p.getPseudoClassName().equals("invalid")));
+		assertNotNull(picker.getTooltip());
+	}
+
+	@Test
+	public void isoDates() {
+		assertEquals(java.util.Optional.of("2026-11-05"), EntityEditor.isoDate(" 2026-11-05 "));
+		assertTrue(EntityEditor.isoDate("11/12/2026").isEmpty());
+		assertTrue(EntityEditor.isoDate("2026-13-01").isEmpty());
+		assertTrue(EntityEditor.isoDate("").isEmpty());
+	}
+
+	/**
+	 * Labels are human readable names, with the property as tooltip, and a
+	 * [?] button shows its description.
+	 */
+	@Test
+	public void labelsAndDescriptions() {
+		clickOn("#propertySearch").write("datePublished");
+		Label label = lookup("#label-datePublished").queryAs(Label.class);
+		assertEquals("Date published", label.getText());
+		assertEquals("datePublished", label.getTooltip().getText());
+		Node description = lookup("#description-datePublished").query();
+		assertFalse(description.isVisible());
+		clickOn("#help-datePublished");
+		assertTrue(description.isVisible());
+		// As plain text, without schema.org's [[CreativeWork]] markup
+		String text = from(description).lookup(".label").queryAs(Label.class).getText();
+		assertTrue(text, text.startsWith("Date of first publication"));
+		assertFalse(text, text.contains("[["));
+		Hyperlink definition = lookup("#definition-datePublished").queryAs(Hyperlink.class);
+		assertEquals("schema.org/datePublished", definition.getText());
+	}
+
+	/**
+	 * The search finds properties by their term and by their readable name,
+	 * ignoring case.
+	 */
+	@Test
+	public void searchTermOrName() {
+		for (String query : List.of("datepublished", "Date published")) {
+			clickOn("#propertySearch").eraseText(((TextField) lookup("#propertySearch").query()).getText().length())
+				.write(query);
+			// "Structured data date published" too; name and description stay on top
+			assertEquals(query, List.of("datePublished", "sdDatePublished"),
+					visibleProperties().stream().map(p -> p.replace(" *", ""))
+						.filter(p -> !EntityEditor.HEADER.contains(p)).sorted().toList());
+		}
+	}
+
+	/**
+	 * name and description under @id edit their first value, as text only,
+	 * and stay in step with their fields under Thing.
+	 */
+	@Test
+	public void nameUnderIdAndThing() {
+		clickOn("#header-name").write("Rain");
+		assertEquals(List.of("Rain"), crate.getRoot().getAll("name").stream().map(JsonNode::asText).toList());
+		// Only text: no buttons to add values or entities
+		assertTrue(lookup("#header-name").queryAs(Node.class).getParent() instanceof GridPane);
+		clickOn("#propertySearch").write("name");
+		TextField inThing = lookup("#value-name-0").queryAs(TextField.class);
+		assertEquals("Rain", inThing.getText());
+		clickOn(inThing).write("fall");
+		assertEquals("Rainfall", lookup("#header-name").queryAs(TextField.class).getText());
+		// A second name, only under Thing; the first stays under @id
+		clickOn("#add-name");
+		clickOn("#value-name-1").write("Precipitation");
+		assertEquals(List.of("Rainfall", "Precipitation"),
+				crate.getRoot().getAll("name").stream().map(JsonNode::asText).toList());
+		clickOn("#header-name").type(KeyCode.END).write("s");
+		assertEquals(List.of("Rainfalls", "Precipitation"),
+				crate.getRoot().getAll("name").stream().map(JsonNode::asText).toList());
+		assertEquals("Rainfalls", lookup("#value-name-0").queryAs(TextField.class).getText());
+	}
+
+	/** Tab leaves the description at the top, rather than typing a tab */
+	@Test
+	public void tabLeavesDescription() {
+		clickOn("#header-description").write("Rain").type(KeyCode.TAB);
+		assertEquals(List.of("Rain"), crate.getRoot().getAll("description").stream().map(JsonNode::asText).toList());
+		assertFalse(lookup("#header-description").queryAs(Node.class).isFocused());
+	}
+
+	/**
+	 * Retired properties are hidden, unless in use or searched for by their
+	 * full term or name; then they are editable, with a note.
+	 */
+	@Test
+	public void retiredProperties() {
+		Node others = lookup("#otherProperties").query();
+		assertFalse(others.isVisible());
+		clickOn("#propertySearch").write("fileForm");
+		assertFalse(visibleProperties().contains("fileFormat"));
+		write("at");
+		assertTrue(others.isVisible());
+		assertEquals(List.of("fileFormat"), visibleProperties().stream()
+				.filter(p -> !EntityEditor.HEADER.contains(p)).toList());
+		assertEquals("\u2691 Retired by schema.org: use Encoding format instead",
+				lookup("#retired-fileFormat").queryAs(Label.class).getText());
+		clickOn(value("fileFormat", 0)).write("text/csv");
+		assertEquals("text/csv", crate.getRoot().get("fileFormat").orElseThrow().asText());
+
+		// In use, it stays after the search, and after showing the form again
+		clickOn("#propertySearch").eraseText("fileFormat".length());
+		assertTrue(others.isVisible());
+		assertTrue(visibleProperties().contains("fileFormat"));
+		chooseType("SoftwareSourceCode");
+		assertTrue(lookup("#otherProperties").query().isVisible());
+		assertEquals("text/csv", value("fileFormat", 0).getText());
 	}
 }

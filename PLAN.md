@@ -34,8 +34,11 @@ See also [MASP.md](MASP.md) for profile-aware editing with RO-Crate MASP.
 
 Builds: Java 25, Gradle 9.8; `./gradlew build` in the conda env
 (`environment.yml`), runtime images with the Temurin `Dockerfile`
-(`dist/wpsld-linux-x64.zip`, cross-linked `dist/wpsld-windows-x64.zip`), and a
-draft GitHub Actions workflow for a native Windows `wpsld.exe`.
+(`dist/wpsld-linux-x64.zip`, cross-linked `dist/wpsld-windows-x64.zip`), and
+releases from GitHub Actions (`.github/workflows/release.yml`, on a tag
+`v<version>`): app images with native launchers for Linux x64 and arm64,
+macOS x64 and arm64 and Windows x64, built on each platform, and a portable
+zip without JavaFX (`./gradlew :ui:distZip`, see `ui/src/dist/README.txt`).
 
 Measured for schema.org 30.0: about 430 ms cold / 110 ms warm to load, the
 model about 2.6 MB once the JSON is dropped; the editor is built in about
@@ -107,11 +110,55 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   loaded, keep unsupported values untouched (shown read-only, written back
   as they were), and report each problem rather than throwing. MASP profile
   and schema crates are RO-Crates too, so this reader is also the first step
-  of MASP.
+  of MASP. *Reader done* (`CrateReader` → `CrateDocument`, on the `masp`
+  branch): never throws, ERROR/WARNING problems (errors first), unknown terms
+  and undefined prefixes reported once each, duplicates merged, values kept as
+  written; reads our own output back unchanged. Next: open crates in the
+  editor, showing the problems, and keep the read `@context` and descriptor
+  when writing back (today `Crate.toJson()` writes RO-Crate 1.3's).
 - **More RO-Crate requirements in the save checks**, e.g. scripts and
   workflows (`SoftwareSourceCode`, `ComputationalWorkflow`) MUST have a
   `name`, found by rocrate-validator; better covered by validation from the
   MASP RO-Crate profile than by hand-written checks.
+
+- **Preview, names and descriptions** *(done on `masp`)*: a Preview tab
+  beside JSON-LD, like `ro-crate-preview.html`, with links between entities
+  and to web addresses. Property labels are readable names ("Date
+  published"): the profile's `name` if it differs from the term, else
+  `Labels.fromTerm` (abbreviations in capitals, "Number of …", explicit names
+  for odd terms such as the CDC `cvd…` ones; all 1,530 schema.org properties
+  checked). A [?] beside each label shows the description as plain text
+  (`Labels.plainText` drops schema.org's `[[Term]]`, HTML and Markdown) and a
+  link to the term's schema.org page. Name and Description sit on top as
+  plain text fields for the first value, and in their group in full. The
+  property search matches the term and the name, not descriptions.
+- **Retired schema.org terms** *(done)*: superseded and attic terms are not
+  fields (pending ones are). In use, they are editable in "Not properties
+  of …" with a ⚑ note naming the replacement; searching a full term or name
+  (e.g. `fileFormat`) reveals one there to add. A profile naming one keeps
+  it in the profile's group. Next: offer to move the value to the
+  replacement (e.g. `fileFormat` → `encodingFormat`); search reveal in the
+  notebook view (which has no search box).
+- **Required types** *(done)*: a notice beside "Add type…" when a profile
+  requires a type the entity lacks (subtypes count), with a button to add it.
+- **Later:** an "External types" section in the type dialog; rows per page
+  of the notebook view fitted to its height; report upstream that the core
+  MASP profile's `datePublished` rule points to `schema:datePubished`.
+
+### Look: the OS/2 Workplace Shell notebook
+
+"WPS" is named after the OS/2 Workplace Shell, whose objects each had a
+Settings (Warp 4: Properties) notebook, the Presentation Manager notebook
+control (`WC_NOTEBOOK`). `Notebook` (in `ui`, styled by `notebook.css`) is a
+prototype of Warp 4's tabbed style: overlapping pastel tabs with the selected
+one in front (`viewOrder`), selected when pressed; scroll arrows when the tabs
+don't fit; a page header with title, "Page n of m" and a dog-ear corner to
+turn the pages of a tab; optional buttons along the bottom (Undo, Default,
+Help); pages built when first shown; Ctrl+PageUp/PageDown and
+PageUp/PageDown. The entity form can be shown as a notebook (toolbar: View
+List / Notebook): groups as tabs, 8 properties per page; no property search
+there yet. Next: Undo/Default/Help, mnemonics on tabs, the Warp 3 style
+(tabs on the right, minor tabs), and whether the notebook becomes the default.
 
 ### Storage backends
 
@@ -147,11 +194,37 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   Linux they need Pango (`libpangoft2`) for text layout, as on any desktop.
 - `TestCrateEditorFailure`: a failure while loading the schema (or building
   the editor) is shown in the window, not lost in the background loading.
+- TestFX keeps each test's application in a static map, so every scene stays
+  in memory until the JVM ends (~25 MB per test): `forkEvery = 1` and a
+  1.5 GB test heap in `ui/build.gradle`.
 - Controls the tests use have ids: `entityId`, `propertySearch`, `addType`,
+  `header-<property>`, `help-<property>`, `description-<property>`,
+  `definition-<property>`, `retired-<property>`, `requiredType-<Type>`,
+  `previewName`, `previewProperties`,
   `type-<Type>`, `removeType-<Type>`, `label-<property>`, `field-<property>`,
   `value-<property>-<n>`, `add-<property>`, `new-<property>`,
   `otherProperties`, `suggestType-<Type>`, `typeSearch`, `typeTree`,
   `entities`, `addEntity`, `removeEntity`, `save`, `preview`.
+
+### User folders
+
+`AppDirectories` (in `lib`) gives the folders for cache, data, settings and
+state, and where to look for data installed for all users: XDG on Linux and
+other Unix (`$XDG_CACHE_HOME`… with their defaults, invalid values ignored),
+`%LOCALAPPDATA%`/`%APPDATA%`/`%PROGRAMDATA%` on Windows, and `~/Library/Caches`
+and `~/Library/Application Support` on macOS, each with a `wpsld` folder.
+Profiles the user loads are kept in `profiles/` of the data folder, and
+preferences (`Settings`, now which profile registries to use) in
+`settings.json` of the config folder; see MASP.md, "Bundled and dynamic
+profiles".
+
+### Menus
+
+A File menu (New RO-Crate Ctrl+N, which asks before discarding changes not
+saved, Save RO-Crate Metadata File… Ctrl+S, Load Profile…, Exit Ctrl+Q) and an Edit menu (Preferences… Ctrl+,), above the toolbar, which
+keeps its buttons. Next: File > Open for existing crates (then the root's
+`conformsTo` chooses the profile), recent files (in the state folder), and
+Edit's undo/redo.
 
 ### Start-up
 

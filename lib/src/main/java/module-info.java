@@ -18,9 +18,13 @@
 module no.s11.wpsld {
     
     requires com.fasterxml.jackson.databind;
+    // Loading MASP profiles by URL
+    requires java.net.http;
     exports no.s11.wpsld;
     exports no.s11.wpsld.arcp;
     exports no.s11.wpsld.soss;
     exports no.s11.wpsld.form;
     exports no.s11.wpsld.crate;
+    exports no.s11.wpsld.jsonld;
+    exports no.s11.wpsld.masp;
 }

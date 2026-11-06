@@ -17,11 +17,11 @@
  */
 package no.s11.wpsld.form;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.soss.ClassDef;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
@@ -38,17 +38,20 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
  * </ul>
  */
 public class EntityTypes {
-	private static final String S = "http://schema.org/";
 	public static final String THING = "Thing";
 
-	private final SchemaFromJsonLd schema;
+	private final CrateTerms terms;
 
 	public EntityTypes(SchemaFromJsonLd schema) {
-		this.schema = schema;
+		this(new CrateTerms(schema));
+	}
+
+	public EntityTypes(CrateTerms terms) {
+		this.terms = terms;
 	}
 
 	private Optional<ClassDef> classDef(String typeName) {
-		return Optional.ofNullable(schema.getClasses().get(URI.create(S + typeName)));
+		return terms.classDef(typeName);
 	}
 
 	private boolean isSubClass(String type, ClassDef superClass) {
@@ -80,12 +83,13 @@ public class EntityTypes {
 	 * anyway alongside them.
 	 */
 	public List<String> add(List<String> types, ClassDef added) {
-		if (types.contains(added.getName())) {
+		String name = terms.name(added);
+		if (types.contains(name)) {
 			return types;
 		}
 		List<String> result = new ArrayList<>(types);
 		result.removeIf(t -> classDef(t).map(c -> added.getSelfAndSuperClasses().contains(c)).orElse(false));
-		result.add(added.getName());
+		result.add(name);
 		return List.copyOf(result);
 	}
 

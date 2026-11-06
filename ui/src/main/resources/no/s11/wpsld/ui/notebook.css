@@ -1,0 +1,106 @@
+/*
+ * The OS/2 Warp 4 Properties notebook look for Notebook: pastel tabs with
+ * rounded tops, grey pages, a status line and a dog-ear corner.
+ */
+.notebook {
+    -fx-background-color: #c6c6c6;
+    -fx-font-size: 12px;
+}
+
+.notebook-tab-area {
+    -fx-padding: 4 4 0 4;
+}
+
+.notebook-tab-row {
+    -fx-padding: 0 0 0 0;
+}
+
+/* A trapezoid with rounded top corners */
+.notebook-tab {
+    -fx-shape: "M0,30 L7,4 Q8,0 12,0 L88,0 Q92,0 93,4 L100,30 Z";
+    -fx-scale-shape: true;
+    -fx-padding: 3 16 2 16;
+    -fx-border-color: #6b6b6b;
+    -fx-border-width: 1 1 0 1;
+    -fx-text-fill: #00007c;
+    -fx-cursor: hand;
+}
+
+.notebook-tab:selected {
+    -fx-font-weight: bold;
+    -fx-text-fill: black;
+    -fx-border-color: black;
+}
+
+.notebook-tab-0 { -fx-background-color: #6ee0e8; }
+.notebook-tab-1 { -fx-background-color: #8ed8a0; }
+.notebook-tab-2 { -fx-background-color: #a8b8f8; }
+.notebook-tab-3 { -fx-background-color: #e2b8ae; }
+.notebook-tab-4 { -fx-background-color: #fff8a0; }
+.notebook-tab-5 { -fx-background-color: #c8a8c8; }
+.notebook-tab-6 { -fx-background-color: #f8a060; }
+
+/* The blue triangles to scroll the tabs */
+.notebook-scroll {
+    -fx-background-color: transparent;
+    -fx-padding: 4 3 6 3;
+}
+
+.notebook-scroll-right {
+    -fx-graphic: none;
+    -fx-shape: "M0,0 L10,6 L0,12 Z";
+    -fx-background-color: #0000c8;
+    -fx-min-width: 11;
+    -fx-min-height: 13;
+    -fx-max-width: 11;
+    -fx-max-height: 13;
+}
+
+.notebook-scroll-left {
+    -fx-shape: "M10,0 L0,6 L10,12 Z";
+    -fx-background-color: #0000c8;
+    -fx-min-width: 11;
+    -fx-min-height: 13;
+    -fx-max-width: 11;
+    -fx-max-height: 13;
+}
+
+.notebook-page {
+    -fx-background-color: #c6c6c6;
+    -fx-border-color: black #6b6b6b #6b6b6b white;
+    -fx-border-width: 1;
+    -fx-padding: 6 8 8 8;
+}
+
+.notebook-page-header {
+    -fx-border-color: transparent transparent #6b6b6b transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 0 0 2 0;
+}
+
+.notebook-page-title {
+    -fx-font-weight: bold;
+}
+
+.notebook-page-content {
+    -fx-padding: 10 4 4 4;
+}
+
+/* The folded page corner: the turned-down triangle of the page */
+.notebook-dog-ear {
+    -fx-shape: "M0,0 L26,26 L0,26 Z";
+    -fx-background-color: #6b6b6b, #ececec;
+    -fx-background-insets: 0, 1 1 0 1;
+    -fx-cursor: hand;
+}
+
+.notebook-dog-ear-sign {
+    -fx-font-size: 10px;
+    -fx-padding: 0 2 0 2;
+    -fx-text-fill: #404040;
+    -fx-mouse-transparent: true;
+}
+
+.notebook-buttons {
+    -fx-padding: 8 4 4 4;
+}

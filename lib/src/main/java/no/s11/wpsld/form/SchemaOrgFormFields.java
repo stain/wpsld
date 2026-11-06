@@ -28,6 +28,7 @@ import java.util.OptionalInt;
 import java.util.Queue;
 import java.util.Set;
 
+import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.soss.ClassDef;
 import no.s11.wpsld.soss.PropertyDef;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
@@ -39,24 +40,58 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
  */
 public class SchemaOrgFormFields implements FormFields {
 	private static final String S = "http://schema.org/";
+	private static final URI S_THING = URI.create(S + "Thing");
 	private static final URI S_BOOLEAN = URI.create(S + "Boolean");
 	private static final URI S_NUMBER = URI.create(S + "Number");
 	private static final URI S_DATE = URI.create(S + "Date");
 	private static final URI S_DATE_TIME = URI.create(S + "DateTime");
 
 	private final SchemaFromJsonLd schema;
+	private final CrateTerms terms;
 
-	public SchemaOrgFormFields(SchemaFromJsonLd schema) {
-		this.schema = Objects.requireNonNull(schema);
+	public CrateTerms getTerms() {
+		return terms;
 	}
 
+	public SchemaOrgFormFields(SchemaFromJsonLd schema) {
+		this(new CrateTerms(schema));
+	}
+
+	public SchemaOrgFormFields(CrateTerms terms) {
+		this.terms = Objects.requireNonNull(terms);
+		this.schema = terms.getSchema();
+	}
+
+	/**
+	 * All properties of the types and their superclasses. Types that are not
+	 * schema.org Things (e.g. from a profile's own vocabulary) are taken as
+	 * Things, so every entity has Thing's properties, like name.
+	 */
 	@Override
 	public List<FormField> fieldsFor(Set<URI> types) {
+		return propertyFields(types, false);
+	}
+
+	/**
+	 * The superseded or attic properties of the types and their superclasses.
+	 */
+	@Override
+	public List<FormField> retiredFieldsFor(Set<URI> types) {
+		return propertyFields(types, true);
+	}
+
+	private List<FormField> propertyFields(Set<URI> types, boolean retired) {
 		List<FormField> fields = new ArrayList<>();
 		Set<URI> seenProperties = new HashSet<>();
-		for (ClassDef classDef : classAndSuperclasses(types)) {
+		Set<URI> withThing = new LinkedHashSet<>(types);
+		boolean anyThing = types.stream().map(schema.getClasses()::get).filter(Objects::nonNull)
+				.anyMatch(c -> isA(c, S_THING));
+		if (!anyThing) {
+			withThing.add(S_THING);
+		}
+		for (ClassDef classDef : classAndSuperclasses(withThing)) {
 			schema.propertiesOf(classDef)
-				.filter(p -> !schema.isSuperseded(p))
+				.filter(p -> schema.isSuperseded(p) == retired)
 				.filter(p -> seenProperties.add(p.getID()))
 				.map(p -> field(p, classDef))
 				.forEach(fields::add);
@@ -89,11 +124,21 @@ public class SchemaOrgFormFields implements FormFields {
 	private FormField field(PropertyDef property, ClassDef group) {
 		List<ClassDef> range = property.getRangeIncludes().stream()
 				.filter(c -> !schema.isSuperseded(c)).toList();
-		return new FormField(property.getName(), property.getID(), property.getName(), property.getComment(),
-				group.getName(), range, kind(range), 0, OptionalInt.empty());
+		// Names as written in RO-Crates, e.g. the group File for MediaObject
+		String name = terms.name(property);
+		return new FormField(name, property.getID(), Labels.fromTerm(name), property.getComment(), terms.name(group), range,
+				kindOf(range), 0, OptionalInt.empty(), FieldTier.OTHER);
 	}
 
-	private ValueKind kind(List<ClassDef> range) {
+	@Override
+	public String getName() {
+		return "schema.org (no profile)";
+	}
+
+	/**
+	 * The kind of values for a property with this range.
+	 */
+	public ValueKind kindOf(List<ClassDef> range) {
 		if (range.isEmpty()) {
 			return ValueKind.TEXT;
 		}

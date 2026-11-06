@@ -146,10 +146,65 @@ then ranges over the root data entity's class rule.
   context resolver (context arrays, prefixes, `@vocab`, string and `{"@id"}`
   term definitions) with **bundled, pinned copies** of the RO-Crate 1.2 and 1.3
   contexts, but not full JSON-LD expansion, since crates are flattened.
+- **Contexts and profiles are separate.** JSON-LD contexts only map terms to
+  IRIs; MASP profile and schema crates are RO-Crates (using contexts) that
+  carry rules. `no.s11.wpsld.jsonld` handles contexts: `ContextCache` is a
+  pre-warmed cache of bundled context documents, listed in `jarcache.json`
+  (JSON-LD Java's format, so other jars can add contexts), with the RO-Crate
+  1.0–1.3 contexts (CC0); `JsonLdContext` processes a `@context` (arrays,
+  `@vocab`, prefixes, term definitions in any order) without fetching and
+  without throwing. Profiles will get their own loading and cache.
+- **RO-Crate names and terms outside schema.org.** `CrateTerms` names
+  schema.org terms as RO-Crates write them, through the RO-Crate 1.3 context:
+  the schema.org name, except `File` for `schema:MediaObject` (checked over
+  all of schema.org 30.0: no other name differs). The context also maps terms
+  outside schema.org (`conformsTo`, `Profile`, `hasResource`… from Dublin
+  Core, dx-prof, PAV, PCDM, CodeMeta, Bioschemas, GeoSPARQL, PROV, IANA link
+  relations, RO terms); the schema model has no definitions for them, so the
+  editor keeps their values but offers no fields. The core MASP RO-Crate
+  profile should cover them.
+- **JSON-LD 1.0.** RO-Crate 1.2/1.3: the metadata document "MUST be a
+  document which is valid JSON-LD 1.0 in flattened and compacted form", so
+  JSON-LD 1.1 context features (scoped contexts, `@import`, `@protected`,
+  `@propagate`, `"@version": 1.1`) are reported as not valid rather than
+  processed. (JSON-LD Java, whose cache format we borrow, is JSON-LD 1.0 only
+  too; we don't use the library.)
+- **Unlicensed contexts.** The Workflow Run, Workflow Testing
+  (`ResearchObject/ro-terms`) and LDAC contexts state no licence, so they are
+  not bundled; ask the maintainers, or fetch them at run time once remote
+  loading is added.
 - **http vs https schema.org.** RO-Crate contexts and profiles (e.g. LDAC) use
   `http://schema.org/`; MASP's own schema.org *schema crate* uses
   `https://schema.org/`. Treat them as the same namespace and normalise to
   `http://schema.org/` (as our pinned 30.0 file and the RO-Crate 1.3 context do).
+- **`sh:` is not defined.** MASP crates use `sh:minCount`/`sh:maxCount`, but
+  their context (`["https://w3id.org/ro/crate/1.2/context", {"@vocab":
+  "http://schema.org/"}]`) doesn't define the `sh` prefix, so in JSON-LD
+  they are absolute IRIs with the scheme `sh`, not SHACL terms. The MASP
+  JavaScript tools match the written key. `CrateReader` reports the undefined
+  prefix once; the profile reader should accept both `sh:minCount` and
+  `http://www.w3.org/ns/shacl#minCount` (and suggest MASP define the prefix).
+- **Reading profile crates.** `CrateReader` reads them into a `CrateDocument`
+  whose `types()`, `values()` and `references()` work by expanded IRI (so
+  `domainIncludes` and `schema:domainIncludes` match, `https://schema.org/`
+  taken as `http://`). The MASP profile crate (13 classes, 29 properties) and
+  the minimal RO-Crate profile (3, 6) load without errors; test fixtures
+  pinned to commit `6d7a018`.
+- **Reading the rules.** `ProfileReader` (package `no.s11.wpsld.masp`) reads
+  a profile crate into a `Profile` of `ClassRule`s and `PropertyRule`s (label,
+  description, `prov:specializationOf`, `rdfs:subClassOf`, domain, range,
+  `Cardinality`), with ranges as class rules, IRIs, `PropertyValue`
+  constraints (literal, `@id` or `/regex/flags`) or allowed values
+  (`ItemList` elements, or the terms of a `DefinedTermSet`), and finds the
+  descriptor and root class rules. The MASP, minimal RO-Crate and LDAC
+  profiles read without problems (13/29, 3/6 and 30/99 rules, as in MASP's
+  catalogue). Findings on the way:
+  - Rule `@id`s can be absolute IRIs (`http://schema.org/name` in the
+    RO-Crate profile) or compact IRIs (`ldac:AccessTypes` in LDAC, referred
+    to expanded elsewhere), so rules are identified by expanded `@id`.
+  - Ranges are written as words, `{"@id": "Text"}`: in JSON-LD a relative
+    IRI, but meant as `schema:Text`, so read as a vocabulary term.
+  - Cardinalities are numbers or strings (`"1"`).
 - **Loose literals.** `sh:minCount` appears both as numbers and strings (`"1"`);
   values can be single objects or arrays; regexes are JavaScript-style `/…/flags`
   and need translating to `java.util.regex`.
@@ -192,6 +247,28 @@ or profile crate.
    ordered property rules (required first), falling back to the vocabulary's
    `domainIncludes` (including superclasses) for "other properties" when no
    profile or no rule applies.
+
+   With a profile, the form distinguishes three kinds of properties for an
+   entity's type(s):
+
+   | Kind | From | In the form |
+   |------|------|-------------|
+   | **Required** | property rules of the matching class rule with `sh:minCount` ≥ 1 | first, open, marked as required, using the profile's label and description; saving warns while they are missing |
+   | **Optional, named by the profile** | property rules without `sh:minCount` (or 0) | next, open: what the profile suggests describing |
+   | **Other properties of the type** | the vocabulary (e.g. schema.org `domainIncludes`) of the type and its superclasses, not named by the profile | last, folded (and searchable), grouped by defining class as today, so nothing schema.org allows is out of reach |
+
+   `sh:maxCount` limits the values of the first two kinds ("+" hidden at the
+   maximum; 1 means a single value); range constraints (`PropertyValue`,
+   `ItemList`) shape their controls. For the third kind the vocabulary is the
+   one the profile is bound to (see caching above), and for a class rule
+   specialising a term outside schema.org (e.g. `ldac:CollectionEvent`), its
+   `rdfs:subClassOf` superclasses and any schema crate defining it. Values the
+   entity has outside all three stay under "Not properties of …" as today.
+   Without a profile (the default) there is only the third kind, as now.
+   In the editor, a **profile drop-down** chooses the `FormFields` used: the
+   default is today's schema.org fields (`SchemaOrgFormFields`, in effect
+   "no profile"), and the MASP profiles that can be loaded are listed after
+   it; a crate's root `conformsTo` can preselect one.
 4. **Validation (later)**: port the MASP algorithm on top of the same model,
    reporting per entity and property, so the editor can show problems inline.
 5. **Profile resolution**: a crate's root `conformsTo` names its profiles; start
@@ -217,8 +294,19 @@ With MASP that single cache is no longer enough:
   descriptions differ per profile. Profile-specific information must never
   be stored on the shared vocabulary objects; the profile layer (`ClassRule`,
   `PropertyRule`) refers to vocabulary terms and adds its own rules on top.
-- **Profiles may target different schema versions.** A profile written for
-  the RO-Crate 1.2 context implies schema.org 22.0 (1.3 implies 30.0), and
+- **Profiles may target different schema versions.** Each RO-Crate context
+  declares the schema.org release it is based on in its `schemaVersion`
+  (read with `ContextCache.schemaOrgVersion`):
+
+  | RO-Crate context | `schemaVersion` | schema.org |
+  |---|---|---|
+  | 1.0 | `http://schema.org/version/5.0/` | 5.0 |
+  | 1.1 | `http://schema.org/version/10.0/` | 10.0 |
+  | 1.2 | `https://schema.org/docs/releases.html#v22.0` | 22.0 |
+  | 1.3 | `https://schema.org/docs/releases.html#v30.0` | 30.0 |
+
+  So a profile written for the RO-Crate 1.2 context implies schema.org 22.0
+  (1.3 implies 30.0, the one bundled today), and
   MASP's own schema.org schema crate uses `https://` IRIs. Terms can be added,
   superseded or retired between releases, so a profile must be resolved
   against the vocabulary version it was written for, not silently against
@@ -275,6 +363,155 @@ warn and suggest adding a schema.org type too — the class's schema.org
 superclass where the profile gives one (`rdfs:subClassOf`, e.g. `Event`), or
 otherwise a default such as `CreativeWork` or `Thing`. Superclasses of a
 selected type need not be added, as elsewhere (see PLAN.md).
+
+Done so far: the type chooser offers, under Thing, the types the profile's
+class rules specialise that are outside schema.org. For example, LDAC's
+root must also be a `pcdm:Collection`, which the RO-Crate context calls
+`RepositoryCollection`. It also offers the RO-Crate context's own non-schema.org
+types, such as `ComputationalWorkflow`, `FormalParameter`, `RepositoryObject`
+and `Profile`. A required type outside schema.org gets an "Add" button like
+schema.org types do.
+
+RO-Crate 1.3 renamed the Bioschemas types: `https://bioschemas.org/terms/ComputationalWorkflow`,
+where 1.1 and 1.2 have `https://bioschemas.org/ComputationalWorkflow`. The
+MASP Workflow Profile still uses the 1.2 form, so `CrateDocument.normalise`
+treats both as the 1.3 form. Upstream, it may be worth moving the profile to
+the 1.3 IRIs. The core RO-Crate MASP profile has no rule for workflows; that
+is left to the Workflow Profile.
+
+### Profiles in the editor
+
+- `ProfileFormFields` gives a profile's three tiers (Required, Suggested,
+  then the other schema.org properties), using the profile's labels,
+  descriptions and cardinality; `FieldTier` on each `FormField`.
+- The root's rules apply to the root only: `FormFields.fieldsFor(types,
+  root)`, the editor knowing the root as `Crate.getRoot()` (found when
+  reading as in "Finding the Root Data Entity", see `CrateReader`), as
+  RO-Crate types can't tell it from other Datasets.
+- A **Profile** drop-down in the toolbar: the bundled core RO-Crate profile
+  by default (the same schema.org fields, those RO-Crate requires first), or
+  schema.org without a profile. Saving checks the selected profile's
+  required properties (`RequiredFields`) with `CrateChecks`.
+- Next: value constraints and allowed values in the controls; remote
+  profiles (with the caveats below).
+
+### Bundled and dynamic profiles
+
+- **Bundled:** the core RO-Crate profile (`profiles/ro-crate`) is bundled in
+  `lib/src/main/resources/masp-profiles/`, listed in `masp-profiles.json`
+  with its identifiers, source, commit and SHA-256. Upstream has no releases,
+  so profiles are pinned to a commit with `scripts/update-masp-profiles.sh
+  <commit> [profile...]`, and updates are reviewed as a diff. Tests check
+  the checksums and that each bundled profile reads.
+- **Identifiers:** a profile crate's root is often `./`, so crates name it in
+  `conformsTo` by its conformance indicators (an `ItemList` under the role
+  `https://w3id.org/ro/conformance-indicators`), which `ProfileReader` reads
+  as `Profile.identifiers()`.
+- **Dynamic:** other profiles (e.g. LDAC) are loaded with **Load profile…**
+  in the toolbar, from a URL or a file chosen in a dialog, in the background
+  (`ProfileCache.load(URI)`: time limits, never throws, failures not cached so
+  they can be retried, shown in the toolbar and an alert). Once loaded, the
+  profile is chosen and **kept for next time**: copied to `profiles/` in the
+  user's data folder (`AppDirectories.data()`), listed in its `profiles.json`
+  with its identifiers, the location asked for, the source it came from (the
+  base for its relative ids), when, and its SHA-256. Loading a profile with
+  the same location or one of the same identifiers replaces the copy (and the
+  drop-down entry); bundled profiles stay. A broken store is ignored.
+- **Retrieval** (`CrateRetriever`, as the RO-Crate spec's "Retrieving an
+  RO-Crate"): follow redirects, then take the first of: the response if JSON
+  (content negotiation asks for `application/ld+json;profile="https://w3id.org/ro/crate"`),
+  a Signposting `Link: rel="describedby"` header (RO-Crate profile preferred,
+  else JSON-LD/JSON), an HTML `<link rel="describedby">` (as MASP's GitHub
+  Pages have, without headers or conneg), or for a folder its
+  `ro-crate-metadata.json`. At most 5 requests and 16 MB; links from the web
+  never lead to `file:`. Checked live: the MASP Pages folders (HTML link),
+  `https://w3id.org/ldac/profile` (302 to another repository's Pages folder,
+  then HTML link), and `https://w3id.org/ro/crate/1.3` (conneg; a crate but
+  not a profile, so refused with "no rules"). Not yet: zip/BagIt (`rel="item"`).
+- **Registries** (`ProfileRegistry`): the Load profile dialog lists the
+  profiles of the known registries, read in the background once a session
+  (failures are warnings, tried again next time), and `load` falls back to
+  them when an identifier doesn't lead to a crate (e.g. Turtle by content
+  negotiation, GitHub `tree` URLs, a registry's own page for the profile):
+  - `MaspCatalogue`: the RO-Crate MASP examples' `catalogue.json`, the
+    entries with `"kind": "profile"` (not schemas), identified by their
+    `profile-crate/` folder.
+  - `RoCrateProfilesRegistry`: profiles.ro-crate.org through its SPARQL
+    endpoint `https://query.ro-crate.org/rocrate/sparql`, only profiles with
+    MASP rules (a `prof:role/schema` resource whose `hasPart` lists
+    `rdfs:Class`/`rdf:Property`), loaded from their metadata descriptor (what
+    is `about` the profile, `ro-crate-metadata.json`), with the portal's own
+    `…/data/profile/<hash>` pages (`owl:sameAs`) as further identifiers.
+  Checked live (2026-11-06): 10 catalogue profiles and LDAC from
+  profiles.ro-crate.org (of its 57 profiles, the only one with MASP rules;
+  Fairscape's "schema" is JSON Schema). All load except the catalogue's CCA
+  demo, which has vocabulary terms (`DefinedTerm`, `rdfs:Class`) but no
+  rules or schema resource, and whose root `https://w3id.org/cc-crate-profile/0.9`
+  looks like a typo for `cca-crate-profile`.
+- **Preferences** (Edit > Preferences…): which registries to use, kept in
+  `settings.json` of the user's config folder (`Settings`), and the kept
+  profiles with their date and origin, each removable (`ProfileCache.forget`).
+- **Same identifier, different profiles:** the LDAC profile in the MASP repo
+  (30/99 rules) and the one `https://w3id.org/ldac/profile` redirects to (in
+  `ldac-profile`, 30/101) both claim `https://w3id.org/ldac/profile`; the
+  last loaded wins.
+- **Next:** a crate's root `conformsTo` choosing a stored or bundled profile
+  (and offering to load one it names), once crates can be opened; removing a
+  checking a kept profile for updates (below); adding registries of one's
+  own in the preferences.
+- **Next, caching like JSON-LD Java:** its default client is Apache
+  HttpClient 4's `CachingHttpClientBuilder` (in memory, 500 entries of up to
+  256 kB, HTTP caching headers honoured, else one day), with the
+  `jarcache.json` documents layered in front as cached responses. Rather than
+  adding HttpClient (not modular, see the SHACL survey), keep Java's
+  `HttpClient` and add our own disk cache layer: bundled → memory → disk
+  (`ETag`, `Last-Modified`, `max-age`) → network with conditional requests
+  (`304` reuses the copy), and a stored copy used when offline, with a
+  warning that it may be out of date.
+
+### Testing with Jena
+
+Generating SHACL from MASP (below) needs no library. To run the generated
+shapes, and to validate our own `ro-crate-metadata.json` independently of our
+code, Apache Jena 6.2 (`jena-shacl`, with JSON-LD parsing) can be a
+**test-only** Gradle dependency: it runs on the module path with a few fixes
+(see the survey), and keeping it out of the application avoids its ~15 MB and
+the module descriptors jlink would need. The tests can run in the Temurin
+container rather than the conda env.
+
+### Later: converting MASP to SHACL
+
+A converter from MASP rules to SHACL shapes should be fairly direct for the
+constraints: unroll the `prov:specializationOf` intermediaries (a class rule
+becomes a node shape for the vocabulary type, a property rule a property
+shape with `sh:path` the specialised property), and map the rest to existing
+SHACL terms: `sh:minCount`/`sh:maxCount` as they are, class-rule ranges as
+`sh:node`/`sh:class`, data types as `sh:datatype`, `PropertyValue` literals as
+`sh:hasValue`/`sh:in`, regexes as `sh:pattern` (with `sh:flags`), and
+`ItemList`/`DefinedTermSet` values as `sh:in`.
+
+The tricky part is **selecting the focus nodes**: RO-Crate types are not
+specific enough. `Dataset` is the type of both the root data entity and every
+folder, so `sh:targetClass schema:Dataset` would apply the root's rules to
+all folders. The root must be found by a pattern instead: it is what the
+metadata descriptor is `about`. In SHACL Core that could be a shape targeting
+the descriptor (`sh:targetNode`, its `@id` being fixed) with a property shape
+`sh:path schema:about` and `sh:node` to the root's shape, though the
+descriptor's IRI depends on the base the crate is parsed with; otherwise
+SPARQL-based targets (SHACL-AF) are needed. MASP's class-rule cardinality on
+instances in the whole crate also has no direct SHACL Core counterpart.
+rocrate-validator uses SHACL for the RO-Crate profiles and is worth comparing
+for how it selects the root.
+
+Simpler: make the shapes **profile-specific and layered**. The core RO-Crate
+profile is validated first, and only its shapes need the descriptor pattern
+to find the root (and tell the root from other `Dataset`s, data entities
+from contextual entities). A profile's own shapes can then assume a crate
+that passed the core profile, as MASP profiles are profiles of RO-Crate
+(`isProfileOf`). The core layer could also mark what it found, e.g. give
+the root a specific class through a SHACL rule (SHACL-AF), so later layers
+target it with `sh:targetClass`; to check whether rocrate-validator already
+does this for its RO-Crate classes.
 
 ### Open questions
 

@@ -71,10 +71,16 @@ public class TestSchemaOrgFormFields {
 		assertTrue(byName.containsKey("encodingFormat"));
 	}
 
+	/**
+	 * Types outside schema.org are taken as Things.
+	 */
 	@Test
-	public void unknownTypesHaveNoFields() {
-		assertTrue(new SchemaOrgFormFields(new SchemaFromJsonLd())
-				.fieldsFor(Set.of(URI.create("http://example.com/Unknown"))).isEmpty());
+	public void unknownTypesAreThings() {
+		List<FormField> fields = new SchemaOrgFormFields(new SchemaFromJsonLd())
+				.fieldsFor(Set.of(URI.create("https://w3id.org/ldac/terms#RepositoryObject")));
+		assertTrue(fields.stream().allMatch(f -> f.group().equals("Thing")));
+		assertTrue(fields.stream().anyMatch(f -> f.name().equals("name")));
+		assertTrue(fields.stream().anyMatch(f -> f.name().equals("description")));
 	}
 
 	@Test
@@ -134,5 +140,26 @@ public class TestSchemaOrgFormFields {
 		// Properties of CreativeWork are not offered for a Person
 		assertFalse(person.containsKey("author"));
 		assertFalse(person.containsKey("license"));
+	}
+
+	/**
+	 * Pending terms are fields like any other; superseded and attic ones are
+	 * only among the retired fields.
+	 */
+	@Test
+	public void pendingAndRetired() {
+		// creditText and conditionsOfAccess are pending
+		assertTrue(byName.containsKey("creditText"));
+		assertTrue(byName.containsKey("conditionsOfAccess"));
+		// Superseded by temporalCoverage
+		assertFalse(byName.containsKey("datasetTimeInterval"));
+		FormFields formFields = new SchemaOrgFormFields(new SchemaFromJsonLd());
+		Set<String> retired = formFields.retiredFieldsFor(Set.of(URI.create(S + "Dataset"))).stream()
+				.map(FormField::name).collect(java.util.stream.Collectors.toSet());
+		assertTrue(retired.contains("datasetTimeInterval"));
+		assertTrue(retired.contains("fileFormat"));
+		// In the attic, without a replacement
+		assertTrue(retired.contains("variablesMeasured"));
+		assertFalse(retired.contains("creditText"));
 	}
 }

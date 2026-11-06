@@ -26,11 +26,17 @@ import org.junit.Test;
 import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
+import javafx.scene.Node;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Hyperlink;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.form.FormFields;
 
 /**
  * GUI tests of the crate window, run headless (see ui/build.gradle).
@@ -77,6 +83,16 @@ public class TestCrateEditor extends ApplicationTest {
 	}
 
 	@Test
+	public void addTypeOutsideSchemaOrg() {
+		entities();
+		// From the RO-Crate context: Bioschemas and PCDM
+		addEntity("computationalworkflow");
+		assertEquals(List.of("ComputationalWorkflow"), entities().getItems().get(1).getTypes());
+		addEntity("repositorycollection");
+		assertEquals(List.of("RepositoryCollection"), entities().getItems().get(2).getTypes());
+	}
+
+	@Test
 	public void idClashMergesOnce() {
 		entities();
 		addEntity("datadownload");
@@ -101,5 +117,180 @@ public class TestCrateEditor extends ApplicationTest {
 		assertTrue(lookup("The crate does not yet meet the RO-Crate requirements").tryQuery().isPresent());
 		clickOn("Cancel");
 		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
+	}
+
+	@Test
+	public void newCrateAsksToDiscardChanges() {
+		entities();
+		// Nothing changed yet: a new crate at once (with its shortcut, as
+		// moving the mouse over the menu bar may open another menu)
+		push(KeyCode.SHORTCUT, KeyCode.N);
+		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
+		addEntity("person");
+		Entity root = entities().getItems().get(0);
+
+		push(KeyCode.SHORTCUT, KeyCode.N);
+		assertTrue(lookup("Discard the changes to this crate?").tryQuery().isPresent());
+		clickOn("Cancel");
+		assertEquals(2, entities().getItems().size());
+
+		push(KeyCode.SHORTCUT, KeyCode.N);
+		clickOn("Discard");
+		assertEquals(1, entities().getItems().size());
+		assertNotSame(root, entities().getItems().get(0));
+		assertEquals(entities().getItems().get(0), entities().getSelectionModel().getSelectedItem());
+	}
+
+	/** Properties of the form's visible rows */
+	private List<String> visibleProperties() {
+		return lookup(n -> n.getId() != null && n.getId().startsWith("label-")).queryAllAs(Label.class).stream()
+				.filter(Label::isVisible).filter(l -> l.getParent() != null && l.getParent().isVisible())
+				// The property, not its human readable label; * if required
+				.map(l -> l.getId().substring("label-".length()) + (l.getText().endsWith(" *") ? " *" : ""))
+				.toList();
+	}
+
+	/**
+	 * The core RO-Crate profile is chosen by default: the root's required
+	 * properties come first, marked.
+	 */
+	@Test
+	public void coreProfileByDefault() {
+		entities();
+		ComboBox<FormFields> profile = lookup("#profile").queryComboBox();
+		assertEquals("RO-Crate Machine Actionable Profile 0.1.0", profile.getValue().getName());
+		List<String> labels = visibleProperties();
+		// name and description under @id, then the required ones
+		assertEquals(List.of("name *", "description *", "datePublished *", "description *", "license *", "name *"),
+				labels.subList(0, 6));
+		assertTrue(lookup("Required by RO-Crate Machine Actionable Profile 0.1.0 (4)").tryQuery().isPresent());
+	}
+
+	@Test
+	public void schemaOrgWithoutProfile() {
+		entities();
+		ComboBox<FormFields> profile = lookup("#profile").queryComboBox();
+		interact(() -> profile.getSelectionModel().select(profile.getItems().size() - 1));
+		assertEquals("schema.org (no profile)", profile.getValue().getName());
+		assertFalse(visibleProperties().contains("name *"));
+		assertTrue(visibleProperties().contains("distribution"));
+	}
+
+	/**
+	 * Only the root has the root's required properties, not a folder Dataset.
+	 */
+	@Test
+	public void rootRulesForRootOnly() {
+		entities();
+		addEntity("dataset");
+		assertEquals(List.of("Dataset"), entities().getItems().get(1).getTypes());
+		assertTrue(visibleProperties().stream().noneMatch(l -> l.endsWith(" *")));
+	}
+
+	/**
+	 * The form's groups as the tabs of an OS/2-style notebook, with pages.
+	 */
+	@Test
+	public void notebookView() {
+		entities();
+		clickOn("#viewNotebook");
+		assertTrue(lookup("#notebook").tryQuery().isPresent());
+		assertEquals(List.of("Required", "Dataset", "CreativeWork", "Thing"),
+				lookup(".notebook-tab").queryAllAs(Label.class).stream().map(Label::getText).toList());
+		assertTrue(lookup("#propertySearch").tryQuery().isEmpty() || !lookup("#propertySearch").query().isVisible());
+		// CreativeWork's properties on pages
+		clickOn(lookup(".notebook-tab").queryAllAs(Label.class).stream().filter(l -> l.getText().equals("CreativeWork"))
+				.findFirst().orElseThrow());
+		assertTrue(lookup(".notebook-status").queryAs(Label.class).getText().matches("Page 1 of \\d+"));
+		// Back to the list
+		clickOn("#viewList");
+		assertTrue(lookup("#notebook").tryQuery().isEmpty());
+		assertTrue(visibleProperties().contains("name *"));
+	}
+
+	private Hyperlink previewLink(String containerId, String text) {
+		return from(lookup(containerId).queryAs(Node.class)).lookup(".hyperlink").queryAllAs(Hyperlink.class).stream()
+				.filter(l -> l.getText().equals(text)).findFirst().orElseThrow(() -> new AssertionError(text));
+	}
+
+	/**
+	 * The preview shows the selected entity, with links that open the
+	 * entities it refers to, and those referring to it.
+	 */
+	@Test
+	public void previewLinks() {
+		entities();
+		assertTrue(lookup("#previewTab").tryQuery().isPresent());
+		assertEquals("./", lookup("#previewName").queryAs(Label.class).getText());
+		// Link the root to a new DataDownload
+		clickOn("#propertySearch").write("distribution");
+		clickOn("#new-distribution");
+		clickOn("DataDownload");
+		Entity download = entities().getItems().get(1);
+		clickOn(previewLink("#previewProperties", download.getId()));
+		// Opened for editing, and previewed
+		assertSame(download, entities().getSelectionModel().getSelectedItem());
+		assertEquals(download.getId(), lookup("#previewName").queryAs(Label.class).getText());
+		assertEquals(download.getId(), lookup("#entityId").queryAs(TextField.class).getText());
+		// Back via the entity referring to it
+		clickOn(previewLink("#previewReferencedBy", "./ (distribution)"));
+		assertSame(entities().getItems().get(0), entities().getSelectionModel().getSelectedItem());
+		// And the link to the crate's root from any other entity
+		interact(() -> entities().getSelectionModel().select(download));
+		clickOn("#previewRoot");
+		assertSame(entities().getItems().get(0), entities().getSelectionModel().getSelectedItem());
+	}
+
+	@Test
+	public void previewUpdatesWhileEditing() {
+		entities();
+		clickOn("#propertySearch").write("name");
+		TextField name = lookup("#header-name").queryAs(TextField.class);
+		clickOn(name).write("My crate");
+		assertEquals("My crate", lookup("#previewName").queryAs(Label.class).getText());
+		clickOn("#propertySearch").eraseText(4).write("license");
+		clickOn(lookup("#value-license-0").queryAs(ComboBox.class).getEditor())
+				.write("http://spdx.org/licenses/CC0-1.0");
+		// Human readable labels of the properties
+		assertTrue(from(lookup("#previewProperties").queryAs(Node.class)).lookup(".label").queryAllAs(Label.class)
+				.stream().anyMatch(l -> l.getText().equals("License")));
+		// A web address, not an entity of the crate, opens in the browser
+		Hyperlink license = previewLink("#previewProperties", "http://spdx.org/licenses/CC0-1.0");
+		assertEquals("Open in the browser", license.getTooltip().getText());
+	}
+
+	/**
+	 * The profile requires the root to be a Dataset; a subtype would do.
+	 */
+	@Test
+	public void requiredTypeNotice() {
+		entities();
+		clickOn("#header-name").write("My crate");
+		assertFalse(lookup("#requiredType-Dataset").tryQuery().isPresent());
+		clickOn("#addType");
+		clickOn("#typeSearch").write("person").type(KeyCode.ENTER);
+		clickOn("#removeType-Dataset");
+		Entity root = entities().getItems().get(0);
+		assertEquals(List.of("Person"), root.getTypes());
+		assertTrue(lookup("#requiredType-Dataset").tryQuery().isPresent());
+		// name is fixed under @id, a property of any type
+		assertFalse(lookup("#otherProperties").tryQuery().map(Node::isVisible).orElse(false));
+		clickOn("#addRequiredType-Dataset");
+		assertEquals(List.of("Person", "Dataset"), root.getTypes());
+		assertFalse(lookup("#requiredType-Dataset").tryQuery().isPresent());
+	}
+
+	/**
+	 * Typing updates the entity's label in the list without rebuilding the
+	 * list's cells, which made the list flicker.
+	 */
+	@Test
+	public void listUpdatesInPlace() {
+		entities();
+		ListCell<?> cell = from(entities()).lookup(".list-cell").queryAs(ListCell.class);
+		clickOn("#header-name").write("My crate");
+		ListCell<?> after = from(entities()).lookup(".list-cell").queryAs(ListCell.class);
+		assertSame(cell, after);
+		assertTrue(after.getText().startsWith("My crate\n"));
 	}
 }

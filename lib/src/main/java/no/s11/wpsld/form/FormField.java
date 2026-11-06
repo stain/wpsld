@@ -36,9 +36,10 @@ import no.s11.wpsld.soss.ClassDef;
  * @param kind     Kind of values, derived from the range
  * @param minCount Minimum number of values, more than 0 if required
  * @param maxCount Maximum number of values, if limited
+ * @param tier     Required, suggested by a profile, or other
  */
 public record FormField(String name, URI property, String label, Optional<String> comment, String group,
-		List<ClassDef> range, ValueKind kind, int minCount, OptionalInt maxCount) {
+		List<ClassDef> range, ValueKind kind, int minCount, OptionalInt maxCount, FieldTier tier) {
 
 	public boolean isRequired() {
 		return minCount > 0;
