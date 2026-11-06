@@ -43,17 +43,21 @@ import java.util.regex.Pattern;
  * Finds and fetches the metadata document of an RO-Crate from a URL, as in
  * "Retrieving an RO-Crate" of the RO-Crate specification. A URL, such as a
  * persistent identifier or a profile's <code>conformsTo</code> identifier,
- * often leads to a web page rather than to the crate, so after following
- * redirects, stopping at the first that works:
+ * often leads to a web page rather than to the crate, so in the
+ * specification's order, stopping at the first that works:
  * <ol>
- * <li>the response itself if it is JSON, as asked for with content negotiation
- * (<code>application/ld+json;profile="https://w3id.org/ro/crate"</code>);
- * <li>FAIR Signposting: a <code>Link</code> header with
- * <code>rel="describedby"</code> to JSON(-LD) or with the RO-Crate profile;
- * <li>the same as a <code>&lt;link&gt;</code> in an HTML page, as RO-Crate
- * previews and MASP profile pages have;
- * <li>for a folder (a path ending with <code>/</code>), its
- * <code>ro-crate-metadata.json</code>.
+ * <li>after following redirects <em>without</em> content negotiation, the
+ * response itself if it is JSON, else FAIR Signposting: a <code>Link</code>
+ * header with <code>rel="describedby"</code> to JSON(-LD) or with the RO-Crate
+ * profile, or the same as a <code>&lt;link&gt;</code> in an HTML page, as
+ * RO-Crate previews and MASP profile pages have;
+ * <li>content negotiation for the RO-Crate media type
+ * (<code>application/ld+json;profile="https://w3id.org/ro/crate"</code>), and
+ * the links of what that gives. Only second, as persistent identifiers may
+ * negotiate to other formats, e.g. w3id.org/fairscape/profile/0.2 to Turtle;
+ * <li>the heuristic fallback: <code>ro-crate-metadata.json</code> next to the
+ * resolved URL, for a folder (a path ending with <code>/</code>) or its
+ * <code>index.html</code>.
  * </ol>
  * Zip and BagIt archives (<code>rel="item"</code>) are not supported yet.
  * Whether what comes back is a crate is for {@link CrateReader} to say, read
@@ -63,10 +67,16 @@ public class CrateRetriever {
 	public static final String RO_CRATE_PROFILE = "https://w3id.org/ro/crate";
 	public static final String ACCEPT = "application/ld+json;profile=\"" + RO_CRATE_PROFILE
 			+ "\", application/ld+json;q=0.9, application/json;q=0.8, text/html;q=0.5, */*;q=0.1";
+	/**
+	 * Without content negotiation, as for Signposting: as a browser asks, as
+	 * some persistent identifiers (e.g. w3id.org/ro/crate/1.3) only redirect
+	 * for HTML or JSON-LD, not for any type
+	 */
+	private static final String ACCEPT_ANY = "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8";
 	/** Largest metadata document read, as anything fetched is untrusted */
 	public static final int MAX_BYTES = 16 * 1024 * 1024;
 	/** Most requests to retrieve one crate: links followed, then the folder */
-	private static final int MAX_REQUESTS = 5;
+	private static final int MAX_REQUESTS = 6;
 	private static final Pattern LINK_TAG = Pattern.compile("<link\\b([^>]*)>", Pattern.CASE_INSENSITIVE);
 	private static final Pattern ATTRIBUTE = Pattern
 			.compile("([\\w-]+)\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s\"'>]+))");
@@ -79,7 +89,8 @@ public class CrateRetriever {
 	 *                identifiers
 	 * @param content Its bytes
 	 * @param steps   How it was found from the URL asked for, e.g. "Link
-	 *                header", "HTML link", "folder"; empty if the URL gave it
+	 *                header", "HTML link", "content negotiation", "folder";
+	 *                empty if the URL gave it
 	 */
 	public record Retrieved(URI source, byte[] content, List<String> steps) {
 		public Retrieved {
@@ -118,56 +129,156 @@ public class CrateRetriever {
 				yield new Retrieved(file.toUri(), limited(in, file.toUri()), List.of());
 			}
 		}
-		case "http", "https" -> fetch(location, location, new LinkedHashSet<>(), new ArrayList<>());
+		case "http", "https" -> new Attempt(location).run();
 		default -> throw new IOException("Only https:, http: and file: URLs, not " + location);
 		};
 	}
 
-	private Retrieved fetch(URI uri, URI asked, Set<URI> requested, List<String> steps)
-			throws IOException, InterruptedException {
-		if (!requested.add(uri) || requested.size() > MAX_REQUESTS) {
-			throw new IOException("Can't find the RO-Crate metadata of " + asked + ": followed " + requested);
+	/**
+	 * A response, its body read if it was 200 OK.
+	 */
+	private record Response(URI at, int status, String type, HttpHeaders headers, byte[] body) {
+		boolean ok() {
+			return status == 200;
 		}
-		HttpRequest request = HttpRequest.newBuilder(uri).timeout(timeout).header("Accept", ACCEPT).GET().build();
-		HttpResponse<InputStream> response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
-		URI at = response.uri();
-		int status = response.statusCode();
-		String type = response.headers().firstValue("Content-Type").orElse("").toLowerCase(Locale.ROOT);
-		byte[] body;
-		try (InputStream in = response.body()) {
-			body = status == 200 ? limited(in, at) : new byte[0];
+
+		boolean json() {
+			return ok() && isJson(type, body);
 		}
-		if (status == 200 && isJson(type, body)) {
-			return new Retrieved(at, body, steps);
+
+		boolean html() {
+			return ok() && isHtml(type, body);
 		}
-		Optional<URI> described = linkHeader(response.headers(), at);
-		if (described.isPresent()) {
-			return fetch(described.get(), asked, requested, with(steps, "Link header"));
+
+		/** What it was, for messages: e.g. "text/turtle from <URL>" or "HTTP 404 from <URL>" */
+		String describe() {
+			return (ok() ? (type.isEmpty() ? "content of unknown type" : type.replaceFirst(";.*", ""))
+					: "HTTP " + status) + " from " + at;
 		}
-		boolean html = status == 200 && isHtml(type, body);
-		if (html) {
-			Optional<URI> linked = htmlLink(new String(body, StandardCharsets.UTF_8), at);
-			if (linked.isPresent()) {
-				return fetch(linked.get(), asked, requested, with(steps, "HTML link"));
-			}
-		}
-		if (at.getPath() != null && at.getPath().endsWith("/")) {
-			return fetch(at.resolve(Crate.RO_CRATE_METADATA_JSON), asked, requested, with(steps, "folder"));
-		}
-		if (html) {
-			throw new IOException(at + " is a web page without a link to its RO-Crate metadata");
-		}
-		if (status == 200) {
-			// Not recognised as JSON: let CrateReader say what is wrong
-			return new Retrieved(at, body, steps);
-		}
-		throw new IOException("Can't load " + at + ": HTTP " + status);
 	}
 
-	private static List<String> with(List<String> steps, String step) {
-		List<String> more = new ArrayList<>(steps);
-		more.add(step);
-		return more;
+	/**
+	 * Retrieving one crate: the requests made so far, and how it was found.
+	 */
+	private final class Attempt {
+		private final URI asked;
+		private final Set<String> requested = new LinkedHashSet<>();
+		private final List<String> steps = new ArrayList<>();
+
+		Attempt(URI asked) {
+			this.asked = asked;
+		}
+
+		Retrieved run() throws IOException, InterruptedException {
+			// 1. Redirects without content negotiation, then Signposting
+			Response plain = get(asked, ACCEPT_ANY);
+			if (plain.json()) {
+				return retrieved(plain);
+			}
+			Optional<Retrieved> linked = follow(plain);
+			if (linked.isPresent()) {
+				return linked.get();
+			}
+			List<String> failures = new ArrayList<>();
+			if (plain.html()) {
+				failures.add(plain.at() + " is a web page without a link to its RO-Crate metadata");
+			} else if (plain.ok()) {
+				failures.add("it gave " + plain.describe());
+			} else {
+				failures.add("Can't load " + plain.at() + ": HTTP " + plain.status());
+			}
+			// 2. Content negotiation for the RO-Crate media type
+			steps.add("content negotiation");
+			Response negotiated = get(asked, ACCEPT);
+			if (negotiated.json()) {
+				return retrieved(negotiated);
+			}
+			linked = follow(negotiated);
+			if (linked.isPresent()) {
+				return linked.get();
+			}
+			steps.remove(steps.size() - 1);
+			if (!negotiated.at().equals(plain.at()) || negotiated.status() != plain.status()) {
+				failures.add("content negotiation gave " + negotiated.describe());
+			}
+			// 3. Heuristic: ro-crate-metadata.json next to the resolved URL
+			Optional<URI> folder = folder(plain.at());
+			if (folder.isPresent()) {
+				steps.add("folder");
+				Response metadata = get(folder.get(), ACCEPT);
+				if (metadata.ok()) {
+					// Not recognised as JSON: let CrateReader say what is wrong
+					return retrieved(metadata);
+				}
+				failures.add("nor " + metadata.describe());
+			}
+			throw new IOException(String.join("; ", failures));
+		}
+
+		/**
+		 * Follow a response's <code>describedby</code> link, from a Link header
+		 * or an HTML page, to the metadata document.
+		 */
+		private Optional<Retrieved> follow(Response response) throws IOException, InterruptedException {
+			Optional<URI> described = linkHeader(response.headers(), response.at());
+			String step = "Link header";
+			if (described.isEmpty() && response.html()) {
+				described = htmlLink(new String(response.body(), StandardCharsets.UTF_8), response.at());
+				step = "HTML link";
+			}
+			if (described.isEmpty()) {
+				return Optional.empty();
+			}
+			steps.add(step);
+			Response target = get(described.get(), ACCEPT);
+			if (target.json()) {
+				return Optional.of(retrieved(target));
+			}
+			Optional<Retrieved> further = follow(target);
+			if (further.isPresent()) {
+				return further;
+			}
+			if (target.html()) {
+				throw new IOException(target.at() + " is a web page without a link to its RO-Crate metadata");
+			}
+			if (target.ok()) {
+				// Not recognised as JSON: let CrateReader say what is wrong
+				return Optional.of(retrieved(target));
+			}
+			throw new IOException("Can't load " + target.at() + ": HTTP " + target.status());
+		}
+
+		private Retrieved retrieved(Response response) {
+			return new Retrieved(response.at(), response.body(), steps);
+		}
+
+		private Response get(URI uri, String accept) throws IOException, InterruptedException {
+			if (!requested.add(accept + " " + uri) || requested.size() > MAX_REQUESTS) {
+				throw new IOException("Can't find the RO-Crate metadata of " + asked + ": followed "
+						+ requested.stream().map(r -> r.substring(r.indexOf(' ') + 1)).distinct().toList());
+			}
+			HttpRequest request = HttpRequest.newBuilder(uri).timeout(timeout).header("Accept", accept).GET().build();
+			HttpResponse<InputStream> response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
+			URI at = response.uri();
+			int status = response.statusCode();
+			String type = response.headers().firstValue("Content-Type").orElse("").toLowerCase(Locale.ROOT);
+			try (InputStream in = response.body()) {
+				return new Response(at, status, type, response.headers(), status == 200 ? limited(in, at) : new byte[0]);
+			}
+		}
+	}
+
+	/**
+	 * Where <code>ro-crate-metadata.json</code> would be next to a resolved
+	 * URL: for a folder, or its <code>index.html</code>, as in the
+	 * specification's example.
+	 */
+	static Optional<URI> folder(URI resolved) {
+		String path = resolved.getPath();
+		if (path == null || !(path.endsWith("/") || path.matches(".*/index\\.html?"))) {
+			return Optional.empty();
+		}
+		return Optional.of(resolved.resolve(Crate.RO_CRATE_METADATA_JSON));
 	}
 
 	private static byte[] limited(InputStream in, URI from) throws IOException {

@@ -100,6 +100,29 @@ public class TestProfileCache {
 				status = 302;
 				body = new byte[0];
 			}
+			// As w3id.org/fairscape/profile/0.2: JSON-LD asked for, Turtle given;
+			// without content negotiation, the page linking to the crate
+			case "/turtle" -> {
+				boolean jsonLd = accept != null && accept.contains("application/ld+json");
+				exchange.getResponseHeaders().add("Location", url(jsonLd ? "/profile.ttl" : "/pages/").toString());
+				status = 303;
+				body = new byte[0];
+			}
+			case "/profile.ttl" -> {
+				exchange.getResponseHeaders().add("Content-Type", "text/turtle");
+				body = "<https://example.com/profile> a <http://www.w3.org/ns/dx/prof/Profile> ."
+						.getBytes(StandardCharsets.UTF_8);
+			}
+			// Turtle only, from a page without a link
+			case "/turtle-only" -> {
+				if (accept != null && accept.contains("application/ld+json")) {
+					exchange.getResponseHeaders().add("Location", url("/profile.ttl").toString());
+					status = 303;
+					body = new byte[0];
+				} else {
+					body = html(exchange, "");
+				}
+			}
 			// Content negotiation
 			case "/conneg" -> {
 				if (accept != null && accept.contains("application/ld+json")) {
@@ -222,8 +245,9 @@ public class TestProfileCache {
 		assertEquals(99, ldac.propertyRules().size());
 		// Kept, and found by identifier afterwards
 		assertSame(ldac, cache.load(url("/ldac/ro-crate-metadata.json")));
-		// The folder, then its ro-crate-metadata.json
-		assertEquals(2, requests.get());
+		// The folder, with and without content negotiation, then its
+		// ro-crate-metadata.json
+		assertEquals(3, requests.get());
 		assertSame(ldac, cache.find("https://w3id.org/ldac/profile").orElseThrow());
 	}
 
@@ -232,7 +256,7 @@ public class TestProfileCache {
 	 */
 	@Test
 	public void retrieveFromIdentifier() {
-		for (String path : List.of("/pages/", "/header", "/w3id", "/conneg")) {
+		for (String path : List.of("/pages/", "/header", "/w3id", "/conneg", "/turtle")) {
 			Profile ldac = cache(Duration.ofSeconds(10)).load(url(path));
 			assertFalse(path + ": " + ldac.allProblems(), ldac.hasErrors());
 			assertEquals(path, 99, ldac.propertyRules().size());
@@ -246,6 +270,11 @@ public class TestProfileCache {
 		assertTrue(page.hasErrors());
 		assertTrue(page.allProblems().toString(),
 				page.allProblems().get(0).message().contains("web page without a link to its RO-Crate metadata"));
+		// Content negotiation to another format is reported too
+		Profile turtle = cache(Duration.ofSeconds(10)).load(url("/turtle-only"));
+		assertTrue(turtle.hasErrors());
+		assertTrue(turtle.allProblems().toString(), turtle.allProblems().get(0).message()
+				.contains("content negotiation gave text/turtle from " + url("/profile.ttl")));
 		Profile loop = cache(Duration.ofSeconds(10)).load(url("/loop/"));
 		assertTrue(loop.hasErrors());
 		assertTrue(loop.allProblems().toString(), loop.allProblems().get(0).message().startsWith("Can't"));
@@ -422,8 +451,9 @@ public class TestProfileCache {
 		assertEquals(Severity.ERROR, missing.allProblems().get(0).severity());
 		// Not cached: tried again
 		cache.load(url("/missing/"));
-		// Each time the folder, then its ro-crate-metadata.json
-		assertEquals(4, requests.get());
+		// Each time the folder, with and without content negotiation, then
+		// its ro-crate-metadata.json
+		assertEquals(6, requests.get());
 	}
 
 	@Test
