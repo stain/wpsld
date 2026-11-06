@@ -83,6 +83,16 @@ public class TestCrateEditor extends ApplicationTest {
 	}
 
 	@Test
+	public void addTypeOutsideSchemaOrg() {
+		entities();
+		// From the RO-Crate context: Bioschemas and PCDM
+		addEntity("computationalworkflow");
+		assertEquals(List.of("ComputationalWorkflow"), entities().getItems().get(1).getTypes());
+		addEntity("repositorycollection");
+		assertEquals(List.of("RepositoryCollection"), entities().getItems().get(2).getTypes());
+	}
+
+	@Test
 	public void idClashMergesOnce() {
 		entities();
 		addEntity("datadownload");

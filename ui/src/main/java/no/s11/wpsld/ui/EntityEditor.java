@@ -79,6 +79,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
+import no.s11.wpsld.crate.CrateDocument;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.form.EntityTypes;
@@ -195,7 +196,20 @@ public class EntityEditor extends ScrollPane {
 	 * Let the user choose a type to add to the entity, e.g. for a new entity.
 	 */
 	public void chooseType() {
-		new TypeSelector(schema, getScene().getWindow()).showAndWait().ifPresent(this::addType);
+		new TypeSelector(schema, otherTypes(), getScene().getWindow()).showAndWait().ifPresent(this::addType);
+	}
+
+	/**
+	 * Types to offer outside schema.org: those the profile names, then the
+	 * RO-Crate context's, e.g. RepositoryCollection and ComputationalWorkflow.
+	 */
+	private List<ClassDef> otherTypes() {
+		Map<URI, ClassDef> others = new LinkedHashMap<>();
+		for (URI iri : formFields.otherTypes()) {
+			others.put(iri, terms.otherClass(iri, Optional.of("From the profile " + formFields.getName() + ": " + iri)));
+		}
+		terms.contextClasses().forEach(c -> others.putIfAbsent(c.getID(), c));
+		return List.copyOf(others.values());
 	}
 
 	private Optional<ClassDef> classDef(String typeName) {
@@ -273,23 +287,24 @@ public class EntityEditor extends ScrollPane {
 		chips.getChildren().add(add);
 		// Types the profile requires, e.g. Dataset for the root; a subtype will do
 		for (URI required : formFields.requiredTypes(typeIris(), entity == root.get())) {
-			Optional<ClassDef> requiredClass = Optional.ofNullable(schema.getClasses().get(required));
-			boolean has = requiredClass.map(c -> entityTypes.isA(entity.getTypes(), c))
-					.orElse(typeIris().contains(required));
+			Optional<ClassDef> schemaClass = Optional.ofNullable(schema.getClasses().get(required));
+			boolean has = schemaClass.map(c -> entityTypes.isA(entity.getTypes(), c))
+					.orElse(typeIris().stream().map(URI::toString).map(CrateDocument::normalise)
+							.anyMatch(CrateDocument.normalise(required.toString())::equals));
 			if (!has) {
-				String name = requiredClass.map(terms::name).orElse(required.toString());
+				// Outside schema.org, e.g. pcdm:Collection: named as the context names it
+				ClassDef requiredClass = schemaClass.orElseGet(() -> terms.otherClass(required, Optional.empty()));
+				String name = terms.name(requiredClass);
 				Label notice = new Label("Required type: " + name);
 				notice.setId(id("requiredType", name));
 				notice.setStyle("-fx-text-fill: #b00000; -fx-font-weight: bold;");
 				notice.setTooltip(tooltip("The profile " + formFields.getName() + " requires this entity to be a "
 						+ name + " (or a kind of " + name + ")"));
 				chips.getChildren().add(notice);
-				requiredClass.ifPresent(c -> {
-					Button addRequired = new Button("Add " + name);
-					addRequired.setId(id("addRequiredType", name));
-					addRequired.setOnAction(e -> addType(c));
-					chips.getChildren().add(addRequired);
-				});
+				Button addRequired = new Button("Add " + name);
+				addRequired.setId(id("addRequiredType", name));
+				addRequired.setOnAction(e -> addType(requiredClass));
+				chips.getChildren().add(addRequired);
 			}
 		}
 		return chips;

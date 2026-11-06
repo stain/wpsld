@@ -39,8 +39,10 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.CrateChecks;
+import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.masp.Profile;
 import no.s11.wpsld.masp.ProfileCache;
 import no.s11.wpsld.masp.ProfileReader;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
@@ -177,5 +179,18 @@ public class TestProfileFormFields {
 		// Without the profile, a retired property of the types
 		assertFalse(core.fieldsFor(DATASET, true).stream().anyMatch(f -> f.name().equals("fileFormat")));
 		assertTrue(core.retiredFieldsFor(DATASET).stream().anyMatch(f -> f.name().equals("fileFormat")));
+	}
+
+	@Test
+	public void otherTypes() throws Exception {
+		assertEquals(List.of(), core.otherTypes());
+		try (InputStream in = getClass().getResourceAsStream("/no/s11/wpsld/crate/masp/ldac-profile.json")) {
+			Profile ldac = new ProfileReader().read(new CrateReader().read(in, "ldac-profile.json"));
+			ProfileFormFields fields = new ProfileFormFields(ldac, new SchemaOrgFormFields(terms));
+			assertTrue(fields.otherTypes().toString(),
+					fields.otherTypes().contains(URI.create("http://pcdm.org/models#Collection")));
+			// The root must be a RepositoryCollection too
+			assertTrue(fields.requiredTypes(DATASET, true).contains(URI.create("http://pcdm.org/models#Collection")));
+		}
 	}
 }

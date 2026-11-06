@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -52,6 +54,9 @@ public record CrateDocument(String source, Optional<Crate> crate, JsonLdContext 
 		List<String> conformsTo, List<Problem> problems) {
 
 	private static final String SCHEMA_HTTPS = "https://schema.org/";
+	private static final String BIOSCHEMAS_TERMS = "https://bioschemas.org/terms/";
+	/** A Bioschemas type outside terms/, e.g. https://bioschemas.org/ComputationalWorkflow */
+	private static final Pattern BIOSCHEMAS_TYPE = Pattern.compile("https?://bioschemas\\.org/([A-Z]\\w*)");
 	private static final String SCHEMA_HTTP = "http://schema.org/";
 
 	/**
@@ -94,10 +99,17 @@ public record CrateDocument(String source, Optional<Crate> crate, JsonLdContext 
 
 	/**
 	 * <code>https://schema.org/</code> IRIs as <code>http://schema.org/</code>,
-	 * as used by the RO-Crate contexts; other IRIs as they are.
+	 * as used by the RO-Crate contexts, and Bioschemas types as RO-Crate 1.3
+	 * writes them, e.g. <code>https://bioschemas.org/terms/ComputationalWorkflow</code>
+	 * for <code>https://bioschemas.org/ComputationalWorkflow</code> of RO-Crate
+	 * 1.1 and 1.2; other IRIs as they are.
 	 */
 	public static String normalise(String iri) {
-		return iri.startsWith(SCHEMA_HTTPS) ? SCHEMA_HTTP + iri.substring(SCHEMA_HTTPS.length()) : iri;
+		if (iri.startsWith(SCHEMA_HTTPS)) {
+			return SCHEMA_HTTP + iri.substring(SCHEMA_HTTPS.length());
+		}
+		Matcher bioschemas = BIOSCHEMAS_TYPE.matcher(iri);
+		return bioschemas.matches() ? BIOSCHEMAS_TERMS + bioschemas.group(1) : iri;
 	}
 
 	/**

@@ -111,6 +111,17 @@ public class ProfileFormFields implements FormFields {
 				.flatMap(r -> r.specializationOf().stream()).map(URI::create).toList();
 	}
 
+	/**
+	 * The types the profile's class rules specialise that schema.org does
+	 * not define, e.g. <code>pcdm:Collection</code> or Bioschemas'
+	 * <code>ComputationalWorkflow</code>.
+	 */
+	@Override
+	public List<URI> otherTypes() {
+		return profile.classRules().values().stream().flatMap(r -> r.specializationOf().stream()).distinct()
+				.map(URI::create).filter(iri -> !terms.getSchema().getClasses().containsKey(iri)).toList();
+	}
+
 	private List<ClassRule> rulesFor(Set<URI> types, boolean root) {
 		if (root && profile.rootRule().isPresent()) {
 			return profile.rootRule().flatMap(profile::classRule).stream().toList();

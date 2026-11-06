@@ -18,6 +18,7 @@
 package no.s11.wpsld.crate;
 
 import java.net.URI;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -46,6 +47,9 @@ import no.s11.wpsld.util.Value;
  */
 public class CrateTerms {
 	/** Names RO-Crate requires instead of the schema.org name */
+	private static final String THING = "http://schema.org/Thing";
+	/** Not types of entities, e.g. rdf:HTML */
+	private static final String RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 	private static final Map<String, String> PREFERRED = Map.of("http://schema.org/MediaObject", "File");
 	private static final Value<JsonLdContext> RO_CRATE_1_3 = Value.lazy(
 			() -> JsonLdContext.of(TextNode.valueOf(Crate.RO_CRATE_1_3_CONTEXT), ContextCache.bundled()));
@@ -106,6 +110,32 @@ public class CrateTerms {
 	 */
 	public Optional<ClassDef> classDef(String typeName) {
 		return context.expandTerm(typeName).map(URI::create).map(schema.getClasses()::get);
+	}
+
+	/**
+	 * A class outside schema.org, e.g. <code>pcdm:Collection</code>, named as
+	 * the RO-Crate context names it (<code>RepositoryCollection</code>) and as
+	 * a kind of Thing, so that it can be chosen and added like schema.org's.
+	 */
+	public ClassDef otherClass(URI iri, Optional<String> comment) {
+		ClassDef thing = schema.getClasses().get(URI.create(THING));
+		return new ClassDef(iri, Optional.of(context.compact(iri.toString())), comment,
+				() -> thing == null ? List.of() : List.of(thing));
+	}
+
+	/**
+	 * The types the RO-Crate context names outside schema.org, e.g.
+	 * <code>ComputationalWorkflow</code> and <code>RepositoryCollection</code>:
+	 * its terms starting with a capital letter, as types do, for IRIs that are
+	 * not schema.org's (or RDF's datatypes).
+	 */
+	public List<ClassDef> contextClasses() {
+		return context.getTerms().stream().filter(t -> !t.isEmpty() && Character.isUpperCase(t.charAt(0))).sorted()
+				.flatMap(t -> context.expandTerm(t).stream())
+				.filter(iri -> !iri.startsWith("http://schema.org/") && !iri.startsWith("https://schema.org/")
+						&& !iri.startsWith(RDF))
+				.distinct().map(iri -> otherClass(URI.create(iri), Optional.of("From the RO-Crate context: " + iri)))
+				.toList();
 	}
 
 	/**

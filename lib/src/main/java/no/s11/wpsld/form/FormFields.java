@@ -66,6 +66,15 @@ public interface FormFields {
 	}
 
 	/**
+	 * Types outside the vocabulary that this choice of fields names, e.g. a
+	 * profile's <code>pcdm:Collection</code>, to offer when adding a type;
+	 * none by default.
+	 */
+	default List<URI> otherTypes() {
+		return List.of();
+	}
+
+	/**
 	 * A name to show for this choice of fields, e.g. in a drop-down.
 	 */
 	String getName();

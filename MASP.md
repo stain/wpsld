@@ -364,6 +364,21 @@ superclass where the profile gives one (`rdfs:subClassOf`, e.g. `Event`), or
 otherwise a default such as `CreativeWork` or `Thing`. Superclasses of a
 selected type need not be added, as elsewhere (see PLAN.md).
 
+Done so far: the type chooser offers, under Thing, the types the profile's
+class rules specialise that are outside schema.org. For example, LDAC's
+root must also be a `pcdm:Collection`, which the RO-Crate context calls
+`RepositoryCollection`. It also offers the RO-Crate context's own non-schema.org
+types, such as `ComputationalWorkflow`, `FormalParameter`, `RepositoryObject`
+and `Profile`. A required type outside schema.org gets an "Add" button like
+schema.org types do.
+
+RO-Crate 1.3 renamed the Bioschemas types: `https://bioschemas.org/terms/ComputationalWorkflow`,
+where 1.1 and 1.2 have `https://bioschemas.org/ComputationalWorkflow`. The
+MASP Workflow Profile still uses the 1.2 form, so `CrateDocument.normalise`
+treats both as the 1.3 form. Upstream, it may be worth moving the profile to
+the 1.3 IRIs. The core RO-Crate MASP profile has no rule for workflows; that
+is left to the Workflow Profile.
+
 ### Profiles in the editor
 
 - `ProfileFormFields` gives a profile's three tiers (Required, Suggested,

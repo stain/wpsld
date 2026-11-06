@@ -95,4 +95,30 @@ public class TestCrateTerms {
 		assertEquals(List.of(), context.getProblems());
 		assertEquals(Optional.of("http://schema.org/MediaObject"), context.expandTerm("File"));
 	}
+
+	@Test
+	public void otherClasses() {
+		List<String> names = terms.contextClasses().stream().map(terms::name).toList();
+		assertTrue(names.toString(), names.containsAll(List.of("ComputationalWorkflow", "FormalParameter",
+				"RepositoryCollection", "RepositoryObject", "RepositoryFile", "Profile")));
+		// Not schema.org's, nor datatypes
+		assertFalse(names.contains("File"));
+		assertFalse(names.contains("HTML"));
+
+		ClassDef collection = terms.otherClass(URI.create("http://pcdm.org/models#Collection"), Optional.empty());
+		assertEquals("RepositoryCollection", terms.name(collection));
+		assertTrue(collection.getSelfAndSuperClasses().contains(classDef("Thing")));
+		assertEquals(Optional.of(URI.create("http://pcdm.org/models#Collection")), terms.iri("RepositoryCollection"));
+	}
+
+	@Test
+	public void bioschemasTypesOfEarlierVersions() {
+		assertEquals("https://bioschemas.org/terms/ComputationalWorkflow",
+				CrateDocument.normalise("https://bioschemas.org/ComputationalWorkflow"));
+		assertEquals("https://bioschemas.org/terms/ComputationalWorkflow",
+				CrateDocument.normalise("https://bioschemas.org/terms/ComputationalWorkflow"));
+		// Not profiles
+		assertEquals("https://bioschemas.org/profiles/ComputationalWorkflow/1.0-RELEASE",
+				CrateDocument.normalise("https://bioschemas.org/profiles/ComputationalWorkflow/1.0-RELEASE"));
+	}
 }
