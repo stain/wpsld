@@ -19,18 +19,28 @@ package no.s11.wpsld.util;
 
 import static org.junit.Assert.*;
 
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
+import org.junit.Assume;
 import org.junit.Test;
 
 public class TestAppDirectories {
 
 	private static List<String> strings(List<Path> paths) {
 		return paths.stream().map(Path::toString).toList();
+	}
+
+	/**
+	 * As Paths, which compare equal also on Windows, where they print with \
+	 */
+	private static List<Path> paths(String... paths) {
+		return Stream.of(paths).map(Path::of).toList();
 	}
 
 	@Test
@@ -40,8 +50,8 @@ public class TestAppDirectories {
 		assertEquals(Path.of("/home/alice/.local/share/wpsld"), dirs.data());
 		assertEquals(Path.of("/home/alice/.config/wpsld"), dirs.config());
 		assertEquals(Path.of("/home/alice/.local/state/wpsld"), dirs.state());
-		assertEquals(List.of("/home/alice/.local/share/wpsld", "/usr/local/share/wpsld", "/usr/share/wpsld"),
-				strings(dirs.dataDirs()));
+		assertEquals(paths("/home/alice/.local/share/wpsld", "/usr/local/share/wpsld", "/usr/share/wpsld"),
+				dirs.dataDirs());
 	}
 
 	@Test
@@ -53,7 +63,7 @@ public class TestAppDirectories {
 		assertEquals(Path.of("/data/wpsld"), dirs.data());
 		assertEquals(Path.of("/cfg/wpsld"), dirs.config());
 		assertEquals(Path.of("/state/wpsld"), dirs.state());
-		assertEquals(List.of("/data/wpsld", "/opt/share/wpsld", "/usr/share/wpsld"), strings(dirs.dataDirs()));
+		assertEquals(paths("/data/wpsld", "/opt/share/wpsld", "/usr/share/wpsld"), dirs.dataDirs());
 	}
 
 	/**
@@ -66,7 +76,7 @@ public class TestAppDirectories {
 				"FreeBSD", "/home/alice");
 		assertEquals(Path.of("/home/alice/.cache/wpsld"), dirs.cache());
 		assertEquals(Path.of("/home/alice/.local/share/wpsld"), dirs.data());
-		assertEquals(List.of("/home/alice/.local/share/wpsld", "/ok/wpsld"), strings(dirs.dataDirs()));
+		assertEquals(paths("/home/alice/.local/share/wpsld", "/ok/wpsld"), dirs.dataDirs());
 	}
 
 	@Test
@@ -103,12 +113,14 @@ public class TestAppDirectories {
 		assertEquals(Path.of("/Users/alice/Library/Application Support/wpsld"), dirs.data());
 		assertEquals(dirs.data(), dirs.config());
 		assertEquals(Path.of("/Users/alice/Library/Application Support/wpsld/State"), dirs.state());
-		assertEquals(List.of("/Users/alice/Library/Application Support/wpsld", "/Library/Application Support/wpsld"),
-				strings(dirs.dataDirs()));
+		assertEquals(paths("/Users/alice/Library/Application Support/wpsld", "/Library/Application Support/wpsld"),
+				dirs.dataDirs());
 	}
 
 	@Test
 	public void createdForUserOnly() throws Exception {
+		// Not on Windows, which has ACLs
+		Assume.assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"));
 		Path dir = Files.createTempDirectory("dirs").resolve("a/b/wpsld");
 		assertEquals(dir, AppDirectories.create(dir));
 		assertTrue(Files.isDirectory(dir));

@@ -63,8 +63,8 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   changed too (e.g. to an absolute URI), with the descriptor's `about`
   following. Changing to an `@id` that already exists asks to merge the two
   entities (`Crate.merge`: types and values combined, references repointed,
-  redundant supertypes dropped). Next: undo, and with the file system backend
-  possibly renaming the file itself.
+  redundant supertypes dropped), and undone with Edit > Undo. Next: with the
+  file system backend, possibly renaming the file itself.
 - **Several `@type`s.** The type selector should allow choosing more than one
   type, making `@type` an array. A type's superclass needn't be added as well
   (e.g. not both `CreativeWork` and `Dataset`); the selector can warn about
@@ -97,7 +97,7 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   `ro-crate-metadata.json`), after `CrateChecks` of the root's required
   properties and of references to local `@id`s not in the crate, with "Save
   anyway". Proper validation will come from MASP rules in Java (no Python).
-  Next: open an existing `ro-crate-metadata.json`.
+  Opening is File > Open (see Menus).
 - **Opening an existing `ro-crate-metadata.json`.** Crates come from any
   tool, so loading needs many sanity checks so that unexpected input never
   breaks the UI: not JSON, or JSON-LD that is not flattened (nested objects,
@@ -113,9 +113,10 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   of MASP. *Reader done* (`CrateReader` → `CrateDocument`, on the `masp`
   branch): never throws, ERROR/WARNING problems (errors first), unknown terms
   and undefined prefixes reported once each, duplicates merged, values kept as
-  written; reads our own output back unchanged. Next: open crates in the
-  editor, showing the problems, and keep the read `@context` and descriptor
-  when writing back (today `Crate.toJson()` writes RO-Crate 1.3's).
+  written; reads our own output back unchanged. *Opening done:* File > Open
+  shows the problems beside the crate, and saving keeps the crate's own
+  `@context` and descriptor (see Menus). Still to do: show values the form
+  can't edit read-only.
 - **More RO-Crate requirements in the save checks**, e.g. scripts and
   workflows (`SoftwareSourceCode`, `ComputationalWorkflow`) MUST have a
   `name`, found by rocrate-validator; better covered by validation from the
@@ -205,6 +206,11 @@ there yet. Next: Undo/Default/Help, mnemonics on tabs, the Warp 3 style
   `value-<property>-<n>`, `add-<property>`, `new-<property>`,
   `otherProperties`, `suggestType-<Type>`, `typeSearch`, `typeTree`,
   `entities`, `addEntity`, `removeEntity`, `save`, `preview`.
+- The release workflow also runs `./gradlew build` on each platform's
+  runner; it must pass on linux-x64, and is reported elsewhere. The tests
+  should not assume `/` in paths or POSIX permissions, and `.gitattributes`
+  checks text out with LF on Windows too, as tests check the SHA-256 of
+  bundled files.
 
 ### User folders
 
@@ -266,5 +272,7 @@ and recent files (in the state folder).
 
 ### Profiles
 
-- RO-Crate MASP profiles: see [MASP.md](MASP.md), on hold until the editor
-  works well with plain schema.org.
+- RO-Crate MASP profiles drive the forms: bundled, loaded from a URL, a
+  file or a registry, and chosen by the crate's `conformsTo`. See
+  [MASP.md](MASP.md) for how, and for what's next (SHACL shapes for profiles
+  such as FAIRSCAPE, checking kept profiles for updates).
