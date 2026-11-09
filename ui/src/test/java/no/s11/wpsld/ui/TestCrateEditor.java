@@ -475,6 +475,39 @@ public class TestCrateEditor extends ApplicationTest {
 		assertFalse(Files.readString(file).contains("Changed elsewhere"));
 	}
 
+	/**
+	 * Saved, changed elsewhere (e.g. on the command line), then edited: coming
+	 * back reloads the file, so saving keeps both the other change and the edit.
+	 */
+	@Test
+	public void saveAfterChangeElsewhereKeepsIt() throws Exception {
+		Path file = openNewCrate();
+		addEntity("person");
+		push(KeyCode.SHORTCUT, KeyCode.S);
+		WaitForAsyncUtils.waitForFxEvents();
+		if (lookup(".dialog-pane .button").match((Button b) -> b.getText().equals("Save Anyway")).tryQuery()
+				.isPresent()) {
+			clickDialogButton("Save Anyway");
+		}
+		assertTrue(Files.readString(file).contains("Person"));
+		changeOnDisk(file);
+		// Back to the window
+		checkDisk();
+		assertTrue(json().contains("Changed elsewhere"));
+		interact(() -> entities().getSelectionModel().select(0));
+		clickOn(lookup("#value-description-0").queryAs(TextField.class)).write(" More");
+		clickOn("#entities");
+		push(KeyCode.SHORTCUT, KeyCode.S);
+		WaitForAsyncUtils.waitForFxEvents();
+		if (lookup(".dialog-pane .button").match((Button b) -> b.getText().equals("Save Anyway")).tryQuery()
+				.isPresent()) {
+			clickDialogButton("Save Anyway");
+		}
+		String saved = Files.readString(file);
+		assertTrue(saved, saved.contains("Changed elsewhere"));
+		assertTrue(saved, saved.contains("For testing More"));
+	}
+
 	/** Saving over a changed file: Reload discards the unsaved changes instead */
 	@Test
 	public void reloadInsteadOfSaving() throws Exception {
