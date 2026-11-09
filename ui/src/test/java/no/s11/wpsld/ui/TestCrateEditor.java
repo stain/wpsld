@@ -382,6 +382,112 @@ public class TestCrateEditor extends ApplicationTest {
 		assertTrue(lookup("#entities").tryQuery().isPresent());
 	}
 
+	/** As another application (e.g. git) would: the crate with another name, and a later time */
+	private static void changeOnDisk(Path file) throws Exception {
+		Files.writeString(file, Files.readString(file).replace("\"A crate\"", "\"Changed elsewhere\""));
+		Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.from(java.time.Instant.now().plusSeconds(10)));
+	}
+
+	/** Check the file on disk, as when coming back to the window, without waiting for a dialog it shows */
+	private void checkDisk() {
+		WaitForAsyncUtils.asyncFx(app::checkDisk);
+		WaitForAsyncUtils.waitForFxEvents();
+	}
+
+	/** A dialog's button, not one of the window's with the same text */
+	private void clickDialogButton(String text) {
+		clickOn(lookup(".dialog-pane .button").match((Button b) -> b.getText().equals(text)).queryButton());
+		WaitForAsyncUtils.waitForFxEvents();
+	}
+
+	private String json() {
+		return lookup("#preview").queryTextInputControl().getText();
+	}
+
+	/**
+	 * Changed on disk with no unsaved changes: reloaded, and Undo brings the
+	 * crate as it was back.
+	 */
+	@Test
+	public void reloadChangedFile() throws Exception {
+		Path file = openNewCrate();
+		changeOnDisk(file);
+		checkDisk();
+		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
+		assertTrue(json().contains("Changed elsewhere"));
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertFalse(stage.getTitle().startsWith("*") || stage.getTitle().endsWith("Edited"));
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		assertTrue(json().contains("A crate"));
+	}
+
+	/**
+	 * Written again with the same content, with a new time (as git may): not
+	 * a change, so unsaved changes stay and nothing is asked.
+	 */
+	@Test
+	public void touchedFileNotChanged() throws Exception {
+		Path file = openNewCrate();
+		addEntity("person");
+		Files.writeString(file, Files.readString(file));
+		Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.from(java.time.Instant.now().plusSeconds(10)));
+		checkDisk();
+		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
+		assertEquals(2, entities().getItems().size());
+	}
+
+	/**
+	 * Changed on disk with unsaved changes: asked once whether to keep them;
+	 * saving then asks again, and Cancel leaves the other changes alone, Save
+	 * Anyway overwrites them.
+	 */
+	@Test
+	public void keepChangesOverChangedFile() throws Exception {
+		Path file = openNewCrate();
+		addEntity("person");
+		changeOnDisk(file);
+		checkDisk();
+		assertTrue(lookup("“" + file.getParent().getFileName() + java.io.File.separator
+				+ "ro-crate-metadata.json” has been changed by another application.").tryQuery().isPresent());
+		clickDialogButton("Keep My Changes");
+		assertEquals(2, entities().getItems().size());
+		// Not asked again for the same change
+		checkDisk();
+		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
+
+		push(KeyCode.SHORTCUT, KeyCode.S);
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup(".dialog-pane .label").match((Label l) -> l.getText().contains("since you opened or saved it"))
+				.tryQuery().isPresent());
+		clickDialogButton("Cancel");
+		assertTrue(Files.readString(file).contains("Changed elsewhere"));
+
+		push(KeyCode.SHORTCUT, KeyCode.S);
+		WaitForAsyncUtils.waitForFxEvents();
+		clickDialogButton("Save Anyway");
+		// Then perhaps the RO-Crate requirements
+		if (lookup(".dialog-pane .button").match((Button b) -> b.getText().equals("Save Anyway")).tryQuery()
+				.isPresent()) {
+			clickDialogButton("Save Anyway");
+		}
+		assertTrue(Files.readString(file).contains("Person"));
+		assertFalse(Files.readString(file).contains("Changed elsewhere"));
+	}
+
+	/** Saving over a changed file: Reload discards the unsaved changes instead */
+	@Test
+	public void reloadInsteadOfSaving() throws Exception {
+		Path file = openNewCrate();
+		addEntity("person");
+		changeOnDisk(file);
+		push(KeyCode.SHORTCUT, KeyCode.S);
+		WaitForAsyncUtils.waitForFxEvents();
+		clickDialogButton("Reload");
+		assertEquals(1, entities().getItems().size());
+		assertTrue(json().contains("Changed elsewhere"));
+		assertTrue(Files.readString(file).contains("Changed elsewhere"));
+	}
+
 	private MenuItem menuItem(String id) {
 		MenuBar bar = lookup("#menuBar").queryAs(MenuBar.class);
 		return bar.getMenus().stream().flatMap(m -> m.getItems().stream()).filter(i -> id.equals(i.getId()))

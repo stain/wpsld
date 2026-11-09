@@ -169,6 +169,13 @@ public class CrateEditor extends Application {
 	private VBox sidebar;
 	/** Where the dividers were when the sidebar was hidden */
 	private double[] dividers;
+	/** True while checking whether the file changed on disk, as its dialog moves the focus */
+	private boolean checkingDisk;
+
+	/** What to do when saving over a file that changed on disk */
+	private enum Overwrite {
+		SAVE_ANYWAY, RELOAD, SAVE_AS, CANCEL
+	}
 
 	public CrateEditor() {
 		this(SchemaFromJsonLd::new, CrateTerms::prewarm, ProfileCache.forUser(), Optional.of(Settings.userFile()));
@@ -250,6 +257,12 @@ public class CrateEditor extends Application {
 			} else if ((REDO.match(e) || (!CrateFile.onMac() && REDO_WINDOWS.match(e))) && !field.isRedoable()) {
 				e.consume();
 				redo();
+			}
+		});
+		// Back from another application, e.g. git: has it changed the file?
+		stage.focusedProperty().addListener((obs, was, focused) -> {
+			if (focused) {
+				Platform.runLater(this::checkDisk);
 			}
 		});
 		// Closing the window, or File > Exit, asks to save changes
@@ -1051,7 +1064,127 @@ public class CrateEditor extends Application {
 	 */
 	boolean save(Stage stage) {
 		Optional<Path> path = crateFile.path();
-		return path.isEmpty() ? saveAs(stage) : meetsRequirements(stage) && saveTo(stage, path.get());
+		if (path.isEmpty()) {
+			return saveAs(stage);
+		}
+		CrateFile.Disk disk = crateFile.disk();
+		if (disk != CrateFile.Disk.SAME) {
+			switch (askBeforeOverwriting(stage, disk)) {
+				case SAVE_ANYWAY -> {
+				}
+				case SAVE_AS -> {
+					return saveAs(stage);
+				}
+				case RELOAD -> {
+					reload(stage);
+					return false;
+				}
+				case CANCEL -> {
+					return false;
+				}
+			}
+		}
+		return meetsRequirements(stage) && saveTo(stage, path.get());
+	}
+
+	/**
+	 * Saving over a file that another application changed, moved or deleted
+	 * since it was opened or saved: Save Anyway (overwriting the other
+	 * changes), Reload (discarding these), Save As… (keeping both), or
+	 * Cancel, which is the default.
+	 */
+	private Overwrite askBeforeOverwriting(Stage stage, CrateFile.Disk disk) {
+		ButtonType saveAnyway = new ButtonType("Save Anyway", ButtonData.YES);
+		ButtonType reload = new ButtonType("Reload", ButtonData.NO);
+		ButtonType saveAs = new ButtonType("Save As…", ButtonData.OTHER);
+		Alert alert;
+		if (disk == CrateFile.Disk.MISSING) {
+			alert = new Alert(AlertType.WARNING, "Save Anyway saves it there again. Save As… saves it somewhere else.",
+					saveAnyway, saveAs, ButtonType.CANCEL);
+			alert.setHeaderText("“" + crateFile.name() + "” has been moved or deleted since you opened or saved it.");
+		} else {
+			alert = new Alert(AlertType.WARNING, "Save Anyway overwrites the other application's changes. Reload"
+					+ " shows the file as it is now, discarding your changes. Save As… keeps both, saving yours as"
+					+ " another file.", saveAnyway, reload, saveAs, ButtonType.CANCEL);
+			alert.setHeaderText("“" + crateFile.name() + "” has been changed by another application since you"
+					+ " opened or saved it.");
+		}
+		alert.initOwner(stage);
+		cancelByDefault(alert);
+		ButtonType chosen = alert.showAndWait().orElse(ButtonType.CANCEL);
+		return chosen == saveAnyway ? Overwrite.SAVE_ANYWAY
+				: chosen == reload ? Overwrite.RELOAD : chosen == saveAs ? Overwrite.SAVE_AS : Overwrite.CANCEL;
+	}
+
+	/** The safe choice as the default button, not the one that overwrites */
+	private static void cancelByDefault(Alert alert) {
+		for (ButtonType type : alert.getButtonTypes()) {
+			if (alert.getDialogPane().lookupButton(type) instanceof Button button) {
+				button.setDefaultButton(type.getButtonData() == ButtonData.CANCEL_CLOSE);
+			}
+		}
+	}
+
+	/**
+	 * Whether another application changed the file since it was opened or
+	 * saved, e.g. git checking out another version, as when coming back to
+	 * the window. If so: without unsaved changes, reload it; with them, ask
+	 * once whether to reload it or keep them (and choose when saving).
+	 * Moved or deleted files are left to saving.
+	 */
+	void checkDisk() {
+		if (checkingDisk || entityEditor == null || crateFile.disk() != CrateFile.Disk.CHANGED) {
+			return;
+		}
+		checkingDisk = true;
+		try {
+			if (!crateFile.isModified(crate.toJson())) {
+				reload(stage);
+			} else if (!crateFile.keptChangesOverDisk()) {
+				ButtonType reload = new ButtonType("Reload", ButtonData.NO);
+				ButtonType keep = new ButtonType("Keep My Changes", ButtonData.CANCEL_CLOSE);
+				Alert alert = new Alert(AlertType.WARNING, "You have unsaved changes. Reload the file to see it as it"
+						+ " is now, discarding your changes, or keep them and choose when you save.", reload, keep);
+				alert.initOwner(stage);
+				alert.setHeaderText("“" + crateFile.name() + "” has been changed by another application.");
+				cancelByDefault(alert);
+				if (alert.showAndWait().orElse(keep) == reload) {
+					reload(stage);
+				} else {
+					crateFile.keepChangesOverDisk();
+				}
+			}
+		} finally {
+			checkingDisk = false;
+		}
+	}
+
+	/**
+	 * Read the file again, as it is on disk now, replacing the crate as an
+	 * undoable step, so that Undo brings back the crate as it was. The same
+	 * entity stays selected, if it still is in the crate. A file that can't be
+	 * read leaves the crate as it is, and isn't asked about again.
+	 */
+	private void reload(Stage stage) {
+		Path path = crateFile.path().orElseThrow();
+		CrateDocument document = new CrateReader().read(path);
+		if (document.crate().isEmpty() || document.hasErrors()) {
+			crateFile.keepChangesOverDisk();
+			Alert error = new Alert(AlertType.ERROR, document.problems().stream().map(Problem::toString)
+					.collect(Collectors.joining("\n")), ButtonType.OK);
+			error.initOwner(stage);
+			error.setHeaderText("Can't reload " + crateFile.name());
+			error.show();
+			return;
+		}
+		Optional<String> selected = Optional.ofNullable(entities.getSelectionModel().getSelectedItem())
+				.map(Entity::getId);
+		crate = document.crate().get();
+		crateFile.reset(Optional.of(path), crate.toJson());
+		entities.getItems().setAll(crate.getEntities());
+		entities.getSelectionModel().select(selected.flatMap(crate::get).orElse(crate.getRoot()));
+		refresh();
+		checkpoint();
 	}
 
 	/**

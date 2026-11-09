@@ -235,6 +235,16 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
   where only for a new crate; Save As… (Shift+Ctrl+S) asks. Both first
   check the RO-Crate requirements, offering Save Anyway. File > Close
   Window (Ctrl+W).
+- Changes on disk by another application, e.g. git (`CrateFile.disk()`):
+  the file's modification time and size are remembered when it is opened
+  or saved, with its SHA-256, which tells a real change from the same
+  content written again (git checking out, touching). Checked when the
+  window gets the focus back and before saving. Without unsaved changes the
+  file is reloaded, as an undoable step; with them, asked once: Reload or
+  Keep My Changes. Saving over a changed file asks Save Anyway, Reload,
+  Save As… or Cancel (the default); a moved or deleted one, Save Anyway,
+  Save As… or Cancel. Next: Show Differences, entity by entity, and merging
+  them, as JSON-LD entities make a three-way merge feasible.
 - The window's title names the file (`CrateFile`): its folder and name, or
   Untitled, as the operating system has it: "name — Edited" while unsaved
   on macOS, "*name – wpsld" elsewhere.
@@ -317,8 +327,9 @@ Next: opening zipped crates and crates from a URL (with `CrateRetriever`),
 and recent files (in the state folder).
 
 Next, from Apple's Human Interface Guidelines (most also good elsewhere):
-on macOS the app menu (About, Settings…, Quit; needs e.g. NSMenuFX, as
-JavaFX makes its own), a Window menu, a Settings window with panes instead
+on macOS the app menu stays as JavaFX makes it: no native bindings (such
+as NSMenuFX) for now, so About, Settings and Quit stay in Help, Edit and
+File, perhaps duplicated where macOS has them; a Window menu, a Settings window with panes instead
 of the modal Preferences; undo items naming what they undo ("Undo Add
 Type"); the system's accent colour in the Windows 11 and macOS styles; View
 > Profile, as every toolbar item should be a command; and for the macOS

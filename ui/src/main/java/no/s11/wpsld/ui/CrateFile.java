@@ -17,7 +17,14 @@
  */
 package no.s11.wpsld.ui;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Optional;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -25,13 +32,31 @@ import com.fasterxml.jackson.databind.JsonNode;
 /**
  * The RO-Crate Metadata File being edited: where it is, once opened or
  * saved, and the crate as it was then, to tell whether it has unsaved
- * changes; and the window title for it.
+ * changes; the file as it was on disk then, to tell whether another
+ * application changed it since; and the window title for it.
  */
 final class CrateFile {
 	static final String UNTITLED = "Untitled";
 
+	/** Whether the file on disk is as it was opened or last saved */
+	enum Disk {
+		SAME, CHANGED, MISSING
+	}
+
+	/**
+	 * The file on disk as it was opened or saved: its modification time and
+	 * size, to notice a change cheaply, and its content's SHA-256, to tell
+	 * whether a changed time (e.g. git checking out the same content again)
+	 * really is a change.
+	 */
+	private record Stamp(FileTime modified, long size, String sha256) {
+	}
+
 	private Optional<Path> path = Optional.empty();
 	private JsonNode saved;
+	private Optional<Stamp> stamp = Optional.empty();
+	/** The SHA-256 of a changed file the user chose to keep their changes over */
+	private Optional<String> keptOver = Optional.empty();
 
 	/**
 	 * @param saved A new crate, not saved anywhere yet
@@ -41,11 +66,79 @@ final class CrateFile {
 	}
 
 	/**
-	 * A crate opened from, or saved to, a file; or a new one (no path).
+	 * A crate opened from, or saved to, a file, remembering the file as it is
+	 * on disk now; or a new one (no path).
 	 */
 	void reset(Optional<Path> path, JsonNode saved) {
 		this.path = path;
 		this.saved = saved;
+		this.stamp = path.flatMap(CrateFile::stamp);
+		this.keptOver = Optional.empty();
+	}
+
+	/**
+	 * Whether the file on disk is as it was opened or last saved; SAME for a
+	 * new crate. Reads the file only if its time or size differ.
+	 */
+	Disk disk() {
+		if (path.isEmpty() || stamp.isEmpty()) {
+			return Disk.SAME;
+		}
+		BasicFileAttributes now;
+		try {
+			now = Files.readAttributes(path.get(), BasicFileAttributes.class);
+		} catch (IOException e) {
+			return Disk.MISSING;
+		}
+		Stamp before = stamp.get();
+		if (now.lastModifiedTime().equals(before.modified()) && now.size() == before.size()) {
+			return Disk.SAME;
+		}
+		Optional<Stamp> current = stamp(path.get());
+		if (current.isEmpty()) {
+			return Disk.MISSING;
+		}
+		if (current.get().sha256().equals(before.sha256())) {
+			// Touched, not changed: no need to read it again next time
+			stamp = current;
+			return Disk.SAME;
+		}
+		return Disk.CHANGED;
+	}
+
+	/**
+	 * The user keeps their changes over the file as it is on disk now, so
+	 * that they are not asked again until it changes again (or they save).
+	 */
+	void keepChangesOverDisk() {
+		keptOver = path.flatMap(CrateFile::stamp).map(Stamp::sha256);
+	}
+
+	/**
+	 * Whether the user chose to keep their changes over the file as it is
+	 * now (see {@link #keepChangesOverDisk()}).
+	 */
+	boolean keptChangesOverDisk() {
+		return keptOver.isPresent() && keptOver.equals(path.flatMap(CrateFile::stamp).map(Stamp::sha256));
+	}
+
+	private static Optional<Stamp> stamp(Path file) {
+		try {
+			BasicFileAttributes attributes = Files.readAttributes(file, BasicFileAttributes.class);
+			byte[] content = Files.readAllBytes(file);
+			return Optional.of(new Stamp(attributes.lastModifiedTime(), attributes.size(), sha256(content)));
+		} catch (IOException e) {
+			return Optional.empty();
+		}
+	}
+
+	private static String sha256(byte[] content) {
+		try {
+			return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
+		} catch (NoSuchAlgorithmException e) {
+			// Every Java has SHA-256
+			throw new IllegalStateException(e);
+		}
 	}
 
 	Optional<Path> path() {

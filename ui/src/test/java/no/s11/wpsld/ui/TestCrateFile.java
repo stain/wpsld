@@ -19,7 +19,10 @@ package no.s11.wpsld.ui;
 
 import static org.junit.Assert.*;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.Instant;
 import java.util.Optional;
 
 import org.junit.Test;
@@ -67,5 +70,42 @@ public class TestCrateFile {
 		CrateFile file = new CrateFile(SAVED);
 		file.reset(Optional.of(Path.of("ro-crate-metadata.json")), SAVED);
 		assertEquals("ro-crate-metadata.json", file.name());
+	}
+
+	/**
+	 * Changes on disk: a new time and size, new content, the same content
+	 * written again (as git may), and a deleted file.
+	 */
+	@Test
+	public void disk() throws Exception {
+		Path file = Files.createTempDirectory("crate").resolve("ro-crate-metadata.json");
+		Files.writeString(file, "{\"a\": 1}");
+		CrateFile crateFile = new CrateFile(SAVED);
+		assertEquals(CrateFile.Disk.SAME, crateFile.disk());
+		crateFile.reset(Optional.of(file), SAVED);
+		assertEquals(CrateFile.Disk.SAME, crateFile.disk());
+
+		// Touched, as git checking out the same content: not a change
+		Files.setLastModifiedTime(file, FileTime.from(Instant.now().plusSeconds(10)));
+		assertEquals(CrateFile.Disk.SAME, crateFile.disk());
+		Files.writeString(file, "{\"a\": 1}");
+		assertEquals(CrateFile.Disk.SAME, crateFile.disk());
+
+		// The same size, other content and time
+		Files.writeString(file, "{\"a\": 2}");
+		Files.setLastModifiedTime(file, FileTime.from(Instant.now().plusSeconds(20)));
+		assertEquals(CrateFile.Disk.CHANGED, crateFile.disk());
+		assertFalse(crateFile.keptChangesOverDisk());
+		crateFile.keepChangesOverDisk();
+		assertTrue(crateFile.keptChangesOverDisk());
+		// Changed again: asked again
+		Files.writeString(file, "{\"a\": 3}");
+		assertFalse(crateFile.keptChangesOverDisk());
+		// Saved (or reloaded): the file as it is now
+		crateFile.reset(Optional.of(file), SAVED);
+		assertEquals(CrateFile.Disk.SAME, crateFile.disk());
+
+		Files.delete(file);
+		assertEquals(CrateFile.Disk.MISSING, crateFile.disk());
 	}
 }
