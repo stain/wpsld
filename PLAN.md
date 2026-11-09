@@ -261,11 +261,16 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
   - Styles: Classic (JavaFX's Modena), Windows 11 (Modena reshaped after
     Fluent, `win11.css`: Mica window, cards, 4 px corners, accent line under
     a focused input, a pill on the selected item, focus rings only for the
-    keyboard, Segoe UI), and OS/2 Warp, which shows the form as a notebook
-    (in place of the earlier View > List/Notebook).
+    keyboard, Segoe UI), and OS/2 Warp (`warp.css`, after Warp 4's
+    Presentation Manager: #cccccc grey, square corners, black-outlined 3D
+    bevels, raised buttons that sink when pressed, sunken white entry
+    fields and lists, grey list selection and title-blue menu selection;
+    colours from the warp-legacy KDE theme), which also shows the form as a
+    notebook (in place of the earlier View > List/Notebook).
   - Colours: Light, Dark or Same as System. Each style has its dark
-    stylesheet: VS Code's Dark Modern for Classic and Warp (`dark.css`),
-    Fluent's dark tokens for Windows 11 (`win11-dark.css`).
+    stylesheet: VS Code's Dark Modern for Classic (`dark.css`), Fluent's
+    dark tokens for Windows 11 (`win11-dark.css`), and the same bevels on
+    dark grey for Warp (`warp-dark.css`).
   - Every window and dialog gets `wpsld.css`, which names the editor's own
     colours (`-wpsld-dim-text`…, used through style classes such as
     `dim-text` instead of inline colours), then the style's stylesheet, then
@@ -276,8 +281,9 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
     Windows 11 only their icon from Microsoft's Fluent System Icons (Ikonli
     12.4.0, `ikonli-fluentui-pack`), as subtle buttons.
   - Next: Fluent icons in the Windows 11 tool bar (Save, Load profile, Add
-    entity) and menus, a fuller
-    Warp style (its controls, not only the notebook), a macOS style, and a
+    entity) and menus; for Warp, IBM Plex Sans Condensed (open font
+    licence) bundled in place of WarpSans, Warp 4-style icons, and the
+    entity list as a WPS folder (icons, Details view); a macOS style; and a
     dark window title bar where the OS allows.
 
 Next: opening zipped crates and crates from a URL (with `CrateRetriever`),

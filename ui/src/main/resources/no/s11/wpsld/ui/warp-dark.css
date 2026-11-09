@@ -1,0 +1,24 @@
+/*
+ * The OS/2 Warp style in dark colours (see Theme): the same bevels as
+ * warp.css on a dark grey face, with the title-bar blue lightened so that
+ * it still reads on dark.
+ */
+.root {
+    -warp-face: #3c3c3c;
+    -warp-light: #6a6a6a;
+    -warp-dark: #1e1e1e;
+    -warp-ink: #000000;
+    -warp-base: #262626;
+    -warp-text: #e4e4e4;
+    -warp-text-secondary: #b4b4b4;
+    -warp-text-disabled: #7a7a7a;
+    -warp-select: #5c5c5c;
+    -warp-select-text: #ffffff;
+    -warp-menu-select: #3d2bd0;
+    -warp-menu-select-text: #ffffff;
+    -warp-link: #9d93ff;
+    -warp-groove: #2e2e2e;
+
+    -wpsld-warning-text: #e0b030;
+    -wpsld-error-text: #ff8080;
+}

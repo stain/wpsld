@@ -153,6 +153,7 @@ public class TestCrateEditorTheme extends ApplicationTest {
 	public void warpStyleNotebook() throws Exception {
 		editorShown();
 		choose("Style", "warp");
+		assertTrue(has(stage.getScene(), "warp.css"));
 		assertTrue(lookup("#notebook").tryQuery().isPresent());
 		assertEquals(List.of("Required", "Dataset", "CreativeWork", "Thing"),
 				lookup(".notebook-tab").queryAllAs(Label.class).stream().map(Label::getText).toList());

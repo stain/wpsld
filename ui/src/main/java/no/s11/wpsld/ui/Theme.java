@@ -59,8 +59,8 @@ final class Theme {
 		CLASSIC("classic", "Classic", null, "dark.css", false),
 		/** As Windows 11's Fluent design: rounded, light controls on cards */
 		WIN11("win11", "Windows 11", "win11.css", "win11-dark.css", false),
-		/** The form as the OS/2 Workplace Shell's Properties notebook */
-		WARP("warp", "OS/2 Warp", null, "dark.css", true);
+		/** As OS/2 Warp 4: grey, bevelled, and the form as a notebook */
+		WARP("warp", "OS/2 Warp", "warp.css", "warp-dark.css", true);
 
 		private final String id;
 		private final String label;

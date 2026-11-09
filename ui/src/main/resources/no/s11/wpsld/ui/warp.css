@@ -1,0 +1,435 @@
+/*
+ * The OS/2 Warp style (see Theme): Modena reshaped after OS/2 Warp 4's
+ * Presentation Manager controls. Everything on #cccccc grey, square corners,
+ * and 3D bevels: raised controls have a black outline with a white edge
+ * top and left and a grey one bottom and right, pressed and entry fields
+ * the other way round (sunken). Lists select in grey, menus in the blue of
+ * the active title bar. The form is a notebook (see notebook.css).
+ *
+ * The colours follow the classic Warp 4 grey of warp-legacy, an OS/2 Warp 4
+ * theme for KDE (https://github.com/huppiflupp/warp-legacy), as -warp-*;
+ * warp-dark.css gives them dark values. Warp 4's font, WarpSans 9 pt, is
+ * IBM's; the system's font is used at that size instead.
+ */
+.root {
+    -warp-face: #cccccc;
+    -warp-light: #ffffff;
+    -warp-dark: #808080;
+    -warp-ink: #000000;
+    -warp-base: #ffffff;
+    -warp-text: #000000;
+    -warp-text-secondary: #404040;
+    -warp-text-disabled: #808080;
+    -warp-select: #808080;
+    -warp-select-text: #ffffff;
+    -warp-menu-select: #2400a8;
+    -warp-menu-select-text: #ffffff;
+    -warp-link: #2400a8;
+    -warp-groove: #b8b8b8;
+
+    -fx-font-size: 12px;
+
+    -fx-base: -warp-face;
+    -fx-background: -warp-face;
+    -fx-control-inner-background: -warp-base;
+    -fx-control-inner-background-alt: -warp-base;
+    -fx-dark-text-color: -warp-text;
+    -fx-mid-text-color: -warp-text;
+    -fx-light-text-color: #ffffff;
+    -fx-accent: -warp-menu-select;
+    -fx-default-button: -warp-face;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+    -fx-selection-bar: -warp-select;
+    -fx-selection-bar-non-focused: -warp-select;
+    -fx-selection-bar-text: -warp-select-text;
+    -fx-box-border: -warp-ink;
+    -fx-text-box-border: -warp-dark;
+    -fx-outer-border: -warp-ink;
+    -fx-inner-border: transparent;
+    -fx-inner-border-horizontal: transparent;
+    -fx-inner-border-bottomup: transparent;
+    -fx-body-color: -warp-face;
+    -fx-body-color-bottomup: -warp-face;
+    -fx-body-color-to-right: -warp-face;
+    -fx-shadow-highlight-color: transparent;
+    -fx-mark-color: -warp-text;
+    -fx-mark-highlight-color: transparent;
+
+    -wpsld-dim-text: -warp-text-secondary;
+    -wpsld-faint-text: -warp-text-disabled;
+    -wpsld-warning-text: #805000;
+    -wpsld-error-text: #c00000;
+}
+
+.label, .check-box, .radio-button {
+    -fx-text-fill: -warp-text;
+}
+
+/*
+ * Raised: a black outline, inside it white top and left, grey bottom and
+ * right. As background layers: ink, then grey, then white short of the
+ * bottom and right, then the face.
+ */
+.button, .toggle-button, .menu-button, .split-menu-button, .choice-box, .combo-box-base,
+.button:focused, .toggle-button:focused, .menu-button:focused, .choice-box:focused, .combo-box-base:focused,
+.button:hover, .toggle-button:hover, .menu-button:hover, .choice-box:hover, .combo-box-base:hover {
+    -fx-background-color: -warp-ink, -warp-dark, -warp-light, -warp-face;
+    -fx-background-insets: 0, 1, 1 2 2 1, 2;
+    -fx-background-radius: 0;
+    -fx-text-fill: -warp-text;
+}
+
+/* Pressed: sunken, the edges swapped */
+.button:armed, .toggle-button:selected, .menu-button:showing, .choice-box:showing, .combo-box-base:showing {
+    -fx-background-color: -warp-ink, -warp-light, -warp-dark, -warp-face;
+    -fx-background-insets: 0, 1, 1 2 2 1, 2;
+}
+
+/* The default button: a second black outline */
+.button:default, .button:default:focused, .button:default:hover {
+    -fx-background-color: -warp-ink, -warp-dark, -warp-light, -warp-face;
+    -fx-background-insets: 0, 2, 2 3 3 2, 3;
+    -fx-text-fill: -warp-text;
+}
+
+.button:default:armed {
+    -fx-background-color: -warp-ink, -warp-light, -warp-dark, -warp-face;
+    -fx-background-insets: 0, 2, 2 3 3 2, 3;
+}
+
+/* Keyboard focus: a dotted rectangle inside the control */
+.button:focus-visible, .toggle-button:focus-visible, .menu-button:focus-visible, .choice-box:focus-visible,
+.combo-box-base:focus-visible, .check-box:focus-visible, .radio-button:focus-visible {
+    -fx-border-color: -warp-ink;
+    -fx-border-style: segments(1, 1);
+    -fx-border-width: 1;
+    -fx-border-insets: 4;
+}
+
+.combo-box-base > .arrow-button, .menu-button > .arrow-button, .choice-box > .open-button {
+    -fx-background-color: transparent;
+}
+
+.combo-box-base > .arrow-button > .arrow, .menu-button > .arrow-button > .arrow,
+.choice-box > .open-button > .arrow {
+    -fx-background-color: -warp-ink;
+}
+
+/*
+ * Sunken, for entry fields and lists: grey top and left, white bottom and
+ * right, and inside that a black line top and left. Layers: white, grey
+ * short of the bottom and right, the face, black short of the bottom and
+ * right, then the base.
+ */
+.text-input, .text-input:focused {
+    -fx-background-color: -warp-light, -warp-dark, -warp-face, -warp-ink, -warp-base;
+    -fx-background-insets: 0, 0 1 1 0, 1, 1 2 2 1, 2;
+    -fx-background-radius: 0;
+    -fx-text-fill: -warp-text;
+    -fx-prompt-text-fill: -warp-text-disabled;
+    -fx-highlight-fill: -warp-menu-select;
+    -fx-highlight-text-fill: -warp-menu-select-text;
+    -fx-padding: 4 6 4 6;
+}
+
+.text-area {
+    -fx-padding: 2;
+}
+
+.text-area > .scroll-pane > .viewport > .content {
+    -fx-background-color: -warp-base;
+    -fx-background-radius: 0;
+    -fx-padding: 3 5 3 5;
+}
+
+.text-area > .scroll-pane, .text-area > .scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
+
+.combo-box-base:editable, .date-picker, .combo-box-base:editable:contains-focus, .date-picker:contains-focus {
+    -fx-background-color: -warp-light, -warp-dark, -warp-face, -warp-ink, -warp-base;
+    -fx-background-insets: 0, 0 1 1 0, 1, 1 2 2 1, 2;
+    -fx-background-radius: 0;
+}
+
+.combo-box-base:editable > .text-field, .combo-box-base:editable > .text-field:focused,
+.date-picker > .text-field, .date-picker > .text-field:focused {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+/* Their button: raised, inside the sunken field */
+.combo-box-base:editable > .arrow-button, .date-picker > .arrow-button {
+    -fx-background-color: -warp-dark, -warp-light, -warp-face;
+    -fx-background-insets: 2, 2 3 3 2, 3;
+    -fx-background-radius: 0;
+}
+
+/* The chosen item, shown in the button: not as a selected list item */
+.combo-box > .list-cell, .combo-box > .list-cell:filled:selected {
+    -fx-background-color: transparent;
+    -fx-text-fill: -warp-text;
+}
+
+.check-box > .box, .check-box:focused > .box, .check-box:hover > .box {
+    -fx-background-color: -warp-light, -warp-dark, -warp-face, -warp-ink, -warp-base;
+    -fx-background-insets: 0, 0 1 1 0, 1, 1 2 2 1, 2;
+    -fx-background-radius: 0;
+    -fx-padding: 4;
+}
+
+.check-box:selected > .box > .mark {
+    -fx-background-color: -warp-ink;
+}
+
+.radio-button > .radio, .radio-button:focused > .radio, .radio-button:hover > .radio {
+    -fx-background-color: -warp-dark, -warp-light, -warp-ink, -warp-base;
+    -fx-background-insets: 0, 1 0 0 1, 1 1 1 1, 2;
+}
+
+.radio-button:selected > .radio > .dot {
+    -fx-background-color: -warp-ink;
+}
+
+/* The menu bar on the face; its menus raised, the item under the mouse blue */
+.menu-bar {
+    -fx-background-color: -warp-face;
+    -fx-padding: 1 2 1 2;
+}
+
+.menu-bar > .container > .menu-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+    -fx-padding: 3 8 3 8;
+}
+
+.menu-bar > .container > .menu-button:hover, .menu-bar > .container > .menu-button:showing,
+.menu-bar > .container > .menu-button:focused {
+    -fx-background-color: -warp-menu-select;
+}
+
+.menu-bar > .container > .menu-button > .label {
+    -fx-text-fill: -warp-text;
+}
+
+.menu-bar > .container > .menu-button:hover > .label, .menu-bar > .container > .menu-button:showing > .label,
+.menu-bar > .container > .menu-button:focused > .label {
+    -fx-text-fill: -warp-menu-select-text;
+}
+
+.context-menu {
+    -fx-background-color: -warp-ink, -warp-dark, -warp-light, -warp-face;
+    -fx-background-insets: 0, 1, 1 2 2 1, 2;
+    -fx-background-radius: 0;
+    -fx-padding: 3;
+    -fx-effect: null;
+}
+
+.menu-item {
+    -fx-padding: 3 10 3 10;
+    -fx-background-radius: 0;
+}
+
+.menu-item:focused, .menu-item:hover {
+    -fx-background-color: -warp-menu-select;
+}
+
+.menu-item > .label {
+    -fx-text-fill: -warp-text;
+}
+
+.menu-item:focused > .label, .menu-item:hover > .label,
+.menu-item:focused > .right-container > .accelerator-text {
+    -fx-text-fill: -warp-menu-select-text;
+}
+
+.menu-item:disabled > .label {
+    -fx-text-fill: -warp-text-disabled;
+}
+
+.radio-menu-item:checked > .left-container > .radio, .check-menu-item:checked > .left-container > .check,
+.menu > .right-container > .arrow {
+    -fx-background-color: -warp-text;
+}
+
+.radio-menu-item:checked:focused > .left-container > .radio,
+.check-menu-item:checked:focused > .left-container > .check, .menu:focused > .right-container > .arrow {
+    -fx-background-color: -warp-menu-select-text;
+}
+
+/* Grooves: a grey line beside a white one */
+.separator:horizontal .line {
+    -fx-border-color: -warp-dark transparent -warp-light transparent;
+    -fx-border-width: 1 0 1 0;
+}
+
+.separator:vertical .line {
+    -fx-border-color: transparent -warp-light transparent -warp-dark;
+    -fx-border-width: 0 1 0 1;
+}
+
+.tooltip {
+    -fx-background-color: -warp-ink, -warp-base;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 0;
+    -fx-padding: 3 6 3 6;
+    -fx-text-fill: -warp-text;
+    -fx-font-size: 12px;
+    -fx-effect: null;
+}
+
+.tool-bar {
+    -fx-background-color: -warp-dark, -warp-light, -warp-face;
+    -fx-background-insets: 0, 0 0 1 0, 0 0 2 0;
+    -fx-padding: 3 4 5 4;
+}
+
+.split-pane {
+    -fx-background-color: -warp-face;
+    -fx-padding: 0;
+}
+
+/* A raised bar between the panes */
+.split-pane > .split-pane-divider {
+    -fx-background-color: -warp-dark, -warp-light, -warp-face;
+    -fx-background-insets: 0, 0 1 0 0, 0 1 0 1;
+    -fx-padding: 0 2 0 2;
+}
+
+.scroll-pane, .scroll-pane > .viewport, .scroll-pane > .corner {
+    -fx-background-color: transparent;
+}
+
+/* Lists, trees and tables: sunken and white; the selected item grey */
+.list-view, .tree-view, .list-view:focused, .tree-view:focused {
+    -fx-background-color: -warp-light, -warp-dark, -warp-face, -warp-ink, -warp-base;
+    -fx-background-insets: 0, 0 1 1 0, 1, 1 2 2 1, 2;
+    -fx-background-radius: 0;
+    -fx-padding: 2;
+}
+
+.list-cell, .tree-cell, .list-cell:odd, .tree-cell:odd {
+    -fx-background-color: -warp-base;
+    -fx-text-fill: -warp-text;
+}
+
+.list-cell:filled:selected, .tree-cell:filled:selected,
+.list-view:focused > .virtual-flow > .clipped-container > .sheet > .list-cell:filled:selected,
+.tree-view:focused > .virtual-flow > .clipped-container > .sheet > .tree-cell:filled:selected,
+.list-view:focused > .virtual-flow > .clipped-container > .sheet > .list-cell:filled:focused:selected,
+.tree-view:focused > .virtual-flow > .clipped-container > .sheet > .tree-cell:filled:focused:selected {
+    -fx-background-color: -warp-select;
+    -fx-background-insets: 0;
+    -fx-text-fill: -warp-select-text;
+}
+
+.list-view:focused > .virtual-flow > .clipped-container > .sheet > .list-cell:focused,
+.tree-view:focused > .virtual-flow > .clipped-container > .sheet > .tree-cell:focused {
+    -fx-background-color: -warp-base;
+    -fx-background-insets: 0;
+}
+
+/* The selected item's text: white on grey, also its second line */
+.list-cell:filled:selected .label, .tree-cell:filled:selected .label {
+    -fx-text-fill: -warp-select-text;
+}
+
+.tree-cell > .tree-disclosure-node > .arrow {
+    -fx-background-color: -warp-ink;
+}
+
+/* Tabs: raised, the selected one in front, joined to its page */
+.tab-pane > .tab-header-area {
+    -fx-padding: 4 4 0 4;
+}
+
+.tab-pane > .tab-header-area > .tab-header-background {
+    -fx-background-color: transparent;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab {
+    -fx-background-color: -warp-ink, -warp-dark, -warp-light, -warp-face;
+    -fx-background-insets: 2 0 0 0, 3 1 0 1, 3 2 0 1, 4 2 0 2;
+    -fx-background-radius: 0;
+    -fx-padding: 4 10 2 10;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-insets: 0, 1 1 0 1, 1 2 0 1, 2 2 0 2;
+    -fx-padding: 5 10 3 10;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab > .tab-container > .tab-label {
+    -fx-text-fill: -warp-text;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected > .tab-container > .tab-label {
+    -fx-font-weight: bold;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab > .tab-container > .focus-indicator,
+.tab-pane:focused > .tab-header-area > .headers-region > .tab:selected > .tab-container > .focus-indicator {
+    -fx-border-color: transparent;
+}
+
+.tab-pane > .tab-content-area {
+    -fx-background-color: -warp-ink, -warp-dark, -warp-light, -warp-face;
+    -fx-background-insets: 0, 1, 1 2 2 1, 2;
+    -fx-background-radius: 0;
+    -fx-padding: 3;
+}
+
+/* Folding groups (e.g. in dialogs): a raised bar */
+.titled-pane > .title, .titled-pane:focused > .title {
+    -fx-background-color: -warp-dark, -warp-light, -warp-face;
+    -fx-background-insets: 0, 0 1 1 0, 1;
+    -fx-background-radius: 0;
+}
+
+.titled-pane > .content {
+    -fx-background-color: -warp-face;
+    -fx-border-color: -warp-dark;
+}
+
+/* Scroll bars: a lighter track, a raised thumb and raised arrow buttons */
+.scroll-bar, .scroll-bar:vertical, .scroll-bar:horizontal {
+    -fx-background-color: -warp-groove;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+}
+
+.scroll-bar > .thumb, .scroll-bar > .increment-button, .scroll-bar > .decrement-button,
+.scroll-bar > .increment-button:hover, .scroll-bar > .decrement-button:hover {
+    -fx-background-color: -warp-ink, -warp-dark, -warp-light, -warp-face;
+    -fx-background-insets: 0, 1, 1 2 2 1, 2;
+    -fx-background-radius: 0;
+}
+
+.scroll-bar > .increment-button:pressed, .scroll-bar > .decrement-button:pressed {
+    -fx-background-color: -warp-ink, -warp-light, -warp-dark, -warp-face;
+}
+
+.scroll-bar > .increment-button > .increment-arrow, .scroll-bar > .decrement-button > .decrement-arrow {
+    -fx-background-color: -warp-ink;
+}
+
+.hyperlink, .hyperlink:visited {
+    -fx-text-fill: -warp-link;
+    -fx-underline: true;
+}
+
+/* Dialogs on the face, the header raised */
+.dialog-pane {
+    -fx-background-color: -warp-face;
+}
+
+.dialog-pane > .header-panel {
+    -fx-background-color: -warp-dark, -warp-light, -warp-face;
+    -fx-background-insets: 0, 0 0 1 0, 0 0 2 0;
+}
+
+.dialog-pane > .header-panel .label {
+    -fx-font-weight: bold;
+    -fx-text-fill: -warp-text;
+}
