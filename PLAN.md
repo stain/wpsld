@@ -158,7 +158,8 @@ turn the pages of a tab; optional buttons along the bottom (Undo, Default,
 Help); pages built when first shown; Ctrl+PageUp/PageDown and
 PageUp/PageDown. The entity form is shown as a notebook in the OS/2 Warp style
 (View > Style): groups as tabs, 8 properties per page; no property search
-there yet. Next: Undo/Default/Help, mnemonics on tabs, the Warp 3 style
+there yet. Next: the scroll wheel over the dog-ear's −/+ turning the pages,
+as its buttons do; Undo/Default/Help, mnemonics on tabs, the Warp 3 style
 (tabs on the right, minor tabs), and whether the notebook becomes the default.
 
 ### Storage backends
@@ -271,6 +272,12 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
   - In a text field, Ctrl+Z first undoes its own typing, then continues with
     the crate's points.
   - The history is per crate: File > New and Open clear it.
+  - The items say what they would undo or redo (`ChangeNames`, from the
+    difference between the two snapshots): Undo Add Person, Remove
+    Person, Change @id, Change Type, Edit “Date published”, Choose Profile,
+    Edit Person (several properties), Changes (several entities); merging
+    and reloading pass their names (Merge Entities, Reload). In a text field
+    with typing to undo: Undo Typing. Named as the Edit menu opens.
 - Choosing a profile writes it in the root's `conformsTo`, replacing other
   offered profiles. The core RO-Crate profile and schema.org aren't written,
   as they are RO-Crate itself. Undo and redo choose the profile the crate
@@ -330,8 +337,7 @@ Next, from Apple's Human Interface Guidelines (most also good elsewhere):
 on macOS the app menu stays as JavaFX makes it: no native bindings (such
 as NSMenuFX) for now, so About, Settings and Quit stay in Help, Edit and
 File, perhaps duplicated where macOS has them; a Window menu, a Settings window with panes instead
-of the modal Preferences; undo items naming what they undo ("Undo Add
-Type"); the system's accent colour in the Windows 11 and macOS styles; View
+of the modal Preferences; the system's accent colour in the Windows 11 and macOS styles; View
 > Profile, as every toolbar item should be a command; and for the macOS
 style's form, − and + at the end of each value row, ⓘ popovers for
 descriptions (keeping ? for help), dividers between rows, "Required" as

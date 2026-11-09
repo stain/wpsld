@@ -64,8 +64,8 @@ public class UndoHistory {
 	public record Step(ObjectNode crate, Place place) {
 	}
 
-	/** A snapshot, and where the change leading to it was made */
-	private record Point(String json, Place place) {
+	/** A snapshot, where the change leading to it was made, and its name (see {@link ChangeNames}) */
+	private record Point(String json, Place place, String name) {
 	}
 
 	private final Deque<Point> undo = new ArrayDeque<>();
@@ -83,7 +83,7 @@ public class UndoHistory {
 	public void reset(ObjectNode crate) {
 		undo.clear();
 		redo.clear();
-		current = new Point(json(crate), Place.NONE);
+		current = new Point(json(crate), Place.NONE, "");
 	}
 
 	/**
@@ -94,12 +94,21 @@ public class UndoHistory {
 	 * @return Whether it was a new point
 	 */
 	public boolean checkpoint(ObjectNode crate, Place place) {
+		return checkpoint(crate, place, Optional.empty());
+	}
+
+	/**
+	 * Mark an undo point, as {@link #checkpoint(ObjectNode, Place)}, with a
+	 * name for the change when its difference doesn't tell, e.g. "Merge
+	 * Entities"; otherwise named by {@link ChangeNames#describe}.
+	 */
+	public boolean checkpoint(ObjectNode crate, Place place, Optional<String> name) {
 		String now = json(crate);
 		if (now.equals(current.json())) {
 			return false;
 		}
 		undo.push(current);
-		current = new Point(now, place);
+		current = new Point(now, place, name.orElseGet(() -> ChangeNames.describe(tree(undo.peek().json()), crate)));
 		redo.clear();
 		trim();
 		return true;
@@ -141,7 +150,27 @@ public class UndoHistory {
 	 * that it doesn't count as a change.
 	 */
 	public void settle(ObjectNode crate) {
-		current = new Point(json(crate), current.place());
+		current = new Point(json(crate), current.place(), current.name());
+	}
+
+	/**
+	 * The name of what Undo would undo, e.g. "Add Person": the change since
+	 * the last undo point, if this crate differs from it, else the change
+	 * that led to that point.
+	 */
+	public Optional<String> undoName(ObjectNode crate) {
+		String now = json(crate);
+		if (!now.equals(current.json())) {
+			return Optional.of(ChangeNames.describe(tree(current.json()), crate));
+		}
+		return undo.isEmpty() ? Optional.empty() : Optional.of(current.name());
+	}
+
+	/**
+	 * The name of what Redo would redo.
+	 */
+	public Optional<String> redoName() {
+		return Optional.ofNullable(redo.peek()).map(Point::name);
 	}
 
 	public boolean canUndo() {

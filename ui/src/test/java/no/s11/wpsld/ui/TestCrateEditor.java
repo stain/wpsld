@@ -488,6 +488,35 @@ public class TestCrateEditor extends ApplicationTest {
 		assertTrue(Files.readString(file).contains("Changed elsewhere"));
 	}
 
+	/** Edit > Undo and Redo say what they would undo and redo */
+	@Test
+	public void namedUndo() {
+		entities();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		MenuItem undo = menuItem("menuUndo");
+		MenuItem redo = menuItem("menuRedo");
+		Runnable name = () -> interact(() -> app.nameUndo(stage, undo, redo));
+		name.run();
+		assertEquals("Undo", undo.getText());
+		addEntity("person");
+		name.run();
+		assertEquals("Undo Add Person", undo.getText());
+		assertEquals("Redo", redo.getText());
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		name.run();
+		assertEquals("Redo Add Person", redo.getText());
+		push(KeyCode.SHORTCUT, KeyCode.SHIFT, KeyCode.Z);
+		// Typing in a field (the root's name): undone first
+		interact(() -> entities().getSelectionModel().select(0));
+		clickOn(lookup("#value-name-0").queryAs(TextField.class)).write("Bob");
+		name.run();
+		assertEquals("Undo Typing", undo.getText());
+		// Left: an edit of the name
+		clickOn("#entities");
+		name.run();
+		assertEquals("Undo Edit “Name”", undo.getText());
+	}
+
 	private MenuItem menuItem(String id) {
 		MenuBar bar = lookup("#menuBar").queryAs(MenuBar.class);
 		return bar.getMenus().stream().flatMap(m -> m.getItems().stream()).filter(i -> id.equals(i.getId()))

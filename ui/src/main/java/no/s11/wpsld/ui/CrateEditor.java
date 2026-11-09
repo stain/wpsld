@@ -485,6 +485,8 @@ public class CrateEditor extends Application {
 		preferences.setAccelerator(new KeyCodeCombination(KeyCode.COMMA, KeyCombination.SHORTCUT_DOWN));
 		preferences.setOnAction(e -> showPreferences(stage));
 		Menu edit = new Menu("Edit", null, undo, redo, new SeparatorMenuItem());
+		// What they would undo and redo, e.g. Undo Add Person, as the menu opens
+		edit.setOnShowing(e -> nameUndo(stage, undo, redo));
 		edit.getItems().addAll(textEditing(stage));
 		edit.getItems().addAll(new SeparatorMenuItem(), preferences);
 		edit.setId("menuEdit");
@@ -504,6 +506,18 @@ public class CrateEditor extends Application {
 		bar.setUseSystemMenuBar(Theme.style().get() == Theme.Style.MACOS);
 		Theme.style().addListener((obs, old, style) -> bar.setUseSystemMenuBar(style == Theme.Style.MACOS));
 		return bar;
+	}
+
+	/**
+	 * Name Edit > Undo and Redo after what they would undo and redo, e.g.
+	 * "Undo Add Person"; "Undo Typing" in a text field with typing to undo,
+	 * which Undo undoes first.
+	 */
+	void nameUndo(Stage stage, MenuItem undo, MenuItem redo) {
+		Optional<String> undone = stage.getScene().getFocusOwner() instanceof TextInputControl field
+				&& field.isUndoable() ? Optional.of("Typing") : history.undoName(crate.toJson());
+		undo.setText(undone.map(name -> "Undo " + name).orElse("Undo"));
+		redo.setText(history.redoName().map(name -> "Redo " + name).orElse("Redo"));
 	}
 
 	/**
@@ -1022,6 +1036,8 @@ public class CrateEditor extends Application {
 	private void rename(Entity entity, String newId) {
 		Optional<Entity> existing = crate.get(newId);
 		Entity edited = entity;
+		// Named, as its difference looks like removing an entity
+		Optional<String> change = Optional.empty();
 		if (existing.isEmpty()) {
 			crate.rename(entity, newId);
 		} else {
@@ -1047,13 +1063,14 @@ public class CrateEditor extends Application {
 			}
 			// e.g. DataDownload and Thing become DataDownload
 			edited.setTypes(entityTypes.simplify(edited.getTypes()));
+			change = Optional.of("Merge Entities");
 		}
 		entities.getItems().setAll(crate.getEntities());
 		entities.getSelectionModel().select(edited);
 		entityEditor.edit(edited);
-		changed();
+		refresh();
 		// Also when confirmed with Enter in the @id field
-		checkpoint();
+		checkpoint(placeOf(null), change);
 	}
 
 	/**
@@ -1184,7 +1201,7 @@ public class CrateEditor extends Application {
 		entities.getItems().setAll(crate.getEntities());
 		entities.getSelectionModel().select(selected.flatMap(crate::get).orElse(crate.getRoot()));
 		refresh();
-		checkpoint();
+		checkpoint(placeOf(null), Optional.of("Reload"));
 	}
 
 	/**
@@ -1272,7 +1289,15 @@ public class CrateEditor extends Application {
 	}
 
 	private void checkpoint(Place place) {
-		history.checkpoint(crate.toJson(), place);
+		checkpoint(place, Optional.empty());
+	}
+
+	/**
+	 * Mark an undo point, named when its difference doesn't tell what it was
+	 * (see {@link no.s11.wpsld.crate.ChangeNames}).
+	 */
+	private void checkpoint(Place place, Optional<String> name) {
+		history.checkpoint(crate.toJson(), place, name);
 		canUndo.set(history.canUndo());
 		canRedo.set(history.canRedo());
 	}
