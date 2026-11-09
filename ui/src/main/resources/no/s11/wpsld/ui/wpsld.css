@@ -26,3 +26,28 @@
 .error-text {
     -fx-text-fill: -wpsld-error-text;
 }
+
+/*
+ * Buttons for small actions (EntityEditor.iconButton): their text, e.g.
+ * "×", unless a style shows their icon instead
+ */
+.icon-button {
+    -fx-content-display: text-only;
+}
+
+.help-button {
+    -fx-padding: 0 5 0 5;
+    -fx-font-size: 0.85em;
+}
+
+.chip-remove {
+    -fx-padding: 0 4 0 4;
+}
+
+/* A type of the entity, with its remove button */
+.type-chip {
+    -fx-background-color: -fx-control-inner-background;
+    -fx-border-color: -fx-box-border;
+    -fx-border-radius: 3;
+    -fx-padding: 2 4 2 6;
+}

@@ -271,7 +271,12 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
     `dim-text` instead of inline colours), then the style's stylesheet, then
     its dark one. The scene's root gets `style-<name>` and `colours-dark` or
     `colours-light`, so `notebook.css` has dark tabs under `.colours-dark`.
-  - Next: icons (Ikonli) for the Windows 11 tool bar and buttons, a fuller
+  - Small actions (remove ×, add another +, help ?) are icon buttons
+    (`EntityEditor.iconButton`): Classic and Warp show their character,
+    Windows 11 only their icon from Microsoft's Fluent System Icons (Ikonli
+    12.4.0, `ikonli-fluentui-pack`), as subtle buttons.
+  - Next: Fluent icons in the Windows 11 tool bar (Save, Load profile, Add
+    entity) and menus, a fuller
     Warp style (its controls, not only the notebook), a macOS style, and a
     dark window title bar where the OS allows.
 

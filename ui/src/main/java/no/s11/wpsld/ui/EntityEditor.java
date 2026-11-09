@@ -79,6 +79,12 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
+
+import org.kordamp.ikonli.Ikon;
+import org.kordamp.ikonli.fluentui.FluentUiRegularAL;
+import org.kordamp.ikonli.fluentui.FluentUiRegularMZ;
+import org.kordamp.ikonli.javafx.FontIcon;
+
 import no.s11.wpsld.crate.CrateDocument;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
@@ -274,17 +280,17 @@ public class EntityEditor extends ScrollPane {
 			Label name = new Label(type);
 			name.setStyle("-fx-font-weight: bold;");
 			classDef(type).flatMap(ClassDef::getComment).map(EntityEditor::tooltip).ifPresent(name::setTooltip);
-			Button remove = new Button("×");
+			Button remove = iconButton("×", FluentUiRegularAL.DISMISS_12);
+			remove.getStyleClass().add("chip-remove");
 			remove.setId(id("removeType", type));
-			remove.setStyle("-fx-padding: 0 4 0 4;");
+			remove.setTooltip(new Tooltip("Remove the type " + type));
 			// Removing the last type falls back to Thing, so a lone Thing stays
 			remove.setDisable(!entityTypes.canRemove(entity.getTypes(), type));
 			remove.setOnAction(e -> removeType(type));
 			HBox chip = new HBox(4, name, remove);
 			chip.setId(id("type", type));
 			chip.setAlignment(Pos.CENTER_LEFT);
-			chip.setStyle("-fx-background-color: -fx-control-inner-background; -fx-border-color: -fx-box-border;"
-					+ " -fx-border-radius: 3; -fx-padding: 2 4 2 6;");
+			chip.getStyleClass().add("type-chip");
 			chips.getChildren().add(chip);
 		}
 		Button add = new Button("Add type…");
@@ -534,6 +540,19 @@ public class EntityEditor extends ScrollPane {
 	}
 
 	/**
+	 * A button for a small action, such as removing a value: its text, e.g.
+	 * "×", and an icon that a style may show instead (see win11.css), which
+	 * colours and sizes it. The text stays for screen readers.
+	 */
+	static Button iconButton(String text, Ikon icon) {
+		FontIcon graphic = new FontIcon(icon);
+		graphic.getStyleClass().add("icon");
+		Button button = new Button(text, graphic);
+		button.getStyleClass().add("icon-button");
+		return button;
+	}
+
+	/**
 	 * Show the form as a notebook of tabs and pages (true) or as a list of
 	 * folding groups (false).
 	 */
@@ -699,10 +718,10 @@ public class EntityEditor extends ScrollPane {
 				}
 				description.setVisible(false);
 				description.setManaged(false);
-				Button help = new Button("?");
+				Button help = iconButton("?", FluentUiRegularMZ.QUESTION_CIRCLE_16);
+				help.getStyleClass().add("help-button");
 				help.setId(id("help", field.name()));
 				help.setTooltip(new Tooltip("What " + field.label() + " is for"));
-				help.setStyle("-fx-padding: 0 5 0 5; -fx-font-size: 0.85em;");
 				help.setFocusTraversable(false);
 				help.setOnAction(e -> {
 					description.setVisible(!description.isVisible());
@@ -916,7 +935,7 @@ public class EntityEditor extends ScrollPane {
 		private final FormField field;
 		private final List<Row> rows = new ArrayList<>();
 		private final VBox rowsBox = new VBox(4);
-		private final Button addValue = new Button("+");
+		private final Button addValue = iconButton("+", FluentUiRegularAL.ADD_16);
 		private final VBox node;
 
 		/** A value row: its control and how to get the text typed in it */
@@ -1017,7 +1036,7 @@ public class EntityEditor extends ScrollPane {
 			control.setId(id("value", field.name()) + "-" + rows.size());
 			control.getProperties().put(PROPERTY, field.name());
 			HBox.setHgrow(control, Priority.ALWAYS);
-			Button remove = new Button("×");
+			Button remove = iconButton("×", FluentUiRegularAL.DISMISS_16);
 			remove.setTooltip(new Tooltip("Remove this value"));
 			HBox rowNode = new HBox(4, control, remove);
 			Row row = new Row(rowNode, text);

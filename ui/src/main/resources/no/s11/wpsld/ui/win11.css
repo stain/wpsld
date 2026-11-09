@@ -142,6 +142,57 @@
     -fx-background-color: -win-text-secondary;
 }
 
+/*
+ * Small actions (remove, add another, help) as subtle buttons: only their
+ * Fluent icon, transparent until hovered
+ */
+.button.icon-button, .button.icon-button:focused {
+    -fx-content-display: graphic-only;
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 4;
+    -fx-padding: 5;
+}
+
+.button.icon-button:hover {
+    -fx-background-color: -win-subtle-hover;
+}
+
+.button.icon-button:armed {
+    -fx-background-color: -win-subtle-selected;
+}
+
+.icon-button > .icon {
+    -fx-icon-color: -win-text;
+    -fx-icon-size: 16;
+}
+
+.button.icon-button.help-button, .button.icon-button.help-button:focused {
+    -fx-padding: 1;
+}
+
+.icon-button.help-button > .icon {
+    -fx-icon-color: -win-text-secondary;
+    -fx-icon-size: 14;
+}
+
+.button.icon-button.chip-remove, .button.icon-button.chip-remove:focused {
+    -fx-padding: 3;
+}
+
+.icon-button.chip-remove > .icon {
+    -fx-icon-size: 12;
+}
+
+/* A type of the entity: a small card */
+.type-chip {
+    -fx-background-color: -win-control-stroke, -win-control;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 4, 3;
+    -fx-border-color: transparent;
+    -fx-padding: 1 2 1 8;
+}
+
 /* Text inputs: white, and an accent line along the bottom when focused */
 .text-input {
     -fx-background-color: -win-strong-stroke, -win-control-stroke, -win-input;
