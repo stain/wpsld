@@ -29,6 +29,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -215,7 +216,8 @@ public class CrateEditor extends Application {
 		BorderPane root = new BorderPane(new Label("Loading schema.org " + SchemaFromJsonLd.SCHEMAORG_VERSION + "…"));
 		stage.setScene(new Scene(root, 1400, 800));
 		// For this window and every one opened after it
-		Theme.choose(Theme.named(settings.theme()));
+		Theme.choose(Theme.named(Theme.Style.class, settings.style()),
+				Theme.named(Theme.Colours.class, settings.colours()));
 		// Also if the window showed another scene before (as in tests)
 		stage.sizeToScene();
 		stage.setTitle("wpsld");
@@ -315,6 +317,9 @@ public class CrateEditor extends Application {
 					return entity;
 				}, this::rename);
 		entityEditor.setBrowse(address -> getHostServices().showDocument(address));
+		// The OS/2 Warp style shows the form as a notebook
+		entityEditor.setNotebookMode(Theme.style().get().notebook());
+		Theme.style().addListener((obs, old, style) -> entityEditor.setNotebookMode(style.notebook()));
 		// Type changes, also those confirmed with Enter in a field
 		entityEditor.setOnStep(this::checkpoint);
 
@@ -444,24 +449,7 @@ public class CrateEditor extends Application {
 		preferences.setOnAction(e -> showPreferences(stage));
 		Menu edit = new Menu("Edit", null, undo, redo, new SeparatorMenuItem(), preferences);
 		edit.setId("menuEdit");
-		// The form as a list of folding groups, or as a notebook in the style
-		// of the OS/2 Workplace Shell's Properties notebook
-		ToggleGroup formView = new ToggleGroup();
-		RadioMenuItem list = new RadioMenuItem("List");
-		list.setId("menuViewList");
-		list.setAccelerator(new KeyCodeCombination(KeyCode.DIGIT1, KeyCombination.SHORTCUT_DOWN));
-		RadioMenuItem notebook = new RadioMenuItem("Notebook");
-		notebook.setId("menuViewNotebook");
-		notebook.setAccelerator(new KeyCodeCombination(KeyCode.DIGIT2, KeyCombination.SHORTCUT_DOWN));
-		list.setToggleGroup(formView);
-		notebook.setToggleGroup(formView);
-		list.setSelected(true);
-		formView.selectedToggleProperty().addListener((obs, old, selected) -> {
-			if (selected != null) {
-				entityEditor.setNotebookMode(selected == notebook);
-			}
-		});
-		Menu view = new Menu("View", null, list, notebook, new SeparatorMenuItem(), themes(stage));
+		Menu view = new Menu("View", null, styles(stage), colours(stage));
 		view.setId("menuView");
 
 		MenuBar bar = new MenuBar(file, edit, view);
@@ -470,25 +458,49 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * View > Theme: the editor's look, kept in the settings.
+	 * View > Style: the controls' look, and the form as a list or (OS/2
+	 * Warp) a notebook; kept in the settings.
 	 */
-	private Menu themes(Stage stage) {
+	private Menu styles(Stage stage) {
+		return choices("Style", Theme.Style.values(), Theme.style().get(), style -> {
+			Theme.choose(style, Theme.colours());
+			settings = settings.withStyle(style.id());
+			saveSettings(stage);
+		});
+	}
+
+	/**
+	 * View > Colours: light, dark or as the system; kept in the settings.
+	 */
+	private Menu colours(Stage stage) {
+		return choices("Colours", Theme.Colours.values(), Theme.colours(), colours -> {
+			Theme.choose(Theme.style().get(), colours);
+			settings = settings.withColours(colours.id());
+			saveSettings(stage);
+		});
+	}
+
+	/**
+	 * A submenu of radio items, ids <code>menu&lt;Name&gt;</code> and
+	 * <code>menu&lt;Name&gt;-&lt;id&gt;</code>.
+	 */
+	private static <C extends Theme.Choice> Menu choices(String name, C[] choices, C selected, Consumer<C> chosen) {
 		ToggleGroup group = new ToggleGroup();
-		Menu menu = new Menu("Theme");
-		menu.setId("menuTheme");
-		for (Theme theme : Theme.values()) {
-			RadioMenuItem item = new RadioMenuItem(theme.label());
-			item.setId("menuTheme-" + theme.id());
-			item.setUserData(theme);
+		Menu menu = new Menu(name);
+		menu.setId("menu" + name);
+		for (C choice : choices) {
+			RadioMenuItem item = new RadioMenuItem(choice.label());
+			item.setId("menu" + name + "-" + choice.id());
+			item.setUserData(choice);
 			item.setToggleGroup(group);
-			item.setSelected(theme == Theme.chosen());
+			item.setSelected(choice == selected);
 			menu.getItems().add(item);
 		}
-		group.selectedToggleProperty().addListener((obs, old, selected) -> {
-			if (selected != null && selected.getUserData() instanceof Theme theme) {
-				Theme.choose(theme);
-				settings = settings.withTheme(theme.id());
-				saveSettings(stage);
+		group.selectedToggleProperty().addListener((obs, old, item) -> {
+			if (item != null) {
+				@SuppressWarnings("unchecked")
+				C choice = (C) item.getUserData();
+				chosen.accept(choice);
 			}
 		});
 		return menu;

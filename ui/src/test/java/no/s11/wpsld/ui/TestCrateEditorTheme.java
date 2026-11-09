@@ -32,6 +32,7 @@ import org.testfx.util.WaitForAsyncUtils;
 
 import javafx.scene.Scene;
 import javafx.scene.control.DialogPane;
+import javafx.scene.control.Label;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
@@ -45,7 +46,7 @@ import no.s11.wpsld.masp.ProfileCache;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
 /**
- * View > Theme: the look of every window, kept in the settings.
+ * View > Style and Colours: the look of every window, kept in the settings.
  */
 public class TestCrateEditorTheme extends ApplicationTest {
 	private Stage stage;
@@ -64,54 +65,114 @@ public class TestCrateEditorTheme extends ApplicationTest {
 		app.start(stage);
 	}
 
-	private RadioMenuItem themeItem(String id) {
+	/** View > Style or View > Colours: the item of this choice */
+	private RadioMenuItem item(String menu, String id) {
 		MenuBar bar = lookup("#menuBar").queryAs(MenuBar.class);
 		Menu view = bar.getMenus().stream().filter(m -> "menuView".equals(m.getId())).findFirst().orElseThrow();
-		Menu theme = (Menu) view.getItems().stream().filter(i -> "menuTheme".equals(i.getId())).findFirst()
+		Menu submenu = (Menu) view.getItems().stream().filter(i -> ("menu" + menu).equals(i.getId())).findFirst()
 				.orElseThrow();
-		MenuItem item = theme.getItems().stream().filter(i -> ("menuTheme-" + id).equals(i.getId())).findFirst()
-				.orElseThrow();
+		MenuItem item = submenu.getItems().stream().filter(i -> ("menu" + menu + "-" + id).equals(i.getId()))
+				.findFirst().orElseThrow();
 		return (RadioMenuItem) item;
 	}
 
+	/** As clicking the item */
+	private void choose(String menu, String id) {
+		interact(() -> item(menu, id).setSelected(true));
+	}
+
+	private static boolean has(Scene scene, String stylesheet) {
+		return scene.getStylesheets().stream().anyMatch(s -> s.endsWith("/" + stylesheet));
+	}
+
 	private static boolean dark(Scene scene) {
-		return scene.getStylesheets().stream().anyMatch(s -> s.endsWith("/dark.css"))
-				&& scene.getRoot().getStyleClass().contains("theme-dark");
+		return scene.getRoot().getStyleClass().contains("colours-dark");
+	}
+
+	private void editorShown() throws Exception {
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
 	}
 
 	@Test
-	public void darkTheme() throws Exception {
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
-		assertTrue(themeItem("light").isSelected());
-		assertFalse(dark(stage.getScene()));
-		assertTrue(stage.getScene().getStylesheets().stream().anyMatch(s -> s.endsWith("/wpsld.css")));
+	public void darkColours() throws Exception {
+		editorShown();
+		Scene scene = stage.getScene();
+		assertTrue(item("Colours", "light").isSelected());
+		assertTrue(item("Style", "classic").isSelected());
+		assertFalse(dark(scene));
+		assertTrue(has(scene, "wpsld.css"));
+		assertFalse(has(scene, "dark.css"));
 
-		// As clicking it
-		interact(() -> themeItem("dark").setSelected(true));
-		assertTrue(themeItem("dark").isSelected());
-		assertTrue(dark(stage.getScene()));
-		assertEquals("dark", Settings.load(settingsFile).theme());
+		choose("Colours", "dark");
+		assertTrue(dark(scene));
+		assertTrue(has(scene, "dark.css"));
+		assertEquals("dark", Settings.load(settingsFile).colours());
 
 		// Dialogs opened after are dark too
 		push(KeyCode.SHORTCUT, KeyCode.COMMA);
 		DialogPane preferences = lookup(".dialog-pane").queryAs(DialogPane.class);
 		assertTrue(dark(preferences.getScene()));
+		assertTrue(has(preferences.getScene(), "dark.css"));
 		clickOn("Cancel");
-		// Cancelling the preferences keeps the theme
-		assertEquals("dark", Settings.load(settingsFile).theme());
+		// Cancelling the preferences keeps the colours
+		assertEquals("dark", Settings.load(settingsFile).colours());
 
-		interact(() -> themeItem("light").setSelected(true));
-		assertFalse(dark(stage.getScene()));
-		assertFalse(stage.getScene().getRoot().getStyleClass().stream().anyMatch(c -> c.startsWith("theme-")
-				&& !c.equals("theme-light")));
-		assertEquals("light", Settings.load(settingsFile).theme());
+		choose("Colours", "light");
+		assertFalse(dark(scene));
+		assertFalse(has(scene, "dark.css"));
+		assertEquals("light", Settings.load(settingsFile).colours());
+	}
+
+	/**
+	 * Windows 11, with its own dark colours on top.
+	 */
+	@Test
+	public void windows11Style() throws Exception {
+		editorShown();
+		Scene scene = stage.getScene();
+		choose("Style", "win11");
+		assertTrue(has(scene, "win11.css"));
+		assertTrue(scene.getRoot().getStyleClass().contains("style-win11"));
+		assertEquals("win11", Settings.load(settingsFile).style());
+
+		choose("Colours", "dark");
+		assertEquals(List.of("wpsld.css", "win11.css", "win11-dark.css"), scene.getStylesheets().stream()
+				.map(s -> s.substring(s.lastIndexOf('/') + 1)).toList());
+
+		choose("Style", "classic");
+		assertEquals(List.of("wpsld.css", "dark.css"), scene.getStylesheets().stream()
+				.map(s -> s.substring(s.lastIndexOf('/') + 1)).toList());
+		assertFalse(scene.getRoot().getStyleClass().contains("style-win11"));
+	}
+
+	/**
+	 * The OS/2 Warp style: the form's groups as the tabs of a notebook, with
+	 * pages.
+	 */
+	@Test
+	public void warpStyleNotebook() throws Exception {
+		editorShown();
+		choose("Style", "warp");
+		assertTrue(lookup("#notebook").tryQuery().isPresent());
+		assertEquals(List.of("Required", "Dataset", "CreativeWork", "Thing"),
+				lookup(".notebook-tab").queryAllAs(Label.class).stream().map(Label::getText).toList());
+		assertTrue(lookup("#propertySearch").tryQuery().isEmpty() || !lookup("#propertySearch").query().isVisible());
+		// CreativeWork's properties on pages
+		clickOn(lookup(".notebook-tab").queryAllAs(Label.class).stream().filter(l -> l.getText().equals("CreativeWork"))
+				.findFirst().orElseThrow());
+		assertTrue(lookup(".notebook-status").queryAs(Label.class).getText().matches("Page 1 of \\d+"));
+		// Back to a list
+		choose("Style", "win11");
+		assertTrue(lookup("#notebook").tryQuery().isEmpty());
+		assertTrue(lookup("#label-name").tryQuery().isPresent());
 	}
 
 	@Test
-	public void themeNamesKnown() {
-		assertEquals(Theme.DARK, Theme.named("dark"));
-		assertEquals(Theme.SYSTEM, Theme.named("system"));
+	public void choicesNamed() {
+		assertEquals(Theme.Style.WIN11, Theme.named(Theme.Style.class, "win11"));
+		assertEquals(Theme.Colours.SYSTEM, Theme.named(Theme.Colours.class, "system"));
 		// From a newer version's settings
-		assertEquals(Theme.LIGHT, Theme.named("high-contrast"));
+		assertEquals(Theme.Style.CLASSIC, Theme.named(Theme.Style.class, "aqua"));
+		assertEquals(Theme.Colours.LIGHT, Theme.named(Theme.Colours.class, "high-contrast"));
 	}
 }

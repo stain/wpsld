@@ -1,6 +1,6 @@
 /*
- * The editor's own colours, under every theme (see Theme): named here, so
- * that a theme's stylesheet only has to give them new values.
+ * The editor's own colours, under every style (see Theme): named here, so
+ * that a style's stylesheets only have to give them new values.
  */
 .root {
     -wpsld-dim-text: #505050;

@@ -156,8 +156,8 @@ one in front (`viewOrder`), selected when pressed; scroll arrows when the tabs
 don't fit; a page header with title, "Page n of m" and a dog-ear corner to
 turn the pages of a tab; optional buttons along the bottom (Undo, Default,
 Help); pages built when first shown; Ctrl+PageUp/PageDown and
-PageUp/PageDown. The entity form can be shown as a notebook (View > Notebook,
-Ctrl+2): groups as tabs, 8 properties per page; no property search
+PageUp/PageDown. The entity form is shown as a notebook in the OS/2 Warp style
+(View > Style): groups as tabs, 8 properties per page; no property search
 there yet. Next: Undo/Default/Help, mnemonics on tabs, the Warp 3 style
 (tabs on the right, minor tabs), and whether the notebook becomes the default.
 
@@ -257,16 +257,23 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
   then conforms to.
 - Closing the window, or File > Exit, asks before discarding changes.
 - Edit > Preferences… (Ctrl+,).
-- View > List (Ctrl+1) or Notebook (Ctrl+2), for the form, in place of the
-  toolbar's toggle buttons.
-- View > Theme: Light (JavaFX's Modena), Dark (Modena recoloured as VS Code's
-  Dark Modern, `dark.css`) or Same as System, kept in `settings.json`
-  (`Theme`). Every window and dialog gets `wpsld.css`, which names the
-  editor's own colours (`-wpsld-dim-text`…, used through style classes such
-  as `dim-text` instead of inline colours), then the theme's stylesheet; the
-  scene's root gets `theme-<name>`, so `notebook.css` has dark tabs under
-  `.theme-dark`. Next: more themes (an OS/2 Warp look?), and a dark window
-  title bar where the OS allows.
+- View > Style and View > Colours, kept in `settings.json` (`Theme`):
+  - Styles: Classic (JavaFX's Modena), Windows 11 (Modena reshaped after
+    Fluent, `win11.css`: Mica window, cards, 4 px corners, accent line under
+    a focused input, a pill on the selected item, focus rings only for the
+    keyboard, Segoe UI), and OS/2 Warp, which shows the form as a notebook
+    (in place of the earlier View > List/Notebook).
+  - Colours: Light, Dark or Same as System. Each style has its dark
+    stylesheet: VS Code's Dark Modern for Classic and Warp (`dark.css`),
+    Fluent's dark tokens for Windows 11 (`win11-dark.css`).
+  - Every window and dialog gets `wpsld.css`, which names the editor's own
+    colours (`-wpsld-dim-text`…, used through style classes such as
+    `dim-text` instead of inline colours), then the style's stylesheet, then
+    its dark one. The scene's root gets `style-<name>` and `colours-dark` or
+    `colours-light`, so `notebook.css` has dark tabs under `.colours-dark`.
+  - Next: icons (Ikonli) for the Windows 11 tool bar and buttons, a fuller
+    Warp style (its controls, not only the notebook), a macOS style, and a
+    dark window title bar where the OS allows.
 
 Next: opening zipped crates and crates from a URL (with `CrateRetriever`),
 and recent files (in the state folder).

@@ -17,13 +17,15 @@
  */
 package no.s11.wpsld.ui;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 import javafx.application.ColorScheme;
 import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.ListChangeListener;
 import javafx.scene.Parent;
@@ -31,83 +33,146 @@ import javafx.scene.Scene;
 import javafx.stage.Window;
 
 /**
- * The editor's look: JavaFX's own Modena, recoloured by a stylesheet.
+ * The editor's look: a {@link Style} in {@link Colours}, both on top of
+ * JavaFX's own Modena.
  * <p>
- * The chosen theme applies to every window, dialogs included, as they open:
- * each scene gets <code>wpsld.css</code>, with the colours the editor names
- * itself (e.g. <code>-wpsld-dim-text</code>), then the theme's stylesheet.
- * The root of each scene also gets the style class
- * <code>theme-&lt;name&gt;</code>, so that a control with its own stylesheet,
- * such as {@link Notebook}, can recolour itself under
- * <code>.theme-dark</code>.
+ * The look applies to every window, dialogs included, as they open: each
+ * scene gets <code>wpsld.css</code>, with the colours the editor names itself
+ * (e.g. <code>-wpsld-dim-text</code>), then the style's stylesheet, then its
+ * dark stylesheet if dark. The root of each scene also gets the style
+ * classes <code>style-&lt;name&gt;</code> and <code>colours-light</code> or
+ * <code>colours-dark</code>, so that a control with its own stylesheet, such
+ * as {@link Notebook}, can recolour itself under <code>.colours-dark</code>.
  */
-enum Theme {
-	LIGHT("light", "Light", null),
-	/** In the colours of Visual Studio Code's Dark Modern theme */
-	DARK("dark", "Dark", "dark.css"),
-	/** Light or Dark, as the operating system's colour scheme */
-	SYSTEM("system", "Same as System", null);
+final class Theme {
+	/**
+	 * A choice in the View menu, kept in the settings by its id.
+	 */
+	interface Choice {
+		String id();
 
-	private static final String BASE = Theme.class.getResource("wpsld.css").toExternalForm();
-	private static final ObjectProperty<Theme> chosen = new SimpleObjectProperty<>(LIGHT);
+		String label();
+	}
+
+	enum Style implements Choice {
+		/** Modena, and in Dark the colours of Visual Studio Code */
+		CLASSIC("classic", "Classic", null, "dark.css", false),
+		/** As Windows 11's Fluent design: rounded, light controls on cards */
+		WIN11("win11", "Windows 11", "win11.css", "win11-dark.css", false),
+		/** The form as the OS/2 Workplace Shell's Properties notebook */
+		WARP("warp", "OS/2 Warp", null, "dark.css", true);
+
+		private final String id;
+		private final String label;
+		private final String stylesheet;
+		private final String darkStylesheet;
+		private final boolean notebook;
+
+		Style(String id, String label, String stylesheet, String darkStylesheet, boolean notebook) {
+			this.id = id;
+			this.label = label;
+			this.stylesheet = url(stylesheet);
+			this.darkStylesheet = url(darkStylesheet);
+			this.notebook = notebook;
+		}
+
+		@Override
+		public String id() {
+			return id;
+		}
+
+		@Override
+		public String label() {
+			return label;
+		}
+
+		/**
+		 * Whether the form is a notebook, rather than a list of folding groups.
+		 */
+		boolean notebook() {
+			return notebook;
+		}
+	}
+
+	enum Colours implements Choice {
+		LIGHT("light", "Light"),
+		DARK("dark", "Dark"),
+		/** Light or Dark, as the operating system's colour scheme */
+		SYSTEM("system", "Same as System");
+
+		private final String id;
+		private final String label;
+
+		Colours(String id, String label) {
+			this.id = id;
+			this.label = label;
+		}
+
+		@Override
+		public String id() {
+			return id;
+		}
+
+		@Override
+		public String label() {
+			return label;
+		}
+	}
+
+	private static final String BASE = url("wpsld.css");
+	private static final ObjectProperty<Style> style = new SimpleObjectProperty<>(Style.CLASSIC);
+	private static final ObjectProperty<Colours> colours = new SimpleObjectProperty<>(Colours.LIGHT);
 	private static boolean watching;
 
-	private final String id;
-	private final String label;
-	private final String stylesheet;
+	private Theme() {
+	}
 
-	Theme(String id, String label, String stylesheet) {
-		this.id = id;
-		this.label = label;
-		this.stylesheet = stylesheet == null ? null : Theme.class.getResource(stylesheet).toExternalForm();
+	private static String url(String stylesheet) {
+		return stylesheet == null ? null : Theme.class.getResource(stylesheet).toExternalForm();
 	}
 
 	/**
-	 * The name kept in the settings.
+	 * The choice with this id; the first for an id not known, e.g. from a
+	 * newer version's settings.
 	 */
-	String id() {
-		return id;
-	}
-
-	String label() {
-		return label;
+	static <C extends Enum<C> & Choice> C named(Class<C> choices, String id) {
+		C[] all = choices.getEnumConstants();
+		return Stream.of(all).filter(c -> c.id().equals(id)).findFirst().orElse(all[0]);
 	}
 
 	/**
-	 * The theme with this name; Light for a name not known, e.g. from a newer
-	 * version's settings.
-	 */
-	static Theme named(String id) {
-		return Stream.of(values()).filter(t -> t.id.equals(id)).findFirst().orElse(LIGHT);
-	}
-
-	/**
-	 * The theme of every window from now on. Must be called on the JavaFX
+	 * The look of every window from now on. Must be called on the JavaFX
 	 * thread.
 	 */
-	static void choose(Theme theme) {
+	static void choose(Style style, Colours colours) {
 		watch();
-		chosen.set(theme);
+		Theme.style.set(style);
+		Theme.colours.set(colours);
 	}
 
-	static Theme chosen() {
-		return chosen.get();
+	static ReadOnlyObjectProperty<Style> style() {
+		return style;
+	}
+
+	static Colours colours() {
+		return colours.get();
 	}
 
 	/**
-	 * The theme shown: for {@link #SYSTEM}, the one matching the operating
-	 * system's colour scheme.
+	 * Whether dark colours show: for {@link Colours#SYSTEM}, if the operating
+	 * system's colour scheme is dark.
 	 */
-	static Theme shown() {
-		if (chosen.get() != SYSTEM) {
-			return chosen.get();
-		}
-		return Platform.getPreferences().getColorScheme() == ColorScheme.DARK ? DARK : LIGHT;
+	static boolean dark() {
+		return switch (colours.get()) {
+			case LIGHT -> false;
+			case DARK -> true;
+			case SYSTEM -> Platform.getPreferences().getColorScheme() == ColorScheme.DARK;
+		};
 	}
 
 	/**
-	 * Apply the theme to each window, as it opens or changes scene or root,
-	 * and again when another theme is chosen, or the system's colour scheme
+	 * Apply the look to each window, as it opens or changes scene or root,
+	 * and again when another is chosen, or the system's colour scheme
 	 * changes.
 	 */
 	private static void watch() {
@@ -121,7 +186,8 @@ enum Theme {
 			}
 		});
 		List.copyOf(Window.getWindows()).forEach(Theme::watch);
-		chosen.addListener(o -> applyToAll());
+		style.addListener(o -> applyToAll());
+		colours.addListener(o -> applyToAll());
 		Platform.getPreferences().colorSchemeProperty().addListener(o -> applyToAll());
 	}
 
@@ -152,19 +218,26 @@ enum Theme {
 		if (scene == null) {
 			return;
 		}
-		Theme shown = shown();
+		Style shown = style.get();
+		boolean dark = dark();
+		List<String> ours = new ArrayList<>(List.of(BASE));
+		Stream.of(Style.values()).flatMap(s -> Stream.of(s.stylesheet, s.darkStylesheet)).filter(Objects::nonNull)
+				.forEach(ours::add);
 		List<String> stylesheets = scene.getStylesheets();
-		stylesheets.removeIf(s -> s.equals(BASE) || Stream.of(values()).anyMatch(t -> s.equals(t.stylesheet)));
-		// The base first, as the theme recolours it
-		stylesheets.add(0, BASE);
-		Optional.ofNullable(shown.stylesheet).ifPresent(s -> stylesheets.add(1, s));
+		stylesheets.removeIf(ours::contains);
+		// In this order, each recolouring the one before
+		List<String> look = Stream.of(BASE, shown.stylesheet, dark ? shown.darkStylesheet : null)
+				.filter(Objects::nonNull).toList();
+		stylesheets.addAll(0, look);
 		removeStyleClasses(scene.getRoot());
-		Optional.ofNullable(scene.getRoot()).ifPresent(r -> r.getStyleClass().add("theme-" + shown.id));
+		if (scene.getRoot() != null) {
+			scene.getRoot().getStyleClass().addAll("style-" + shown.id, dark ? "colours-dark" : "colours-light");
+		}
 	}
 
 	private static void removeStyleClasses(Parent root) {
 		if (root != null) {
-			root.getStyleClass().removeIf(c -> c.startsWith("theme-"));
+			root.getStyleClass().removeIf(c -> c.startsWith("style-") || c.startsWith("colours-"));
 		}
 	}
 }

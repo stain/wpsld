@@ -45,7 +45,7 @@ The portable zip leaves out JavaFX. Either:
 ### Where wpsld keeps its files
 
 wpsld keeps profiles you have loaded, and its settings (Edit > Preferences,
-and the theme from View > Theme), in these places:
+and the style and colours from the View menu), in these places:
 
 | | Profiles | Settings |
 |-|----------|----------|

@@ -305,28 +305,6 @@ public class TestCrateEditor extends ApplicationTest {
 		assertTrue(visibleProperties().stream().noneMatch(l -> l.endsWith(" *")));
 	}
 
-	/**
-	 * The form's groups as the tabs of an OS/2-style notebook, with pages.
-	 */
-	@Test
-	public void notebookView() {
-		entities();
-		// View > Notebook, with its shortcut (see newCrateAsksToDiscardChanges)
-		push(KeyCode.SHORTCUT, KeyCode.DIGIT2);
-		assertTrue(lookup("#notebook").tryQuery().isPresent());
-		assertEquals(List.of("Required", "Dataset", "CreativeWork", "Thing"),
-				lookup(".notebook-tab").queryAllAs(Label.class).stream().map(Label::getText).toList());
-		assertTrue(lookup("#propertySearch").tryQuery().isEmpty() || !lookup("#propertySearch").query().isVisible());
-		// CreativeWork's properties on pages
-		clickOn(lookup(".notebook-tab").queryAllAs(Label.class).stream().filter(l -> l.getText().equals("CreativeWork"))
-				.findFirst().orElseThrow());
-		assertTrue(lookup(".notebook-status").queryAs(Label.class).getText().matches("Page 1 of \\d+"));
-		// Back to the list, View > List
-		push(KeyCode.SHORTCUT, KeyCode.DIGIT1);
-		assertTrue(lookup("#notebook").tryQuery().isEmpty());
-		assertTrue(visibleProperties().contains("name *"));
-	}
-
 	private Hyperlink previewLink(String containerId, String text) {
 		return from(lookup(containerId).queryAs(Node.class)).lookup(".hyperlink").queryAllAs(Hyperlink.class).stream()
 				.filter(l -> l.getText().equals(text)).findFirst().orElseThrow(() -> new AssertionError(text));
