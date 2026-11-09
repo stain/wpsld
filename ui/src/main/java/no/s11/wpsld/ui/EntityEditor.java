@@ -88,6 +88,7 @@ import org.kordamp.ikonli.fluentui.FluentUiRegularAL;
 import org.kordamp.ikonli.fluentui.FluentUiRegularMZ;
 import org.kordamp.ikonli.javafx.FontIcon;
 
+import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.CrateDocument;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
@@ -154,6 +155,11 @@ public class EntityEditor extends ScrollPane {
 	 * value; all their values are edited in their group (Thing)
 	 */
 	static final List<String> HEADER = List.of("name", "description");
+	/**
+	 * Properties of the entity shown also edited under @id with all their
+	 * values: for the root, its parts and mentions ({@link Crate#ROOT_LINKS})
+	 */
+	private List<String> headerLinks = List.of();
 	/** Labels of the fields of the entity shown, by property */
 	private final Map<String, String> labels = new HashMap<>();
 	/** How to show the current values again, for the editors of each property */
@@ -401,6 +407,15 @@ public class EntityEditor extends ScrollPane {
 			Optional<FormField> field = fields.stream().filter(f -> f.name().equals(property)).findFirst();
 			if (field.isPresent()) {
 				header.addRow(headerRow++, fieldLabel(field.get()), headerEditor(field.get()));
+			}
+		}
+		// The root's parts and mentions too, which link the crate's entities
+		// to it: all their values, as in their group
+		headerLinks = entity == root.get() ? Crate.ROOT_LINKS : List.of();
+		for (String property : headerLinks) {
+			Optional<FormField> field = fields.stream().filter(f -> f.name().equals(property)).findFirst();
+			if (field.isPresent()) {
+				header.addRow(headerRow++, fieldLabel(field.get()), new FieldEditor(field.get(), true).node());
 			}
 		}
 		if (!layout.notebook()) {
@@ -834,7 +849,8 @@ public class EntityEditor extends ScrollPane {
 	 * @return Whether it was found
 	 */
 	public boolean focusProperty(String property) {
-		for (String id : List.of(id("header", property), id("value", property) + "-0")) {
+		for (String id : List.of(id("header", property), id("headerValue", property) + "-0",
+				id("value", property) + "-0")) {
 			Node field = lookup("#" + id);
 			if (field != null) {
 				field.requestFocus();
@@ -984,29 +1000,36 @@ public class EntityEditor extends ScrollPane {
 		private final VBox rowsBox = new VBox(4);
 		private final Button addValue = iconButton("+", FluentUiRegularAL.ADD_16);
 		private final VBox node;
+		/** Shown under @id rather than in the field's group, with ids of its own */
+		private final boolean header;
 
 		/** A value row: its control and how to get the text typed in it */
 		private record Row(HBox node, Supplier<String> text) {
 		}
 
 		FieldEditor(FormField field) {
+			this(field, false);
+		}
+
+		FieldEditor(FormField field, boolean header) {
 			this.field = field;
+			this.header = header;
 			showValues();
-			if (HEADER.contains(field.name())) {
+			if (HEADER.contains(field.name()) || headerLinks.contains(field.name())) {
 				reloads.computeIfAbsent(field.name(), k -> new ArrayList<>()).add(new Reload(this, () -> {
 					rows.clear();
 					rowsBox.getChildren().clear();
 					showValues();
 				}));
 			}
-			addValue.setId(id("add", field.name()));
+			addValue.setId(id(prefix("add"), field.name()));
 			addValue.setTooltip(new Tooltip("Add another value"));
 			addValue.setOnAction(e -> addRow(""));
 			HBox actions = new HBox(4, addValue);
 			List<ClassDef> entityTypes = field.range().stream().filter(c -> !schema.isDataType(c)).toList();
 			if (!entityTypes.isEmpty()) {
 				MenuButton create = new MenuButton("New");
-				create.setId(id("new", field.name()));
+				create.setId(id(prefix("new"), field.name()));
 				create.setTooltip(new Tooltip("Create a new entity and link it"));
 				for (ClassDef type : entityTypes) {
 					MenuItem item = new MenuItem(terms.name(type));
@@ -1016,11 +1039,18 @@ public class EntityEditor extends ScrollPane {
 				actions.getChildren().add(create);
 			}
 			node = new VBox(4, rowsBox, actions);
-			node.setId(id("field", field.name()));
+			node.setId(id(prefix("field"), field.name()));
 		}
 
 		Node node() {
 			return node;
+		}
+
+		/**
+		 * A prefix of node ids, e.g. value, or headerValue under @id.
+		 */
+		private String prefix(String prefix) {
+			return header ? "header" + Character.toUpperCase(prefix.charAt(0)) + prefix.substring(1) : prefix;
 		}
 
 		private void showValues() {
@@ -1087,7 +1117,7 @@ public class EntityEditor extends ScrollPane {
 			}
 			}
 			control.setMaxWidth(Double.MAX_VALUE);
-			control.setId(id("value", field.name()) + "-" + rows.size());
+			control.setId(id(prefix("value"), field.name()) + "-" + rows.size());
 			control.getProperties().put(PROPERTY, field.name());
 			HBox.setHgrow(control, Priority.ALWAYS);
 			boolean several = field.maxCount().orElse(Integer.MAX_VALUE) > 1;
@@ -1111,7 +1141,7 @@ public class EntityEditor extends ScrollPane {
 					// + adds a value below this one
 					Button add = iconButton("+", FluentUiRegularAL.ADD_16);
 					add.getStyleClass().add("row-button");
-					add.setId(id("add", field.name()) + "-" + rows.size());
+					add.setId(id(prefix("add"), field.name()) + "-" + rows.size());
 					add.setTooltip(new Tooltip("Add another value"));
 					add.disableProperty().bind(addValue.disableProperty());
 					add.setOnAction(e -> addRow("", rows.indexOf(row) + 1));

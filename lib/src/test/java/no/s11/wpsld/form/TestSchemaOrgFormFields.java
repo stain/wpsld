@@ -162,4 +162,21 @@ public class TestSchemaOrgFormFields {
 		assertTrue(retired.contains("variablesMeasured"));
 		assertFalse(retired.contains("creditText"));
 	}
+
+	/**
+	 * The root's parts are its files and folders, or other creative works.
+	 */
+	@Test
+	public void rootHasPartOfFilesAndFolders() {
+		FormFields formFields = new SchemaOrgFormFields(new SchemaFromJsonLd());
+		Set<URI> dataset = Set.of(URI.create(S + "Dataset"));
+		FormField rootParts = formFields.fieldsFor(dataset, true).stream().filter(f -> f.name().equals("hasPart"))
+				.findFirst().orElseThrow();
+		assertEquals(List.of(S + "MediaObject", S + "Dataset", S + "CreativeWork"),
+				rootParts.range().stream().map(c -> c.getID().toString()).toList());
+		assertEquals(ValueKind.REFERENCE, rootParts.kind());
+		// Other Datasets' parts as schema.org has them
+		assertEquals(List.of(S + "CreativeWork"),
+				byName.get("hasPart").range().stream().map(c -> c.getID().toString()).toList());
+	}
 }

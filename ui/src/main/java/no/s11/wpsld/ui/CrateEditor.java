@@ -383,6 +383,9 @@ public class CrateEditor extends Application {
 			// A Thing to start with, and straight away choose its type, which
 			// replaces Thing (not needed for entities added from a property)
 			Entity entity = crate.add("Thing");
+			// Mentioned by the root until something else links to it, as
+			// no entity may be left dangling
+			crate.mentionUnlinked();
 			entities.getItems().add(entity);
 			entities.getSelectionModel().select(entity);
 			// One undo point with the type chosen next (see EntityEditor's
@@ -399,6 +402,8 @@ public class CrateEditor extends Application {
 		remove.setOnAction(e -> {
 			Entity entity = entities.getSelectionModel().getSelectedItem();
 			crate.remove(entity);
+			// The entities only it linked to the root are now mentioned
+			crate.mentionUnlinked();
 			entities.getItems().remove(entity);
 			changed();
 		});
@@ -1228,9 +1233,10 @@ public class CrateEditor extends Application {
 
 	/**
 	 * Whether the crate meets the RO-Crate requirements, or the user chooses
-	 * to save it anyway.
+	 * to save it anyway; first the entities left dangling are mentioned.
 	 */
 	private boolean meetsRequirements(Stage stage) {
+		mentionUnlinked();
 		// The profile's required properties, then RO-Crate's own checks
 		// (worded alike, so each problem only once)
 		List<String> problems = Stream.concat(RequiredFields.check(crate, profiles.getValue(), terms).stream(),
@@ -1244,6 +1250,22 @@ public class CrateEditor extends Application {
 		alert.initOwner(stage);
 		alert.setHeaderText("The crate does not yet meet the RO-Crate requirements");
 		return alert.showAndWait().orElse(ButtonType.CANCEL) == saveAnyway;
+	}
+
+	/**
+	 * Add the entities not linked from the root data entity to its
+	 * <code>mentions</code> (see {@link Crate#mentionUnlinked()}), e.g. after
+	 * removing the only reference to one, as an undoable step.
+	 */
+	private void mentionUnlinked() {
+		if (crate.mentionUnlinked().isEmpty()) {
+			return;
+		}
+		if (entityEditor.getEntity() == crate.getRoot()) {
+			entityEditor.edit(crate.getRoot());
+		}
+		refresh();
+		checkpoint();
 	}
 
 	/**

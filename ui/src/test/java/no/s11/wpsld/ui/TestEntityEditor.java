@@ -37,6 +37,8 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.GridPane;
 import javafx.stage.Stage;
@@ -93,23 +95,23 @@ public class TestEntityEditor extends ApplicationTest {
 	@Test
 	public void propertySearchFilters() {
 		assertTrue(visibleProperties().contains("distribution"));
-		// hasPart is from CreativeWork, folded and not built before searching
-		assertFalse(visibleProperties().contains("hasPart"));
+		// isBasedOn is from CreativeWork, folded and not built before searching
+		assertFalse(visibleProperties().contains("isBasedOn"));
 
-		clickOn("#propertySearch").write("hasP");
+		clickOn("#propertySearch").write("isBa");
 		List<String> found = visibleProperties();
-		assertTrue(found.contains("hasPart"));
+		assertTrue(found.contains("isBasedOn"));
 		assertFalse(found.contains("distribution"));
 		assertFalse(found.contains("isPartOf"));
 
 		// Backspace shows more again
 		eraseText(2);
-		assertTrue(visibleProperties().contains("character"));
+		assertTrue(visibleProperties().contains("isPartOf"));
 
 		// Cleared, as before the search
 		eraseText(2);
 		assertTrue(visibleProperties().contains("distribution"));
-		assertFalse(visibleProperties().contains("hasPart"));
+		assertFalse(visibleProperties().contains("isBasedOn"));
 	}
 
 	@Test
@@ -183,6 +185,33 @@ public class TestEntityEditor extends ApplicationTest {
 		assertEquals(List.of("DataDownload"), download.getTypes());
 		assertEquals(List.of(ref(download.getId())), crate.getRoot().getAll("distribution"));
 		assertEquals("#datadownload-1", value("distribution", 0).getText());
+	}
+
+	/**
+	 * The root's parts and mentions are under @id, its parts files, folders
+	 * or other creative works.
+	 */
+	@Test
+	public void rootLinksInHeader() {
+		assertTrue(lookup("#headerField-hasPart").tryQuery().isPresent());
+		assertTrue(lookup("#headerField-mentions").tryQuery().isPresent());
+		clickOn("#headerNew-hasPart");
+		MenuButton create = lookup("#headerNew-hasPart").queryAs(MenuButton.class);
+		assertEquals(List.of("File", "Dataset", "CreativeWork"),
+				create.getItems().stream().map(MenuItem::getText).toList());
+		// Not clickOn("Dataset"), which finds the root's type
+		interact(() -> create.getItems().get(1).fire());
+		Entity folder = crate.get("#dataset-1").orElseThrow();
+		assertEquals(List.of(ref(folder.getId())), crate.getRoot().getAll("hasPart"));
+		assertEquals("#dataset-1", lookup("#headerValue-hasPart-0").queryAs(ComboBox.class).getEditor().getText());
+
+		// The group's field shows the same values once opened
+		clickOn("#propertySearch").write("hasPart");
+		assertEquals("#dataset-1", value("hasPart", 0).getText());
+
+		// Other Datasets have their parts in their group only
+		edit(folder);
+		assertTrue(lookup("#headerField-hasPart").tryQuery().isEmpty());
 	}
 
 	@Test
@@ -316,10 +345,10 @@ public class TestEntityEditor extends ApplicationTest {
 		for (String query : List.of("datepublished", "Date published")) {
 			clickOn("#propertySearch").eraseText(((TextField) lookup("#propertySearch").query()).getText().length())
 				.write(query);
-			// "Structured data date published" too; name and description stay on top
+			// "Structured data date published" too; the fields under @id stay on top
 			assertEquals(query, List.of("datePublished", "sdDatePublished"),
 					visibleProperties().stream().map(p -> p.replace(" *", ""))
-						.filter(p -> !EntityEditor.HEADER.contains(p)).sorted().toList());
+						.filter(p -> !EntityEditor.HEADER.contains(p) && !Crate.ROOT_LINKS.contains(p)).sorted().toList());
 		}
 	}
 
@@ -370,7 +399,7 @@ public class TestEntityEditor extends ApplicationTest {
 		write("at");
 		assertTrue(others.isVisible());
 		assertEquals(List.of("fileFormat"), visibleProperties().stream()
-				.filter(p -> !EntityEditor.HEADER.contains(p)).toList());
+				.filter(p -> !EntityEditor.HEADER.contains(p) && !Crate.ROOT_LINKS.contains(p)).toList());
 		assertEquals("\u2691 Retired by schema.org: use Encoding format instead",
 				lookup("#retired-fileFormat").queryAs(Label.class).getText());
 		clickOn(value("fileFormat", 0)).write("text/csv");

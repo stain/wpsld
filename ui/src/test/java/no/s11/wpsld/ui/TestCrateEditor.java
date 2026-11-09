@@ -22,12 +22,15 @@ import static org.junit.Assert.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
 import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
+
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
 import javafx.scene.Node;
 import javafx.scene.control.ComboBox;
@@ -91,6 +94,29 @@ public class TestCrateEditor extends ApplicationTest {
 		addEntity("person");
 		assertEquals(2, entities().getItems().size());
 		assertEquals(List.of("Person"), entities().getItems().get(1).getTypes());
+		// Not left dangling: the root mentions it
+		Entity root = entities().getItems().get(0);
+		assertEquals(List.of(entities().getItems().get(1).getId()),
+				root.getAll("mentions").stream().map(v -> v.get("@id").asText()).toList());
+	}
+
+	@Test
+	public void removingTheOnlyLinkMentions() {
+		entities();
+		addEntity("person");
+		addEntity("organization");
+		Entity root = entities().getItems().get(0);
+		Entity person = entities().getItems().get(1);
+		Entity org = entities().getItems().get(2);
+		// The organization linked from the person, no longer from the root
+		interact(() -> {
+			person.set("affiliation", Optional.of(JsonNodeFactory.instance.objectNode().put("@id", org.getId())));
+			root.setAll("mentions", List.of(JsonNodeFactory.instance.objectNode().put("@id", person.getId())));
+		});
+		interact(() -> entities().getSelectionModel().select(person));
+		clickOn("#removeEntity");
+		assertTrue(root.getAll("mentions").stream().map(v -> v.get("@id").asText()).toList()
+				.contains(org.getId()));
 	}
 
 	@Test
@@ -658,9 +684,9 @@ public class TestCrateEditor extends ApplicationTest {
 		ComboBox<FormFields> profile = lookup("#profile").queryComboBox();
 		assertEquals("RO-Crate Machine Actionable Profile 0.1.0", profile.getValue().getName());
 		List<String> labels = visibleProperties();
-		// name and description under @id, then the required ones
-		assertEquals(List.of("name *", "description *", "datePublished *", "description *", "license *", "name *"),
-				labels.subList(0, 6));
+		// name, description, parts and mentions under @id, then the required ones
+		assertEquals(List.of("name *", "description *", "hasPart", "mentions", "datePublished *", "description *",
+				"license *", "name *"), labels.subList(0, 8));
 		assertTrue(lookup("Required by RO-Crate Machine Actionable Profile 0.1.0 (4)").tryQuery().isPresent());
 	}
 

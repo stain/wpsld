@@ -94,7 +94,7 @@ public class ProfileFormFields implements FormFields {
 		}
 		// Required before suggested, whichever rule they come from
 		fields.sort((a, b) -> a.tier().compareTo(b.tier()));
-		vocabulary.fieldsFor(types).stream().filter(f -> !names.contains(f.name())).forEach(fields::add);
+		vocabulary.fieldsFor(types, root).stream().filter(f -> !names.contains(f.name())).forEach(fields::add);
 		return fields;
 	}
 
