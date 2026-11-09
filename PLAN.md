@@ -366,12 +366,30 @@ For macOS (when running on it, whatever the style):
 - The **close button's dot** and real **sheets** are out of JavaFX's reach.
 
 For every platform:
-- **View > Profile**, as every toolbar item should also be a command.
+- **A toolbar** with more than Save, and with icons:
+  - The commands people use most, in a few groups: New, Open, Save; Undo,
+    Redo (with their names as tooltips, see Named undo); Add Entity,
+    Remove; and the sidebar's View > Sidebar. Each also a menu command,
+    as Apple's guidelines ask, with its shortcut in the tooltip.
+  - Icons, as each style has them: Fluent icons for Windows 11 (Ikonli,
+    already bundled), borderless symbols for macOS (at most three groups,
+    no backgrounds; SF Symbols can't be bundled, so Fluent's or another
+    open set drawn plainly), Warp 4-like icons for OS/2 Warp, and for
+    Classic icons with text. A button's text stays as its tooltip and for
+    screen readers, as for the icon buttons today.
+  - A narrow window: Windows 11 moves what doesn't fit to a "…" overflow
+    menu; JavaFX's ToolBar already shows an overflow arrow.
+  - The **profile** chooser moved out of the way and compacted: today a
+    wide labelled combo box and a Load profile… button take half the
+    toolbar. Instead a compact pop-up button at the toolbar's end (or above
+    the form, as it chooses the form's fields), showing a short name of the
+    profile, e.g. "RO-Crate" rather than "RO-Crate Machine Actionable
+    Profile 0.1.0", with the full name and source as tooltip, and Load
+    Profile… as the last item of its list; and **View > Profile** with the
+    same choices, as every toolbar item should also be a command.
 - The system's **accent colour** (JavaFX's `Platform.Preferences`) in the
   Windows 11 and macOS styles, instead of a fixed blue; **increased
   contrast** colours.
-- **Toolbar icons**: borderless symbols on macOS, Fluent icons on Windows
-  11 (Save, Load profile, Add entity), with the text as tooltips.
 - A **dark window title bar** where the OS allows it under dark colours.
 
 Styles:
