@@ -16,6 +16,26 @@ and Describo.
 It is a work in progress. See [PLAN.md](PLAN.md) for the plan and
 [MASP.md](MASP.md) for how profiles are read and used.
 
+## Screenshots
+
+An example crate with made-up data, in some of the styles under View >
+Style and View > Colours. The entities are listed on the left, the selected
+one's form is in the middle, and its preview on the right.
+
+| | |
+|-|-|
+| ![A person in the Classic style](docs/screenshots/classic-person.png) | ![The crate's root dataset in the Windows 11 style](docs/screenshots/windows11-dataset.png) |
+| A person, in the Classic style | The crate itself, with the fields its profile requires first, in the Windows 11 style |
+| ![A file in the macOS style, in dark colours](docs/screenshots/macos-dark-file.png) | ![An event in the OS/2 Warp style](docs/screenshots/warp-event.png) |
+| A file, in the macOS style in dark colours, each value with − and + | An event, in the OS/2 Warp style, with the form as a notebook |
+
+These are made headless by
+[`ReadmeScreenshots`](ui/src/test/java/no/s11/wpsld/ui/ReadmeScreenshots.java),
+from [`example-crate`](ui/src/test/resources/example-crate), so their text
+looks plainer than on a desktop:
+
+    SCREENSHOTS=$PWD/docs/screenshots ./gradlew :ui:test --tests '*ReadmeScreenshots' --rerun
+
 ## Running a release
 
 Download a zip from the [releases](https://github.com/stain/wpsld/releases).

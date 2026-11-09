@@ -170,8 +170,9 @@ turn the pages of a tab; optional buttons along the bottom (Undo, Default,
 Help); pages built when first shown; Ctrl+PageUp/PageDown and
 PageUp/PageDown. The entity form is shown as a notebook in the OS/2 Warp style
 (View > Style): groups as tabs, 8 properties per page; no property search
-there yet. Next: the scroll wheel over the dog-ear's −/+ turning the pages,
-as its buttons do; Undo/Default/Help, mnemonics on tabs, the Warp 3 style
+there yet. Next (see also "Platform guidelines and styles"): the scroll
+wheel over the dog-ear's −/+ turning the pages; Undo/Default/Help,
+mnemonics on tabs, the Warp 3 style
 (tabs on the right, minor tabs), and whether the notebook becomes the default.
 
 ### Storage backends
@@ -332,35 +333,62 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
     (`EntityEditor.iconButton`): Classic and Warp show their character,
     Windows 11 only their icon from Microsoft's Fluent System Icons (Ikonli
     12.4.0, `ikonli-fluentui-pack`), as subtle buttons.
-  - Next: Fluent icons in the Windows 11 tool bar (Save, Load profile, Add
-    entity) and menus; for Warp, IBM Plex Sans Condensed (open font
-    licence) bundled in place of WarpSans, Warp 4-style icons, and the
-    entity list as a WPS folder (icons, Details view); and a
-    dark window title bar where the OS allows. For macOS: try Liquid Glass
-    (macOS 26) as effects on the macOS style (translucent fills, highlights,
-    capsule shapes; JavaFX can't blur or refract what's behind a control),
-    then work back to Yosemite (10.10), as a variant or its own style, and
-    Aqua (10.0) as a nostalgic style like Warp.
+  - How the form is laid out follows the style (`FormLayout`): a list of
+    folding groups (Classic, Windows 11) with × on each value, + below and
+    ? showing the description below; a notebook (OS/2 Warp); or as macOS
+    forms: − and + at the end of each value row (+ adds one below it, as in
+    Mail's rules), ⓘ opening the description in a popover (on macOS ? is
+    for help), thin lines between rows, and a rounded search field with a
+    magnifier. Required fields keep their * (Apple's guidelines say nothing
+    of marking them; "Required" as placeholder would hide the type hint).
 
 Next: opening zipped crates and crates from a URL (with `CrateRetriever`),
 and recent files (in the state folder).
 
-- How the form is laid out follows the style (`FormLayout`): a list of
-  folding groups (Classic, Windows 11) with × on each value, + below and
-  ? showing the description below; a notebook (OS/2 Warp); or as macOS
-  forms: − and + at the end of each value row (+ adds one below it, as in
-  Mail's rules), ⓘ opening the description in a popover (on macOS ? is
-  for help), thin lines between rows, and a rounded search field with a
-  magnifier. Required fields keep their * (Apple's guidelines say nothing
-  of marking them; "Required" as placeholder would hide the type hint).
+### Platform guidelines and styles: still to do
 
-Next, from Apple's Human Interface Guidelines (most also good elsewhere):
-on macOS the app menu stays as JavaFX makes it: no native bindings (such
-as NSMenuFX) for now, so About, Settings and Quit stay in Help, Edit and
-File, perhaps duplicated where macOS has them; a Window menu, a Settings window with panes instead
-of the modal Preferences; the system's accent colour in the Windows 11 and macOS styles; View
-> Profile, as every toolbar item should be a command; and for the macOS
-style, Help > wpsld Help for ? to open.
+Checked against Apple's Human Interface Guidelines (macOS 26); Windows'
+and GNOME's guidelines are still to check the same way. Done so far: Save
+and Save As, Save / Don't Save / Cancel, the file named in the title with
+unsaved changes marked, files changed on disk, Close Window, the text
+editing commands, named Undo and Redo, View > Sidebar, Merge instead of
+OK, no Command-Y on macOS, and the macOS-style form.
+
+For macOS (when running on it, whatever the style):
+- **No native bindings** (such as NSMenuFX) for now: the app menu stays as
+  JavaFX makes it, so About, Settings and Quit stay in Help, Edit and File;
+  duplicate them where macOS expects them if that helps.
+- A **Window menu** (Minimize, Zoom, the window), which macOS apps have
+  even with one window.
+- A **Settings window** with toolbar panes, titled after the pane shown,
+  applying changes as they are made, instead of the modal Preferences.
+- **Help > wpsld Help**, for ? (Command-?) to open.
+- The **close button's dot** and real **sheets** are out of JavaFX's reach.
+
+For every platform:
+- **View > Profile**, as every toolbar item should also be a command.
+- The system's **accent colour** (JavaFX's `Platform.Preferences`) in the
+  Windows 11 and macOS styles, instead of a fixed blue; **increased
+  contrast** colours.
+- **Toolbar icons**: borderless symbols on macOS, Fluent icons on Windows
+  11 (Save, Load profile, Add entity), with the text as tooltips.
+- A **dark window title bar** where the OS allows it under dark colours.
+
+Styles:
+- **macOS**: try Liquid Glass (macOS 26) as effects on the macOS style,
+  only on controls and navigation (toolbar, sidebar, menus), never on
+  content: translucent fills, highlights, capsule shapes (JavaFX can't
+  blur or refract what is behind a control). Then work back to Yosemite
+  (10.10), as a variant or its own style, and Aqua (10.0) as a nostalgic
+  style like Warp, which may want other components (pinstripes, gel
+  buttons).
+- **OS/2 Warp**: IBM Plex Sans Condensed (open font licence) bundled in
+  place of WarpSans; Warp 4-style icons; the scroll wheel over the
+  notebook's −/+ turning pages; the entity list as a Workplace Shell folder
+  (see the explorer under Entities).
+- **Windows 11**: Fluent icons in the tool bar and menus; Mica-like
+  backgrounds where JavaFX allows.
+- Check the colours of each style on the real systems, side by side.
 
 ### Entities
 
@@ -370,6 +398,12 @@ style, Help > wpsld Help for ? to open.
   copy (the entities it refers to too), matching those the other crate
   already has (same `@id`, or same identifier) rather than duplicating
   them.
+- **An explorer for entities**, like Explorer, the Finder or a Workplace
+  Shell folder: a window (or view) of the crate with virtual folders for
+  each kind of contextual entity on top, e.g. "Persons", "Organizations"
+  and "Events", each with an icon for its kind, as the Workplace Shell had
+  specialised folders; data entities by their folders (`hasPart`). Related
+  to the type selector below and to browsing large crates.
 - **A type selector above the entity list**, showing only entities of the
   chosen type, its subtypes included (e.g. Organization also shows
   ResearchOrganization). Only types the crate's entities have are offered.
