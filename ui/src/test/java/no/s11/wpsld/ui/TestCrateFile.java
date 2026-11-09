@@ -108,4 +108,22 @@ public class TestCrateFile {
 		Files.delete(file);
 		assertEquals(CrateFile.Disk.MISSING, crateFile.disk());
 	}
+
+	/** Line ends as the file had them: \r\n only if every line has them, as in Vim */
+	@Test
+	public void lineEnds() throws Exception {
+		assertEquals("\n", CrateFile.lineEnd("{\n}\n".getBytes()));
+		assertEquals("\r\n", CrateFile.lineEnd("{\r\n}\r\n".getBytes()));
+		assertEquals("\n", CrateFile.lineEnd("{\r\n}\n".getBytes()));
+		assertEquals("\n", CrateFile.lineEnd("{}".getBytes()));
+		Path file = Files.createTempDirectory("crate").resolve("ro-crate-metadata.json");
+		Files.writeString(file, "{\r\n}\r\n");
+		CrateFile crateFile = new CrateFile(SAVED);
+		assertEquals("\n", crateFile.lineEnd());
+		crateFile.reset(Optional.of(file), SAVED);
+		assertEquals("\r\n", crateFile.lineEnd());
+		// Save As elsewhere keeps them; a new crate has \n
+		crateFile.reset(Optional.empty(), SAVED);
+		assertEquals("\n", crateFile.lineEnd());
+	}
 }

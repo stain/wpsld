@@ -24,10 +24,19 @@ dependencies {
 
 }
 
-// The tests serve profile crates with the JDK's HTTP server
+// The tests serve profile crates with the JDK's HTTP server. They have no
+// module-info, so Gradle runs them on the class path, which reads every
+// module: only jdk.httpserver has to be added (not --add-reads for
+// no.s11.wpsld, which isn't a module there, and only gave warnings)
 tasks.named('compileTestJava') {
-    options.compilerArgs += ['--add-modules', 'jdk.httpserver', '--add-reads', 'no.s11.wpsld=jdk.httpserver']
+    options.compilerArgs += ['--add-modules', 'jdk.httpserver']
 }
 tasks.named('test') {
-    jvmArgs '--add-modules', 'jdk.httpserver', '--add-reads', 'no.s11.wpsld=jdk.httpserver'
+    jvmArgs '--add-modules', 'jdk.httpserver'
+}
+
+// The module name's s11 is the organisation's domain (s11.no); javac's lint
+// would warn about its digits on every build
+tasks.named('compileJava') {
+    options.compilerArgs += ['-Xlint:-module']
 }

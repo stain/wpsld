@@ -36,8 +36,6 @@ import java.util.stream.Stream;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -125,7 +123,6 @@ public class CrateEditor extends Application {
 			KeyCombination.SHIFT_DOWN);
 	private static final KeyCombination REDO_WINDOWS = new KeyCodeCombination(KeyCode.Y,
 			KeyCombination.SHORTCUT_DOWN);
-	private static final ObjectMapper MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 	/** Incremented on changes, to update the labels of the entity list */
 	private final LongProperty labels = new SimpleLongProperty();
 
@@ -1257,7 +1254,8 @@ public class CrateEditor extends Application {
 	boolean saveTo(Stage stage, Path file) {
 		try {
 			JsonNode json = crate.toJson();
-			MAPPER.writeValue(file.toFile(), json);
+			// With the line ends the file had, else \n
+			Crate.writer(crateFile.lineEnd()).writeValue(file.toFile(), json);
 			crateFile.reset(Optional.of(file), json);
 			lastFolder = file.toAbsolutePath().getParent().toFile();
 			refresh();
@@ -1368,7 +1366,7 @@ public class CrateEditor extends Application {
 		}
 		JsonNode json = crate.toJson();
 		try {
-			preview.setText(MAPPER.writeValueAsString(json));
+			preview.setText(Crate.WRITER.writeValueAsString(json));
 		} catch (JsonProcessingException e) {
 			preview.setText(e.toString());
 		}

@@ -285,6 +285,10 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
     one undo step ("Undo Merge" back to the user's own version). Later,
     finer: per property within an entity, so only the same property
     changed on both sides conflicts.
+- Line ends: saved files have \n on every platform (`Crate.WRITER`,
+  rather than Jackson's system line separator), so the same crate is the
+  same file on each, e.g. for git; except a file opened with \r\n on
+  every line, which keeps them, as Vim does (`CrateFile.lineEnd`).
 - The window's title names the file (`CrateFile`): its folder and name, or
   Untitled, as the operating system has it: "name — Edited" while unsaved
   on macOS, "*name – wpsld" elsewhere.

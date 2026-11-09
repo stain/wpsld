@@ -55,6 +55,8 @@ final class CrateFile {
 	private Optional<Path> path = Optional.empty();
 	private JsonNode saved;
 	private Optional<Stamp> stamp = Optional.empty();
+	/** The line ends to write: as the file had them, else \n */
+	private String lineEnd = "\n";
 	/** The SHA-256 of a changed file the user chose to keep their changes over */
 	private Optional<String> keptOver = Optional.empty();
 
@@ -74,6 +76,37 @@ final class CrateFile {
 		this.saved = saved;
 		this.stamp = path.flatMap(CrateFile::stamp);
 		this.keptOver = Optional.empty();
+		// Kept for Save As too; a new crate gets \n
+		if (path.isEmpty()) {
+			lineEnd = "\n";
+		} else {
+			try {
+				lineEnd = lineEnd(Files.readAllBytes(path.get()));
+			} catch (IOException e) {
+				// As before
+			}
+		}
+	}
+
+	/**
+	 * The line ends to save with: those of the file as opened or saved (\r\n
+	 * only if every line has them, as Vim tells), else \n, on any platform.
+	 */
+	String lineEnd() {
+		return lineEnd;
+	}
+
+	static String lineEnd(byte[] content) {
+		boolean any = false;
+		for (int i = 0; i < content.length; i++) {
+			if (content[i] == '\n') {
+				if (i == 0 || content[i - 1] != '\r') {
+					return "\n";
+				}
+				any = true;
+			}
+		}
+		return any ? "\r\n" : "\n";
 	}
 
 	/**

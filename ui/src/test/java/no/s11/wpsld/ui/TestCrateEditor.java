@@ -509,6 +509,28 @@ public class TestCrateEditor extends ApplicationTest {
 		assertTrue(saved, saved.contains("For testing More"));
 	}
 
+	/** A file with \r\n line ends is saved with them, on any platform; others with \n */
+	@Test
+	public void lineEndsKept() throws Exception {
+		Path file = openNewCrate();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		// Opened again with \r\n line ends
+		Files.writeString(file, Files.readString(file).replace("\n", "\r\n"));
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, file.getParent())).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		addEntity("person");
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.saveTo(stage, file)).get());
+		String saved = Files.readString(file);
+		assertTrue(saved.contains("Person"));
+		assertTrue(saved.contains("\r\n"));
+		assertFalse(saved.replace("\r\n", "").contains("\n"));
+		// A new crate: \n
+		push(KeyCode.SHORTCUT, KeyCode.N);
+		Path other = file.resolveSibling("other-ro-crate-metadata.json");
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.saveTo(stage, other)).get());
+		assertFalse(Files.readString(other).contains("\r"));
+	}
+
 	/** Saving over a changed file: Reload discards the unsaved changes instead */
 	@Test
 	public void reloadInsteadOfSaving() throws Exception {
@@ -537,10 +559,13 @@ public class TestCrateEditor extends ApplicationTest {
 					.map(t -> Character.toLowerCase(t.charAt(t.indexOf('_') + 1))).toList();
 			assertEquals(menu.getText() + " " + letters, letters.size(), new java.util.HashSet<>(letters).size());
 		}
-		push(KeyCode.ALT, KeyCode.F);
-		WaitForAsyncUtils.waitForFxEvents();
-		assertTrue(bar.getMenus().get(0).isShowing());
-		push(KeyCode.ESCAPE);
+		// macOS has no such keys
+		if (!CrateFile.onMac()) {
+			push(KeyCode.ALT, KeyCode.F);
+			WaitForAsyncUtils.waitForFxEvents();
+			assertTrue(bar.getMenus().get(0).isShowing());
+			push(KeyCode.ESCAPE);
+		}
 	}
 
 	/** Edit > Undo and Redo say what they would undo and redo */

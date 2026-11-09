@@ -31,7 +31,6 @@ import java.util.Set;
 import org.junit.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 
 import no.s11.wpsld.crate.CrateDocument.Problem;
 import no.s11.wpsld.crate.CrateDocument.Severity;
@@ -132,8 +131,7 @@ public class TestCrateReader {
 		Path file = Path.of(getClass().getResource("expected-ro-crate-metadata.json").toURI());
 		CrateDocument document = reader.read(file);
 		assertEquals(List.of(), document.problems());
-		String written = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT)
-				.writeValueAsString(document.crate().orElseThrow().toJson());
+		String written = Crate.WRITER.writeValueAsString(document.crate().orElseThrow().toJson());
 		assertEquals(Files.readString(file).strip(), written.strip());
 	}
 
