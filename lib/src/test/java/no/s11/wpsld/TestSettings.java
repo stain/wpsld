@@ -44,6 +44,20 @@ public class TestSettings {
 	}
 
 	@Test
+	public void theme() throws Exception {
+		Path file = temp.getRoot().toPath().resolve("settings.json");
+		assertEquals("light", Settings.DEFAULT.theme());
+		Settings dark = new Settings(Set.of("profiles.ro-crate.org")).withTheme("dark");
+		dark.save(file);
+		assertEquals(dark, Settings.load(file));
+		// Changing the registries keeps the theme
+		assertEquals("dark", dark.withDisabledRegistries(Set.of()).theme());
+		// Settings from before themes
+		Files.writeString(file, "{\"disabledRegistries\": []}");
+		assertEquals(Settings.DEFAULT, Settings.load(file));
+	}
+
+	@Test
 	public void brokenFileIgnored() throws Exception {
 		Path file = temp.newFile("settings.json").toPath();
 		Files.writeString(file, "{ not json");

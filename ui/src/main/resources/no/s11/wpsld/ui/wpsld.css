@@ -1,0 +1,28 @@
+/*
+ * The editor's own colours, under every theme (see Theme): named here, so
+ * that a theme's stylesheet only has to give them new values.
+ */
+.root {
+    -wpsld-dim-text: #505050;
+    -wpsld-faint-text: #808080;
+    -wpsld-warning-text: #8a5a00;
+    -wpsld-error-text: #b00000;
+}
+
+/* Secondary text: descriptions, addresses, folders */
+.dim-text {
+    -fx-text-fill: -wpsld-dim-text;
+}
+
+/* Text standing in for what isn't there, e.g. "No values" */
+.faint-text {
+    -fx-text-fill: -wpsld-faint-text;
+}
+
+.warning-text {
+    -fx-text-fill: -wpsld-warning-text;
+}
+
+.error-text {
+    -fx-text-fill: -wpsld-error-text;
+}

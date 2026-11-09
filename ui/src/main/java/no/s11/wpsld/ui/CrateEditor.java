@@ -214,6 +214,8 @@ public class CrateEditor extends Application {
 	public void start(Stage stage) {
 		BorderPane root = new BorderPane(new Label("Loading schema.org " + SchemaFromJsonLd.SCHEMAORG_VERSION + "…"));
 		stage.setScene(new Scene(root, 1400, 800));
+		// For this window and every one opened after it
+		Theme.choose(Theme.named(settings.theme()));
 		// Also if the window showed another scene before (as in tests)
 		stage.sizeToScene();
 		stage.setTitle("wpsld");
@@ -459,12 +461,37 @@ public class CrateEditor extends Application {
 				entityEditor.setNotebookMode(selected == notebook);
 			}
 		});
-		Menu view = new Menu("View", null, list, notebook);
+		Menu view = new Menu("View", null, list, notebook, new SeparatorMenuItem(), themes(stage));
 		view.setId("menuView");
 
 		MenuBar bar = new MenuBar(file, edit, view);
 		bar.setId("menuBar");
 		return bar;
+	}
+
+	/**
+	 * View > Theme: the editor's look, kept in the settings.
+	 */
+	private Menu themes(Stage stage) {
+		ToggleGroup group = new ToggleGroup();
+		Menu menu = new Menu("Theme");
+		menu.setId("menuTheme");
+		for (Theme theme : Theme.values()) {
+			RadioMenuItem item = new RadioMenuItem(theme.label());
+			item.setId("menuTheme-" + theme.id());
+			item.setUserData(theme);
+			item.setToggleGroup(group);
+			item.setSelected(theme == Theme.chosen());
+			menu.getItems().add(item);
+		}
+		group.selectedToggleProperty().addListener((obs, old, selected) -> {
+			if (selected != null && selected.getUserData() instanceof Theme theme) {
+				Theme.choose(theme);
+				settings = settings.withTheme(theme.id());
+				saveSettings(stage);
+			}
+		});
+		return menu;
 	}
 
 	/**
@@ -666,17 +693,21 @@ public class CrateEditor extends Application {
 		new PreferencesDialog(stage, settings, profileCache, this::forgotten).showAndWait().ifPresent(changed -> {
 			settings = changed;
 			profileCache.setDisabledRegistries(changed.disabledRegistries());
-			if (settingsFile.isPresent()) {
-				try {
-					changed.save(settingsFile.get());
-				} catch (IOException e) {
-					Alert alert = new Alert(AlertType.ERROR, e.toString(), ButtonType.OK);
-					alert.initOwner(stage);
-					alert.setHeaderText("Can't save the preferences in " + settingsFile.get());
-					alert.show();
-				}
-			}
+			saveSettings(stage);
 		});
+	}
+
+	private void saveSettings(Stage stage) {
+		if (settingsFile.isPresent()) {
+			try {
+				settings.save(settingsFile.get());
+			} catch (IOException e) {
+				Alert alert = new Alert(AlertType.ERROR, e.toString(), ButtonType.OK);
+				alert.initOwner(stage);
+				alert.setHeaderText("Can't save the preferences in " + settingsFile.get());
+				alert.show();
+			}
+		}
 	}
 
 	/**
@@ -721,7 +752,7 @@ public class CrateEditor extends Application {
 		Label registryProblems = new Label();
 		registryProblems.setId("registryProblems");
 		registryProblems.setWrapText(true);
-		registryProblems.setStyle("-fx-text-fill: #8a5a00;");
+		registryProblems.getStyleClass().add("warning-text");
 		VBox content = new VBox(8, new HBox(8, location, file), help, listed, registryProblems);
 		content.setPadding(new Insets(4));
 		dialog.getDialogPane().setContent(content);

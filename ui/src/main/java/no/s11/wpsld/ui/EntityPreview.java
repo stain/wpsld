@@ -95,7 +95,7 @@ public class EntityPreview extends ScrollPane {
 		name.setWrapText(true);
 		name.setStyle("-fx-font-size: 1.6em; -fx-font-weight: bold;");
 		Label about = new Label(String.join(", ", entity.getTypes()) + "    " + entity.getId());
-		about.setStyle("-fx-text-fill: #505050;");
+		about.getStyleClass().add("dim-text");
 		content.getChildren().addAll(name, about);
 		// The description as a paragraph under the name, not in the table
 		List<String> descriptions = entity.getAll("description").stream().filter(JsonNode::isValueNode)
@@ -188,7 +188,7 @@ public class EntityPreview extends ScrollPane {
 				return webLink(id);
 			}
 			Label missing = new Label(id + " (not in the crate)");
-			missing.setStyle("-fx-text-fill: #808080;");
+			missing.getStyleClass().add("faint-text");
 			return missing;
 		}
 		if (value.isTextual() && isWebAddress(value.asText())) {

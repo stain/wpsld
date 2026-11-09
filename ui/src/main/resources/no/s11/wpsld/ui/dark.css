@@ -1,0 +1,296 @@
+/*
+ * The Dark theme (see Theme): JavaFX's Modena recoloured in the colours of
+ * Visual Studio Code's "Dark Modern", and flattened as VS Code draws its
+ * controls: no gradients, thin borders, a blue accent.
+ *
+ *   #181818  side bar, title and status bar: the window
+ *   #1f1f1f  editor: lists, text areas, menus
+ *   #313131  inputs and secondary buttons, border #3c3c3c
+ *   #0078d4  focus, primary buttons, menu selection
+ *   #04395e  selected list item (#37373d when the list has no focus)
+ *   #cccccc  text, #9d9d9d secondary text
+ */
+.root {
+    -fx-base: #313131;
+    -fx-background: #181818;
+    -fx-control-inner-background: #1f1f1f;
+    -fx-control-inner-background-alt: #1f1f1f;
+    -fx-light-text-color: #cccccc;
+    -fx-dark-text-color: #1f1f1f;
+    -fx-mid-text-color: #cccccc;
+    -fx-accent: #0078d4;
+    -fx-default-button: #0078d4;
+    -fx-focus-color: #0078d4;
+    -fx-faint-focus-color: transparent;
+    -fx-selection-bar: #04395e;
+    -fx-selection-bar-non-focused: #37373d;
+    -fx-selection-bar-text: #ffffff;
+    -fx-cell-hover-color: #2a2d2e;
+    -fx-box-border: #3c3c3c;
+    -fx-text-box-border: #3c3c3c;
+    -fx-outer-border: #3c3c3c;
+    -fx-inner-border: transparent;
+    -fx-inner-border-horizontal: transparent;
+    -fx-inner-border-bottomup: transparent;
+    -fx-body-color: #313131;
+    -fx-body-color-bottomup: #313131;
+    -fx-body-color-to-right: #313131;
+    -fx-shadow-highlight-color: transparent;
+    -fx-mark-color: #cccccc;
+    -fx-mark-highlight-color: transparent;
+
+    -wpsld-dim-text: #9d9d9d;
+    -wpsld-faint-text: #6e7681;
+    -wpsld-warning-text: #cca700;
+    -wpsld-error-text: #f85149;
+}
+
+/* Buttons: grey, the default one blue */
+.button, .toggle-button, .menu-button, .split-menu-button > .label, .split-menu-button > .arrow-button,
+.combo-box-base, .choice-box {
+    -fx-background-color: #3c3c3c, #313131;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 2, 2;
+}
+
+.button:hover, .toggle-button:hover, .menu-button:hover, .combo-box-base:hover, .choice-box:hover {
+    -fx-background-color: #464646, #3a3a3a;
+}
+
+.button:armed, .toggle-button:selected, .menu-button:showing, .combo-box-base:showing {
+    -fx-background-color: #464646, #454545;
+}
+
+.button:default {
+    -fx-background-color: #0078d4;
+    -fx-background-insets: 0;
+    -fx-text-fill: #ffffff;
+}
+
+.button:default:hover {
+    -fx-background-color: #026ec1;
+}
+
+.button:focused, .toggle-button:focused, .menu-button:focused, .combo-box-base:focused, .choice-box:focused,
+.check-box:focused > .box, .radio-button:focused > .radio {
+    -fx-background-color: #0078d4, #313131;
+    -fx-background-insets: 0, 1;
+}
+
+.button:default:focused {
+    -fx-background-color: #ffffff, #0078d4;
+}
+
+/* Inputs */
+.text-field, .text-area, .combo-box-base.combo-box > .text-field, .date-picker > .text-field {
+    -fx-background-color: #3c3c3c, #313131;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 2, 2;
+    -fx-prompt-text-fill: #989898;
+    -fx-highlight-fill: #264f78;
+    -fx-highlight-text-fill: #ffffff;
+}
+
+.text-field:focused, .text-area:focused {
+    -fx-background-color: #0078d4, #313131;
+}
+
+.text-area .content {
+    -fx-background-color: #1f1f1f;
+}
+
+.check-box > .box, .radio-button > .radio {
+    -fx-background-color: #3c3c3c, #313131;
+    -fx-background-insets: 0, 1;
+}
+
+.check-box:selected > .box {
+    -fx-background-color: #0078d4;
+}
+
+/* The menu bar as VS Code's title bar, and its menus */
+.menu-bar {
+    -fx-background-color: #181818;
+    -fx-border-color: transparent transparent #2b2b2b transparent;
+}
+
+.menu-bar > .container > .menu-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 3;
+}
+
+.menu-bar > .container > .menu-button:hover, .menu-bar > .container > .menu-button:showing {
+    -fx-background-color: #2a2d2e;
+}
+
+.tool-bar {
+    -fx-background-color: #181818;
+    -fx-border-color: transparent transparent #2b2b2b transparent;
+}
+
+.context-menu {
+    -fx-background-color: #454545, #1f1f1f;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 4, 4;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 8, 0, 0, 2);
+}
+
+.menu-item:focused, .menu-item:hover {
+    -fx-background-color: #0078d4;
+    -fx-background-radius: 3;
+}
+
+.menu-item:focused > .label, .menu-item:hover > .label {
+    -fx-text-fill: #ffffff;
+}
+
+.separator:horizontal .line {
+    -fx-border-color: #454545 transparent transparent transparent;
+}
+
+.tooltip {
+    -fx-background-color: #454545, #202020;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 3, 3;
+    -fx-text-fill: #cccccc;
+}
+
+/* Lists and trees as the side bar */
+.list-view, .tree-view {
+    -fx-background-color: #2b2b2b, #181818;
+    -fx-control-inner-background: #181818;
+    -fx-control-inner-background-alt: #181818;
+}
+
+.list-cell:filled:hover, .tree-cell:filled:hover {
+    -fx-background-color: #2a2d2e;
+}
+
+.list-cell:filled:selected, .tree-cell:filled:selected {
+    -fx-background-color: #37373d;
+}
+
+.list-view:focused > .virtual-flow > .clipped-container > .sheet > .list-cell:filled:selected,
+.tree-view:focused > .virtual-flow > .clipped-container > .sheet > .tree-cell:filled:selected {
+    -fx-background-color: #0078d4, #04395e;
+    -fx-background-insets: 0, 1;
+}
+
+/* Tabs as the editor's: the selected one with a blue top line */
+.tab-pane > .tab-header-area > .tab-header-background {
+    -fx-background-color: #2b2b2b, #181818;
+    -fx-background-insets: 0, 0 0 1 0;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab {
+    -fx-background-color: #181818;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+    -fx-padding: 4 12 4 12;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-color: #0078d4, #1f1f1f;
+    -fx-background-insets: 0, 1 0 0 0;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab > .tab-container > .tab-label {
+    -fx-text-fill: #9d9d9d;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected > .tab-container > .tab-label {
+    -fx-text-fill: #ffffff;
+}
+
+.tab-pane:focused > .tab-header-area > .headers-region > .tab:selected .focus-indicator {
+    -fx-border-color: transparent;
+}
+
+/* The form's folding groups as the side bar's sections */
+.titled-pane > .title {
+    -fx-background-color: #2b2b2b, #181818;
+    -fx-background-insets: 0, 0 0 1 0;
+    -fx-background-radius: 0;
+}
+
+.titled-pane > .title > .text, .titled-pane > .title > .label {
+    -fx-font-weight: bold;
+}
+
+.titled-pane > .content {
+    -fx-background-color: #1f1f1f;
+    -fx-border-color: #2b2b2b;
+}
+
+.split-pane {
+    -fx-background-color: #181818;
+    -fx-padding: 0;
+}
+
+.split-pane > .split-pane-divider {
+    -fx-background-color: #2b2b2b;
+    -fx-padding: 0 1 0 1;
+}
+
+.scroll-pane, .scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
+
+.scroll-pane > .corner, .scroll-bar > .increment-button, .scroll-bar > .decrement-button {
+    -fx-background-color: transparent;
+}
+
+/* Thin scroll bars with a translucent thumb, and no arrows */
+.scroll-bar {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.scroll-bar > .increment-button > .increment-arrow, .scroll-bar > .decrement-button > .decrement-arrow {
+    -fx-shape: " ";
+    -fx-padding: 0;
+}
+
+.scroll-bar:vertical > .increment-button, .scroll-bar:vertical > .decrement-button {
+    -fx-padding: 0 5 0 5;
+}
+
+.scroll-bar:horizontal > .increment-button, .scroll-bar:horizontal > .decrement-button {
+    -fx-padding: 5 0 5 0;
+}
+
+.scroll-bar > .thumb {
+    -fx-background-color: rgba(121, 121, 121, 0.4);
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+}
+
+.scroll-bar > .thumb:hover {
+    -fx-background-color: rgba(100, 100, 100, 0.7);
+}
+
+.scroll-bar > .thumb:pressed {
+    -fx-background-color: rgba(191, 191, 191, 0.4);
+}
+
+.hyperlink {
+    -fx-text-fill: #4daafc;
+}
+
+.hyperlink:visited {
+    -fx-text-fill: #4daafc;
+}
+
+/* Dialogs: the header as the window, the buttons below */
+.dialog-pane {
+    -fx-background-color: #1f1f1f;
+}
+
+.dialog-pane > .header-panel {
+    -fx-background-color: #2b2b2b, #181818;
+    -fx-background-insets: 0, 0 0 1 0;
+}
+
+.dialog-pane > .header-panel .label {
+    -fx-text-fill: #cccccc;
+}

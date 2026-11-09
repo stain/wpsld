@@ -303,7 +303,8 @@ public class EntityEditor extends ScrollPane {
 				String name = terms.name(requiredClass);
 				Label notice = new Label("Required type: " + name);
 				notice.setId(id("requiredType", name));
-				notice.setStyle("-fx-text-fill: #b00000; -fx-font-weight: bold;");
+				notice.getStyleClass().add("error-text");
+				notice.setStyle("-fx-font-weight: bold;");
 				notice.setTooltip(tooltip("The profile " + formFields.getName() + " requires this entity to be a "
 						+ name + " (or a kind of " + name + ")"));
 				chips.getChildren().add(notice);
@@ -683,7 +684,7 @@ public class EntityEditor extends ScrollPane {
 			field.comment().ifPresent(comment -> {
 				Label text = new Label(Labels.plainText(comment));
 				text.setWrapText(true);
-				text.setStyle("-fx-text-fill: #505050;");
+				text.getStyleClass().add("dim-text");
 				VBox description = new VBox(2, text);
 				description.setId(id("description", field.name()));
 				// The full definition, e.g. https://schema.org/datePublished
@@ -793,7 +794,8 @@ public class EntityEditor extends ScrollPane {
 			Label label = new Label("\u2691 " + note);
 			label.setId(id("retired", property));
 			label.setWrapText(true);
-			label.setStyle("-fx-text-fill: #8a5a00; -fx-font-size: 0.9em;");
+			label.getStyleClass().add("warning-text");
+			label.setStyle("-fx-font-size: 0.9em;");
 			return label;
 		});
 	}
