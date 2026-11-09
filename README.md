@@ -130,6 +130,13 @@ into `dist/`:
 The portable zip, without JavaFX, is `./gradlew :ui:distZip`, written to
 `ui/build/distributions/`.
 
+### Tests on GitHub
+
+[`.github/workflows/test.yml`](.github/workflows/test.yml) builds wpsld and
+runs its tests, the headless GUI tests too, for every pull request: they must
+pass on Linux, and are reported for Windows and macOS. The release workflow
+also runs them on each platform before making a release.
+
 ### Releases
 
 [`.github/workflows/release.yml`](.github/workflows/release.yml) builds the
