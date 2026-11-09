@@ -441,9 +441,14 @@ Styles:
     every licence's full text (21 MB); a licence's JSON-LD (5-40 kB) could
     be fetched from `….jsonld` when its text is wanted. Pin it to a tag
     with a script, as `scripts/update-masp-profiles.sh` pins profiles.
-  - First confirm the licence of the SPDX License List data: neither
-    license-list-data nor license-list-XML states one (GitHub says
-    NOASSERTION), and it goes in THIRD-PARTY-NOTICES.txt.
+  - Its licence: license-list-data's
+    [accessingLicenses.md](https://github.com/spdx/license-list-data/blob/main/accessingLicenses.md)
+    gives Creative Commons Attribution 3.0 (CC-BY-3.0), strictly under
+    "Tech Report License", i.e. for that document; neither repository has a
+    licence file (GitHub says NOASSERTION). Take the list as CC-BY-3.0,
+    which only asks for attribution: credit the SPDX License List v3.29.0,
+    link the licence, and say it is unchanged (or what was left out) in
+    THIRD-PARTY-NOTICES.txt.
 - **An explorer for entities**, like Explorer, the Finder or a Workplace
   Shell folder: a window (or view) of the crate with virtual folders for
   each kind of contextual entity on top, e.g. "Persons", "Organizations"
