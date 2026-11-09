@@ -146,6 +146,27 @@ public class TestCrateEditorTheme extends ApplicationTest {
 	}
 
 	/**
+	 * macOS, which also asks for the screen's menu bar (only used on macOS).
+	 */
+	@Test
+	public void macOSStyle() throws Exception {
+		editorShown();
+		Scene scene = stage.getScene();
+		MenuBar bar = lookup("#menuBar").queryAs(MenuBar.class);
+		assertFalse(bar.isUseSystemMenuBar());
+		choose("Style", "macos");
+		assertEquals(List.of("wpsld.css", "macos.css"), scene.getStylesheets().stream()
+				.map(s -> s.substring(s.lastIndexOf('/') + 1)).toList());
+		assertTrue(bar.isUseSystemMenuBar());
+		assertTrue(lookup("#notebook").tryQuery().isEmpty());
+		choose("Colours", "dark");
+		assertEquals(List.of("wpsld.css", "macos.css", "macos-dark.css"), scene.getStylesheets().stream()
+				.map(s -> s.substring(s.lastIndexOf('/') + 1)).toList());
+		choose("Style", "classic");
+		assertFalse(bar.isUseSystemMenuBar());
+	}
+
+	/**
 	 * The OS/2 Warp style: the form's groups as the tabs of a notebook, with
 	 * pages.
 	 */

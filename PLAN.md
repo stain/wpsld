@@ -266,7 +266,12 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
   - Styles: Classic (JavaFX's Modena), Windows 11 (Modena reshaped after
     Fluent, `win11.css`: Mica window, cards, 4 px corners, accent line under
     a focused input, a pill on the selected item, focus rings only for the
-    keyboard, Segoe UI), and OS/2 Warp (`warp.css`, after Warp 4's
+    keyboard, Segoe UI), macOS (`macos.css`, after macOS 14-15 before
+    Liquid Glass: white push buttons with a soft shadow, the blue focus ring,
+    pop-up buttons with a blue chevron box, System Settings' rounded groups,
+    a grey sidebar with rounded selection, segmented tabs, the round help
+    button, the system font, and on macOS the screen's menu bar), and OS/2
+    Warp (`warp.css`, after Warp 4's
     Presentation Manager: #cccccc grey, square corners, black-outlined 3D
     bevels, raised buttons that sink when pressed, sunken white entry
     fields and lists, grey list selection and title-blue menu selection;
@@ -274,8 +279,9 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
     notebook (in place of the earlier View > List/Notebook).
   - Colours: Light, Dark or Same as System. Each style has its dark
     stylesheet: VS Code's Dark Modern for Classic (`dark.css`), Fluent's
-    dark tokens for Windows 11 (`win11-dark.css`), and the same bevels on
-    dark grey for Warp (`warp-dark.css`).
+    dark tokens for Windows 11 (`win11-dark.css`), AppKit's dark colours for
+    macOS (`macos-dark.css`), and the same bevels on dark grey for Warp
+    (`warp-dark.css`).
   - Every window and dialog gets `wpsld.css`, which names the editor's own
     colours (`-wpsld-dim-text`…, used through style classes such as
     `dim-text` instead of inline colours), then the style's stylesheet, then
@@ -288,8 +294,12 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
   - Next: Fluent icons in the Windows 11 tool bar (Save, Load profile, Add
     entity) and menus; for Warp, IBM Plex Sans Condensed (open font
     licence) bundled in place of WarpSans, Warp 4-style icons, and the
-    entity list as a WPS folder (icons, Details view); a macOS style; and a
-    dark window title bar where the OS allows.
+    entity list as a WPS folder (icons, Details view); and a
+    dark window title bar where the OS allows. For macOS: try Liquid Glass
+    (macOS 26) as effects on the macOS style (translucent fills, highlights,
+    capsule shapes; JavaFX can't blur or refract what's behind a control),
+    then work back to Yosemite (10.10), as a variant or its own style, and
+    Aqua (10.0) as a nostalgic style like Warp.
 
 Next: opening zipped crates and crates from a URL (with `CrateRetriever`),
 and recent files (in the state folder).

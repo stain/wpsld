@@ -126,6 +126,7 @@ the zips for a platform. Their licences and notices are in
 which the build puts in every zip and which Help > About wpsld shows. That
 file covers the built application, not the source in this repository.
 
-OS/2 and Warp are trademarks of IBM, and Windows and Segoe are trademarks of
-Microsoft. wpsld is not affiliated with either; its "OS/2 Warp" and
-"Windows 11" styles only resemble their looks.
+OS/2 and Warp are trademarks of IBM, Windows and Segoe are trademarks of
+Microsoft, and macOS is a trademark of Apple. wpsld is not affiliated with
+any of them; its "OS/2 Warp", "Windows 11" and "macOS" styles only resemble
+their looks.

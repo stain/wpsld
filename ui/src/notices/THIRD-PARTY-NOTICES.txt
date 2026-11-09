@@ -15,8 +15,9 @@ JavaFX, under the GNU General Public License version 2 with the Classpath
 Exception. Their notices are in the runtime's legal/ folder.
 
 OS/2 and Warp are trademarks of IBM. Windows and Segoe are trademarks of
-Microsoft. wpsld is not affiliated with IBM or Microsoft; its "OS/2 Warp"
-and "Windows 11" styles only resemble their looks.
+Microsoft. macOS is a trademark of Apple. wpsld is not affiliated with IBM,
+Microsoft or Apple; its "OS/2 Warp", "Windows 11" and "macOS" styles only
+resemble their looks.
 
 
 ============================================================================

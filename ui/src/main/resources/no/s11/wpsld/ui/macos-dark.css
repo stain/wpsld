@@ -1,0 +1,40 @@
+/*
+ * The macOS style in dark colours (see Theme): approximately AppKit's dark
+ * appearance for macos.css, with its brighter accent blue.
+ */
+.root {
+    -mac-window: #282828;
+    -mac-control: #5c5c5c;
+    -mac-control-pressed: #747474;
+    -mac-control-border: rgba(0, 0, 0, 0.3);
+    -mac-control-shadow: rgba(0, 0, 0, 0.35);
+    -mac-field: #1e1e1e;
+    -mac-field-border: rgba(255, 255, 255, 0.14);
+    -mac-group: #303030;
+    -mac-group-border: rgba(255, 255, 255, 0.08);
+    -mac-list: #1e1e1e;
+    -mac-sidebar: #303030;
+    -mac-sidebar-selection: #4a4a4a;
+    -mac-segment-track: #3a3a3a;
+    -mac-menu: #2f2f2f;
+    -mac-menu-border: rgba(255, 255, 255, 0.16);
+    -mac-separator: rgba(255, 255, 255, 0.1);
+    -mac-hover: rgba(255, 255, 255, 0.08);
+    -mac-text: #dfdfdf;
+    -mac-text-secondary: #9a9a9a;
+    -mac-text-disabled: #646464;
+    -mac-accent: #0a84ff;
+    -mac-accent-pressed: #3a9cff;
+    -mac-on-accent: #ffffff;
+    -mac-selection: #0058d0;
+    -mac-selection-unfocused: #464646;
+    -mac-selection-unfocused-text: #dfdfdf;
+    -mac-focus-ring: rgba(10, 132, 255, 0.5);
+    -mac-text-highlight: #3f638b;
+    -mac-link: #419cff;
+    -mac-scroll-thumb: rgba(255, 255, 255, 0.35);
+    -mac-shadow: rgba(0, 0, 0, 0.5);
+
+    -wpsld-warning-text: #ffb340;
+    -wpsld-error-text: #ff6961;
+}

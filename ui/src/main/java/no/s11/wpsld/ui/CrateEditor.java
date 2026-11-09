@@ -460,6 +460,10 @@ public class CrateEditor extends Application {
 
 		MenuBar bar = new MenuBar(file, edit, view, help);
 		bar.setId("menuBar");
+		// In the macOS style, on macOS the menus are in the screen's menu bar
+		// (set, as JavaFX doesn't allow binding it)
+		bar.setUseSystemMenuBar(Theme.style().get() == Theme.Style.MACOS);
+		Theme.style().addListener((obs, old, style) -> bar.setUseSystemMenuBar(style == Theme.Style.MACOS));
 		return bar;
 	}
 
