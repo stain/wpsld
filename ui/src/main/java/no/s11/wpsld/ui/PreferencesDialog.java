@@ -78,7 +78,7 @@ class PreferencesDialog extends Dialog<Settings> {
 			use.setSelected(settings.isRegistryEnabled(registry.name()));
 			registry.address().ifPresent(a -> use.setTooltip(new Tooltip(a.toString())));
 			Label address = new Label(registry.address().map(Object::toString).orElse(""));
-			address.setStyle("-fx-text-fill: #606060;");
+			address.getStyleClass().add("dim-text");
 			address.setPadding(new Insets(0, 0, 0, 24));
 			registries.getChildren().addAll(use, address);
 			enabled.put(registry, use);
@@ -120,7 +120,7 @@ class PreferencesDialog extends Dialog<Settings> {
 			}
 		});
 		Label folder = new Label(profiles.store().map(s -> "Kept in " + s).orElse("Not kept"));
-		folder.setStyle("-fx-text-fill: #606060;");
+		folder.getStyleClass().add("dim-text");
 		folder.setWrapText(true);
 		VBox keptBox = new VBox(8, new Label("Profiles loaded before, kept for next time"), kept,
 				new HBox(8, remove), folder);
@@ -138,7 +138,7 @@ class PreferencesDialog extends Dialog<Settings> {
 			}
 			Set<String> disabled = enabled.entrySet().stream().filter(e -> !e.getValue().isSelected())
 					.map(e -> e.getKey().name()).collect(Collectors.toSet());
-			return new Settings(disabled);
+			return settings.withDisabledRegistries(disabled);
 		});
 	}
 }

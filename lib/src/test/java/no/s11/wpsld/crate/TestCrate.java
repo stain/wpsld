@@ -28,8 +28,6 @@ import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
 public class TestCrate {
@@ -252,8 +250,7 @@ public class TestCrate {
 		crate.rename(file, "code.py");
 		root.setAll("author", List.of(JSON.objectNode().put("@id", alice.getId())));
 		root.setAll("hasPart", List.of(JSON.objectNode().put("@id", "code.py")));
-		String written = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT)
-				.writeValueAsString(crate.toJson());
+		String written = Crate.WRITER.writeValueAsString(crate.toJson());
 		try (InputStream expected = getClass().getResourceAsStream("expected-ro-crate-metadata.json")) {
 			assertNotNull(expected);
 			assertEquals(new String(expected.readAllBytes(), StandardCharsets.UTF_8).strip(), written.strip());

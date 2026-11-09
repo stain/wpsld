@@ -1,0 +1,666 @@
+/*
+ * The macOS style (see Theme): Modena reshaped after macOS 14-15 (Sonoma,
+ * Sequoia), before Liquid Glass. A light grey window; white push buttons
+ * with a fine border and a soft shadow, the default one in the accent blue;
+ * white text fields with a translucent blue focus ring; pop-up buttons with
+ * a small blue box of chevrons; form groups as rounded white boxes, as in
+ * System Settings; lists select with a rounded inset, blue when focused and
+ * grey when not; rounded menus highlighting in blue; thin overlay scroll
+ * bars; and the round help button. The font is the system's at 13 px: SF on
+ * macOS.
+ *
+ * The colours approximate AppKit's light appearance as -mac-*;
+ * macos-dark.css gives them their dark values.
+ */
+.root {
+    -mac-window: #ececec;
+    -mac-control: #ffffff;
+    -mac-control-pressed: #e4e4e4;
+    -mac-control-border: rgba(0, 0, 0, 0.16);
+    -mac-control-shadow: rgba(0, 0, 0, 0.18);
+    -mac-field: #ffffff;
+    -mac-field-border: rgba(0, 0, 0, 0.18);
+    -mac-group: #f6f6f6;
+    -mac-group-border: rgba(0, 0, 0, 0.08);
+    -mac-list: #ffffff;
+    -mac-sidebar: #e3e3e3;
+    -mac-sidebar-selection: #cacaca;
+    -mac-segment-track: #e0e0e0;
+    -mac-menu: #f6f6f6;
+    -mac-menu-border: rgba(0, 0, 0, 0.14);
+    -mac-separator: rgba(0, 0, 0, 0.1);
+    -mac-hover: rgba(0, 0, 0, 0.05);
+    -mac-text: #262626;
+    -mac-text-secondary: #808080;
+    -mac-text-disabled: #b2b2b2;
+    -mac-accent: #007aff;
+    -mac-accent-pressed: #0062cc;
+    -mac-on-accent: #ffffff;
+    -mac-selection: #0064e1;
+    -mac-selection-unfocused: #dcdcdc;
+    -mac-selection-unfocused-text: #262626;
+    -mac-focus-ring: rgba(0, 122, 255, 0.5);
+    -mac-text-highlight: #b3d7ff;
+    -mac-link: #0068da;
+    -mac-scroll-thumb: rgba(0, 0, 0, 0.35);
+    -mac-shadow: rgba(0, 0, 0, 0.25);
+
+    -fx-font-family: "System";
+    -fx-font-size: 13px;
+
+    -fx-base: -mac-control;
+    -fx-background: -mac-window;
+    -fx-control-inner-background: -mac-field;
+    -fx-control-inner-background-alt: -mac-field;
+    -fx-dark-text-color: -mac-text;
+    -fx-mid-text-color: -mac-text;
+    -fx-light-text-color: #ffffff;
+    -fx-accent: -mac-accent;
+    -fx-default-button: -mac-accent;
+    -fx-focus-color: -mac-focus-ring;
+    -fx-faint-focus-color: transparent;
+    -fx-selection-bar: -mac-selection;
+    -fx-selection-bar-non-focused: -mac-selection-unfocused;
+    -fx-selection-bar-text: #ffffff;
+    -fx-box-border: -mac-control-border;
+    -fx-text-box-border: -mac-field-border;
+    -fx-outer-border: -mac-control-border;
+    -fx-inner-border: transparent;
+    -fx-inner-border-horizontal: transparent;
+    -fx-inner-border-bottomup: transparent;
+    -fx-body-color: -mac-control;
+    -fx-body-color-bottomup: -mac-control;
+    -fx-body-color-to-right: -mac-control;
+    -fx-shadow-highlight-color: transparent;
+    -fx-mark-color: -mac-text;
+    -fx-mark-highlight-color: transparent;
+
+    -wpsld-dim-text: -mac-text-secondary;
+    -wpsld-faint-text: -mac-text-disabled;
+    -wpsld-warning-text: #a05a00;
+    -wpsld-error-text: #d70015;
+}
+
+.label, .check-box, .radio-button {
+    -fx-text-fill: -mac-text;
+}
+
+/* Push buttons: white, a fine border and a soft shadow below */
+.button, .toggle-button, .menu-button, .split-menu-button, .choice-box, .combo-box-base,
+.button:focused, .toggle-button:focused, .menu-button:focused, .choice-box:focused, .combo-box-base:focused,
+.button:hover, .toggle-button:hover, .menu-button:hover, .choice-box:hover, .combo-box-base:hover {
+    -fx-background-color: -mac-control-shadow, -mac-control-border, -mac-control;
+    -fx-background-insets: 0 0 -1 0, 0, 0.5;
+    -fx-background-radius: 6, 6, 5.5;
+    -fx-text-fill: -mac-text;
+}
+
+.button, .toggle-button {
+    -fx-padding: 3 12 3 12;
+}
+
+.button:armed, .toggle-button:selected, .menu-button:showing, .choice-box:showing, .combo-box-base:showing {
+    -fx-background-color: -mac-control-shadow, -mac-control-border, -mac-control-pressed;
+}
+
+.button:default, .button:default:focused, .button:default:hover {
+    -fx-background-color: -mac-control-shadow, -mac-accent;
+    -fx-background-insets: 0 0 -1 0, 0;
+    -fx-background-radius: 6, 6;
+    -fx-text-fill: -mac-on-accent;
+}
+
+.button:default:armed {
+    -fx-background-color: -mac-control-shadow, -mac-accent-pressed;
+}
+
+/* The focus ring, for the keyboard: a translucent accent ring outside */
+.button:focus-visible, .toggle-button:focus-visible, .menu-button:focus-visible, .choice-box:focus-visible,
+.combo-box-base:focus-visible, .check-box:focus-visible > .box, .radio-button:focus-visible > .radio {
+    -fx-border-color: -mac-focus-ring;
+    -fx-border-width: 3.5;
+    -fx-border-radius: 9;
+    -fx-border-insets: -3.5;
+}
+
+/* Pop-up buttons: a small blue box with up and down chevrons */
+.combo-box > .arrow-button, .choice-box > .open-button {
+    -fx-background-color: -mac-accent;
+    -fx-background-insets: 3 3 3 0;
+    -fx-background-radius: 4;
+    -fx-padding: 0 5 0 5;
+}
+
+.combo-box > .arrow-button > .arrow, .choice-box > .open-button > .arrow {
+    -fx-background-color: -mac-on-accent;
+    -fx-shape: "M0,4 L3.5,0 L7,4 L6,5 L3.5,2.2 L1,5 Z M0,8 L1,7 L3.5,9.8 L6,7 L7,8 L3.5,12 Z";
+    -fx-padding: 4.5 3 4.5 3;
+}
+
+.menu-button > .arrow-button {
+    -fx-background-color: transparent;
+}
+
+.menu-button > .arrow-button > .arrow {
+    -fx-background-color: -mac-text-secondary;
+}
+
+/* Text fields: white, a fine border; focused, the ring around them */
+.text-input {
+    -fx-background-color: -mac-field-border, -mac-field;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 5, 4;
+    -fx-text-fill: -mac-text;
+    -fx-prompt-text-fill: -mac-text-disabled;
+    -fx-highlight-fill: -mac-text-highlight;
+    -fx-highlight-text-fill: -mac-text;
+    -fx-padding: 4 7 4 7;
+}
+
+.text-input:focused {
+    -fx-background-color: -mac-focus-ring, -mac-accent, -mac-field;
+    -fx-background-insets: -3, 0, 1;
+    -fx-background-radius: 8, 5, 4;
+}
+
+.text-area {
+    -fx-padding: 1;
+}
+
+.text-area > .scroll-pane > .viewport > .content {
+    -fx-background-color: -mac-field;
+    -fx-background-radius: 4;
+    -fx-padding: 3 6 3 6;
+}
+
+.text-area > .scroll-pane, .text-area > .scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
+
+/* Combo boxes and date pickers to type in: a field with a button */
+.combo-box-base:editable, .date-picker {
+    -fx-background-color: -mac-field-border, -mac-field;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 5, 4;
+}
+
+.combo-box-base:editable:contains-focus, .date-picker:contains-focus {
+    -fx-background-color: -mac-focus-ring, -mac-accent, -mac-field;
+    -fx-background-insets: -3, 0, 1;
+    -fx-background-radius: 8, 5, 4;
+}
+
+.combo-box-base:editable > .text-field, .combo-box-base:editable > .text-field:focused,
+.date-picker > .text-field, .date-picker > .text-field:focused {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.combo-box-base:editable > .arrow-button, .date-picker > .arrow-button {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0 7 0 7;
+}
+
+.combo-box-base:editable > .arrow-button > .arrow, .date-picker > .arrow-button > .arrow {
+    -fx-background-color: -mac-text-secondary;
+    -fx-shape: "M0,1 L1,0 L4,3 L7,0 L8,1 L4,5 Z";
+    -fx-padding: 2.5 4 2.5 4;
+}
+
+/* The chosen item, shown in the button: not as a selected list item */
+.combo-box > .list-cell, .combo-box > .list-cell:filled:selected {
+    -fx-background-color: transparent;
+    -fx-text-fill: -mac-text;
+    -fx-padding: 2 8 2 8;
+}
+
+.check-box > .box, .check-box:focused > .box, .check-box:hover > .box {
+    -fx-background-color: -mac-control-shadow, -mac-control-border, -mac-control;
+    -fx-background-insets: 0 0 -0.5 0, 0, 0.5;
+    -fx-background-radius: 4, 4, 3.5;
+    -fx-padding: 3;
+}
+
+.check-box:selected > .box, .check-box:selected:focused > .box {
+    -fx-background-color: -mac-accent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 4;
+}
+
+.check-box:selected > .box > .mark {
+    -fx-background-color: -mac-on-accent;
+}
+
+.radio-button > .radio, .radio-button:focused > .radio, .radio-button:hover > .radio {
+    -fx-background-color: -mac-control-shadow, -mac-control-border, -mac-control;
+    -fx-background-insets: 0 0 -0.5 0, 0, 0.5;
+}
+
+.radio-button:selected > .radio, .radio-button:selected:focused > .radio {
+    -fx-background-color: -mac-accent;
+    -fx-background-insets: 0;
+}
+
+.radio-button:selected > .radio > .dot {
+    -fx-background-color: -mac-on-accent;
+}
+
+/* The small actions: borderless, their character in grey */
+.button.icon-button, .button.icon-button:focused {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 5;
+    -fx-text-fill: -mac-text-secondary;
+    -fx-font-size: 15px;
+    -fx-padding: 0 6 0 6;
+}
+
+.button.icon-button:hover {
+    -fx-background-color: -mac-hover;
+    -fx-text-fill: -mac-text;
+}
+
+.button.icon-button:armed {
+    -fx-background-color: -mac-control-pressed;
+}
+
+/* The help button: round, with its question mark */
+.button.icon-button.help-button, .button.icon-button.help-button:focused,
+.button.icon-button.help-button:hover {
+    -fx-background-color: -mac-control-shadow, -mac-control-border, -mac-control;
+    -fx-background-insets: 0 0 -0.5 0, 0, 0.5;
+    -fx-background-radius: 1em;
+    -fx-text-fill: -mac-text;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-padding: 0;
+    -fx-min-width: 16;
+    -fx-min-height: 16;
+    -fx-max-width: 16;
+    -fx-max-height: 16;
+}
+
+.button.icon-button.chip-remove {
+    -fx-font-size: 13px;
+    -fx-padding: 0 4 0 4;
+}
+
+/* ⓘ: round, with an i, opening the description in a popover */
+.button.icon-button.help-button.info-button {
+    -fx-font-family: "Serif";
+    -fx-font-style: italic;
+}
+
+/* − and + at the end of a value row: small, round and bordered, as in Mail's rules */
+.button.icon-button.row-button, .button.icon-button.row-button:focused, .button.icon-button.row-button:hover {
+    -fx-background-color: -mac-control-shadow, -mac-control-border, -mac-control;
+    -fx-background-insets: 0 0 -0.5 0, 0, 0.5;
+    -fx-background-radius: 1em;
+    -fx-text-fill: -mac-text;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 0;
+    -fx-min-width: 18;
+    -fx-min-height: 18;
+    -fx-max-width: 18;
+    -fx-max-height: 18;
+}
+
+.button.icon-button.row-button:armed {
+    -fx-background-color: -mac-control-shadow, -mac-control-border, -mac-control-pressed;
+}
+
+/* Rows divided by thin lines, as in System Settings' groups */
+.form-label, .form-value {
+    -fx-border-color: transparent transparent -mac-separator transparent;
+    -fx-padding: 0 0 6 0;
+}
+
+/* The label fills its cell, so that the line runs under the whole row */
+.form-label {
+    -fx-border-insets: 0 -10 0 0;
+    -fx-max-width: 100000;
+    -fx-max-height: 100000;
+    -fx-alignment: top-left;
+}
+
+.form-label.last-row, .form-value.last-row {
+    -fx-border-color: transparent;
+}
+
+/* Descriptions in a popover: rounded, with a shadow */
+.popover {
+    -fx-background-color: -mac-menu-border, -mac-menu;
+    -fx-background-insets: 0, 0.5;
+    -fx-background-radius: 10, 9.5;
+    -fx-padding: 10 12 10 12;
+    -fx-effect: dropshadow(gaussian, -mac-shadow, 18, 0, 0, 6);
+}
+
+/* The search field: rounded, a magnifier on the left */
+.search-field {
+    -fx-background-radius: 1em, 1em;
+    -fx-padding: 3 8 3 24;
+}
+
+.search-field:focused {
+    -fx-background-radius: 1em, 1em, 1em;
+}
+
+.search-icon {
+    visibility: visible;
+    -fx-background-color: -mac-text-secondary;
+    -fx-shape: "M6,0 A6,6 0 1,0 6,12 A6,6 0 1,0 6,0 Z M6,1.6 A4.4,4.4 0 1,1 6,10.4 A4.4,4.4 0 1,1 6,1.6 Z M9.6,10.7 L10.7,9.6 L15,13.9 L13.9,15 Z";
+    -fx-min-width: 12;
+    -fx-min-height: 12;
+    -fx-max-width: 12;
+    -fx-max-height: 12;
+    -fx-translate-x: 8;
+}
+
+/* A type of the entity, as a token */
+.type-chip {
+    -fx-background-color: -mac-separator, -mac-control;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 5, 4;
+    -fx-border-color: transparent;
+    -fx-padding: 1 2 1 8;
+}
+
+/* Menus: rounded, a shadow, the item under the mouse in blue */
+.menu-bar {
+    -fx-background-color: -mac-window;
+    -fx-border-color: transparent transparent -mac-separator transparent;
+    -fx-padding: 1 6 1 6;
+}
+
+.menu-bar > .container > .menu-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 4;
+    -fx-padding: 2 8 2 8;
+}
+
+.menu-bar > .container > .menu-button:hover, .menu-bar > .container > .menu-button:showing,
+.menu-bar > .container > .menu-button:focused {
+    -fx-background-color: -mac-hover;
+}
+
+.menu-bar > .container > .menu-button > .label,
+.menu-bar > .container > .menu-button:hover > .label,
+.menu-bar > .container > .menu-button:showing > .label,
+.menu-bar > .container > .menu-button:focused > .label {
+    -fx-text-fill: -mac-text;
+}
+
+.context-menu {
+    -fx-background-color: -mac-menu-border, -mac-menu;
+    -fx-background-insets: 0, 0.5;
+    -fx-background-radius: 7, 6.5;
+    -fx-padding: 5;
+    -fx-effect: dropshadow(gaussian, -mac-shadow, 18, 0, 0, 6);
+}
+
+.menu-item {
+    -fx-padding: 3 10 3 10;
+    -fx-background-radius: 4;
+}
+
+.menu-item:focused, .menu-item:hover {
+    -fx-background-color: -mac-accent;
+}
+
+.menu-item > .label {
+    -fx-text-fill: -mac-text;
+}
+
+.menu-item:focused > .label, .menu-item:hover > .label,
+.menu-item:focused > .right-container > .accelerator-text {
+    -fx-text-fill: -mac-on-accent;
+}
+
+.menu-item > .right-container > .accelerator-text {
+    -fx-text-fill: -mac-text-secondary;
+}
+
+.menu-item:disabled > .label {
+    -fx-text-fill: -mac-text-disabled;
+}
+
+.radio-menu-item:checked > .left-container > .radio, .check-menu-item:checked > .left-container > .check,
+.menu > .right-container > .arrow {
+    -fx-background-color: -mac-text;
+}
+
+.radio-menu-item:checked:focused > .left-container > .radio,
+.check-menu-item:checked:focused > .left-container > .check, .menu:focused > .right-container > .arrow {
+    -fx-background-color: -mac-on-accent;
+}
+
+.separator:horizontal .line {
+    -fx-border-color: -mac-separator transparent transparent transparent;
+}
+
+.separator:vertical .line {
+    -fx-border-color: transparent -mac-separator transparent transparent;
+}
+
+.tooltip {
+    -fx-background-color: -mac-menu-border, -mac-menu;
+    -fx-background-insets: 0, 0.5;
+    -fx-background-radius: 4, 3.5;
+    -fx-padding: 3 6 3 6;
+    -fx-text-fill: -mac-text;
+    -fx-font-size: 11px;
+    -fx-effect: dropshadow(gaussian, -mac-shadow, 6, 0, 0, 2);
+}
+
+.tool-bar {
+    -fx-background-color: -mac-window;
+    -fx-border-color: transparent transparent -mac-separator transparent;
+    -fx-padding: 5 8 5 8;
+    -fx-spacing: 6;
+}
+
+.split-pane {
+    -fx-background-color: -mac-window;
+    -fx-padding: 0;
+}
+
+.split-pane > .split-pane-divider {
+    -fx-background-color: -mac-separator;
+    -fx-padding: 0 0.5 0 0.5;
+}
+
+.scroll-pane, .scroll-pane > .viewport, .scroll-pane > .corner {
+    -fx-background-color: transparent;
+}
+
+/* Lists as a sidebar: items selected with a rounded inset */
+.list-view, .tree-view {
+    -fx-background-color: -mac-list;
+    -fx-background-insets: 0;
+    -fx-padding: 4;
+}
+
+.list-cell, .tree-cell, .list-cell:odd, .tree-cell:odd {
+    -fx-background-color: transparent;
+    -fx-text-fill: -mac-text;
+    -fx-padding: 4 8 4 8;
+}
+
+/* The crate's entities as the window's sidebar: grey, as in Finder */
+#entities {
+    -fx-background-color: -mac-sidebar;
+}
+
+#entities > .virtual-flow > .clipped-container > .sheet > .list-cell:filled:selected {
+    -fx-background-color: -mac-sidebar-selection;
+}
+
+#entities:focused > .virtual-flow > .clipped-container > .sheet > .list-cell:filled:selected {
+    -fx-background-color: -mac-selection;
+}
+
+.list-cell:filled:selected, .tree-cell:filled:selected {
+    -fx-background-color: -mac-selection-unfocused;
+    -fx-background-radius: 5;
+    -fx-text-fill: -mac-selection-unfocused-text;
+}
+
+.list-view:focused > .virtual-flow > .clipped-container > .sheet > .list-cell:filled:selected,
+.tree-view:focused > .virtual-flow > .clipped-container > .sheet > .tree-cell:filled:selected,
+.list-view:focused > .virtual-flow > .clipped-container > .sheet > .list-cell:filled:focused:selected,
+.tree-view:focused > .virtual-flow > .clipped-container > .sheet > .tree-cell:filled:focused:selected {
+    -fx-background-color: -mac-selection;
+    -fx-background-insets: 0;
+    -fx-background-radius: 5;
+    -fx-text-fill: #ffffff;
+}
+
+.list-view:focused > .virtual-flow > .clipped-container > .sheet > .list-cell:filled:selected .label,
+.tree-view:focused > .virtual-flow > .clipped-container > .sheet > .tree-cell:filled:selected .label {
+    -fx-text-fill: #ffffff;
+}
+
+.list-view:focused > .virtual-flow > .clipped-container > .sheet > .list-cell:focused,
+.tree-view:focused > .virtual-flow > .clipped-container > .sheet > .tree-cell:focused {
+    -fx-background-color: transparent;
+}
+
+.tree-cell > .tree-disclosure-node > .arrow {
+    -fx-background-color: -mac-text-secondary;
+}
+
+/* Tabs as a segmented control: the selected segment raised and white */
+.tab-pane > .tab-header-area {
+    -fx-padding: 6 8 6 8;
+}
+
+.tab-pane > .tab-header-area > .tab-header-background {
+    -fx-background-color: transparent;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab {
+    -fx-background-color: -mac-separator, -mac-segment-track;
+    -fx-background-insets: 0, 0.5;
+    -fx-background-radius: 0;
+    -fx-padding: 2 14 2 14;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:top:first-child {
+    -fx-background-radius: 6 0 0 6, 5.5 0 0 5.5;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:top:last-child {
+    -fx-background-radius: 0 6 6 0, 0 5.5 5.5 0;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-color: -mac-control-shadow, -mac-control-border, -mac-control;
+    -fx-background-insets: 0 0 -1 0, 0, 0.5;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab > .tab-container > .tab-label {
+    -fx-text-fill: -mac-text;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab > .tab-container > .focus-indicator,
+.tab-pane:focused > .tab-header-area > .headers-region > .tab:selected > .tab-container > .focus-indicator {
+    -fx-border-color: transparent;
+}
+
+.tab-pane > .tab-content-area {
+    -fx-background-color: -mac-group-border, -mac-group;
+    -fx-background-insets: 0, 0.5;
+    -fx-background-radius: 10, 9.5;
+    -fx-padding: 4;
+}
+
+/* The form's folding groups, as System Settings' rounded groups */
+.titled-pane {
+    -fx-padding: 0 0 8 0;
+}
+
+.titled-pane > .title, .titled-pane:focused > .title, .titled-pane > .title:hover {
+    -fx-background-color: transparent;
+    -fx-padding: 4 4 4 2;
+}
+
+.titled-pane > .title > .text, .titled-pane > .title > .label {
+    -fx-fill: -mac-text-secondary;
+    -fx-text-fill: -mac-text-secondary;
+    -fx-font-weight: bold;
+}
+
+/* A chevron, pointing down when open */
+.titled-pane > .title > .arrow-button > .arrow {
+    -fx-background-color: -mac-text-secondary;
+    -fx-shape: "M0,1 L1,0 L4,3 L7,0 L8,1 L4,5 Z";
+    -fx-padding: 2.5 4 2.5 4;
+}
+
+.titled-pane > .content {
+    -fx-background-color: -mac-group-border, -mac-group;
+    -fx-background-insets: 0, 0.5;
+    -fx-background-radius: 10, 9.5;
+    -fx-border-color: transparent;
+    -fx-padding: 8 10 8 10;
+}
+
+/* Overlay scroll bars: a thin, round thumb and no track or arrows */
+.scroll-bar, .scroll-bar:vertical, .scroll-bar:horizontal {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.scroll-bar > .increment-button, .scroll-bar > .decrement-button {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar > .increment-button > .increment-arrow, .scroll-bar > .decrement-button > .decrement-arrow {
+    -fx-shape: " ";
+    -fx-padding: 0;
+}
+
+.scroll-bar:vertical > .increment-button, .scroll-bar:vertical > .decrement-button {
+    -fx-padding: 0 4 0 4;
+}
+
+.scroll-bar:horizontal > .increment-button, .scroll-bar:horizontal > .decrement-button {
+    -fx-padding: 4 0 4 0;
+}
+
+.scroll-bar > .thumb {
+    -fx-background-color: -mac-scroll-thumb;
+    -fx-background-insets: 1;
+    -fx-background-radius: 1em;
+}
+
+.hyperlink, .hyperlink:visited {
+    -fx-text-fill: -mac-link;
+}
+
+/* Dialogs as sheets: the title in bold, the buttons at the bottom right */
+.dialog-pane {
+    -fx-background-color: -mac-window;
+}
+
+.dialog-pane > .header-panel {
+    -fx-background-color: -mac-window;
+    -fx-padding: 14 20 2 20;
+}
+
+.dialog-pane > .header-panel .label {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -mac-text;
+}
+
+.dialog-pane > .content {
+    -fx-padding: 10 20 10 20;
+}
+
+.dialog-pane > .button-bar > .container {
+    -fx-padding: 4 20 16 20;
+}

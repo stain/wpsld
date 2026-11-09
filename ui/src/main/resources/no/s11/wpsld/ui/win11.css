@@ -1,0 +1,585 @@
+/*
+ * The Windows 11 style (see Theme): Modena reshaped after the Fluent design
+ * of WinUI 3. The window is Mica grey, with controls and groups as light
+ * cards with thin strokes and 4 px corners (8 px for menus and tabs); text
+ * inputs have an accent line along the bottom when focused; the selected
+ * list item has an accent "pill"; a focus ring only shows for the keyboard
+ * (:focus-visible). Segoe UI is the font on Windows; elsewhere JavaFX falls
+ * back to its default.
+ *
+ * Colours are Fluent's light theme tokens as -win-*; win11-dark.css gives
+ * them their dark values.
+ */
+.root {
+    -win-mica: #f3f3f3;
+    -win-card: #fbfbfb;
+    -win-card-hover: #f6f6f6;
+    -win-card-stroke: #e5e5e5;
+    -win-control: #fefefe;
+    -win-control-hover: #f8f8f8;
+    -win-control-pressed: #f3f3f3;
+    -win-control-stroke: #e5e5e5;
+    -win-control-stroke-bottom: #d1d1d1;
+    -win-strong-stroke: #8a8a8a;
+    -win-input: #ffffff;
+    -win-input-focused: #ffffff;
+    -win-subtle-hover: rgba(0, 0, 0, 0.037);
+    -win-subtle-selected: rgba(0, 0, 0, 0.055);
+    -win-flyout: #fcfcfc;
+    -win-flyout-stroke: #e0e0e0;
+    -win-dialog: #ffffff;
+    -win-divider: #ebebeb;
+    -win-text: #1b1b1b;
+    -win-text-secondary: #5d5d5d;
+    -win-text-disabled: #a0a0a0;
+    -win-accent: #005fb8;
+    -win-accent-hover: #1a6ec1;
+    -win-accent-pressed: #3381c8;
+    -win-accent-bottom: #003e92;
+    -win-accent-text: #005fb8;
+    -win-on-accent: #ffffff;
+    -win-focus: #1b1b1b;
+    -win-scroll-thumb: rgba(0, 0, 0, 0.45);
+    -win-shadow: rgba(0, 0, 0, 0.14);
+
+    -fx-font-family: "Segoe UI";
+    -fx-font-size: 14px;
+
+    -fx-base: -win-control;
+    -fx-background: -win-mica;
+    -fx-control-inner-background: -win-input;
+    -fx-control-inner-background-alt: -win-input;
+    -fx-dark-text-color: -win-text;
+    -fx-mid-text-color: -win-text;
+    -fx-light-text-color: #ffffff;
+    -fx-accent: -win-accent;
+    -fx-default-button: -win-accent;
+    -fx-focus-color: -win-focus;
+    -fx-faint-focus-color: transparent;
+    -fx-selection-bar: #e8e8e8;
+    -fx-selection-bar-non-focused: #e8e8e8;
+    -fx-selection-bar-text: -win-text;
+    -fx-box-border: -win-control-stroke;
+    -fx-text-box-border: -win-control-stroke;
+    -fx-outer-border: -win-control-stroke;
+    -fx-inner-border: transparent;
+    -fx-inner-border-horizontal: transparent;
+    -fx-inner-border-bottomup: transparent;
+    -fx-body-color: -win-control;
+    -fx-body-color-bottomup: -win-control;
+    -fx-body-color-to-right: -win-control;
+    -fx-shadow-highlight-color: transparent;
+    -fx-mark-color: -win-text;
+    -fx-mark-highlight-color: transparent;
+
+    -wpsld-dim-text: -win-text-secondary;
+    -wpsld-faint-text: #8b8b8b;
+    -wpsld-warning-text: #9d5d00;
+    -wpsld-error-text: #c42b1c;
+}
+
+.label, .check-box, .radio-button, .hyperlink {
+    -fx-text-fill: -win-text;
+}
+
+/* Buttons: a light card with a darker bottom stroke; the default in accent */
+.button, .toggle-button, .menu-button, .split-menu-button, .choice-box, .combo-box-base {
+    -fx-background-color: -win-control-stroke-bottom, -win-control-stroke, -win-control;
+    -fx-background-insets: 0, 0 0 1 0, 1;
+    -fx-background-radius: 4, 4, 3;
+    -fx-text-fill: -win-text;
+}
+
+.button, .toggle-button {
+    -fx-padding: 4 11 5 11;
+}
+
+.button:focused, .toggle-button:focused, .menu-button:focused, .split-menu-button:focused, .choice-box:focused,
+.combo-box-base:focused {
+    -fx-background-color: -win-control-stroke-bottom, -win-control-stroke, -win-control;
+    -fx-background-insets: 0, 0 0 1 0, 1;
+}
+
+.button:hover, .toggle-button:hover, .menu-button:hover, .split-menu-button:hover, .choice-box:hover,
+.combo-box-base:hover {
+    -fx-background-color: -win-control-stroke-bottom, -win-control-stroke, -win-control-hover;
+}
+
+.button:armed, .toggle-button:selected, .menu-button:showing, .choice-box:showing, .combo-box-base:showing {
+    -fx-background-color: -win-control-stroke, -win-control-stroke, -win-control-pressed;
+    -fx-text-fill: -win-text-secondary;
+}
+
+.button:default {
+    -fx-background-color: -win-accent-bottom, -win-accent;
+    -fx-background-insets: 0, 0 0 1 0;
+    -fx-background-radius: 4, 4;
+    -fx-text-fill: -win-on-accent;
+}
+
+.button:default:hover {
+    -fx-background-color: -win-accent-bottom, -win-accent-hover;
+}
+
+.button:default:armed {
+    -fx-background-color: -win-accent-pressed, -win-accent-pressed;
+}
+
+.button:focus-visible, .toggle-button:focus-visible, .menu-button:focus-visible, .choice-box:focus-visible,
+.combo-box-base:focus-visible, .check-box:focus-visible > .box, .radio-button:focus-visible > .radio,
+.hyperlink:focus-visible {
+    -fx-border-color: -win-focus;
+    -fx-border-width: 2;
+    -fx-border-radius: 6;
+    -fx-border-insets: -3;
+}
+
+.combo-box-base > .arrow-button, .menu-button > .arrow-button, .choice-box > .open-button {
+    -fx-background-color: transparent;
+}
+
+.combo-box-base > .arrow-button > .arrow, .menu-button > .arrow-button > .arrow, .choice-box > .open-button > .arrow {
+    -fx-background-color: -win-text-secondary;
+}
+
+/*
+ * Small actions (remove, add another, help) as subtle buttons: only their
+ * Fluent icon, transparent until hovered
+ */
+.button.icon-button, .button.icon-button:focused {
+    -fx-content-display: graphic-only;
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 4;
+    -fx-padding: 5;
+}
+
+.button.icon-button:hover {
+    -fx-background-color: -win-subtle-hover;
+}
+
+.button.icon-button:armed {
+    -fx-background-color: -win-subtle-selected;
+}
+
+.icon-button > .icon {
+    -fx-icon-color: -win-text;
+    -fx-icon-size: 16;
+}
+
+.button.icon-button.help-button, .button.icon-button.help-button:focused {
+    -fx-padding: 1;
+}
+
+.icon-button.help-button > .icon {
+    -fx-icon-color: -win-text-secondary;
+    -fx-icon-size: 14;
+}
+
+.button.icon-button.chip-remove, .button.icon-button.chip-remove:focused {
+    -fx-padding: 3;
+}
+
+.icon-button.chip-remove > .icon {
+    -fx-icon-size: 12;
+}
+
+/* A type of the entity: a small card */
+.type-chip {
+    -fx-background-color: -win-control-stroke, -win-control;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 4, 3;
+    -fx-border-color: transparent;
+    -fx-padding: 1 2 1 8;
+}
+
+/* Text inputs: white, and an accent line along the bottom when focused */
+.text-input {
+    -fx-background-color: -win-strong-stroke, -win-control-stroke, -win-input;
+    -fx-background-insets: 0, 0 0 1 0, 1;
+    -fx-background-radius: 4, 4, 3;
+    -fx-text-fill: -win-text;
+    -fx-prompt-text-fill: -win-text-secondary;
+    -fx-highlight-fill: -win-accent;
+    -fx-highlight-text-fill: -win-on-accent;
+    -fx-padding: 5 10 6 10;
+}
+
+.text-input:focused {
+    -fx-background-color: -win-accent, -win-control-stroke, -win-input-focused;
+    -fx-background-insets: 0, 0 0 2 0, 1 1 2 1;
+}
+
+.text-area {
+    -fx-padding: 1;
+}
+
+.text-area > .scroll-pane > .viewport > .content {
+    -fx-background-color: transparent;
+    -fx-padding: 5 9 5 9;
+}
+
+.text-area > .scroll-pane, .text-area > .scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
+
+/* Editable combo boxes and date pickers: one input with a button */
+.combo-box-base:editable, .date-picker {
+    -fx-background-color: -win-strong-stroke, -win-control-stroke, -win-input;
+    -fx-background-insets: 0, 0 0 1 0, 1;
+    -fx-background-radius: 4, 4, 3;
+}
+
+.combo-box-base:editable:contains-focus, .date-picker:contains-focus {
+    -fx-background-color: -win-accent, -win-control-stroke, -win-input-focused;
+    -fx-background-insets: 0, 0 0 2 0, 1 1 2 1;
+}
+
+.combo-box-base:editable > .text-field, .combo-box-base:editable > .text-field:focused,
+.date-picker > .text-field, .date-picker > .text-field:focused {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.combo-box-base:editable > .arrow-button, .date-picker > .arrow-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0 3 3 0;
+}
+
+.combo-box-base:editable > .arrow-button:hover, .date-picker > .arrow-button:hover {
+    -fx-background-color: -win-subtle-hover;
+}
+
+.combo-box > .list-cell, .combo-box > .list-cell:filled:selected, .combo-box > .list-cell:filled:hover {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-text-fill: -win-text;
+    -fx-padding: 4 10 5 10;
+}
+
+/* Check boxes and radio buttons: a strong stroke, filled with the accent */
+.check-box > .box, .check-box:focused > .box {
+    -fx-background-color: -win-strong-stroke, -win-input;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 4, 3;
+    -fx-padding: 3;
+}
+
+.check-box:hover > .box {
+    -fx-background-color: -win-strong-stroke, -win-control-hover;
+}
+
+.check-box:selected > .box, .check-box:selected:focused > .box {
+    -fx-background-color: -win-accent;
+    -fx-background-insets: 0;
+}
+
+.check-box:selected > .box > .mark {
+    -fx-background-color: -win-on-accent;
+}
+
+.radio-button > .radio, .radio-button:focused > .radio {
+    -fx-background-color: -win-strong-stroke, -win-input;
+    -fx-background-insets: 0, 1;
+}
+
+.radio-button:selected > .radio, .radio-button:selected:focused > .radio {
+    -fx-background-color: -win-accent, -win-on-accent;
+    -fx-background-insets: 0, 4;
+}
+
+.radio-button:selected > .radio > .dot {
+    -fx-background-color: transparent;
+}
+
+/* The menu bar on the Mica, and its menus as flyouts */
+.menu-bar {
+    -fx-background-color: -win-mica;
+    -fx-padding: 2 4 2 4;
+}
+
+.menu-bar > .container > .menu-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 4;
+    -fx-padding: 4 10 4 10;
+}
+
+.menu-bar > .container > .menu-button:hover, .menu-bar > .container > .menu-button:showing,
+.menu-bar > .container > .menu-button:focused {
+    -fx-background-color: -win-subtle-hover;
+}
+
+.menu-bar > .container > .menu-button > .label,
+.menu-bar > .container > .menu-button:hover > .label,
+.menu-bar > .container > .menu-button:showing > .label,
+.menu-bar > .container > .menu-button:focused > .label {
+    -fx-text-fill: -win-text;
+}
+
+.context-menu {
+    -fx-background-color: -win-flyout-stroke, -win-flyout;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 8, 7;
+    -fx-padding: 4;
+    -fx-effect: dropshadow(gaussian, -win-shadow, 16, 0, 0, 6);
+}
+
+.menu-item {
+    -fx-padding: 6 12 6 12;
+    -fx-background-radius: 4;
+}
+
+.menu-item:focused, .menu-item:hover {
+    -fx-background-color: -win-subtle-hover;
+}
+
+.menu-item > .label, .menu-item:focused > .label, .menu-item:hover > .label {
+    -fx-text-fill: -win-text;
+}
+
+.menu-item:disabled > .label {
+    -fx-text-fill: -win-text-disabled;
+}
+
+.menu-item > .right-container > .accelerator-text, .menu-item:focused > .right-container > .accelerator-text {
+    -fx-text-fill: -win-text-secondary;
+}
+
+.radio-menu-item:checked > .left-container > .radio,
+.radio-menu-item:checked:focused > .left-container > .radio,
+.check-menu-item:checked > .left-container > .check,
+.check-menu-item:checked:focused > .left-container > .check,
+.menu > .right-container > .arrow, .menu:focused > .right-container > .arrow {
+    -fx-background-color: -win-text;
+}
+
+.context-menu .separator:horizontal .line {
+    -fx-border-color: -win-divider transparent transparent transparent;
+}
+
+.tooltip {
+    -fx-background-color: -win-flyout-stroke, -win-flyout;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 4, 3;
+    -fx-padding: 6 9 7 9;
+    -fx-text-fill: -win-text;
+    -fx-font-size: 12px;
+    -fx-effect: dropshadow(gaussian, -win-shadow, 8, 0, 0, 3);
+}
+
+/* The tool bar as a command bar */
+.tool-bar {
+    -fx-background-color: -win-mica;
+    -fx-padding: 4 8 6 8;
+    -fx-spacing: 6;
+}
+
+.separator:vertical .line {
+    -fx-border-color: transparent -win-divider transparent transparent;
+}
+
+.separator:horizontal .line {
+    -fx-border-color: -win-divider transparent transparent transparent;
+}
+
+/* Panes on the Mica, divided by space rather than lines */
+.split-pane {
+    -fx-background-color: -win-mica;
+    -fx-padding: 0 4 4 4;
+}
+
+.split-pane > .split-pane-divider {
+    -fx-background-color: transparent;
+    -fx-padding: 0 3 0 3;
+}
+
+.scroll-pane, .scroll-pane > .viewport, .scroll-pane > .corner {
+    -fx-background-color: transparent;
+}
+
+/* Lists and trees as cards; items rounded, the selected one with a pill */
+.list-view, .tree-view {
+    -fx-background-color: -win-card-stroke, -win-card;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 8, 7;
+    -fx-padding: 4;
+}
+
+.list-cell, .tree-cell, .list-cell:odd, .tree-cell:odd {
+    -fx-background-color: transparent;
+    -fx-text-fill: -win-text;
+    -fx-padding: 6 10 6 14;
+}
+
+.list-cell:filled:hover, .tree-cell:filled:hover {
+    -fx-background-color: -win-subtle-hover;
+    -fx-background-insets: 1 0 1 0;
+    -fx-background-radius: 4;
+}
+
+.list-cell:filled:selected, .tree-cell:filled:selected,
+.list-view:focused > .virtual-flow > .clipped-container > .sheet > .list-cell:filled:selected,
+.tree-view:focused > .virtual-flow > .clipped-container > .sheet > .tree-cell:filled:selected,
+.list-view:focused > .virtual-flow > .clipped-container > .sheet > .list-cell:filled:focused:selected,
+.tree-view:focused > .virtual-flow > .clipped-container > .sheet > .tree-cell:filled:focused:selected {
+    -fx-background-color: -win-subtle-selected;
+    -fx-background-insets: 1 0 1 0;
+    -fx-background-radius: 4;
+    -fx-border-color: transparent transparent transparent -win-accent;
+    -fx-border-width: 0 0 0 3;
+    -fx-border-insets: 10 0 10 1;
+    -fx-border-radius: 2;
+    -fx-text-fill: -win-text;
+}
+
+.list-view:focused > .virtual-flow > .clipped-container > .sheet > .list-cell:focused,
+.tree-view:focused > .virtual-flow > .clipped-container > .sheet > .tree-cell:focused {
+    -fx-background-color: transparent;
+}
+
+.tree-cell > .tree-disclosure-node > .arrow {
+    -fx-background-color: -win-text-secondary;
+}
+
+/* Tabs as a tab view: the selected one a card joined to its content */
+.tab-pane > .tab-header-area {
+    -fx-padding: 4 8 0 8;
+}
+
+.tab-pane > .tab-header-area > .tab-header-background {
+    -fx-background-color: transparent;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 8 8 0 0;
+    -fx-padding: 6 14 6 14;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:hover {
+    -fx-background-color: -win-subtle-hover;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-color: -win-card-stroke, -win-card;
+    -fx-background-insets: 0, 1 1 0 1;
+    -fx-background-radius: 8 8 0 0, 7 7 0 0;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab > .tab-container > .tab-label {
+    -fx-text-fill: -win-text-secondary;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected > .tab-container > .tab-label {
+    -fx-text-fill: -win-text;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab > .tab-container > .focus-indicator,
+.tab-pane:focused > .tab-header-area > .headers-region > .tab:selected > .tab-container > .focus-indicator {
+    -fx-border-color: transparent;
+}
+
+.tab-pane > .tab-content-area {
+    -fx-background-color: -win-card-stroke, -win-card;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 0 8 8 8, 0 7 7 7;
+    -fx-padding: 1;
+}
+
+/* The form's folding groups as expanders: a card header, its content below */
+.titled-pane {
+    -fx-padding: 0 0 6 0;
+}
+
+.titled-pane > .title, .titled-pane:focused > .title {
+    -fx-background-color: -win-card-stroke, -win-card;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 4, 3;
+    -fx-padding: 9 12 9 12;
+}
+
+.titled-pane:expanded > .title {
+    -fx-background-radius: 4 4 0 0, 3 3 0 0;
+}
+
+.titled-pane > .title:hover {
+    -fx-background-color: -win-card-stroke, -win-card-hover;
+}
+
+.titled-pane > .title > .text, .titled-pane > .title > .label {
+    -fx-fill: -win-text;
+    -fx-text-fill: -win-text;
+}
+
+.titled-pane > .title > .arrow-button > .arrow {
+    -fx-background-color: -win-text-secondary;
+}
+
+.titled-pane > .content {
+    -fx-background-color: -win-card-stroke, -win-card;
+    -fx-background-insets: 0, 0 1 1 1;
+    -fx-background-radius: 0 0 4 4, 0 0 3 3;
+    -fx-border-color: transparent;
+    -fx-padding: 4 4 4 4;
+}
+
+/* Thin, rounded scroll bars without arrows */
+.scroll-bar, .scroll-bar:vertical, .scroll-bar:horizontal {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.scroll-bar > .increment-button, .scroll-bar > .decrement-button {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar > .increment-button > .increment-arrow, .scroll-bar > .decrement-button > .decrement-arrow {
+    -fx-shape: " ";
+    -fx-padding: 0;
+}
+
+.scroll-bar:vertical > .increment-button, .scroll-bar:vertical > .decrement-button {
+    -fx-padding: 0 4 0 4;
+}
+
+.scroll-bar:horizontal > .increment-button, .scroll-bar:horizontal > .decrement-button {
+    -fx-padding: 4 0 4 0;
+}
+
+.scroll-bar > .thumb {
+    -fx-background-color: -win-scroll-thumb;
+    -fx-background-insets: 1;
+    -fx-background-radius: 4;
+}
+
+.hyperlink, .hyperlink:visited {
+    -fx-text-fill: -win-accent-text;
+}
+
+/* Dialogs as content dialogs: a white body, buttons on the Mica below */
+.dialog-pane {
+    -fx-background-color: -win-dialog;
+}
+
+.dialog-pane > .header-panel {
+    -fx-background-color: -win-dialog;
+    -fx-padding: 16 24 4 24;
+}
+
+.dialog-pane > .header-panel .label {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -win-text;
+}
+
+.dialog-pane > .content {
+    -fx-padding: 12 24 16 24;
+}
+
+.dialog-pane > .button-bar > .container {
+    -fx-background-color: -win-divider, -win-mica;
+    -fx-background-insets: 0, 1 0 0 0;
+    -fx-padding: 16 24 16 24;
+}

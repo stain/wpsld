@@ -1,0 +1,71 @@
+/*
+ * The editor's own colours, under every style (see Theme): named here, so
+ * that a style's stylesheets only have to give them new values.
+ */
+.root {
+    -wpsld-dim-text: #505050;
+    -wpsld-faint-text: #808080;
+    -wpsld-warning-text: #8a5a00;
+    -wpsld-error-text: #b00000;
+}
+
+/* Secondary text: descriptions, addresses, folders */
+.dim-text {
+    -fx-text-fill: -wpsld-dim-text;
+}
+
+/* Text standing in for what isn't there, e.g. "No values" */
+.faint-text {
+    -fx-text-fill: -wpsld-faint-text;
+}
+
+.warning-text {
+    -fx-text-fill: -wpsld-warning-text;
+}
+
+.error-text {
+    -fx-text-fill: -wpsld-error-text;
+}
+
+/*
+ * Buttons for small actions (EntityEditor.iconButton): their text, e.g.
+ * "×", unless a style shows their icon instead
+ */
+.icon-button {
+    -fx-content-display: text-only;
+}
+
+.help-button {
+    -fx-padding: 0 5 0 5;
+    -fx-font-size: 0.85em;
+}
+
+.chip-remove {
+    -fx-padding: 0 4 0 4;
+}
+
+/* A type of the entity, with its remove button */
+.type-chip {
+    -fx-background-color: -fx-control-inner-background;
+    -fx-border-color: -fx-box-border;
+    -fx-border-radius: 3;
+    -fx-padding: 2 4 2 6;
+}
+
+/* Room around a dialog's content, which Modena gives almost none */
+.dialog-pane > .content {
+    -fx-padding: 8 12 8 12;
+}
+
+/* The search field's magnifier, for styles that show one (see macos.css) */
+.search-icon {
+    visibility: hidden;
+}
+
+/* A field's description, from ⓘ in styles with popovers (see FormLayout) */
+.popover {
+    -fx-background-color: -fx-box-border, -fx-control-inner-background;
+    -fx-background-insets: 0, 1;
+    -fx-padding: 10 12 10 12;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.25), 12, 0, 0, 4);
+}

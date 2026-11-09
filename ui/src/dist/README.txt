@@ -16,4 +16,5 @@ JAVA_HOME set to the JDK or java on the PATH.
 The zips for a platform (wpsld-<version>-<platform>.zip) include Java and
 JavaFX instead.
 
-Source and licence (Apache-2.0): https://github.com/stain/wpsld
+Licence: LICENSE.txt (Apache-2.0). The third-party software in lib/ and
+its licences: THIRD-PARTY-NOTICES.txt. Source: https://github.com/stain/wpsld

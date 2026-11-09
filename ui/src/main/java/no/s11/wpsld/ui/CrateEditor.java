@@ -29,14 +29,13 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -44,6 +43,8 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
 import javafx.beans.WeakInvalidationListener;
+import javafx.beans.binding.BooleanBinding;
+import javafx.beans.binding.Bindings;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.LongProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -54,6 +55,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.ButtonBar.ButtonData;
@@ -121,7 +123,6 @@ public class CrateEditor extends Application {
 			KeyCombination.SHIFT_DOWN);
 	private static final KeyCombination REDO_WINDOWS = new KeyCodeCombination(KeyCode.Y,
 			KeyCombination.SHORTCUT_DOWN);
-	private static final ObjectMapper MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 	/** Incremented on changes, to update the labels of the entity list */
 	private final LongProperty labels = new SimpleLongProperty();
 
@@ -131,8 +132,10 @@ public class CrateEditor extends Application {
 	private CompletableFuture<JsonLdContext> contextLoading;
 	/** The crate being edited, replaced by File > New */
 	private Crate crate = new Crate();
-	/** The crate as started or last saved, to tell whether it changed since */
-	private JsonNode unchanged = crate.toJson();
+	/** Where the crate is saved, if it is, and whether it changed since */
+	private final CrateFile crateFile = new CrateFile(crate.toJson());
+	/** The window, once shown, whose title names the crate's file */
+	private Stage stage;
 	/** Undo points of this crate: after leaving a field, adding, removing, changing types or @ids */
 	private final UndoHistory history = new UndoHistory(crate.toJson());
 	private final BooleanProperty canUndo = new SimpleBooleanProperty();
@@ -156,8 +159,20 @@ public class CrateEditor extends Application {
 	/** Where the user's preferences are kept, if they are */
 	private final Optional<Path> settingsFile;
 	private Settings settings = Settings.DEFAULT;
-	/** Where the crate was last saved, to start the next save there */
-	private File lastSaved;
+	/** The folder of the file last opened or saved, to start choosing there */
+	private File lastFolder;
+	/** The panes: entities (the sidebar), the form, the previews */
+	private SplitPane split;
+	private VBox sidebar;
+	/** Where the dividers were when the sidebar was hidden */
+	private double[] dividers;
+	/** True while checking whether the file changed on disk, as its dialog moves the focus */
+	private boolean checkingDisk;
+
+	/** What to do when saving over a file that changed on disk */
+	private enum Overwrite {
+		SAVE_ANYWAY, RELOAD, SAVE_AS, CANCEL
+	}
 
 	public CrateEditor() {
 		this(SchemaFromJsonLd::new, CrateTerms::prewarm, ProfileCache.forUser(), Optional.of(Settings.userFile()));
@@ -212,15 +227,21 @@ public class CrateEditor extends Application {
 
 	@Override
 	public void start(Stage stage) {
+		this.stage = stage;
 		BorderPane root = new BorderPane(new Label("Loading schema.org " + SchemaFromJsonLd.SCHEMAORG_VERSION + "…"));
 		stage.setScene(new Scene(root, 1400, 800));
+		// For this window and every one opened after it
+		Theme.choose(Theme.named(Theme.Style.class, settings.style()),
+				Theme.named(Theme.Colours.class, settings.colours()));
 		// Also if the window showed another scene before (as in tests)
 		stage.sizeToScene();
 		stage.setTitle("wpsld");
 		// An undo point when leaving a field (or any control)
 		stage.getScene().focusOwnerProperty().addListener((obs, old, now) -> checkpoint(placeOf(old)));
-		// Redo also as on Windows
-		stage.getScene().getAccelerators().put(REDO_WINDOWS, this::redo);
+		// Redo also as on Windows and Linux; on macOS Command-Y is not Redo
+		if (!CrateFile.onMac()) {
+			stage.getScene().getAccelerators().put(REDO_WINDOWS, this::redo);
+		}
 		// In a text field, Ctrl+Z is first its own undo of typing; once it
 		// has none, the crate's, e.g. in the field focused by an undo
 		stage.getScene().addEventFilter(KeyEvent.KEY_PRESSED, e -> {
@@ -230,14 +251,20 @@ public class CrateEditor extends Application {
 			if (UNDO.match(e) && !field.isUndoable()) {
 				e.consume();
 				undo();
-			} else if ((REDO.match(e) || REDO_WINDOWS.match(e)) && !field.isRedoable()) {
+			} else if ((REDO.match(e) || (!CrateFile.onMac() && REDO_WINDOWS.match(e))) && !field.isRedoable()) {
 				e.consume();
 				redo();
 			}
 		});
-		// Closing the window, or File > Exit, asks before discarding changes
+		// Back from another application, e.g. git: has it changed the file?
+		stage.focusedProperty().addListener((obs, was, focused) -> {
+			if (focused) {
+				Platform.runLater(this::checkDisk);
+			}
+		});
+		// Closing the window, or File > Exit, asks to save changes
 		stage.setOnCloseRequest(e -> {
-			if (!mayDiscard(stage)) {
+			if (!mayClose(stage)) {
 				e.consume();
 			}
 		});
@@ -260,7 +287,7 @@ public class CrateEditor extends Application {
 				showFailure(root, "Can't show the editor", e);
 				return;
 			}
-			Button save = new Button("Save RO-Crate Metadata File…");
+			Button save = new Button("Save");
 			save.setId("save");
 			save.setOnAction(e -> save(stage));
 			profiles.setId("profile");
@@ -313,6 +340,9 @@ public class CrateEditor extends Application {
 					return entity;
 				}, this::rename);
 		entityEditor.setBrowse(address -> getHostServices().showDocument(address));
+		// As the style lays it out, e.g. as a notebook in the OS/2 Warp style
+		entityEditor.setFormLayout(Theme.style().get().form());
+		Theme.style().addListener((obs, old, style) -> entityEditor.setFormLayout(style.form()));
 		// Type changes, also those confirmed with Enter in a field
 		entityEditor.setOnStep(this::checkpoint);
 
@@ -375,7 +405,7 @@ public class CrateEditor extends Application {
 		HBox buttons = new HBox(6, add, remove);
 		buttons.setPadding(new Insets(6));
 		VBox.setVgrow(entities, Priority.ALWAYS);
-		VBox entityList = new VBox(new Label(" Entities"), entities, buttons);
+		sidebar = new VBox(new Label(" Entities"), entities, buttons);
 
 		preview.setId("preview");
 		preview.setEditable(false);
@@ -385,13 +415,14 @@ public class CrateEditor extends Application {
 		// refers to, which open them) and the crate's JSON-LD
 		entityPreview = new EntityPreview(() -> crate, entities.getSelectionModel()::select,
 				address -> getHostServices().showDocument(address), property -> entityEditor.label(property));
+		entityPreview.setFolder(() -> crateFile.path().map(file -> file.toAbsolutePath().getParent()));
 		Tab previewTab = new Tab("Preview", entityPreview);
 		previewTab.setId("previewTab");
 		Tab jsonTab = new Tab("JSON-LD", preview);
 		jsonTab.setId("jsonTab");
 		TabPane views = new TabPane(previewTab, jsonTab);
 		views.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-		SplitPane split = new SplitPane(entityList, entityEditor, views);
+		split = new SplitPane(sidebar, entityEditor, views);
 		split.setDividerPositions(0.2, 0.66);
 		entities.getSelectionModel().select(crate.getRoot());
 		changed();
@@ -399,109 +430,249 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * The File, Edit and View menus.
+	 * The File, Edit, View and Help menus.
 	 */
 	private MenuBar menus(Stage stage) {
-		MenuItem newCrate = new MenuItem("New RO-Crate");
+		MenuItem newCrate = new MenuItem("_New RO-Crate");
 		newCrate.setId("menuNew");
 		newCrate.setAccelerator(new KeyCodeCombination(KeyCode.N, KeyCombination.SHORTCUT_DOWN));
 		newCrate.setOnAction(e -> newCrate(stage));
-		MenuItem open = new MenuItem("Open RO-Crate Metadata File…");
+		MenuItem open = new MenuItem("_Open…");
 		open.setId("menuOpen");
 		open.setAccelerator(new KeyCodeCombination(KeyCode.O, KeyCombination.SHORTCUT_DOWN));
 		open.setOnAction(e -> askToOpen(stage));
-		MenuItem save = new MenuItem("Save RO-Crate Metadata File…");
+		MenuItem close = new MenuItem("_Close Window");
+		close.setId("menuClose");
+		close.setAccelerator(new KeyCodeCombination(KeyCode.W, KeyCombination.SHORTCUT_DOWN));
+		// As closing the window, rather than stage.close(), which doesn't ask
+		close.setOnAction(e -> stage.fireEvent(new WindowEvent(stage, WindowEvent.WINDOW_CLOSE_REQUEST)));
+		MenuItem save = new MenuItem("_Save");
 		save.setId("menuSave");
 		save.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN));
 		save.setOnAction(e -> save(stage));
-		MenuItem load = new MenuItem("Load Profile…");
+		MenuItem saveAs = new MenuItem("Save _As…");
+		saveAs.setId("menuSaveAs");
+		saveAs.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN,
+				KeyCombination.SHIFT_DOWN));
+		saveAs.setOnAction(e -> saveAs(stage));
+		MenuItem load = new MenuItem("_Load Profile…");
 		load.setId("menuLoadProfile");
 		load.disableProperty().bind(loadProfile.disabledProperty());
 		load.setOnAction(e -> askForProfile(stage));
-		MenuItem exit = new MenuItem("Exit");
+		MenuItem exit = new MenuItem("E_xit");
 		exit.setId("menuExit");
 		exit.setAccelerator(new KeyCodeCombination(KeyCode.Q, KeyCombination.SHORTCUT_DOWN));
 		// As closing the window, rather than stage.close(), which doesn't ask
 		exit.setOnAction(e -> stage.fireEvent(new WindowEvent(stage, WindowEvent.WINDOW_CLOSE_REQUEST)));
-		Menu file = new Menu("File", null, newCrate, open, save, load, new SeparatorMenuItem(), exit);
+		Menu file = new Menu("_File", null, newCrate, open, close, new SeparatorMenuItem(), save, saveAs,
+				new SeparatorMenuItem(), load, new SeparatorMenuItem(), exit);
 		file.setId("menuFile");
 
-		MenuItem undo = new MenuItem("Undo");
+		MenuItem undo = new MenuItem("_Undo");
 		undo.setId("menuUndo");
 		undo.setAccelerator(UNDO);
 		undo.disableProperty().bind(canUndo.not());
 		undo.setOnAction(e -> undo());
-		MenuItem redo = new MenuItem("Redo");
+		MenuItem redo = new MenuItem("_Redo");
 		redo.setId("menuRedo");
 		redo.setAccelerator(REDO);
 		redo.disableProperty().bind(canRedo.not());
 		redo.setOnAction(e -> redo());
-		MenuItem preferences = new MenuItem("Preferences…");
+		MenuItem preferences = new MenuItem("Pr_eferences…");
 		preferences.setId("menuPreferences");
 		preferences.setAccelerator(new KeyCodeCombination(KeyCode.COMMA, KeyCombination.SHORTCUT_DOWN));
 		preferences.setOnAction(e -> showPreferences(stage));
-		Menu edit = new Menu("Edit", null, undo, redo, new SeparatorMenuItem(), preferences);
+		Menu edit = new Menu("_Edit", null, undo, redo, new SeparatorMenuItem());
+		// What they would undo and redo, e.g. Undo Add Person, as the menu opens
+		edit.setOnShowing(e -> nameUndo(stage, undo, redo));
+		edit.getItems().addAll(textEditing(stage));
+		edit.getItems().addAll(new SeparatorMenuItem(), preferences);
 		edit.setId("menuEdit");
-		// The form as a list of folding groups, or as a notebook in the style
-		// of the OS/2 Workplace Shell's Properties notebook
-		ToggleGroup formView = new ToggleGroup();
-		RadioMenuItem list = new RadioMenuItem("List");
-		list.setId("menuViewList");
-		list.setAccelerator(new KeyCodeCombination(KeyCode.DIGIT1, KeyCombination.SHORTCUT_DOWN));
-		RadioMenuItem notebook = new RadioMenuItem("Notebook");
-		notebook.setId("menuViewNotebook");
-		notebook.setAccelerator(new KeyCodeCombination(KeyCode.DIGIT2, KeyCombination.SHORTCUT_DOWN));
-		list.setToggleGroup(formView);
-		notebook.setToggleGroup(formView);
-		list.setSelected(true);
-		formView.selectedToggleProperty().addListener((obs, old, selected) -> {
-			if (selected != null) {
-				entityEditor.setNotebookMode(selected == notebook);
-			}
-		});
-		Menu view = new Menu("View", null, list, notebook);
+		Menu view = new Menu("_View", null, sidebarItem(), new SeparatorMenuItem(), styles(stage), colours(stage));
 		view.setId("menuView");
 
-		MenuBar bar = new MenuBar(file, edit, view);
+		MenuItem about = new MenuItem("_About wpsld…");
+		about.setId("menuAbout");
+		about.setOnAction(e -> new AboutDialog(stage, address -> getHostServices().showDocument(address)).show());
+		Menu help = new Menu("_Help", null, about);
+		help.setId("menuHelp");
+
+		MenuBar bar = new MenuBar(file, edit, view, help);
 		bar.setId("menuBar");
+		// In the macOS style, on macOS the menus are in the screen's menu bar
+		// (set, as JavaFX doesn't allow binding it)
+		bar.setUseSystemMenuBar(Theme.style().get() == Theme.Style.MACOS);
+		Theme.style().addListener((obs, old, style) -> bar.setUseSystemMenuBar(style == Theme.Style.MACOS));
 		return bar;
 	}
 
 	/**
+	 * Name Edit > Undo and Redo after what they would undo and redo, e.g.
+	 * "Undo Add Person"; "Undo Typing" in a text field with typing to undo,
+	 * which Undo undoes first.
+	 */
+	void nameUndo(Stage stage, MenuItem undo, MenuItem redo) {
+		Optional<String> undone = stage.getScene().getFocusOwner() instanceof TextInputControl field
+				&& field.isUndoable() ? Optional.of("Typing") : history.undoName(crate.toJson());
+		// _ marks the Alt key; one in a name, e.g. has_version, is doubled to stay
+		undo.setText(undone.map(name -> "_Undo " + name.replace("_", "__")).orElse("_Undo"));
+		redo.setText(history.redoName().map(name -> "_Redo " + name.replace("_", "__")).orElse("_Redo"));
+	}
+
+	/**
+	 * Edit > Cut, Copy, Paste and Select All, for the text field being edited;
+	 * disabled elsewhere. A text field handles their shortcuts itself first,
+	 * so these act when chosen from the menu.
+	 */
+	private List<MenuItem> textEditing(Stage stage) {
+		List<MenuItem> items = new ArrayList<>();
+		BooleanBinding noField = Bindings.createBooleanBinding(
+				() -> !(stage.getScene().getFocusOwner() instanceof TextInputControl),
+				stage.getScene().focusOwnerProperty());
+		record Command(String label, String id, KeyCode key, Consumer<TextInputControl> action) {
+		}
+		for (Command command : List.of(new Command("Cu_t", "menuCut", KeyCode.X, TextInputControl::cut),
+				new Command("_Copy", "menuCopy", KeyCode.C, TextInputControl::copy),
+				new Command("_Paste", "menuPaste", KeyCode.V, TextInputControl::paste),
+				new Command("Select _All", "menuSelectAll", KeyCode.A, TextInputControl::selectAll))) {
+			MenuItem item = new MenuItem(command.label());
+			item.setId(command.id());
+			item.setAccelerator(new KeyCodeCombination(command.key(), KeyCombination.SHORTCUT_DOWN));
+			item.disableProperty().bind(noField);
+			item.setOnAction(e -> {
+				if (stage.getScene().getFocusOwner() instanceof TextInputControl field) {
+					command.action().accept(field);
+				}
+			});
+			items.add(item);
+		}
+		return items;
+	}
+
+	/**
+	 * View: show or hide the sidebar of entities. As the operating system
+	 * has it: on macOS an item that says what it will do (Hide Sidebar, Show
+	 * Sidebar, Control-Command-S), elsewhere a checked item.
+	 */
+	private MenuItem sidebarItem() {
+		if (CrateFile.onMac()) {
+			MenuItem item = new MenuItem("Hide Side_bar");
+			item.setId("menuSidebar");
+			item.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN,
+					KeyCombination.CONTROL_DOWN));
+			item.setOnAction(e -> {
+				showSidebar(!split.getItems().contains(sidebar));
+				item.setText(split.getItems().contains(sidebar) ? "Hide Side_bar" : "Show Side_bar");
+			});
+			return item;
+		}
+		CheckMenuItem item = new CheckMenuItem("Side_bar");
+		item.setId("menuSidebar");
+		item.setSelected(true);
+		item.selectedProperty().addListener((obs, old, show) -> showSidebar(show));
+		return item;
+	}
+
+	void showSidebar(boolean show) {
+		boolean shown = split.getItems().contains(sidebar);
+		if (show && !shown) {
+			split.getItems().add(0, sidebar);
+			split.setDividerPositions(dividers);
+		} else if (!show && shown) {
+			dividers = split.getDividerPositions();
+			split.getItems().remove(sidebar);
+			// The form keeps its share of the space beside the previews
+			split.setDividerPositions((dividers[1] - dividers[0]) / (1 - dividers[0]));
+		}
+	}
+
+	/**
+	 * View > Style: the controls' look, and the form as a list or (OS/2
+	 * Warp) a notebook; kept in the settings.
+	 */
+	private Menu styles(Stage stage) {
+		return choices("Style", Theme.Style.values(), Theme.style().get(), style -> {
+			Theme.choose(style, Theme.colours());
+			settings = settings.withStyle(style.id());
+			saveSettings(stage);
+		});
+	}
+
+	/**
+	 * View > Colours: light, dark or as the system; kept in the settings.
+	 */
+	private Menu colours(Stage stage) {
+		return choices("Colours", Theme.Colours.values(), Theme.colours(), colours -> {
+			Theme.choose(Theme.style().get(), colours);
+			settings = settings.withColours(colours.id());
+			saveSettings(stage);
+		});
+	}
+
+	/**
+	 * A submenu of radio items, ids <code>menu&lt;Name&gt;</code> and
+	 * <code>menu&lt;Name&gt;-&lt;id&gt;</code>.
+	 */
+	private static <C extends Theme.Choice> Menu choices(String name, C[] choices, C selected, Consumer<C> chosen) {
+		ToggleGroup group = new ToggleGroup();
+		// With its first letter for the Alt key
+		Menu menu = new Menu("_" + name);
+		menu.setId("menu" + name);
+		for (C choice : choices) {
+			RadioMenuItem item = new RadioMenuItem(choice.label());
+			item.setId("menu" + name + "-" + choice.id());
+			item.setUserData(choice);
+			item.setToggleGroup(group);
+			item.setSelected(choice == selected);
+			menu.getItems().add(item);
+		}
+		group.selectedToggleProperty().addListener((obs, old, item) -> {
+			if (item != null) {
+				@SuppressWarnings("unchecked")
+				C choice = (C) item.getUserData();
+				chosen.accept(choice);
+			}
+		});
+		return menu;
+	}
+
+	/**
 	 * Start a new crate with only its root data entity, after asking whether
-	 * to discard the changes to this one.
+	 * to save the changes to this one.
 	 */
 	void newCrate(Stage stage) {
-		if (mayDiscard(stage)) {
-			edit(new Crate());
-			stage.setTitle("wpsld");
+		if (mayClose(stage)) {
+			edit(new Crate(), Optional.empty());
 		}
 	}
 
 	/**
-	 * Whether the crate has no changes since it was started, opened or saved,
-	 * or the user agrees to discard them.
+	 * Whether the crate may be closed: it has no unsaved changes, or the user
+	 * saves them or chooses not to.
 	 */
-	private boolean mayDiscard(Stage stage) {
-		if (crate.toJson().equals(unchanged)) {
+	private boolean mayClose(Stage stage) {
+		if (!crateFile.isModified(crate.toJson())) {
 			return true;
 		}
-		ButtonType discard = new ButtonType("Discard", ButtonData.OK_DONE);
-		Alert alert = new Alert(AlertType.CONFIRMATION, "The changes since it was last saved will be lost.",
-				discard, ButtonType.CANCEL);
+		ButtonType save = new ButtonType("Save", ButtonData.YES);
+		ButtonType dontSave = new ButtonType("Don't Save", ButtonData.NO);
+		Alert alert = new Alert(AlertType.CONFIRMATION, "Your changes will be lost if you don't save them.", save,
+				dontSave, ButtonType.CANCEL);
 		alert.initOwner(stage);
-		alert.setHeaderText("Discard the changes to this crate?");
-		return alert.showAndWait().orElse(ButtonType.CANCEL) == discard;
+		alert.setHeaderText("Do you want to save the changes to " + crateFile.name() + "?");
+		ButtonType chosen = alert.showAndWait().orElse(ButtonType.CANCEL);
+		return chosen == dontSave || (chosen == save && save(stage));
 	}
 
 	/**
-	 * Edit another crate, from its root data entity.
+	 * Edit another crate, from its root data entity: one opened from or
+	 * saved to a file, or a new one.
 	 */
-	private void edit(Crate other) {
+	private void edit(Crate other, Optional<Path> path) {
 		crate = other;
+		crateFile.reset(path, crate.toJson());
 		entities.getItems().setAll(crate.getEntities());
 		entities.getSelectionModel().select(crate.getRoot());
-		unchanged = crate.toJson();
 		// The undo history is for one crate
 		history.reset(crate.toJson());
 		changed();
@@ -512,7 +683,7 @@ public class CrateEditor extends Application {
 	 * asking whether to discard the changes to this crate.
 	 */
 	private void askToOpen(Stage stage) {
-		if (!mayDiscard(stage)) {
+		if (!mayClose(stage)) {
 			return;
 		}
 		FileChooser chooser = new FileChooser();
@@ -520,8 +691,8 @@ public class CrateEditor extends Application {
 		chooser.getExtensionFilters().setAll(
 				new FileChooser.ExtensionFilter("RO-Crate Metadata File", "*.json", "*.jsonld"),
 				new FileChooser.ExtensionFilter("All files", "*"));
-		if (lastSaved != null) {
-			chooser.setInitialDirectory(lastSaved.getParentFile());
+		if (lastFolder != null) {
+			chooser.setInitialDirectory(lastFolder);
 		}
 		File file = chooser.showOpenDialog(stage);
 		if (file != null) {
@@ -546,10 +717,9 @@ public class CrateEditor extends Application {
 			error.show();
 			return false;
 		}
-		edit(document.crate().get());
 		Path file = Path.of(document.source());
-		lastSaved = file.toFile();
-		stage.setTitle("wpsld – " + file);
+		edit(document.crate().get(), Optional.of(file));
+		lastFolder = file.toFile().getParentFile();
 		chooseProfile(document);
 		if (!document.problems().isEmpty()) {
 			Alert warnings = new Alert(AlertType.WARNING, document.problems().stream().map(Problem::toString)
@@ -666,17 +836,21 @@ public class CrateEditor extends Application {
 		new PreferencesDialog(stage, settings, profileCache, this::forgotten).showAndWait().ifPresent(changed -> {
 			settings = changed;
 			profileCache.setDisabledRegistries(changed.disabledRegistries());
-			if (settingsFile.isPresent()) {
-				try {
-					changed.save(settingsFile.get());
-				} catch (IOException e) {
-					Alert alert = new Alert(AlertType.ERROR, e.toString(), ButtonType.OK);
-					alert.initOwner(stage);
-					alert.setHeaderText("Can't save the preferences in " + settingsFile.get());
-					alert.show();
-				}
-			}
+			saveSettings(stage);
 		});
+	}
+
+	private void saveSettings(Stage stage) {
+		if (settingsFile.isPresent()) {
+			try {
+				settings.save(settingsFile.get());
+			} catch (IOException e) {
+				Alert alert = new Alert(AlertType.ERROR, e.toString(), ButtonType.OK);
+				alert.initOwner(stage);
+				alert.setHeaderText("Can't save the preferences in " + settingsFile.get());
+				alert.show();
+			}
+		}
 	}
 
 	/**
@@ -721,7 +895,7 @@ public class CrateEditor extends Application {
 		Label registryProblems = new Label();
 		registryProblems.setId("registryProblems");
 		registryProblems.setWrapText(true);
-		registryProblems.setStyle("-fx-text-fill: #8a5a00;");
+		registryProblems.getStyleClass().add("warning-text");
 		VBox content = new VBox(8, new HBox(8, location, file), help, listed, registryProblems);
 		content.setPadding(new Insets(4));
 		dialog.getDialogPane().setContent(content);
@@ -862,16 +1036,19 @@ public class CrateEditor extends Application {
 	private void rename(Entity entity, String newId) {
 		Optional<Entity> existing = crate.get(newId);
 		Entity edited = entity;
+		// Named, as its difference looks like removing an entity
+		Optional<String> change = Optional.empty();
 		if (existing.isEmpty()) {
 			crate.rename(entity, newId);
 		} else {
+			ButtonType merge = new ButtonType("Merge", ButtonData.OK_DONE);
 			Alert alert = new Alert(AlertType.CONFIRMATION, "Another entity, " + existing.get().getLabel() + " ("
 					+ String.join(", ", existing.get().getTypes()) + "), already has the @id " + newId
 					+ ".\n\nMerge " + entity.getLabel() + " into it? Their types and values are combined and"
-					+ " references to either point to the merged entity.", ButtonType.OK, ButtonType.CANCEL);
+					+ " references to either point to the merged entity.", merge, ButtonType.CANCEL);
 			alert.initOwner(entities.getScene().getWindow());
 			alert.setHeaderText("Merge entities?");
-			if (alert.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) {
+			if (alert.showAndWait().orElse(ButtonType.CANCEL) != merge) {
 				// Back to the current @id
 				entityEditor.edit(entity);
 				return;
@@ -886,55 +1063,208 @@ public class CrateEditor extends Application {
 			}
 			// e.g. DataDownload and Thing become DataDownload
 			edited.setTypes(entityTypes.simplify(edited.getTypes()));
+			change = Optional.of("Merge Entities");
 		}
 		entities.getItems().setAll(crate.getEntities());
 		entities.getSelectionModel().select(edited);
 		entityEditor.edit(edited);
-		changed();
+		refresh();
 		// Also when confirmed with Enter in the @id field
-		checkpoint();
+		checkpoint(placeOf(null), change);
 	}
 
 	/**
-	 * Save the crate as an RO-Crate Metadata File, after checking the RO-Crate
-	 * requirements and asking whether to save anyway if any are not met.
+	 * File > Save: to the file it was opened from or saved to, else as for
+	 * Save As.
+	 *
+	 * @return Whether it was saved
 	 */
-	private void save(Stage stage) {
+	boolean save(Stage stage) {
+		Optional<Path> path = crateFile.path();
+		if (path.isEmpty()) {
+			return saveAs(stage);
+		}
+		CrateFile.Disk disk = crateFile.disk();
+		if (disk != CrateFile.Disk.SAME) {
+			switch (askBeforeOverwriting(stage, disk)) {
+				case SAVE_ANYWAY -> {
+				}
+				case SAVE_AS -> {
+					return saveAs(stage);
+				}
+				case RELOAD -> {
+					reload(stage);
+					return false;
+				}
+				case CANCEL -> {
+					return false;
+				}
+			}
+		}
+		return meetsRequirements(stage) && saveTo(stage, path.get());
+	}
+
+	/**
+	 * Saving over a file that another application changed, moved or deleted
+	 * since it was opened or saved: Save Anyway (overwriting the other
+	 * changes), Reload (discarding these), Save As… (keeping both), or
+	 * Cancel, which is the default.
+	 */
+	private Overwrite askBeforeOverwriting(Stage stage, CrateFile.Disk disk) {
+		ButtonType saveAnyway = new ButtonType("Save Anyway", ButtonData.YES);
+		ButtonType reload = new ButtonType("Reload", ButtonData.NO);
+		ButtonType saveAs = new ButtonType("Save As…", ButtonData.OTHER);
+		Alert alert;
+		if (disk == CrateFile.Disk.MISSING) {
+			alert = new Alert(AlertType.WARNING, "Save Anyway saves it there again. Save As… saves it somewhere else.",
+					saveAnyway, saveAs, ButtonType.CANCEL);
+			alert.setHeaderText("“" + crateFile.name() + "” has been moved or deleted since you opened or saved it.");
+		} else {
+			alert = new Alert(AlertType.WARNING, "Save Anyway overwrites the other application's changes. Reload"
+					+ " shows the file as it is now, discarding your changes. Save As… keeps both, saving yours as"
+					+ " another file.", saveAnyway, reload, saveAs, ButtonType.CANCEL);
+			alert.setHeaderText("“" + crateFile.name() + "” has been changed by another application since you"
+					+ " opened or saved it.");
+		}
+		alert.initOwner(stage);
+		cancelByDefault(alert);
+		ButtonType chosen = alert.showAndWait().orElse(ButtonType.CANCEL);
+		return chosen == saveAnyway ? Overwrite.SAVE_ANYWAY
+				: chosen == reload ? Overwrite.RELOAD : chosen == saveAs ? Overwrite.SAVE_AS : Overwrite.CANCEL;
+	}
+
+	/** The safe choice as the default button, not the one that overwrites */
+	private static void cancelByDefault(Alert alert) {
+		for (ButtonType type : alert.getButtonTypes()) {
+			if (alert.getDialogPane().lookupButton(type) instanceof Button button) {
+				button.setDefaultButton(type.getButtonData() == ButtonData.CANCEL_CLOSE);
+			}
+		}
+	}
+
+	/**
+	 * Whether another application changed the file since it was opened or
+	 * saved, e.g. git checking out another version, as when coming back to
+	 * the window. If so: without unsaved changes, reload it; with them, ask
+	 * once whether to reload it or keep them (and choose when saving).
+	 * Moved or deleted files are left to saving.
+	 */
+	void checkDisk() {
+		if (checkingDisk || entityEditor == null || crateFile.disk() != CrateFile.Disk.CHANGED) {
+			return;
+		}
+		checkingDisk = true;
+		try {
+			if (!crateFile.isModified(crate.toJson())) {
+				reload(stage);
+			} else if (!crateFile.keptChangesOverDisk()) {
+				ButtonType reload = new ButtonType("Reload", ButtonData.NO);
+				ButtonType keep = new ButtonType("Keep My Changes", ButtonData.CANCEL_CLOSE);
+				Alert alert = new Alert(AlertType.WARNING, "You have unsaved changes. Reload the file to see it as it"
+						+ " is now, discarding your changes, or keep them and choose when you save.", reload, keep);
+				alert.initOwner(stage);
+				alert.setHeaderText("“" + crateFile.name() + "” has been changed by another application.");
+				cancelByDefault(alert);
+				if (alert.showAndWait().orElse(keep) == reload) {
+					reload(stage);
+				} else {
+					crateFile.keepChangesOverDisk();
+				}
+			}
+		} finally {
+			checkingDisk = false;
+		}
+	}
+
+	/**
+	 * Read the file again, as it is on disk now, replacing the crate as an
+	 * undoable step, so that Undo brings back the crate as it was. The same
+	 * entity stays selected, if it still is in the crate. A file that can't be
+	 * read leaves the crate as it is, and isn't asked about again.
+	 */
+	private void reload(Stage stage) {
+		Path path = crateFile.path().orElseThrow();
+		CrateDocument document = new CrateReader().read(path);
+		if (document.crate().isEmpty() || document.hasErrors()) {
+			crateFile.keepChangesOverDisk();
+			Alert error = new Alert(AlertType.ERROR, document.problems().stream().map(Problem::toString)
+					.collect(Collectors.joining("\n")), ButtonType.OK);
+			error.initOwner(stage);
+			error.setHeaderText("Can't reload " + crateFile.name());
+			error.show();
+			return;
+		}
+		Optional<String> selected = Optional.ofNullable(entities.getSelectionModel().getSelectedItem())
+				.map(Entity::getId);
+		crate = document.crate().get();
+		crateFile.reset(Optional.of(path), crate.toJson());
+		entities.getItems().setAll(crate.getEntities());
+		entities.getSelectionModel().select(selected.flatMap(crate::get).orElse(crate.getRoot()));
+		refresh();
+		checkpoint(placeOf(null), Optional.of("Reload"));
+	}
+
+	/**
+	 * File > Save As: choose where to save the crate as an RO-Crate Metadata
+	 * File, and save it there.
+	 *
+	 * @return Whether it was saved
+	 */
+	boolean saveAs(Stage stage) {
+		if (!meetsRequirements(stage)) {
+			return false;
+		}
+		FileChooser chooser = new FileChooser();
+		chooser.setTitle("Save RO-Crate Metadata File");
+		chooser.setInitialFileName(crateFile.path().map(p -> p.getFileName().toString())
+				.orElse(Crate.RO_CRATE_METADATA_JSON));
+		chooser.getExtensionFilters().setAll(new FileChooser.ExtensionFilter("JSON-LD", "*.json", "*.jsonld"));
+		if (lastFolder != null) {
+			chooser.setInitialDirectory(lastFolder);
+		}
+		File file = chooser.showSaveDialog(stage);
+		return file != null && saveTo(stage, file.toPath());
+	}
+
+	/**
+	 * Whether the crate meets the RO-Crate requirements, or the user chooses
+	 * to save it anyway.
+	 */
+	private boolean meetsRequirements(Stage stage) {
 		// The profile's required properties, then RO-Crate's own checks
 		// (worded alike, so each problem only once)
 		List<String> problems = Stream.concat(RequiredFields.check(crate, profiles.getValue(), terms).stream(),
 				CrateChecks.check(crate).stream()).distinct().toList();
-		if (!problems.isEmpty()) {
-			ButtonType saveAnyway = new ButtonType("Save anyway", ButtonData.OK_DONE);
-			Alert alert = new Alert(AlertType.WARNING,
-					"• " + String.join("\n• ", problems), saveAnyway, ButtonType.CANCEL);
-			alert.initOwner(stage);
-			alert.setHeaderText("The crate does not yet meet the RO-Crate requirements");
-			if (alert.showAndWait().orElse(ButtonType.CANCEL) != saveAnyway) {
-				return;
-			}
+		if (problems.isEmpty()) {
+			return true;
 		}
-		FileChooser chooser = new FileChooser();
-		chooser.setTitle("Save RO-Crate Metadata File");
-		chooser.setInitialFileName(Crate.RO_CRATE_METADATA_JSON);
-		chooser.getExtensionFilters().setAll(new FileChooser.ExtensionFilter("JSON-LD", "*.json", "*.jsonld"));
-		if (lastSaved != null) {
-			chooser.setInitialDirectory(lastSaved.getParentFile());
-		}
-		File file = chooser.showSaveDialog(stage);
-		if (file == null) {
-			return;
-		}
+		ButtonType saveAnyway = new ButtonType("Save Anyway", ButtonData.OK_DONE);
+		Alert alert = new Alert(AlertType.WARNING, "• " + String.join("\n• ", problems), saveAnyway,
+				ButtonType.CANCEL);
+		alert.initOwner(stage);
+		alert.setHeaderText("The crate does not yet meet the RO-Crate requirements");
+		return alert.showAndWait().orElse(ButtonType.CANCEL) == saveAnyway;
+	}
+
+	/**
+	 * Write the crate to this file, which it is then saved to.
+	 *
+	 * @return Whether it was written
+	 */
+	boolean saveTo(Stage stage, Path file) {
 		try {
 			JsonNode json = crate.toJson();
-			MAPPER.writeValue(file, json);
-			lastSaved = file;
-			unchanged = json;
-			stage.setTitle("wpsld – " + file);
+			// With the line ends the file had, else \n
+			Crate.writer(crateFile.lineEnd()).writeValue(file.toFile(), json);
+			crateFile.reset(Optional.of(file), json);
+			lastFolder = file.toAbsolutePath().getParent().toFile();
+			refresh();
+			return true;
 		} catch (IOException e) {
 			Alert error = new Alert(AlertType.ERROR, "Can't save " + file + ":\n" + e.getMessage());
 			error.initOwner(stage);
 			error.showAndWait();
+			return false;
 		}
 	}
 
@@ -960,7 +1290,15 @@ public class CrateEditor extends Application {
 	}
 
 	private void checkpoint(Place place) {
-		history.checkpoint(crate.toJson(), place);
+		checkpoint(place, Optional.empty());
+	}
+
+	/**
+	 * Mark an undo point, named when its difference doesn't tell what it was
+	 * (see {@link no.s11.wpsld.crate.ChangeNames}).
+	 */
+	private void checkpoint(Place place, Optional<String> name) {
+		history.checkpoint(crate.toJson(), place, name);
 		canUndo.set(history.canUndo());
 		canRedo.set(history.canRedo());
 	}
@@ -1000,7 +1338,7 @@ public class CrateEditor extends Application {
 	 */
 	private void restore(ObjectNode before, Step step) {
 		Optional<String> shown = Optional.ofNullable(entities.getSelectionModel().getSelectedItem()).map(Entity::getId);
-		crate = new CrateReader().read(step.crate(), lastSaved == null ? "undo" : lastSaved.toString()).crate()
+		crate = new CrateReader().read(step.crate(), crateFile.path().map(Path::toString).orElse("undo")).crate()
 				.orElseThrow();
 		history.settle(crate.toJson());
 		followCrate(List.of(), true);
@@ -1026,10 +1364,14 @@ public class CrateEditor extends Application {
 		if (entityPreview != null) {
 			entityPreview.refresh();
 		}
+		JsonNode json = crate.toJson();
 		try {
-			preview.setText(MAPPER.writeValueAsString(crate.toJson()));
+			preview.setText(Crate.WRITER.writeValueAsString(json));
 		} catch (JsonProcessingException e) {
 			preview.setText(e.toString());
+		}
+		if (stage != null) {
+			stage.setTitle(crateFile.title(json, CrateFile.onMac()));
 		}
 	}
 

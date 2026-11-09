@@ -44,6 +44,21 @@ public class TestSettings {
 	}
 
 	@Test
+	public void styleAndColours() throws Exception {
+		Path file = temp.getRoot().toPath().resolve("settings.json");
+		assertEquals("classic", Settings.DEFAULT.style());
+		assertEquals("light", Settings.DEFAULT.colours());
+		Settings settings = new Settings(Set.of("profiles.ro-crate.org")).withStyle("win11").withColours("dark");
+		settings.save(file);
+		assertEquals(settings, Settings.load(file));
+		// Changing the registries keeps the look
+		assertEquals(new Settings(Set.of(), "win11", "dark"), settings.withDisabledRegistries(Set.of()));
+		// Settings from before styles
+		Files.writeString(file, "{\"disabledRegistries\": []}");
+		assertEquals(Settings.DEFAULT, Settings.load(file));
+	}
+
+	@Test
 	public void brokenFileIgnored() throws Exception {
 		Path file = temp.newFile("settings.json").toPath();
 		Files.writeString(file, "{ not json");

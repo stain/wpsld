@@ -65,6 +65,21 @@ jlink {
     }
 }
 
+// The licence and the third-party notices (src/notices, which covers the
+// built application, not the source), in every zip and in the About box
+def notices = files(rootProject.file('LICENSE.txt'), 'src/notices/THIRD-PARTY-NOTICES.txt')
+
+tasks.named('processResources') {
+    from(notices) {
+        into 'no/s11/wpsld/ui'
+    }
+    // The version for the About box
+    inputs.property('version', version.toString())
+    filesMatching('**/about.properties') {
+        expand(version: version.toString())
+    }
+}
+
 // The app image of the platform Gradle runs on, with its native launcher
 // (wpsld.exe, wpsld.app or bin/wpsld), zipped as
 // build/image-zip/wpsld-<version>-<platform>.zip, e.g. -Pplatform=linux-x64
@@ -73,6 +88,10 @@ if (!crossTargets && project.hasProperty('platform')) {
     tasks.register('appImageZip', Zip) {
         dependsOn tasks.named('jpackageImage')
         from(layout.buildDirectory.dir('jpackage'))
+        // Beside wpsld.app on macOS, else in the wpsld folder
+        from(notices) {
+            into(isMac ? '' : 'wpsld')
+        }
         archiveFileName = "wpsld-${version}-${findProperty('platform')}.zip"
         destinationDirectory = layout.buildDirectory.dir('image-zip')
         useFileSystemPermissions()
@@ -89,6 +108,7 @@ crossTargets.keySet().each { target ->
             // jlink writes both launchers for every platform; keep only this one's
             exclude(target.startsWith('windows') ? 'bin/wpsld' : 'bin/*.bat')
         }
+        from(notices)
         into("wpsld-${target}")
         archiveFileName = "wpsld-${target}.zip"
         destinationDirectory = layout.buildDirectory.dir('image-zip')
@@ -111,6 +131,10 @@ dependencies {
 
     implementation project(':lib')
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.4'
+    // Icons as font glyphs: Microsoft's Fluent System Icons, for the
+    // Windows 11 style (see Theme)
+    implementation 'org.kordamp.ikonli:ikonli-javafx:12.4.0'
+    implementation 'org.kordamp.ikonli:ikonli-fluentui-pack:12.4.0'
 
 }
 
@@ -118,7 +142,8 @@ test {
     systemProperty 'glass.platform', 'headless'
     systemProperty 'testfx.robot', 'glass'
     systemProperty 'prism.order', 'sw'
-    jvmArgs '--enable-native-access=javafx.graphics'
+    // The tests run JavaFX on the class path, in the unnamed module
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
     // TestFX registers each test's application in a static JavaFX map
     // (ParametersImpl), so every test's scene and form stay in memory until
     // the JVM ends: one JVM per test class, with room for ~25 MB per test
@@ -140,6 +165,7 @@ distributions {
     main {
         contents {
             exclude 'javafx-*.jar'
+            from(notices)
         }
     }
 }
@@ -155,4 +181,10 @@ tasks.named('startScripts') {
         windowsScript.text = windowsScript.text.replaceFirst(/(?m)^set MODULE_PATH=.*$/,
                 java.util.regex.Matcher.quoteReplacement('set MODULE_PATH=%APP_HOME%\\lib'))
     }
+}
+
+// The module name's s11 is the organisation's domain (s11.no); javac's lint
+// would warn about its digits on every build
+tasks.named('compileJava') {
+    options.compilerArgs += ['-Xlint:-module']
 }

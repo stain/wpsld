@@ -37,14 +37,38 @@ import no.s11.wpsld.util.AppDirectories;
  *
  * @param disabledRegistries Names of the profile registries not to use, see
  *                           {@link no.s11.wpsld.masp.ProfileRegistry#name()}
+ * @param style              The name of the editor's style, e.g.
+ *                           <code>win11</code>; the user interface decides
+ *                           which it knows
+ * @param colours            The name of its colours, e.g. <code>dark</code>
  */
-public record Settings(Set<String> disabledRegistries) {
+public record Settings(Set<String> disabledRegistries, String style, String colours) {
 	public static final String FILE = "settings.json";
+	public static final String DEFAULT_STYLE = "classic";
+	public static final String DEFAULT_COLOURS = "light";
 	public static final Settings DEFAULT = new Settings(Set.of());
 	private static final ObjectMapper MAPPER = new ObjectMapper();
 
 	public Settings {
 		disabledRegistries = Set.copyOf(disabledRegistries);
+		style = style == null || style.isBlank() ? DEFAULT_STYLE : style;
+		colours = colours == null || colours.isBlank() ? DEFAULT_COLOURS : colours;
+	}
+
+	public Settings(Set<String> disabledRegistries) {
+		this(disabledRegistries, DEFAULT_STYLE, DEFAULT_COLOURS);
+	}
+
+	public Settings withDisabledRegistries(Set<String> disabledRegistries) {
+		return new Settings(disabledRegistries, style, colours);
+	}
+
+	public Settings withStyle(String style) {
+		return new Settings(disabledRegistries, style, colours);
+	}
+
+	public Settings withColours(String colours) {
+		return new Settings(disabledRegistries, style, colours);
 	}
 
 	/**
@@ -66,7 +90,8 @@ public record Settings(Set<String> disabledRegistries) {
 			JsonNode json = MAPPER.readTree(file.toFile());
 			Set<String> disabled = new TreeSet<>();
 			json.path("disabledRegistries").forEach(n -> disabled.add(n.asText()));
-			return new Settings(disabled);
+			return new Settings(disabled, json.path("style").asText(DEFAULT_STYLE),
+					json.path("colours").asText(DEFAULT_COLOURS));
 		} catch (IOException e) {
 			return DEFAULT;
 		}
@@ -79,6 +104,8 @@ public record Settings(Set<String> disabledRegistries) {
 		Path dir = AppDirectories.create(file.toAbsolutePath().getParent());
 		ObjectNode json = MAPPER.createObjectNode();
 		new TreeSet<>(disabledRegistries).forEach(json.putArray("disabledRegistries")::add);
+		json.put("style", style);
+		json.put("colours", colours);
 		Path temp = Files.createTempFile(dir, "settings-", ".tmp");
 		MAPPER.writer(SerializationFeature.INDENT_OUTPUT).writeValue(temp.toFile(), json);
 		Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);

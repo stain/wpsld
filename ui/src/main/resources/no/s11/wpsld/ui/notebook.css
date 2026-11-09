@@ -3,7 +3,7 @@
  * rounded tops, grey pages, a status line and a dog-ear corner.
  */
 .notebook {
-    -fx-background-color: #c6c6c6;
+    -fx-background-color: #cccccc;
     -fx-font-size: 12px;
 }
 
@@ -66,7 +66,7 @@
 }
 
 .notebook-page {
-    -fx-background-color: #c6c6c6;
+    -fx-background-color: #cccccc;
     -fx-border-color: black #6b6b6b #6b6b6b white;
     -fx-border-width: 1;
     -fx-padding: 6 8 8 8;
@@ -103,4 +103,50 @@
 
 .notebook-buttons {
     -fx-padding: 8 4 4 4;
+}
+
+/*
+ * Under dark colours (see Theme): the same pastels as dark tints, on pages
+ * of the dark Warp grey (see warp-dark.css).
+ */
+.colours-dark .notebook, .colours-dark .notebook-page {
+    -fx-background-color: #3c3c3c;
+}
+
+.colours-dark .notebook-page {
+    -fx-border-color: #000000 #1e1e1e #1e1e1e #6a6a6a;
+}
+
+.colours-dark .notebook-tab {
+    -fx-border-color: #454545;
+    -fx-text-fill: #cccccc;
+}
+
+.colours-dark .notebook-tab:selected {
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #8a8a8a;
+}
+
+.colours-dark .notebook-tab-0 { -fx-background-color: #1d4d51; }
+.colours-dark .notebook-tab-1 { -fx-background-color: #2a4d33; }
+.colours-dark .notebook-tab-2 { -fx-background-color: #2f3a6b; }
+.colours-dark .notebook-tab-3 { -fx-background-color: #5a3a33; }
+.colours-dark .notebook-tab-4 { -fx-background-color: #56512c; }
+.colours-dark .notebook-tab-5 { -fx-background-color: #4a3a4a; }
+.colours-dark .notebook-tab-6 { -fx-background-color: #6a4020; }
+
+.colours-dark .notebook-scroll-left, .colours-dark .notebook-scroll-right {
+    -fx-background-color: #4daafc;
+}
+
+.colours-dark .notebook-page-header {
+    -fx-border-color: transparent transparent #3c3c3c transparent;
+}
+
+.colours-dark .notebook-dog-ear {
+    -fx-background-color: #1e1e1e, #4a4a4a;
+}
+
+.colours-dark .notebook-dog-ear-sign {
+    -fx-text-fill: #9d9d9d;
 }

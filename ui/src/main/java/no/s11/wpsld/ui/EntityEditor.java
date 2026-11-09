@@ -45,6 +45,7 @@ import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.css.PseudoClass;
 import javafx.collections.transformation.FilteredList;
+import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.VPos;
@@ -77,8 +78,16 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.Popup;
 import javafx.util.StringConverter;
+
+import org.kordamp.ikonli.Ikon;
+import org.kordamp.ikonli.fluentui.FluentUiRegularAL;
+import org.kordamp.ikonli.fluentui.FluentUiRegularMZ;
+import org.kordamp.ikonli.javafx.FontIcon;
+
 import no.s11.wpsld.crate.CrateDocument;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
@@ -134,7 +143,8 @@ public class EntityEditor extends ScrollPane {
 	/** True while an @id change is applied */
 	private boolean renaming;
 	/** Show the groups as a notebook rather than a list */
-	private boolean notebookMode;
+	/** How the form is laid out, as the style wants it */
+	private FormLayout layout = FormLayout.LIST;
 	/** The tabs of the notebook while building it */
 	private final List<Notebook.Tab> notebookTabs = new ArrayList<>();
 	/** Fields on each page of the notebook */
@@ -274,17 +284,17 @@ public class EntityEditor extends ScrollPane {
 			Label name = new Label(type);
 			name.setStyle("-fx-font-weight: bold;");
 			classDef(type).flatMap(ClassDef::getComment).map(EntityEditor::tooltip).ifPresent(name::setTooltip);
-			Button remove = new Button("×");
+			Button remove = iconButton("×", FluentUiRegularAL.DISMISS_12);
+			remove.getStyleClass().add("chip-remove");
 			remove.setId(id("removeType", type));
-			remove.setStyle("-fx-padding: 0 4 0 4;");
+			remove.setTooltip(new Tooltip("Remove the type " + type));
 			// Removing the last type falls back to Thing, so a lone Thing stays
 			remove.setDisable(!entityTypes.canRemove(entity.getTypes(), type));
 			remove.setOnAction(e -> removeType(type));
 			HBox chip = new HBox(4, name, remove);
 			chip.setId(id("type", type));
 			chip.setAlignment(Pos.CENTER_LEFT);
-			chip.setStyle("-fx-background-color: -fx-control-inner-background; -fx-border-color: -fx-box-border;"
-					+ " -fx-border-radius: 3; -fx-padding: 2 4 2 6;");
+			chip.getStyleClass().add("type-chip");
 			chips.getChildren().add(chip);
 		}
 		Button add = new Button("Add type…");
@@ -303,7 +313,8 @@ public class EntityEditor extends ScrollPane {
 				String name = terms.name(requiredClass);
 				Label notice = new Label("Required type: " + name);
 				notice.setId(id("requiredType", name));
-				notice.setStyle("-fx-text-fill: #b00000; -fx-font-weight: bold;");
+				notice.getStyleClass().add("error-text");
+				notice.setStyle("-fx-font-weight: bold;");
 				notice.setTooltip(tooltip("The profile " + formFields.getName() + " requires this entity to be a "
 						+ name + " (or a kind of " + name + ")"));
 				chips.getChildren().add(notice);
@@ -392,7 +403,7 @@ public class EntityEditor extends ScrollPane {
 				header.addRow(headerRow++, fieldLabel(field.get()), headerEditor(field.get()));
 			}
 		}
-		if (!notebookMode) {
+		if (!layout.notebook()) {
 			// A search, not a field to fill in: small, on the right
 			TextField search = new TextField(propertyQuery);
 			search.setId("propertySearch");
@@ -403,9 +414,16 @@ public class EntityEditor extends ScrollPane {
 				propertyQuery = query;
 				applySearch(starting);
 			});
+			// A magnifier inside it, for styles that show one (see macos.css)
+			Region magnifier = new Region();
+			magnifier.getStyleClass().add("search-icon");
+			magnifier.setMouseTransparent(true);
+			StackPane.setAlignment(magnifier, Pos.CENTER_LEFT);
+			search.getStyleClass().add("search-field");
+			StackPane searchField = new StackPane(search, magnifier);
 			Region spacer = new Region();
 			HBox.setHgrow(spacer, Priority.ALWAYS);
-			HBox searchBar = new HBox(spacer, search);
+			HBox searchBar = new HBox(spacer, searchField);
 			form.getChildren().add(searchBar);
 		}
 		Set<String> fieldNames = fields.stream().map(FormField::name).collect(Collectors.toSet());
@@ -458,7 +476,7 @@ public class EntityEditor extends ScrollPane {
 		}
 		String otherTitle = "Not properties of " + String.join(", ", entity.getTypes()) + " ("
 				+ (others.size() + retiredInUse) + ")";
-		if (notebookMode) {
+		if (layout.notebook()) {
 			if (grid != null || retiredInUse > 0) {
 				List<FormField> inUse = retiredFields.stream().filter(f -> entity.get(f.name()).isPresent()).toList();
 				VBox page = new VBox(8);
@@ -480,7 +498,7 @@ public class EntityEditor extends ScrollPane {
 
 		Map<String, List<FormField>> byGroup = fields.stream()
 				.collect(Collectors.groupingBy(FormField::group, LinkedHashMap::new, Collectors.toList()));
-		if (notebookMode) {
+		if (layout.notebook()) {
 			showNotebook(byGroup);
 			return;
 		}
@@ -533,12 +551,25 @@ public class EntityEditor extends ScrollPane {
 	}
 
 	/**
-	 * Show the form as a notebook of tabs and pages (true) or as a list of
-	 * folding groups (false).
+	 * A button for a small action, such as removing a value: its text, e.g.
+	 * "×", and an icon that a style may show instead (see win11.css), which
+	 * colours and sizes it. The text stays for screen readers.
 	 */
-	public void setNotebookMode(boolean notebookMode) {
-		this.notebookMode = notebookMode;
-		setFitToHeight(notebookMode);
+	static Button iconButton(String text, Ikon icon) {
+		FontIcon graphic = new FontIcon(icon);
+		graphic.getStyleClass().add("icon");
+		Button button = new Button(text, graphic);
+		button.getStyleClass().add("icon-button");
+		return button;
+	}
+
+	/**
+	 * Lay the form out as a style wants it, e.g. as a notebook of tabs and
+	 * pages rather than a list of folding groups.
+	 */
+	public void setFormLayout(FormLayout layout) {
+		this.layout = layout;
+		setFitToHeight(layout.notebook());
 		if (entity != null) {
 			showForm();
 		}
@@ -683,7 +714,7 @@ public class EntityEditor extends ScrollPane {
 			field.comment().ifPresent(comment -> {
 				Label text = new Label(Labels.plainText(comment));
 				text.setWrapText(true);
-				text.setStyle("-fx-text-fill: #505050;");
+				text.getStyleClass().add("dim-text");
 				VBox description = new VBox(2, text);
 				description.setId(id("description", field.name()));
 				// The full definition, e.g. https://schema.org/datePublished
@@ -696,25 +727,61 @@ public class EntityEditor extends ScrollPane {
 					link.setOnAction(e -> browse.accept(page));
 					description.getChildren().add(link);
 				}
-				description.setVisible(false);
-				description.setManaged(false);
-				Button help = new Button("?");
+				Button help;
+				if (layout.popoverHelp()) {
+					// ⓘ, as on macOS ? opens the app's help
+					help = iconButton("i", FluentUiRegularAL.INFO_16);
+					help.getStyleClass().add("info-button");
+					help.setOnAction(e -> showPopover(help, description));
+				} else {
+					description.setVisible(false);
+					description.setManaged(false);
+					help = iconButton("?", FluentUiRegularMZ.QUESTION_CIRCLE_16);
+					help.setOnAction(e -> {
+						description.setVisible(!description.isVisible());
+						description.setManaged(description.isVisible());
+					});
+					editor.getChildren().add(description);
+				}
+				help.getStyleClass().add("help-button");
 				help.setId(id("help", field.name()));
 				help.setTooltip(new Tooltip("What " + field.label() + " is for"));
-				help.setStyle("-fx-padding: 0 5 0 5; -fx-font-size: 0.85em;");
 				help.setFocusTraversable(false);
-				help.setOnAction(e -> {
-					description.setVisible(!description.isVisible());
-					description.setManaged(description.isVisible());
-				});
-				editor.getChildren().add(description);
 				label.setGraphic(help);
 				label.setContentDisplay(ContentDisplay.RIGHT);
 			});
+			// For styles that divide the rows (see macos.css)
+			label.getStyleClass().add("form-label");
+			editor.getStyleClass().add("form-value");
 			grid.addRow(row++, label, editor);
 			rows.put(field, List.of(label, editor));
 		}
+		if (row > 0) {
+			grid.getChildren().subList(grid.getChildren().size() - 2, grid.getChildren().size())
+					.forEach(n -> n.getStyleClass().add("last-row"));
+		}
 		return grid;
+	}
+
+	/**
+	 * Show a field's description in a popover below its ⓘ button, closed by
+	 * clicking elsewhere or Escape.
+	 */
+	private static void showPopover(Node owner, VBox description) {
+		Popup popup = new Popup();
+		popup.setAutoHide(true);
+		popup.setHideOnEscape(true);
+		VBox box = new VBox(description);
+		box.getStyleClass().add("popover");
+		box.setMaxWidth(380);
+		description.getChildren().forEach(n -> {
+			if (n instanceof Label text) {
+				text.setMaxWidth(360);
+			}
+		});
+		popup.getContent().setAll(box);
+		Bounds bounds = owner.localToScreen(owner.getBoundsInLocal());
+		popup.show(owner, bounds.getMinX() - 8, bounds.getMaxY() + 4);
 	}
 
 	/**
@@ -793,7 +860,8 @@ public class EntityEditor extends ScrollPane {
 			Label label = new Label("\u2691 " + note);
 			label.setId(id("retired", property));
 			label.setWrapText(true);
-			label.setStyle("-fx-text-fill: #8a5a00; -fx-font-size: 0.9em;");
+			label.getStyleClass().add("warning-text");
+			label.setStyle("-fx-font-size: 0.9em;");
 			return label;
 		});
 	}
@@ -914,7 +982,7 @@ public class EntityEditor extends ScrollPane {
 		private final FormField field;
 		private final List<Row> rows = new ArrayList<>();
 		private final VBox rowsBox = new VBox(4);
-		private final Button addValue = new Button("+");
+		private final Button addValue = iconButton("+", FluentUiRegularAL.ADD_16);
 		private final VBox node;
 
 		/** A value row: its control and how to get the text typed in it */
@@ -982,6 +1050,13 @@ public class EntityEditor extends ScrollPane {
 		}
 
 		private void addRow(String current) {
+			addRow(current, rows.size());
+		}
+
+		/**
+		 * Add a row for a value at this position among the rows.
+		 */
+		private void addRow(String current, int position) {
 			String rangeNames = field.range().stream().map(terms::name).collect(Collectors.joining(" or "));
 			Control control;
 			Supplier<String> text;
@@ -1015,23 +1090,40 @@ public class EntityEditor extends ScrollPane {
 			control.setId(id("value", field.name()) + "-" + rows.size());
 			control.getProperties().put(PROPERTY, field.name());
 			HBox.setHgrow(control, Priority.ALWAYS);
-			Button remove = new Button("×");
+			boolean several = field.maxCount().orElse(Integer.MAX_VALUE) > 1;
+			Button remove = layout.rowButtons() ? iconButton("\u2212", FluentUiRegularAL.DISMISS_16)
+					: iconButton("×", FluentUiRegularAL.DISMISS_16);
 			remove.setTooltip(new Tooltip("Remove this value"));
 			HBox rowNode = new HBox(4, control, remove);
+			rowNode.setAlignment(Pos.CENTER_LEFT);
 			Row row = new Row(rowNode, text);
 			remove.setOnAction(e -> {
 				rows.remove(row);
 				rowsBox.getChildren().remove(rowNode);
 				if (rows.isEmpty()) {
-					addRow("");
+					addRow("", 0);
 				}
 				update();
 			});
-			rows.add(row);
-			rowsBox.getChildren().add(rowNode);
+			if (layout.rowButtons()) {
+				remove.getStyleClass().add("row-button");
+				if (several) {
+					// + adds a value below this one
+					Button add = iconButton("+", FluentUiRegularAL.ADD_16);
+					add.getStyleClass().add("row-button");
+					add.setId(id("add", field.name()) + "-" + rows.size());
+					add.setTooltip(new Tooltip("Add another value"));
+					add.disableProperty().bind(addValue.disableProperty());
+					add.setOnAction(e -> addRow("", rows.indexOf(row) + 1));
+					rowNode.getChildren().add(add);
+				}
+			}
+			rows.add(position, row);
+			rowsBox.getChildren().add(position, rowNode);
 			addValue.setDisable(full());
-			// A single value field needs no button to add more
-			addValue.setVisible(field.maxCount().orElse(Integer.MAX_VALUE) > 1);
+			// A single value field needs no button to add more, nor one below
+			// the rows when each has its own
+			addValue.setVisible(several && !layout.rowButtons());
 			addValue.setManaged(addValue.isVisible());
 		}
 

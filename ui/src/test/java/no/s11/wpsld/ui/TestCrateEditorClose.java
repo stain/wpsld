@@ -44,19 +44,19 @@ public class TestCrateEditorClose extends ApplicationTest {
 	}
 
 	@Test
-	public void closeAsksToDiscardChanges() throws Exception {
+	public void closeAsksToSaveChanges() throws Exception {
 		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
 		clickOn("#addEntity");
 		clickOn("#typeSearch").write("person").type(KeyCode.ENTER);
 
 		// File > Exit, with its shortcut, as closing the window
 		push(KeyCode.SHORTCUT, KeyCode.Q);
-		assertTrue(lookup("Discard the changes to this crate?").tryQuery().isPresent());
+		assertTrue(lookup("Do you want to save the changes to Untitled?").tryQuery().isPresent());
 		clickOn("Cancel");
 		assertTrue(stage.isShowing());
 
 		push(KeyCode.SHORTCUT, KeyCode.Q);
-		clickOn("Discard");
+		clickOn("Don't Save");
 		WaitForAsyncUtils.waitForFxEvents();
 		assertFalse(stage.isShowing());
 	}

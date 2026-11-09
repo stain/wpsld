@@ -23,7 +23,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
+import com.fasterxml.jackson.core.util.DefaultIndenter;
+import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -37,6 +41,23 @@ import com.fasterxml.jackson.databind.node.TextNode;
  */
 public class Crate {
 	public static final String RO_CRATE_METADATA_JSON = "ro-crate-metadata.json";
+
+	/**
+	 * Writes an RO-Crate Metadata File as Jackson's pretty printer does, but
+	 * with \n line ends on every platform rather than the system's (\r\n on
+	 * Windows), so that a crate saved on any of them is the same file, e.g.
+	 * for git. See {@link #writer(String)} to keep a file's own line ends.
+	 */
+	public static final ObjectWriter WRITER = writer("\n");
+
+	/**
+	 * Writes an RO-Crate Metadata File with these line ends, e.g. \r\n for
+	 * a file that had them when opened.
+	 */
+	public static ObjectWriter writer(String lineEnd) {
+		return new ObjectMapper()
+				.writer(new DefaultPrettyPrinter().withObjectIndenter(new DefaultIndenter("  ", lineEnd)));
+	}
 	/** The RO-Crate specification's versions start with this */
 	public static final String RO_CRATE_SPEC = "https://w3id.org/ro/crate/";
 	public static final String RO_CRATE_1_3 = "https://w3id.org/ro/crate/1.3";

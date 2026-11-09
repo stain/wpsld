@@ -22,6 +22,7 @@ import static org.junit.Assert.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
@@ -31,7 +32,13 @@ import org.testfx.util.WaitForAsyncUtils;
 import javafx.scene.Node;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Hyperlink;
+import javafx.scene.control.Button;
+import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.Label;
+import javafx.scene.control.SplitPane;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuBar;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
@@ -106,7 +113,7 @@ public class TestCrateEditor extends ApplicationTest {
 		// The person is shown; give it the download's @id
 		renameTo(download.getId());
 		// Asked once to merge, even as the dialog takes the focus
-		clickOn("OK");
+		clickOn("Merge");
 		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
 		assertEquals(List.of(download), entities().getItems().subList(1, entities().getItems().size()));
 		assertEquals(List.of("DataDownload", "Person"), download.getTypes());
@@ -124,7 +131,7 @@ public class TestCrateEditor extends ApplicationTest {
 	}
 
 	@Test
-	public void newCrateAsksToDiscardChanges() {
+	public void newCrateAsksToSaveChanges() {
 		entities();
 		// Nothing changed yet: a new crate at once (with its shortcut, as
 		// moving the mouse over the menu bar may open another menu)
@@ -134,12 +141,12 @@ public class TestCrateEditor extends ApplicationTest {
 		Entity root = entities().getItems().get(0);
 
 		push(KeyCode.SHORTCUT, KeyCode.N);
-		assertTrue(lookup("Discard the changes to this crate?").tryQuery().isPresent());
+		assertTrue(lookup("Do you want to save the changes to Untitled?").tryQuery().isPresent());
 		clickOn("Cancel");
 		assertEquals(2, entities().getItems().size());
 
 		push(KeyCode.SHORTCUT, KeyCode.N);
-		clickOn("Discard");
+		clickOn("Don't Save");
 		assertEquals(1, entities().getItems().size());
 		assertNotSame(root, entities().getItems().get(0));
 		assertEquals(entities().getItems().get(0), entities().getSelectionModel().getSelectedItem());
@@ -168,7 +175,8 @@ public class TestCrateEditor extends ApplicationTest {
 		assertEquals(List.of("./", "#alice"), entities().getItems().stream().map(Entity::getId).toList());
 		assertEquals(entities().getItems().get(0), entities().getSelectionModel().getSelectedItem());
 		assertEquals("RO-Crate Machine Actionable Profile 0.1.0", profiles.getValue().getName());
-		assertEquals("wpsld – " + dir.resolve("ro-crate-metadata.json"), stage.getTitle());
+		assertEquals(title(dir.getFileName() + java.io.File.separator + "ro-crate-metadata.json", false),
+				stage.getTitle());
 		// Written with its own version, and nothing to discard yet
 		assertTrue(lookup("#preview").queryTextInputControl().getText().contains("https://w3id.org/ro/crate/1.2/context"));
 		push(KeyCode.SHORTCUT, KeyCode.N);
@@ -218,7 +226,12 @@ public class TestCrateEditor extends ApplicationTest {
 		// Leaving a field without changes is no new point: redo is still there after undo
 		push(KeyCode.SHORTCUT, KeyCode.Z);
 		leaveField();
-		push(KeyCode.SHORTCUT, KeyCode.Y);
+		// Redo as on Windows and Linux; on macOS Command-Y isn't Redo
+		if (CrateFile.onMac()) {
+			push(KeyCode.SHORTCUT, KeyCode.SHIFT, KeyCode.Z);
+		} else {
+			push(KeyCode.SHORTCUT, KeyCode.Y);
+		}
 		assertEquals("My crate", entities().getItems().get(0).get("name").orElseThrow().asText());
 	}
 
@@ -233,7 +246,7 @@ public class TestCrateEditor extends ApplicationTest {
 		addEntity("person");
 		Entity download = entities().getItems().get(1);
 		renameTo(download.getId());
-		clickOn("OK");
+		clickOn("Merge");
 		assertEquals(2, entities().getItems().size());
 
 		leaveField();
@@ -254,9 +267,376 @@ public class TestCrateEditor extends ApplicationTest {
 		assertEquals(List.of("DataDownload", "Person"), entities().getItems().get(1).getTypes());
 
 		push(KeyCode.SHORTCUT, KeyCode.N);
-		clickOn("Discard");
+		clickOn("Don't Save");
 		push(KeyCode.SHORTCUT, KeyCode.Z);
 		assertEquals(1, entities().getItems().size());
+	}
+
+	/** The window's title for this file name, as on this operating system */
+	private static String title(String name, boolean modified) {
+		return CrateFile.onMac() ? name + (modified ? " — Edited" : "") : (modified ? "*" : "") + name + " – wpsld";
+	}
+
+	/** A crate in a new folder, opened */
+	private Path openNewCrate() throws Exception {
+		entities();
+		Path dir = Files.createTempDirectory("crate");
+		Path file = dir.resolve("ro-crate-metadata.json");
+		Files.writeString(file, """
+				{"@context": "https://w3id.org/ro/crate/1.3/context",
+				 "@graph": [
+				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.3"}},
+				  {"@id": "./", "@type": "Dataset", "name": "A crate", "description": "For testing",
+				   "datePublished": "2026-11-09", "license": {"@id": "http://spdx.org/licenses/CC0-1.0"}}
+				 ]}""");
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir)).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		return file;
+	}
+
+	/**
+	 * File > Save writes to the file opened, without asking where; the
+	 * title shows unsaved changes until then.
+	 */
+	@Test
+	public void saveToOpenedFile() throws Exception {
+		Path file = openNewCrate();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		String name = file.getParent().getFileName() + java.io.File.separator + "ro-crate-metadata.json";
+		assertEquals(title(name, false), stage.getTitle());
+		addEntity("person");
+		assertEquals(title(name, true), stage.getTitle());
+
+		push(KeyCode.SHORTCUT, KeyCode.S);
+		WaitForAsyncUtils.waitForFxEvents();
+		// The person has no name, which the core profile doesn't require
+		if (lookup("Save Anyway").tryQuery().isPresent()) {
+			clickOn("Save Anyway");
+		}
+		assertTrue(Files.readString(file).contains("Person"));
+		assertEquals(title(name, false), stage.getTitle());
+		// Saved: nothing to ask about
+		push(KeyCode.SHORTCUT, KeyCode.N);
+		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
+	}
+
+	/**
+	 * Closing (here File > New) with unsaved changes: Save saves them first.
+	 */
+	@Test
+	public void saveWhenAsked() throws Exception {
+		Path file = openNewCrate();
+		addEntity("person");
+		push(KeyCode.SHORTCUT, KeyCode.N);
+		// The dialog's, not the toolbar's Save
+		clickOn(lookup(".dialog-pane .button").match((Button b) -> b.getText().equals("Save")).queryButton());
+		WaitForAsyncUtils.waitForFxEvents();
+		if (lookup("Save Anyway").tryQuery().isPresent()) {
+			clickOn("Save Anyway");
+		}
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(Files.readString(file).contains("Person"));
+		assertEquals(1, entities().getItems().size());
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertEquals(title(CrateFile.UNTITLED, false), stage.getTitle());
+	}
+
+	/**
+	 * A text field pastes once, also with Edit > Paste's shortcut; and the
+	 * menu's text commands are only enabled in a text field.
+	 */
+	@Test
+	public void textEditing() {
+		entities();
+		MenuItem paste = menuItem("menuPaste");
+		clickOn("#entities");
+		assertTrue(paste.isDisable());
+		TextField name = lookup("#value-name-0").queryAs(TextField.class);
+		clickOn(name).write("abc");
+		assertFalse(paste.isDisable());
+		push(KeyCode.SHORTCUT, KeyCode.A);
+		push(KeyCode.SHORTCUT, KeyCode.C);
+		push(KeyCode.END);
+		push(KeyCode.SHORTCUT, KeyCode.V);
+		assertEquals("abcabc", name.getText());
+		// From the menu
+		interact(paste::fire);
+		assertEquals("abcabcabc", name.getText());
+	}
+
+	/** View > Sidebar hides the entities, and shows them again */
+	@Test
+	public void sidebar() {
+		entities();
+		SplitPane split = lookup(".split-pane").queryAs(SplitPane.class);
+		assertEquals(3, split.getItems().size());
+		MenuItem sidebar = menuItem("menuSidebar");
+		// As choosing it: a checked item on Windows and Linux, Hide/Show Sidebar on macOS
+		Runnable choose = () -> {
+			if (sidebar instanceof CheckMenuItem check) {
+				check.setSelected(!check.isSelected());
+			} else {
+				sidebar.fire();
+			}
+		};
+		interact(choose);
+		assertEquals(2, split.getItems().size());
+		assertTrue(lookup("#entities").tryQuery().isEmpty());
+		interact(choose);
+		assertEquals(3, split.getItems().size());
+		assertTrue(lookup("#entities").tryQuery().isPresent());
+	}
+
+	/** As another application (e.g. git) would: the crate with another name, and a later time */
+	private static void changeOnDisk(Path file) throws Exception {
+		Files.writeString(file, Files.readString(file).replace("\"A crate\"", "\"Changed elsewhere\""));
+		Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.from(java.time.Instant.now().plusSeconds(10)));
+	}
+
+	/** Check the file on disk, as when coming back to the window, without waiting for a dialog it shows */
+	private void checkDisk() {
+		WaitForAsyncUtils.asyncFx(app::checkDisk);
+		WaitForAsyncUtils.waitForFxEvents();
+	}
+
+	/** A dialog's button, not one of the window's with the same text */
+	private void clickDialogButton(String text) {
+		clickOn(lookup(".dialog-pane .button").match((Button b) -> b.getText().equals(text)).queryButton());
+		WaitForAsyncUtils.waitForFxEvents();
+	}
+
+	private String json() {
+		return lookup("#preview").queryTextInputControl().getText();
+	}
+
+	/**
+	 * Changed on disk with no unsaved changes: reloaded, and Undo brings the
+	 * crate as it was back.
+	 */
+	@Test
+	public void reloadChangedFile() throws Exception {
+		Path file = openNewCrate();
+		changeOnDisk(file);
+		checkDisk();
+		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
+		assertTrue(json().contains("Changed elsewhere"));
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertFalse(stage.getTitle().startsWith("*") || stage.getTitle().endsWith("Edited"));
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		assertTrue(json().contains("A crate"));
+	}
+
+	/**
+	 * Written again with the same content, with a new time (as git may): not
+	 * a change, so unsaved changes stay and nothing is asked.
+	 */
+	@Test
+	public void touchedFileNotChanged() throws Exception {
+		Path file = openNewCrate();
+		addEntity("person");
+		Files.writeString(file, Files.readString(file));
+		Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.from(java.time.Instant.now().plusSeconds(10)));
+		checkDisk();
+		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
+		assertEquals(2, entities().getItems().size());
+	}
+
+	/**
+	 * Changed on disk with unsaved changes: asked once whether to keep them;
+	 * saving then asks again, and Cancel leaves the other changes alone, Save
+	 * Anyway overwrites them.
+	 */
+	@Test
+	public void keepChangesOverChangedFile() throws Exception {
+		Path file = openNewCrate();
+		addEntity("person");
+		changeOnDisk(file);
+		checkDisk();
+		assertTrue(lookup("“" + file.getParent().getFileName() + java.io.File.separator
+				+ "ro-crate-metadata.json” has been changed by another application.").tryQuery().isPresent());
+		clickDialogButton("Keep My Changes");
+		assertEquals(2, entities().getItems().size());
+		// Not asked again for the same change
+		checkDisk();
+		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
+
+		push(KeyCode.SHORTCUT, KeyCode.S);
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup(".dialog-pane .label").match((Label l) -> l.getText().contains("since you opened or saved it"))
+				.tryQuery().isPresent());
+		clickDialogButton("Cancel");
+		assertTrue(Files.readString(file).contains("Changed elsewhere"));
+
+		push(KeyCode.SHORTCUT, KeyCode.S);
+		WaitForAsyncUtils.waitForFxEvents();
+		clickDialogButton("Save Anyway");
+		// Then perhaps the RO-Crate requirements
+		if (lookup(".dialog-pane .button").match((Button b) -> b.getText().equals("Save Anyway")).tryQuery()
+				.isPresent()) {
+			clickDialogButton("Save Anyway");
+		}
+		assertTrue(Files.readString(file).contains("Person"));
+		assertFalse(Files.readString(file).contains("Changed elsewhere"));
+	}
+
+	/**
+	 * Saved, changed elsewhere (e.g. on the command line), then edited: coming
+	 * back reloads the file, so saving keeps both the other change and the edit.
+	 */
+	@Test
+	public void saveAfterChangeElsewhereKeepsIt() throws Exception {
+		Path file = openNewCrate();
+		addEntity("person");
+		push(KeyCode.SHORTCUT, KeyCode.S);
+		WaitForAsyncUtils.waitForFxEvents();
+		if (lookup(".dialog-pane .button").match((Button b) -> b.getText().equals("Save Anyway")).tryQuery()
+				.isPresent()) {
+			clickDialogButton("Save Anyway");
+		}
+		assertTrue(Files.readString(file).contains("Person"));
+		changeOnDisk(file);
+		// Back to the window
+		checkDisk();
+		assertTrue(json().contains("Changed elsewhere"));
+		interact(() -> entities().getSelectionModel().select(0));
+		clickOn(lookup("#value-description-0").queryAs(TextField.class)).write(" More");
+		clickOn("#entities");
+		push(KeyCode.SHORTCUT, KeyCode.S);
+		WaitForAsyncUtils.waitForFxEvents();
+		if (lookup(".dialog-pane .button").match((Button b) -> b.getText().equals("Save Anyway")).tryQuery()
+				.isPresent()) {
+			clickDialogButton("Save Anyway");
+		}
+		String saved = Files.readString(file);
+		assertTrue(saved, saved.contains("Changed elsewhere"));
+		assertTrue(saved, saved.contains("For testing More"));
+	}
+
+	/** A file with \r\n line ends is saved with them, on any platform; others with \n */
+	@Test
+	public void lineEndsKept() throws Exception {
+		Path file = openNewCrate();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		// Opened again with \r\n line ends
+		Files.writeString(file, Files.readString(file).replace("\n", "\r\n"));
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, file.getParent())).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		addEntity("person");
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.saveTo(stage, file)).get());
+		String saved = Files.readString(file);
+		assertTrue(saved.contains("Person"));
+		assertTrue(saved.contains("\r\n"));
+		assertFalse(saved.replace("\r\n", "").contains("\n"));
+		// A new crate: \n
+		push(KeyCode.SHORTCUT, KeyCode.N);
+		Path other = file.resolveSibling("other-ro-crate-metadata.json");
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.saveTo(stage, other)).get());
+		assertFalse(Files.readString(other).contains("\r"));
+	}
+
+	/** Saving over a changed file: Reload discards the unsaved changes instead */
+	@Test
+	public void reloadInsteadOfSaving() throws Exception {
+		Path file = openNewCrate();
+		addEntity("person");
+		changeOnDisk(file);
+		push(KeyCode.SHORTCUT, KeyCode.S);
+		WaitForAsyncUtils.waitForFxEvents();
+		clickDialogButton("Reload");
+		assertEquals(1, entities().getItems().size());
+		assertTrue(json().contains("Changed elsewhere"));
+		assertTrue(Files.readString(file).contains("Changed elsewhere"));
+	}
+
+	/** Alt and a menu's letter opens it, as on Windows and Linux */
+	@Test
+	public void menuMnemonics() {
+		entities();
+		MenuBar bar = lookup("#menuBar").queryAs(MenuBar.class);
+		assertEquals(List.of("_File", "_Edit", "_View", "_Help"), bar.getMenus().stream().map(Menu::getText).toList());
+		assertTrue(bar.getMenus().stream().allMatch(Menu::isMnemonicParsing));
+		// Each menu's items have their own letters
+		for (Menu menu : bar.getMenus()) {
+			List<Character> letters = menu.getItems().stream().map(MenuItem::getText).filter(t -> t != null)
+					.map(t -> t.replace("__", "")).filter(t -> t.contains("_"))
+					.map(t -> Character.toLowerCase(t.charAt(t.indexOf('_') + 1))).toList();
+			assertEquals(menu.getText() + " " + letters, letters.size(), new java.util.HashSet<>(letters).size());
+		}
+		// macOS has no such keys
+		if (!CrateFile.onMac()) {
+			push(KeyCode.ALT, KeyCode.F);
+			WaitForAsyncUtils.waitForFxEvents();
+			assertTrue(bar.getMenus().get(0).isShowing());
+			push(KeyCode.ESCAPE);
+		}
+	}
+
+	/** Edit > Undo and Redo say what they would undo and redo */
+	@Test
+	public void namedUndo() {
+		entities();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		MenuItem undo = menuItem("menuUndo");
+		MenuItem redo = menuItem("menuRedo");
+		Runnable name = () -> interact(() -> app.nameUndo(stage, undo, redo));
+		name.run();
+		assertEquals("_Undo", undo.getText());
+		addEntity("person");
+		name.run();
+		assertEquals("_Undo Add Person", undo.getText());
+		assertEquals("_Redo", redo.getText());
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		name.run();
+		assertEquals("_Redo Add Person", redo.getText());
+		push(KeyCode.SHORTCUT, KeyCode.SHIFT, KeyCode.Z);
+		// Typing in a field (the root's name): undone first
+		interact(() -> entities().getSelectionModel().select(0));
+		clickOn(lookup("#value-name-0").queryAs(TextField.class)).write("Bob");
+		name.run();
+		assertEquals("_Undo Typing", undo.getText());
+		// Left: an edit of the name
+		clickOn("#entities");
+		name.run();
+		assertEquals("_Undo Edit “Name”", undo.getText());
+	}
+
+	/**
+	 * The preview's @id, on its own line: opens where it leads, a web address
+	 * or a file beside the crate; #local, blank node and urn:uuid ids don't.
+	 */
+	@Test
+	public void previewIdentifier() throws Exception {
+		entities();
+		Path dir = Files.createTempDirectory("crate");
+		Files.writeString(dir.resolve("data.csv"), "a,b\n");
+		List<String> ids = List.of("https://example.com/x", "data.csv", "missing.csv", "#local", "_:b0",
+				"urn:uuid:3f2504e0-4f89-11d3-9a0c-0305e82c3301");
+		Files.writeString(dir.resolve("ro-crate-metadata.json"), """
+				{"@context": "https://w3id.org/ro/crate/1.3/context",
+				 "@graph": [
+				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.3"}},
+				  {"@id": "./", "@type": "Dataset", "name": "A crate"},
+				  """ + ids.stream().map(id -> "{\"@id\": \"" + id + "\", \"@type\": \"Thing\"}")
+				.collect(java.util.stream.Collectors.joining(",")) + "]}");
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir)).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		Map<String, Boolean> clickable = new java.util.LinkedHashMap<>();
+		for (Entity entity : List.copyOf(entities().getItems())) {
+			interact(() -> entities().getSelectionModel().select(entity));
+			clickable.put(entity.getId(), lookup("#previewId").query() instanceof Hyperlink);
+		}
+		assertEquals(Map.of("./", true, "https://example.com/x", true, "data.csv", true, "missing.csv", false,
+				"#local", false, "_:b0", false, "urn:uuid:3f2504e0-4f89-11d3-9a0c-0305e82c3301", false), clickable);
+	}
+
+	private MenuItem menuItem(String id) {
+		MenuBar bar = lookup("#menuBar").queryAs(MenuBar.class);
+		return bar.getMenus().stream().flatMap(m -> m.getItems().stream()).filter(i -> id.equals(i.getId()))
+				.findFirst().orElseThrow();
 	}
 
 	/** Properties of the form's visible rows */
@@ -303,28 +683,6 @@ public class TestCrateEditor extends ApplicationTest {
 		addEntity("dataset");
 		assertEquals(List.of("Dataset"), entities().getItems().get(1).getTypes());
 		assertTrue(visibleProperties().stream().noneMatch(l -> l.endsWith(" *")));
-	}
-
-	/**
-	 * The form's groups as the tabs of an OS/2-style notebook, with pages.
-	 */
-	@Test
-	public void notebookView() {
-		entities();
-		// View > Notebook, with its shortcut (see newCrateAsksToDiscardChanges)
-		push(KeyCode.SHORTCUT, KeyCode.DIGIT2);
-		assertTrue(lookup("#notebook").tryQuery().isPresent());
-		assertEquals(List.of("Required", "Dataset", "CreativeWork", "Thing"),
-				lookup(".notebook-tab").queryAllAs(Label.class).stream().map(Label::getText).toList());
-		assertTrue(lookup("#propertySearch").tryQuery().isEmpty() || !lookup("#propertySearch").query().isVisible());
-		// CreativeWork's properties on pages
-		clickOn(lookup(".notebook-tab").queryAllAs(Label.class).stream().filter(l -> l.getText().equals("CreativeWork"))
-				.findFirst().orElseThrow());
-		assertTrue(lookup(".notebook-status").queryAs(Label.class).getText().matches("Page 1 of \\d+"));
-		// Back to the list, View > List
-		push(KeyCode.SHORTCUT, KeyCode.DIGIT1);
-		assertTrue(lookup("#notebook").tryQuery().isEmpty());
-		assertTrue(visibleProperties().contains("name *"));
 	}
 
 	private Hyperlink previewLink(String containerId, String text) {

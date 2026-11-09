@@ -16,6 +16,38 @@ and Describo.
 It is a work in progress. See [PLAN.md](PLAN.md) for the plan and
 [MASP.md](MASP.md) for how profiles are read and used.
 
+## Screenshots
+
+An example crate with made-up data, in some of the styles under View >
+Style and View > Colours. The entities are listed on the left, the selected
+one's form is in the middle, and its preview on the right.
+
+| | |
+|-|-|
+| ![A person in the Classic style](docs/screenshots/classic-person.png) | ![The crate's root dataset in the Windows 11 style](docs/screenshots/windows11-dataset.png) |
+| A person, in the Classic style | The crate itself, with the fields its profile requires first, in the Windows 11 style |
+| ![A file in the macOS style, in dark colours](docs/screenshots/macos-dark-file.png) | ![An event in the OS/2 Warp style](docs/screenshots/warp-event.png) |
+| A file, in the macOS style in dark colours, each value with − and + | An event, in the OS/2 Warp style, with the form as a notebook |
+
+### Making the screenshots again
+
+The screenshots are made by a test,
+[`ReadmeScreenshots`](ui/src/test/java/no/s11/wpsld/ui/ReadmeScreenshots.java),
+which opens the made-up crate in
+[`ui/src/test/resources/example-crate`](ui/src/test/resources/example-crate)
+and takes one window per style. It only runs when the environment variable
+`SCREENSHOTS` names the folder to write them to (an absolute path, as the
+tests run in another folder), and is skipped otherwise. From the
+repository's folder, with the same set-up as for building (see Building):
+
+    SCREENSHOTS=$PWD/docs/screenshots ./gradlew :ui:test --tests '*ReadmeScreenshots' --rerun
+
+`--rerun` makes Gradle run it even if nothing changed since the last test
+run. The screenshots are taken headless, with JavaFX's own text rendering,
+so their text looks plainer than on a desktop. To change what they show,
+edit the example crate or the test, and check the new PNGs before
+committing them.
+
 ## Running a release
 
 Download a zip from the [releases](https://github.com/stain/wpsld/releases).
@@ -64,8 +96,8 @@ The portable zip leaves out JavaFX. Either:
 
 ### Where wpsld keeps its files
 
-wpsld keeps profiles you have loaded, and its settings (Edit > Preferences),
-in these places:
+wpsld keeps profiles you have loaded, and its settings (Edit > Preferences,
+and the style and colours from the View menu), in these places:
 
 | | Profiles | Settings |
 |-|----------|----------|
@@ -118,6 +150,13 @@ into `dist/`:
 The portable zip, without JavaFX, is `./gradlew :ui:distZip`, written to
 `ui/build/distributions/`.
 
+### Tests on GitHub
+
+[`.github/workflows/test.yml`](.github/workflows/test.yml) builds wpsld and
+runs its tests, the headless GUI tests too, for every pull request: they must
+pass on Linux, and are reported for Windows and macOS. The release workflow
+also runs them on each platform before making a release.
+
 ### Releases
 
 [`.github/workflows/release.yml`](.github/workflows/release.yml) builds the
@@ -132,8 +171,21 @@ comes from [`gradle.properties`](gradle.properties).
 | Module | Contents |
 |--------|----------|
 | [`lib`](lib) (`no.s11.wpsld`) | No JavaFX. The schema.org model, form fields, the RO-Crate model, reading and retrieving crates, JSON-LD contexts, MASP profiles and registries, and settings. Its only dependency is Jackson. |
-| [`ui`](ui) (`no.s11.wpsld.ui`) | The JavaFX editor: the crate window (`CrateEditor`), the entity form (`EntityEditor`), the preview, the type chooser and the preferences. |
+| [`ui`](ui) (`no.s11.wpsld.ui`) | The JavaFX editor: the crate window (`CrateEditor`), the entity form (`EntityEditor`), the preview, the type chooser and the preferences, and its styles (`Theme`). Besides JavaFX, it uses [Ikonli](https://kordamp.org/ikonli/) for the Fluent icons of the Windows 11 style. |
 
 ## Licence
 
-[Apache License 2.0](LICENSE.txt)
+The source code in this repository is under the
+[Apache License 2.0](LICENSE.txt).
+
+The built application also includes third-party software: Jackson, Ikonli,
+and Microsoft's Fluent UI System Icons, plus a Java runtime and JavaFX in
+the zips for a platform. Their licences and notices are in
+[`ui/src/notices/THIRD-PARTY-NOTICES.txt`](ui/src/notices/THIRD-PARTY-NOTICES.txt),
+which the build puts in every zip and which Help > About wpsld shows. That
+file covers the built application, not the source in this repository.
+
+OS/2 and Warp are trademarks of IBM, Windows and Segoe are trademarks of
+Microsoft, and macOS is a trademark of Apple. wpsld is not affiliated with
+any of them; its "OS/2 Warp", "Windows 11" and "macOS" styles only resemble
+their looks.
