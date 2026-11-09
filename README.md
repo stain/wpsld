@@ -31,9 +31,29 @@ be installed.
 | `wpsld-<version>-windows-x64.zip` | Windows x64 | `wpsld\wpsld.exe` |
 | `wpsld-<version>-portable.zip` | any, with your own Java 25 and JavaFX 27 | `bin/wpsld`, `bin\wpsld.bat` |
 
-The macOS app is not signed. After unzipping, allow it to run with:
+### The apps are not signed yet
 
-    xattr -dr com.apple.quarantine wpsld.app
+Windows and macOS mark files downloaded from the internet, and the mark
+carries over to files unzipped from them. As wpsld is not signed, they then
+refuse to start it the first time.
+
+**Windows:** Microsoft Defender SmartScreen says it "prevented an
+unrecognised app from starting". Either:
+
+- before unzipping, right-click the zip, choose Properties, tick
+  **Unblock** and press OK (or in PowerShell:
+  `Unblock-File wpsld-<version>-windows-x64.zip`), or
+- in the SmartScreen message, click **More info**, then **Run anyway**.
+
+**macOS:** macOS says that "wpsld" can't be opened, or that Apple could not
+check it for malicious software. Either:
+
+- in Terminal, in the folder where you unzipped it:
+
+      xattr -dr com.apple.quarantine wpsld.app
+
+- or try to open it once, then go to System Settings > Privacy & Security,
+  and click **Open Anyway** beside the message about wpsld.
 
 The portable zip leaves out JavaFX. Either:
 
