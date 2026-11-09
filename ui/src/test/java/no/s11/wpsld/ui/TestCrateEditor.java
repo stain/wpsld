@@ -282,7 +282,7 @@ public class TestCrateEditor extends ApplicationTest {
 				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
 				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.3"}},
 				  {"@id": "./", "@type": "Dataset", "name": "A crate", "description": "For testing",
-				   "datePublished": "2026-11-09", "license": {"@id": "https://spdx.org/licenses/CC0-1.0"}}
+				   "datePublished": "2026-11-09", "license": {"@id": "http://spdx.org/licenses/CC0-1.0"}}
 				 ]}""");
 		Stage stage = (Stage) entities().getScene().getWindow();
 		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir)).get());

@@ -375,13 +375,34 @@ For every platform:
 - A **dark window title bar** where the OS allows it under dark colours.
 
 Styles:
-- **macOS**: try Liquid Glass (macOS 26) as effects on the macOS style,
-  only on controls and navigation (toolbar, sidebar, menus), never on
-  content: translucent fills, highlights, capsule shapes (JavaFX can't
-  blur or refract what is behind a control). Then work back to Yosemite
-  (10.10), as a variant or its own style, and Aqua (10.0) as a nostalgic
-  style like Warp, which may want other components (pinstripes, gel
-  buttons).
+- **macOS family**, revised after the macOS style (macOS 14-15) and its
+  form (`FormLayout.MAC`) were built:
+  - First a refactoring: a style as a chain of stylesheets (e.g. macOS 26 =
+    `macos.css` + `macos-glass.css`, Yosemite = `macos.css` +
+    `yosemite.css`), each with its dark ones, rather than one stylesheet
+    and one dark; and what a family shares as flags of the style rather
+    than tests for MACOS: the screen's menu bar (today only for MACOS), and
+    whether it has dark colours at all.
+  - **macOS 26 (Liquid Glass)** as `macos-glass.css` on the macOS style,
+    only on controls and navigation (toolbar, sidebar, menus, buttons),
+    never on content: translucent fills, highlights, capsule buttons, the
+    sidebar floating inset with rounded corners. Needs style classes on the
+    sidebar and toolbar (and padding around the sidebar), not only CSS.
+    JavaFX can't blur or refract what is behind a control, so judge from
+    snapshots whether the imitation convinces.
+  - **Yosemite (10.10)** shares most of macOS (− and + rows, popovers, the
+    blue pop-up box, segmented tabs, the source-list sidebar), but not
+    System Settings' rounded groups, which came later: forms then had
+    labels aligned to the right with a colon, in plain rows. That is a
+    second Mac form layout (`FormLayout.MAC_CLASSIC`), and the label's colon
+    is text, so code. Yosemite had no dark windows (only a dark menu bar and
+    Dock): Dark either keeps it light or borrows macOS's dark.
+  - **Aqua (10.0-10.4)** as its own nostalgic style on `MAC_CLASSIC`:
+    pinstripes need no image, as JavaFX gradients can repeat
+    (`linear-gradient(from 0px 0px to 0px 4px, repeat, …)`); gel buttons
+    and the blue scroll thumb from layered radial and linear gradients;
+    Lucida Grande only exists on Macs. Other components (drawers, Aqua's
+    centred tabs) only if they matter.
 - **OS/2 Warp**: IBM Plex Sans Condensed (open font licence) bundled in
   place of WarpSans; Warp 4-style icons; the scroll wheel over the
   notebook's −/+ turning pages; the entity list as a Workplace Shell folder
@@ -398,6 +419,31 @@ Styles:
   copy (the entities it refers to too), matching those the other crate
   already has (same `@id`, or same identifier) rather than duplicating
   them.
+- **An SPDX licence selector** for `license`: search the SPDX License
+  List by identifier or name (e.g. "Apache", "CC-BY"), adding the licence
+  as a contextual entity `{"@id": "http://spdx.org/licenses/Apache-2.0",
+  "@type": "CreativeWork", "name": "Apache License 2.0"}`. Use the
+  `http://spdx.org/licenses/` IRIs: they are the `@id`s in SPDX's own
+  JSON-LD (license-list-data's `jsonld/`), although the web server
+  redirects them to `https://`. Findings (2026-11-09):
+  - They can't be resolved as Linked Data: whatever the Accept header,
+    `http://spdx.org/licenses/Apache-2.0` redirects (301) to the HTML page,
+    which has the licence as RDFa (`typeof="spdx:License"`, `spdx:name`,
+    `spdx:licenseId`) but no `<link>` to the JSON-LD. That is at a separate
+    address, `https://spdx.org/licenses/Apache-2.0.jsonld`, served as
+    `binary/octet-stream`. `CrateRetriever` gets neither, so bundle.
+  - Bundle `json/licenses.json` of license-list-data's release v3.29.0
+    (https://github.com/spdx/license-list-data/releases/tag/v3.29.0, 740
+    licences, 340 kB, SHA-256
+    47d1cc681abe31166b342b6cc4aab13a6ba8ea5c48794697fe3bf8b1dbaf509a):
+    identifier, name, OSI approval, deprecation and `seeAlso` for each,
+    which is all a selector needs. Not `jsonld/licenses.jsonld`, which has
+    every licence's full text (21 MB); a licence's JSON-LD (5-40 kB) could
+    be fetched from `….jsonld` when its text is wanted. Pin it to a tag
+    with a script, as `scripts/update-masp-profiles.sh` pins profiles.
+  - First confirm the licence of the SPDX License List data: neither
+    license-list-data nor license-list-XML states one (GitHub says
+    NOASSERTION), and it goes in THIRD-PARTY-NOTICES.txt.
 - **An explorer for entities**, like Explorer, the Finder or a Workplace
   Shell folder: a window (or view) of the crate with virtual folders for
   each kind of contextual entity on top, e.g. "Persons", "Organizations"

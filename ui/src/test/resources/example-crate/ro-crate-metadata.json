@@ -13,7 +13,7 @@
       "name": "Bird counts at Lake Example, spring 2025",
       "description": "An example crate with made-up data: counts of water birds at Lake Example during a spring survey, with the people and the place involved.",
       "datePublished": "2025-11-01",
-      "license": {"@id": "https://spdx.org/licenses/CC-BY-4.0"},
+      "license": {"@id": "http://spdx.org/licenses/CC-BY-4.0"},
       "keywords": ["birds", "survey", "example"],
       "author": [{"@id": "#alice"}, {"@id": "#bob"}],
       "publisher": {"@id": "#example-university"},
@@ -79,7 +79,7 @@
       "encodingFormat": "text/markdown"
     },
     {
-      "@id": "https://spdx.org/licenses/CC-BY-4.0",
+      "@id": "http://spdx.org/licenses/CC-BY-4.0",
       "@type": "CreativeWork",
       "name": "Creative Commons Attribution 4.0 International"
     }

@@ -29,12 +29,24 @@ one's form is in the middle, and its preview on the right.
 | ![A file in the macOS style, in dark colours](docs/screenshots/macos-dark-file.png) | ![An event in the OS/2 Warp style](docs/screenshots/warp-event.png) |
 | A file, in the macOS style in dark colours, each value with − and + | An event, in the OS/2 Warp style, with the form as a notebook |
 
-These are made headless by
+### Making the screenshots again
+
+The screenshots are made by a test,
 [`ReadmeScreenshots`](ui/src/test/java/no/s11/wpsld/ui/ReadmeScreenshots.java),
-from [`example-crate`](ui/src/test/resources/example-crate), so their text
-looks plainer than on a desktop:
+which opens the made-up crate in
+[`ui/src/test/resources/example-crate`](ui/src/test/resources/example-crate)
+and takes one window per style. It only runs when the environment variable
+`SCREENSHOTS` names the folder to write them to (an absolute path, as the
+tests run in another folder), and is skipped otherwise. From the
+repository's folder, with the same set-up as for building (see Building):
 
     SCREENSHOTS=$PWD/docs/screenshots ./gradlew :ui:test --tests '*ReadmeScreenshots' --rerun
+
+`--rerun` makes Gradle run it even if nothing changed since the last test
+run. The screenshots are taken headless, with JavaFX's own text rendering,
+so their text looks plainer than on a desktop. To change what they show,
+edit the example crate or the test, and check the new PNGs before
+committing them.
 
 ## Running a release
 
