@@ -68,11 +68,17 @@ final class Theme {
 		private final String darkStylesheet;
 		private final boolean notebook;
 
+		/**
+		 * @param stylesheet     The file name of its stylesheet, if any, beside
+		 *                       Theme; only a name, so that the styles don't
+		 *                       depend on Theme being set up first
+		 * @param darkStylesheet The one it adds for dark colours
+		 */
 		Style(String id, String label, String stylesheet, String darkStylesheet, boolean notebook) {
 			this.id = id;
 			this.label = label;
-			this.stylesheet = url(stylesheet);
-			this.darkStylesheet = url(darkStylesheet);
+			this.stylesheet = stylesheet;
+			this.darkStylesheet = darkStylesheet;
 			this.notebook = notebook;
 		}
 
@@ -222,12 +228,13 @@ final class Theme {
 		boolean dark = dark();
 		List<String> ours = new ArrayList<>(List.of(BASE));
 		Stream.of(Style.values()).flatMap(s -> Stream.of(s.stylesheet, s.darkStylesheet)).filter(Objects::nonNull)
-				.forEach(ours::add);
+				.map(Theme::url).forEach(ours::add);
 		List<String> stylesheets = scene.getStylesheets();
 		stylesheets.removeIf(ours::contains);
 		// In this order, each recolouring the one before
-		List<String> look = Stream.of(BASE, shown.stylesheet, dark ? shown.darkStylesheet : null)
-				.filter(Objects::nonNull).toList();
+		List<String> look = new ArrayList<>(List.of(BASE));
+		Stream.of(shown.stylesheet, dark ? shown.darkStylesheet : null).filter(Objects::nonNull).map(Theme::url)
+				.forEach(look::add);
 		stylesheets.addAll(0, look);
 		removeStyleClasses(scene.getRoot());
 		if (scene.getRoot() != null) {
