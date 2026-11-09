@@ -535,6 +535,10 @@ run) loads, but shows what to work on:
 - **Browsing its files**: with many data entities, the flat entity list is
   not enough; needs other ways to navigate, e.g. by folder (`hasPart`), by
   type (see the type selector above), or by search.
+- **`conformsTo` with several values** is shown as one text field holding
+  them all in brackets (`[…]`), rather than one row per value as other
+  properties with several values have; probably a value form the field
+  doesn't recognise (e.g. an array of `{"@id"}` read as text).
 - **A hang or slowness** when following Orchestration of `#Task_1636` to
   the Run of "COMPSs runtime version 3.4": find out where the time goes
   (preview, form building, or reference lookups across many entities).
