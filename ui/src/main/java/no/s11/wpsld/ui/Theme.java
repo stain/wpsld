@@ -56,19 +56,19 @@ final class Theme {
 
 	enum Style implements Choice {
 		/** Modena, and in Dark the colours of Visual Studio Code */
-		CLASSIC("classic", "Classic", null, "dark.css", false),
+		CLASSIC("classic", "Classic", null, "dark.css", FormLayout.LIST),
 		/** As Windows 11's Fluent design: rounded, light controls on cards */
-		WIN11("win11", "Windows 11", "win11.css", "win11-dark.css", false),
+		WIN11("win11", "Windows 11", "win11.css", "win11-dark.css", FormLayout.LIST),
 		/** As macOS 14-15: rounded white controls, System Settings' groups */
-		MACOS("macos", "macOS", "macos.css", "macos-dark.css", false),
+		MACOS("macos", "macOS", "macos.css", "macos-dark.css", FormLayout.MAC),
 		/** As OS/2 Warp 4: grey, bevelled, and the form as a notebook */
-		WARP("warp", "OS/2 Warp", "warp.css", "warp-dark.css", true);
+		WARP("warp", "OS/2 Warp", "warp.css", "warp-dark.css", FormLayout.NOTEBOOK);
 
 		private final String id;
 		private final String label;
 		private final String stylesheet;
 		private final String darkStylesheet;
-		private final boolean notebook;
+		private final FormLayout form;
 
 		/**
 		 * @param stylesheet     The file name of its stylesheet, if any, beside
@@ -76,12 +76,12 @@ final class Theme {
 		 *                       depend on Theme being set up first
 		 * @param darkStylesheet The one it adds for dark colours
 		 */
-		Style(String id, String label, String stylesheet, String darkStylesheet, boolean notebook) {
+		Style(String id, String label, String stylesheet, String darkStylesheet, FormLayout form) {
 			this.id = id;
 			this.label = label;
 			this.stylesheet = stylesheet;
 			this.darkStylesheet = darkStylesheet;
-			this.notebook = notebook;
+			this.form = form;
 		}
 
 		@Override
@@ -95,10 +95,10 @@ final class Theme {
 		}
 
 		/**
-		 * Whether the form is a notebook, rather than a list of folding groups.
+		 * How the form is laid out, e.g. as a notebook
 		 */
-		boolean notebook() {
-			return notebook;
+		FormLayout form() {
+			return form;
 		}
 	}
 

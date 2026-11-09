@@ -333,15 +333,22 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
 Next: opening zipped crates and crates from a URL (with `CrateRetriever`),
 and recent files (in the state folder).
 
+- How the form is laid out follows the style (`FormLayout`): a list of
+  folding groups (Classic, Windows 11) with × on each value, + below and
+  ? showing the description below; a notebook (OS/2 Warp); or as macOS
+  forms: − and + at the end of each value row (+ adds one below it, as in
+  Mail's rules), ⓘ opening the description in a popover (on macOS ? is
+  for help), thin lines between rows, and a rounded search field with a
+  magnifier. Required fields keep their * (Apple's guidelines say nothing
+  of marking them; "Required" as placeholder would hide the type hint).
+
 Next, from Apple's Human Interface Guidelines (most also good elsewhere):
 on macOS the app menu stays as JavaFX makes it: no native bindings (such
 as NSMenuFX) for now, so About, Settings and Quit stay in Help, Edit and
 File, perhaps duplicated where macOS has them; a Window menu, a Settings window with panes instead
 of the modal Preferences; the system's accent colour in the Windows 11 and macOS styles; View
 > Profile, as every toolbar item should be a command; and for the macOS
-style's form, − and + at the end of each value row, ⓘ popovers for
-descriptions (keeping ? for help), dividers between rows, "Required" as
-placeholder, and a search field look.
+style, Help > wpsld Help for ? to open.
 
 ### Entities
 
@@ -355,6 +362,23 @@ placeholder, and a search field look.
   chosen type, its subtypes included (e.g. Organization also shows
   ResearchOrganization). Only types the crate's entities have are offered.
   Tabs in the OS/2 Warp style, a drop-down in the others.
+
+- **Opening a folder for annotation**, with or without an
+  `ro-crate-metadata.json`: the whole folder opened as a crate, which
+  needs a way to fill `hasPart` with its existing folders and files (and
+  later to notice new ones). Related to opening zipped crates.
+- **Previewing files** of data entities, e.g. images, text and tables:
+  only for an attached crate (opened from or saved to a folder), whose
+  relative `@id`s are files beside it.
+
+### To debug: labels of properties outside the profile
+
+Loading the crate of
+https://www.rohub.org/3b9d1622-2ff1-4a08-8e4a-9fe002f47180?activetab=overview,
+a property outside the profile, `https://w3id.org/ro-id/rohub/model#has_version`,
+gets a strange label in the editor and the preview, "Https://w 3d.org…":
+the whole IRI is split into words, rather than its local name after `#`
+or `/` (here "Has version").
 
 ### To debug: a large workflow run crate
 

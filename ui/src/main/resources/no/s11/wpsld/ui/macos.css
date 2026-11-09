@@ -286,6 +286,79 @@
     -fx-padding: 0 4 0 4;
 }
 
+/* ⓘ: round, with an i, opening the description in a popover */
+.button.icon-button.help-button.info-button {
+    -fx-font-family: "Serif";
+    -fx-font-style: italic;
+}
+
+/* − and + at the end of a value row: small, round and bordered, as in Mail's rules */
+.button.icon-button.row-button, .button.icon-button.row-button:focused, .button.icon-button.row-button:hover {
+    -fx-background-color: -mac-control-shadow, -mac-control-border, -mac-control;
+    -fx-background-insets: 0 0 -0.5 0, 0, 0.5;
+    -fx-background-radius: 1em;
+    -fx-text-fill: -mac-text;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 0;
+    -fx-min-width: 18;
+    -fx-min-height: 18;
+    -fx-max-width: 18;
+    -fx-max-height: 18;
+}
+
+.button.icon-button.row-button:armed {
+    -fx-background-color: -mac-control-shadow, -mac-control-border, -mac-control-pressed;
+}
+
+/* Rows divided by thin lines, as in System Settings' groups */
+.form-label, .form-value {
+    -fx-border-color: transparent transparent -mac-separator transparent;
+    -fx-padding: 0 0 6 0;
+}
+
+/* The label fills its cell, so that the line runs under the whole row */
+.form-label {
+    -fx-border-insets: 0 -10 0 0;
+    -fx-max-width: 100000;
+    -fx-max-height: 100000;
+    -fx-alignment: top-left;
+}
+
+.form-label.last-row, .form-value.last-row {
+    -fx-border-color: transparent;
+}
+
+/* Descriptions in a popover: rounded, with a shadow */
+.popover {
+    -fx-background-color: -mac-menu-border, -mac-menu;
+    -fx-background-insets: 0, 0.5;
+    -fx-background-radius: 10, 9.5;
+    -fx-padding: 10 12 10 12;
+    -fx-effect: dropshadow(gaussian, -mac-shadow, 18, 0, 0, 6);
+}
+
+/* The search field: rounded, a magnifier on the left */
+.search-field {
+    -fx-background-radius: 1em, 1em;
+    -fx-padding: 3 8 3 24;
+}
+
+.search-field:focused {
+    -fx-background-radius: 1em, 1em, 1em;
+}
+
+.search-icon {
+    visibility: visible;
+    -fx-background-color: -mac-text-secondary;
+    -fx-shape: "M6,0 A6,6 0 1,0 6,12 A6,6 0 1,0 6,0 Z M6,1.6 A4.4,4.4 0 1,1 6,10.4 A4.4,4.4 0 1,1 6,1.6 Z M9.6,10.7 L10.7,9.6 L15,13.9 L13.9,15 Z";
+    -fx-min-width: 12;
+    -fx-min-height: 12;
+    -fx-max-width: 12;
+    -fx-max-height: 12;
+    -fx-translate-x: 8;
+}
+
 /* A type of the entity, as a token */
 .type-chip {
     -fx-background-color: -mac-separator, -mac-control;

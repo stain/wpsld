@@ -343,9 +343,9 @@ public class CrateEditor extends Application {
 					return entity;
 				}, this::rename);
 		entityEditor.setBrowse(address -> getHostServices().showDocument(address));
-		// The OS/2 Warp style shows the form as a notebook
-		entityEditor.setNotebookMode(Theme.style().get().notebook());
-		Theme.style().addListener((obs, old, style) -> entityEditor.setNotebookMode(style.notebook()));
+		// As the style lays it out, e.g. as a notebook in the OS/2 Warp style
+		entityEditor.setFormLayout(Theme.style().get().form());
+		Theme.style().addListener((obs, old, style) -> entityEditor.setFormLayout(style.form()));
 		// Type changes, also those confirmed with Enter in a field
 		entityEditor.setOnStep(this::checkpoint);
 

@@ -56,3 +56,16 @@
 .dialog-pane > .content {
     -fx-padding: 8 12 8 12;
 }
+
+/* The search field's magnifier, for styles that show one (see macos.css) */
+.search-icon {
+    visibility: hidden;
+}
+
+/* A field's description, from ⓘ in styles with popovers (see FormLayout) */
+.popover {
+    -fx-background-color: -fx-box-border, -fx-control-inner-background;
+    -fx-background-insets: 0, 1;
+    -fx-padding: 10 12 10 12;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.25), 12, 0, 0, 4);
+}

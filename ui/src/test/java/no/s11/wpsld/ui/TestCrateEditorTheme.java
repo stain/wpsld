@@ -159,11 +159,20 @@ public class TestCrateEditorTheme extends ApplicationTest {
 				.map(s -> s.substring(s.lastIndexOf('/') + 1)).toList());
 		assertTrue(bar.isUseSystemMenuBar());
 		assertTrue(lookup("#notebook").tryQuery().isEmpty());
+		// The form as on macOS: − and + on each value row, not + below
+		assertTrue(lookup(".row-button").tryQuery().isPresent());
+		assertTrue(lookup("#add-datePublished").tryQuery().map(n -> !n.isVisible()).orElse(true));
+		// ⓘ: the description in a popover
+		assertTrue(lookup("#description-datePublished").tryQuery().isEmpty());
+		clickOn("#help-datePublished");
+		assertTrue(lookup("#description-datePublished").tryQuery().isPresent());
+		push(KeyCode.ESCAPE);
 		choose("Colours", "dark");
 		assertEquals(List.of("wpsld.css", "macos.css", "macos-dark.css"), scene.getStylesheets().stream()
 				.map(s -> s.substring(s.lastIndexOf('/') + 1)).toList());
 		choose("Style", "classic");
 		assertFalse(bar.isUseSystemMenuBar());
+		assertTrue(lookup(".row-button").tryQuery().isEmpty());
 	}
 
 	/**
