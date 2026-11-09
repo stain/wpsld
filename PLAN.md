@@ -39,6 +39,10 @@ releases from GitHub Actions (`.github/workflows/release.yml`, on a tag
 `v<version>`): app images with native launchers for Linux x64 and arm64,
 macOS x64 and arm64 and Windows x64, built on each platform, and a portable
 zip without JavaFX (`./gradlew :ui:distZip`, see `ui/src/dist/README.txt`).
+The apps are not signed, so SmartScreen and Gatekeeper block them at first
+(see README.md). Next: sign `wpsld.exe` in the workflow (SignPath Foundation
+is free for open source; Azure Trusted Signing), and sign and notarise the
+macOS apps (needs an Apple Developer account).
 
 Measured for schema.org 30.0: about 430 ms cold / 110 ms warm to load, the
 model about 2.6 MB once the JSON is dropped; the editor is built in about

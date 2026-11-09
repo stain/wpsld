@@ -8,8 +8,8 @@
 # Actions -> Run workflow, it only keeps the zips as workflow artifacts.
 #
 # Not built: Windows on Arm, as JavaFX 27 has no windows-aarch64 jmods.
-# The macOS apps are not signed: unzip, then allow them with
-# xattr -dr com.apple.quarantine wpsld.app
+# The apps are not signed, so Windows SmartScreen and macOS Gatekeeper
+# block them at first; see "The apps are not signed yet" in README.md.
 name: Release
 
 on:
