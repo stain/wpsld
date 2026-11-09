@@ -226,7 +226,12 @@ public class TestCrateEditor extends ApplicationTest {
 		// Leaving a field without changes is no new point: redo is still there after undo
 		push(KeyCode.SHORTCUT, KeyCode.Z);
 		leaveField();
-		push(KeyCode.SHORTCUT, KeyCode.Y);
+		// Redo as on Windows and Linux; on macOS Command-Y isn't Redo
+		if (CrateFile.onMac()) {
+			push(KeyCode.SHORTCUT, KeyCode.SHIFT, KeyCode.Z);
+		} else {
+			push(KeyCode.SHORTCUT, KeyCode.Y);
+		}
 		assertEquals("My crate", entities().getItems().get(0).get("name").orElseThrow().asText());
 	}
 
