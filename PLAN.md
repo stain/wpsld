@@ -257,8 +257,34 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
   file is reloaded, as an undoable step; with them, asked once: Reload or
   Keep My Changes. Saving over a changed file asks Save Anyway, Reload,
   Save As… or Cancel (the default); a moved or deleted one, Save Anyway,
-  Save As… or Cancel. Next: Show Differences, entity by entity, and merging
-  them, as JSON-LD entities make a three-way merge feasible.
+  Save As… or Cancel.
+  Next (not yet done):
+  - **Anyone may change the file**, not only the same person in another
+    window: a background job, another user, or another machine or VM on a
+    shared file system. So also check while the window has the focus, not
+    only when it gets it back: a file watcher (Java's `WatchService`)
+    where the file system reports changes, and polling the time and size
+    every few seconds where it doesn't (network shares, VM shared folders).
+  - **Show the silent reload**: a notice such as "Reloaded: changed by
+    another application. Undo to go back.", as it otherwise looks as if
+    nothing happened. Make an undo point just before reloading, so that
+    typing still in progress in a field comes back with Undo too.
+  - **Merge by replaying the unsaved edits** onto the file as it is now.
+    The form edits one entity at a time, so each undo point can keep the
+    entities it changed, each as its JSON-LD before and after (before null
+    for an added entity, after null for a removed one); a point may change
+    several, e.g. renaming an @id changes the references to it, removing
+    one removes references, merging changes two. When the file changed
+    with unsaved edits, read it again, then replay the points since it was
+    opened or last saved, in order: for each entity changed, if the file's
+    version equals the recorded before, apply the after (add, replace or
+    remove); if it already equals the after, nothing to do; otherwise both
+    the file and the user changed the same entity: a conflict, so stop and
+    ask (mine, theirs, or Save As… to keep both), showing the differences.
+    Without conflicts the merge needs no question beyond a notice, and is
+    one undo step ("Undo Merge" back to the user's own version). Later,
+    finer: per property within an entity, so only the same property
+    changed on both sides conflicts.
 - The window's title names the file (`CrateFile`): its folder and name, or
   Untitled, as the operating system has it: "name — Edited" while unsaved
   on macOS, "*name – wpsld" elsewhere.
