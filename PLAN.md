@@ -133,6 +133,18 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   link to the term's schema.org page. Name and Description sit on top as
   plain text fields for the first value, and in their group in full. The
   property search matches the term and the name, not descriptions.
+- **Preview header** *(done)*: the name, the types, and the `@id` on its
+  own line (several types may take the width), which opens where it leads:
+  a web address in the browser, a relative path (also `./`) as the file
+  or folder beside the crate, only if the crate has a folder (opened from
+  or saved to one) and the file exists; `#local`, `_:` blank nodes,
+  `urn:uuid:` and other absolute ids are plain text.
+- **Adding any property by its IRI**: a URL, or a prefixed name the
+  crate's `@context` maps to one, pasted into the property search and
+  confirmed with Enter, adds it, shown under "Not properties of …". An
+  `https://schema.org/` URL becomes its `http://schema.org/` term, as the
+  RO-Crate context has it; only a term newer than the context needs the
+  explicit `http://schema.org/…` IRI.
 - **Retired schema.org terms** *(done)*: superseded and attic terms are not
   fields (pending ones are). In use, they are editable in "Not properties
   of …" with a ⚑ note naming the replacement; searching a full term or name

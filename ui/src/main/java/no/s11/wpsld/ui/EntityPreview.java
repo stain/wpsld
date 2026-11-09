@@ -19,6 +19,9 @@ package no.s11.wpsld.ui;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -58,6 +61,8 @@ public class EntityPreview extends ScrollPane {
 	private final Consumer<String> browse;
 	/** Human readable label of a property */
 	private final Function<String, String> label;
+	/** The folder of the crate, if it has one (opened from or saved to it) */
+	private Supplier<Optional<Path>> folder = Optional::empty;
 	private final VBox content = new VBox(8);
 	private Entity entity;
 
@@ -71,6 +76,14 @@ public class EntityPreview extends ScrollPane {
 		content.setId("entityPreview");
 		setContent(content);
 		setFitToWidth(true);
+	}
+
+	/**
+	 * Where the crate is, to open the files its relative <code>@id</code>s
+	 * name; none for a new crate.
+	 */
+	public void setFolder(Supplier<Optional<Path>> folder) {
+		this.folder = Objects.requireNonNull(folder);
 	}
 
 	/**
@@ -94,9 +107,14 @@ public class EntityPreview extends ScrollPane {
 		name.setId("previewName");
 		name.setWrapText(true);
 		name.setStyle("-fx-font-size: 1.6em; -fx-font-weight: bold;");
-		Label about = new Label(String.join(", ", entity.getTypes()) + "    " + entity.getId());
-		about.getStyleClass().add("dim-text");
-		content.getChildren().addAll(name, about);
+		Label types = new Label(String.join(", ", entity.getTypes()));
+		types.setId("previewTypes");
+		types.setWrapText(true);
+		types.getStyleClass().add("dim-text");
+		// On its own line, as several types may take the whole width
+		Node id = identifier(entity.getId());
+		id.setId("previewId");
+		content.getChildren().addAll(name, types, id);
 		// The description as a paragraph under the name, not in the table
 		List<String> descriptions = entity.getAll("description").stream().filter(JsonNode::isValueNode)
 				.map(JsonNode::asText).toList();
@@ -203,6 +221,54 @@ public class EntityPreview extends ScrollPane {
 		Hyperlink link = new Hyperlink(text);
 		link.setOnAction(e -> open.accept(target));
 		return link;
+	}
+
+	/**
+	 * An entity's <code>@id</code>, to open where it leads: a web address in
+	 * the browser, a relative path (also <code>./</code>) as the file or
+	 * folder beside the crate if there is one; others, such as
+	 * <code>#local</code>, <code>_:blank</code> and <code>urn:uuid:</code>,
+	 * just as text.
+	 */
+	private Node identifier(String id) {
+		if (isWebAddress(id)) {
+			return webLink(id);
+		}
+		Optional<Path> file = local(id);
+		if (file.isPresent()) {
+			Hyperlink link = new Hyperlink(id);
+			link.setTooltip(new Tooltip(Files.isDirectory(file.get()) ? "Open the folder" : "Open the file"));
+			link.setOnAction(e -> browse.accept(file.get().toUri().toString()));
+			return link;
+		}
+		Label text = new Label(id);
+		text.setWrapText(true);
+		text.getStyleClass().add("dim-text");
+		return text;
+	}
+
+	/**
+	 * The existing file or folder a relative <code>@id</code> names beside the
+	 * crate, e.g. <code>data/table.csv</code> or <code>./</code>; none for
+	 * <code>#local</code> ids, blank nodes and absolute URIs, or if the crate
+	 * has no folder.
+	 */
+	private Optional<Path> local(String id) {
+		if (id.isEmpty() || id.startsWith("#") || id.startsWith("_:")) {
+			return Optional.empty();
+		}
+		try {
+			URI uri = new URI(id);
+			if (uri.isAbsolute() || uri.getPath() == null || uri.getPath().isEmpty()) {
+				return Optional.empty();
+			}
+			Optional<Path> dir = folder.get().map(Path::normalize);
+			// Not outside the crate's folder, e.g. ../other
+			return dir.map(d -> d.resolve(uri.getPath()).normalize()).filter(file -> file.startsWith(dir.get()))
+					.filter(Files::exists);
+		} catch (URISyntaxException | InvalidPathException e) {
+			return Optional.empty();
+		}
 	}
 
 	private Hyperlink webLink(String address) {

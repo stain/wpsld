@@ -22,6 +22,7 @@ import static org.junit.Assert.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
@@ -515,6 +516,37 @@ public class TestCrateEditor extends ApplicationTest {
 		clickOn("#entities");
 		name.run();
 		assertEquals("Undo Edit “Name”", undo.getText());
+	}
+
+	/**
+	 * The preview's @id, on its own line: opens where it leads, a web address
+	 * or a file beside the crate; #local, blank node and urn:uuid ids don't.
+	 */
+	@Test
+	public void previewIdentifier() throws Exception {
+		entities();
+		Path dir = Files.createTempDirectory("crate");
+		Files.writeString(dir.resolve("data.csv"), "a,b\n");
+		List<String> ids = List.of("https://example.com/x", "data.csv", "missing.csv", "#local", "_:b0",
+				"urn:uuid:3f2504e0-4f89-11d3-9a0c-0305e82c3301");
+		Files.writeString(dir.resolve("ro-crate-metadata.json"), """
+				{"@context": "https://w3id.org/ro/crate/1.3/context",
+				 "@graph": [
+				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.3"}},
+				  {"@id": "./", "@type": "Dataset", "name": "A crate"},
+				  """ + ids.stream().map(id -> "{\"@id\": \"" + id + "\", \"@type\": \"Thing\"}")
+				.collect(java.util.stream.Collectors.joining(",")) + "]}");
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir)).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		Map<String, Boolean> clickable = new java.util.LinkedHashMap<>();
+		for (Entity entity : List.copyOf(entities().getItems())) {
+			interact(() -> entities().getSelectionModel().select(entity));
+			clickable.put(entity.getId(), lookup("#previewId").query() instanceof Hyperlink);
+		}
+		assertEquals(Map.of("./", true, "https://example.com/x", true, "data.csv", true, "missing.csv", false,
+				"#local", false, "_:b0", false, "urn:uuid:3f2504e0-4f89-11d3-9a0c-0305e82c3301", false), clickable);
 	}
 
 	private MenuItem menuItem(String id) {
