@@ -322,8 +322,12 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
   as they are RO-Crate itself. Undo and redo choose the profile the crate
   then conforms to.
 - Edit > Preferences… (Ctrl+,).
+- Every menu and item has a letter for the Alt key (Alt+F opens File, as
+  on Windows and Linux; `_` in its text), unique within its menu; Undo's
+  and Redo's names have their own `_` doubled. macOS has no such letters.
 - Help > About wpsld…: version (from the build, `about.properties`), the
-  source's address, the Java and JavaFX versions, the licence and the
+  source's address, the Java and JavaFX versions, the licence, the
+  runtime's Java and JavaFX notices (from its `legal` folder), and the
   third-party notices (`ui/src/notices/THIRD-PARTY-NOTICES.txt`, for the
   built application: the build copies it and LICENSE.txt into the resources
   and into every zip). Update the notices when a dependency changes.

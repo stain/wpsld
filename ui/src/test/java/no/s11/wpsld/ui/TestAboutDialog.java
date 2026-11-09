@@ -64,6 +64,11 @@ public class TestAboutDialog extends ApplicationTest {
 			assertTrue(component, notices.contains(component));
 		}
 
+		// The runtime's own notices, from its legal folder (a JDK has one too)
+		String java = lookup("#aboutJava").queryAs(TextArea.class).getText();
+		assertTrue(java, java.contains("java.base/LICENSE"));
+		assertTrue(lookup("#aboutJavaFX").queryAs(TextArea.class).getText().contains("JavaFX"));
+
 		clickOn("#aboutSource");
 		assertEquals(List.of(AboutDialog.SOURCE), browsed);
 		clickOn("Close");

@@ -12,7 +12,8 @@ software below: the build downloads it as dependencies.
 
 The zips for a platform also include a Java runtime (Eclipse Temurin) and
 JavaFX, under the GNU General Public License version 2 with the Classpath
-Exception. Their notices are in the runtime's legal/ folder.
+Exception. Their notices are in the runtime's legal/ folder, and in the
+About box's Java and JavaFX tabs.
 
 OS/2 and Warp are trademarks of IBM. Windows and Segoe are trademarks of
 Microsoft. macOS is a trademark of Apple. wpsld is not affiliated with IBM,

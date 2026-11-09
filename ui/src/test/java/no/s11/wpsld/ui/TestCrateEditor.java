@@ -37,6 +37,7 @@ import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.Label;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -522,6 +523,26 @@ public class TestCrateEditor extends ApplicationTest {
 		assertTrue(Files.readString(file).contains("Changed elsewhere"));
 	}
 
+	/** Alt and a menu's letter opens it, as on Windows and Linux */
+	@Test
+	public void menuMnemonics() {
+		entities();
+		MenuBar bar = lookup("#menuBar").queryAs(MenuBar.class);
+		assertEquals(List.of("_File", "_Edit", "_View", "_Help"), bar.getMenus().stream().map(Menu::getText).toList());
+		assertTrue(bar.getMenus().stream().allMatch(Menu::isMnemonicParsing));
+		// Each menu's items have their own letters
+		for (Menu menu : bar.getMenus()) {
+			List<Character> letters = menu.getItems().stream().map(MenuItem::getText).filter(t -> t != null)
+					.map(t -> t.replace("__", "")).filter(t -> t.contains("_"))
+					.map(t -> Character.toLowerCase(t.charAt(t.indexOf('_') + 1))).toList();
+			assertEquals(menu.getText() + " " + letters, letters.size(), new java.util.HashSet<>(letters).size());
+		}
+		push(KeyCode.ALT, KeyCode.F);
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(bar.getMenus().get(0).isShowing());
+		push(KeyCode.ESCAPE);
+	}
+
 	/** Edit > Undo and Redo say what they would undo and redo */
 	@Test
 	public void namedUndo() {
@@ -531,24 +552,24 @@ public class TestCrateEditor extends ApplicationTest {
 		MenuItem redo = menuItem("menuRedo");
 		Runnable name = () -> interact(() -> app.nameUndo(stage, undo, redo));
 		name.run();
-		assertEquals("Undo", undo.getText());
+		assertEquals("_Undo", undo.getText());
 		addEntity("person");
 		name.run();
-		assertEquals("Undo Add Person", undo.getText());
-		assertEquals("Redo", redo.getText());
+		assertEquals("_Undo Add Person", undo.getText());
+		assertEquals("_Redo", redo.getText());
 		push(KeyCode.SHORTCUT, KeyCode.Z);
 		name.run();
-		assertEquals("Redo Add Person", redo.getText());
+		assertEquals("_Redo Add Person", redo.getText());
 		push(KeyCode.SHORTCUT, KeyCode.SHIFT, KeyCode.Z);
 		// Typing in a field (the root's name): undone first
 		interact(() -> entities().getSelectionModel().select(0));
 		clickOn(lookup("#value-name-0").queryAs(TextField.class)).write("Bob");
 		name.run();
-		assertEquals("Undo Typing", undo.getText());
+		assertEquals("_Undo Typing", undo.getText());
 		// Left: an edit of the name
 		clickOn("#entities");
 		name.run();
-		assertEquals("Undo Edit “Name”", undo.getText());
+		assertEquals("_Undo Edit “Name”", undo.getText());
 	}
 
 	/**

@@ -436,68 +436,68 @@ public class CrateEditor extends Application {
 	 * The File, Edit, View and Help menus.
 	 */
 	private MenuBar menus(Stage stage) {
-		MenuItem newCrate = new MenuItem("New RO-Crate");
+		MenuItem newCrate = new MenuItem("_New RO-Crate");
 		newCrate.setId("menuNew");
 		newCrate.setAccelerator(new KeyCodeCombination(KeyCode.N, KeyCombination.SHORTCUT_DOWN));
 		newCrate.setOnAction(e -> newCrate(stage));
-		MenuItem open = new MenuItem("Open…");
+		MenuItem open = new MenuItem("_Open…");
 		open.setId("menuOpen");
 		open.setAccelerator(new KeyCodeCombination(KeyCode.O, KeyCombination.SHORTCUT_DOWN));
 		open.setOnAction(e -> askToOpen(stage));
-		MenuItem close = new MenuItem("Close Window");
+		MenuItem close = new MenuItem("_Close Window");
 		close.setId("menuClose");
 		close.setAccelerator(new KeyCodeCombination(KeyCode.W, KeyCombination.SHORTCUT_DOWN));
 		// As closing the window, rather than stage.close(), which doesn't ask
 		close.setOnAction(e -> stage.fireEvent(new WindowEvent(stage, WindowEvent.WINDOW_CLOSE_REQUEST)));
-		MenuItem save = new MenuItem("Save");
+		MenuItem save = new MenuItem("_Save");
 		save.setId("menuSave");
 		save.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN));
 		save.setOnAction(e -> save(stage));
-		MenuItem saveAs = new MenuItem("Save As…");
+		MenuItem saveAs = new MenuItem("Save _As…");
 		saveAs.setId("menuSaveAs");
 		saveAs.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN,
 				KeyCombination.SHIFT_DOWN));
 		saveAs.setOnAction(e -> saveAs(stage));
-		MenuItem load = new MenuItem("Load Profile…");
+		MenuItem load = new MenuItem("_Load Profile…");
 		load.setId("menuLoadProfile");
 		load.disableProperty().bind(loadProfile.disabledProperty());
 		load.setOnAction(e -> askForProfile(stage));
-		MenuItem exit = new MenuItem("Exit");
+		MenuItem exit = new MenuItem("E_xit");
 		exit.setId("menuExit");
 		exit.setAccelerator(new KeyCodeCombination(KeyCode.Q, KeyCombination.SHORTCUT_DOWN));
 		// As closing the window, rather than stage.close(), which doesn't ask
 		exit.setOnAction(e -> stage.fireEvent(new WindowEvent(stage, WindowEvent.WINDOW_CLOSE_REQUEST)));
-		Menu file = new Menu("File", null, newCrate, open, close, new SeparatorMenuItem(), save, saveAs,
+		Menu file = new Menu("_File", null, newCrate, open, close, new SeparatorMenuItem(), save, saveAs,
 				new SeparatorMenuItem(), load, new SeparatorMenuItem(), exit);
 		file.setId("menuFile");
 
-		MenuItem undo = new MenuItem("Undo");
+		MenuItem undo = new MenuItem("_Undo");
 		undo.setId("menuUndo");
 		undo.setAccelerator(UNDO);
 		undo.disableProperty().bind(canUndo.not());
 		undo.setOnAction(e -> undo());
-		MenuItem redo = new MenuItem("Redo");
+		MenuItem redo = new MenuItem("_Redo");
 		redo.setId("menuRedo");
 		redo.setAccelerator(REDO);
 		redo.disableProperty().bind(canRedo.not());
 		redo.setOnAction(e -> redo());
-		MenuItem preferences = new MenuItem("Preferences…");
+		MenuItem preferences = new MenuItem("Pr_eferences…");
 		preferences.setId("menuPreferences");
 		preferences.setAccelerator(new KeyCodeCombination(KeyCode.COMMA, KeyCombination.SHORTCUT_DOWN));
 		preferences.setOnAction(e -> showPreferences(stage));
-		Menu edit = new Menu("Edit", null, undo, redo, new SeparatorMenuItem());
+		Menu edit = new Menu("_Edit", null, undo, redo, new SeparatorMenuItem());
 		// What they would undo and redo, e.g. Undo Add Person, as the menu opens
 		edit.setOnShowing(e -> nameUndo(stage, undo, redo));
 		edit.getItems().addAll(textEditing(stage));
 		edit.getItems().addAll(new SeparatorMenuItem(), preferences);
 		edit.setId("menuEdit");
-		Menu view = new Menu("View", null, sidebarItem(), new SeparatorMenuItem(), styles(stage), colours(stage));
+		Menu view = new Menu("_View", null, sidebarItem(), new SeparatorMenuItem(), styles(stage), colours(stage));
 		view.setId("menuView");
 
-		MenuItem about = new MenuItem("About wpsld…");
+		MenuItem about = new MenuItem("_About wpsld…");
 		about.setId("menuAbout");
 		about.setOnAction(e -> new AboutDialog(stage, address -> getHostServices().showDocument(address)).show());
-		Menu help = new Menu("Help", null, about);
+		Menu help = new Menu("_Help", null, about);
 		help.setId("menuHelp");
 
 		MenuBar bar = new MenuBar(file, edit, view, help);
@@ -517,8 +517,9 @@ public class CrateEditor extends Application {
 	void nameUndo(Stage stage, MenuItem undo, MenuItem redo) {
 		Optional<String> undone = stage.getScene().getFocusOwner() instanceof TextInputControl field
 				&& field.isUndoable() ? Optional.of("Typing") : history.undoName(crate.toJson());
-		undo.setText(undone.map(name -> "Undo " + name).orElse("Undo"));
-		redo.setText(history.redoName().map(name -> "Redo " + name).orElse("Redo"));
+		// _ marks the Alt key; one in a name, e.g. has_version, is doubled to stay
+		undo.setText(undone.map(name -> "_Undo " + name.replace("_", "__")).orElse("_Undo"));
+		redo.setText(history.redoName().map(name -> "_Redo " + name.replace("_", "__")).orElse("_Redo"));
 	}
 
 	/**
@@ -533,10 +534,10 @@ public class CrateEditor extends Application {
 				stage.getScene().focusOwnerProperty());
 		record Command(String label, String id, KeyCode key, Consumer<TextInputControl> action) {
 		}
-		for (Command command : List.of(new Command("Cut", "menuCut", KeyCode.X, TextInputControl::cut),
-				new Command("Copy", "menuCopy", KeyCode.C, TextInputControl::copy),
-				new Command("Paste", "menuPaste", KeyCode.V, TextInputControl::paste),
-				new Command("Select All", "menuSelectAll", KeyCode.A, TextInputControl::selectAll))) {
+		for (Command command : List.of(new Command("Cu_t", "menuCut", KeyCode.X, TextInputControl::cut),
+				new Command("_Copy", "menuCopy", KeyCode.C, TextInputControl::copy),
+				new Command("_Paste", "menuPaste", KeyCode.V, TextInputControl::paste),
+				new Command("Select _All", "menuSelectAll", KeyCode.A, TextInputControl::selectAll))) {
 			MenuItem item = new MenuItem(command.label());
 			item.setId(command.id());
 			item.setAccelerator(new KeyCodeCombination(command.key(), KeyCombination.SHORTCUT_DOWN));
@@ -558,17 +559,17 @@ public class CrateEditor extends Application {
 	 */
 	private MenuItem sidebarItem() {
 		if (CrateFile.onMac()) {
-			MenuItem item = new MenuItem("Hide Sidebar");
+			MenuItem item = new MenuItem("Hide Side_bar");
 			item.setId("menuSidebar");
 			item.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN,
 					KeyCombination.CONTROL_DOWN));
 			item.setOnAction(e -> {
 				showSidebar(!split.getItems().contains(sidebar));
-				item.setText(split.getItems().contains(sidebar) ? "Hide Sidebar" : "Show Sidebar");
+				item.setText(split.getItems().contains(sidebar) ? "Hide Side_bar" : "Show Side_bar");
 			});
 			return item;
 		}
-		CheckMenuItem item = new CheckMenuItem("Sidebar");
+		CheckMenuItem item = new CheckMenuItem("Side_bar");
 		item.setId("menuSidebar");
 		item.setSelected(true);
 		item.selectedProperty().addListener((obs, old, show) -> showSidebar(show));
@@ -617,7 +618,8 @@ public class CrateEditor extends Application {
 	 */
 	private static <C extends Theme.Choice> Menu choices(String name, C[] choices, C selected, Consumer<C> chosen) {
 		ToggleGroup group = new ToggleGroup();
-		Menu menu = new Menu(name);
+		// With its first letter for the Alt key
+		Menu menu = new Menu("_" + name);
 		menu.setId("menu" + name);
 		for (C choice : choices) {
 			RadioMenuItem item = new RadioMenuItem(choice.label());

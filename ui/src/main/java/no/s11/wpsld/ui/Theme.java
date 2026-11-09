@@ -51,18 +51,19 @@ final class Theme {
 	interface Choice {
 		String id();
 
+		/** As in the menu, with _ before the letter for the Alt key */
 		String label();
 	}
 
 	enum Style implements Choice {
 		/** Modena, and in Dark the colours of Visual Studio Code */
-		CLASSIC("classic", "Classic", null, "dark.css", FormLayout.LIST),
+		CLASSIC("classic", "_Classic", null, "dark.css", FormLayout.LIST),
 		/** As Windows 11's Fluent design: rounded, light controls on cards */
-		WIN11("win11", "Windows 11", "win11.css", "win11-dark.css", FormLayout.LIST),
+		WIN11("win11", "_Windows 11", "win11.css", "win11-dark.css", FormLayout.LIST),
 		/** As macOS 14-15: rounded white controls, System Settings' groups */
-		MACOS("macos", "macOS", "macos.css", "macos-dark.css", FormLayout.MAC),
+		MACOS("macos", "_macOS", "macos.css", "macos-dark.css", FormLayout.MAC),
 		/** As OS/2 Warp 4: grey, bevelled, and the form as a notebook */
-		WARP("warp", "OS/2 Warp", "warp.css", "warp-dark.css", FormLayout.NOTEBOOK);
+		WARP("warp", "OS/2 Wa_rp", "warp.css", "warp-dark.css", FormLayout.NOTEBOOK);
 
 		private final String id;
 		private final String label;
@@ -103,10 +104,10 @@ final class Theme {
 	}
 
 	enum Colours implements Choice {
-		LIGHT("light", "Light"),
-		DARK("dark", "Dark"),
+		LIGHT("light", "_Light"),
+		DARK("dark", "_Dark"),
 		/** Light or Dark, as the operating system's colour scheme */
-		SYSTEM("system", "Same as System");
+		SYSTEM("system", "Same as _System");
 
 		private final String id;
 		private final String label;
