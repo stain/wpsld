@@ -31,7 +31,12 @@ import org.testfx.util.WaitForAsyncUtils;
 import javafx.scene.Node;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Hyperlink;
+import javafx.scene.control.Button;
+import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.Label;
+import javafx.scene.control.SplitPane;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.MenuBar;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
@@ -106,7 +111,7 @@ public class TestCrateEditor extends ApplicationTest {
 		// The person is shown; give it the download's @id
 		renameTo(download.getId());
 		// Asked once to merge, even as the dialog takes the focus
-		clickOn("OK");
+		clickOn("Merge");
 		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
 		assertEquals(List.of(download), entities().getItems().subList(1, entities().getItems().size()));
 		assertEquals(List.of("DataDownload", "Person"), download.getTypes());
@@ -124,7 +129,7 @@ public class TestCrateEditor extends ApplicationTest {
 	}
 
 	@Test
-	public void newCrateAsksToDiscardChanges() {
+	public void newCrateAsksToSaveChanges() {
 		entities();
 		// Nothing changed yet: a new crate at once (with its shortcut, as
 		// moving the mouse over the menu bar may open another menu)
@@ -134,12 +139,12 @@ public class TestCrateEditor extends ApplicationTest {
 		Entity root = entities().getItems().get(0);
 
 		push(KeyCode.SHORTCUT, KeyCode.N);
-		assertTrue(lookup("Discard the changes to this crate?").tryQuery().isPresent());
+		assertTrue(lookup("Do you want to save the changes to Untitled?").tryQuery().isPresent());
 		clickOn("Cancel");
 		assertEquals(2, entities().getItems().size());
 
 		push(KeyCode.SHORTCUT, KeyCode.N);
-		clickOn("Discard");
+		clickOn("Don't Save");
 		assertEquals(1, entities().getItems().size());
 		assertNotSame(root, entities().getItems().get(0));
 		assertEquals(entities().getItems().get(0), entities().getSelectionModel().getSelectedItem());
@@ -168,7 +173,8 @@ public class TestCrateEditor extends ApplicationTest {
 		assertEquals(List.of("./", "#alice"), entities().getItems().stream().map(Entity::getId).toList());
 		assertEquals(entities().getItems().get(0), entities().getSelectionModel().getSelectedItem());
 		assertEquals("RO-Crate Machine Actionable Profile 0.1.0", profiles.getValue().getName());
-		assertEquals("wpsld – " + dir.resolve("ro-crate-metadata.json"), stage.getTitle());
+		assertEquals(title(dir.getFileName() + java.io.File.separator + "ro-crate-metadata.json", false),
+				stage.getTitle());
 		// Written with its own version, and nothing to discard yet
 		assertTrue(lookup("#preview").queryTextInputControl().getText().contains("https://w3id.org/ro/crate/1.2/context"));
 		push(KeyCode.SHORTCUT, KeyCode.N);
@@ -233,7 +239,7 @@ public class TestCrateEditor extends ApplicationTest {
 		addEntity("person");
 		Entity download = entities().getItems().get(1);
 		renameTo(download.getId());
-		clickOn("OK");
+		clickOn("Merge");
 		assertEquals(2, entities().getItems().size());
 
 		leaveField();
@@ -254,9 +260,132 @@ public class TestCrateEditor extends ApplicationTest {
 		assertEquals(List.of("DataDownload", "Person"), entities().getItems().get(1).getTypes());
 
 		push(KeyCode.SHORTCUT, KeyCode.N);
-		clickOn("Discard");
+		clickOn("Don't Save");
 		push(KeyCode.SHORTCUT, KeyCode.Z);
 		assertEquals(1, entities().getItems().size());
+	}
+
+	/** The window's title for this file name, as on this operating system */
+	private static String title(String name, boolean modified) {
+		return CrateFile.onMac() ? name + (modified ? " — Edited" : "") : (modified ? "*" : "") + name + " – wpsld";
+	}
+
+	/** A crate in a new folder, opened */
+	private Path openNewCrate() throws Exception {
+		entities();
+		Path dir = Files.createTempDirectory("crate");
+		Path file = dir.resolve("ro-crate-metadata.json");
+		Files.writeString(file, """
+				{"@context": "https://w3id.org/ro/crate/1.3/context",
+				 "@graph": [
+				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.3"}},
+				  {"@id": "./", "@type": "Dataset", "name": "A crate", "description": "For testing",
+				   "datePublished": "2026-11-09", "license": {"@id": "https://spdx.org/licenses/CC0-1.0"}}
+				 ]}""");
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir)).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		return file;
+	}
+
+	/**
+	 * File > Save writes to the file opened, without asking where; the
+	 * title shows unsaved changes until then.
+	 */
+	@Test
+	public void saveToOpenedFile() throws Exception {
+		Path file = openNewCrate();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		String name = file.getParent().getFileName() + java.io.File.separator + "ro-crate-metadata.json";
+		assertEquals(title(name, false), stage.getTitle());
+		addEntity("person");
+		assertEquals(title(name, true), stage.getTitle());
+
+		push(KeyCode.SHORTCUT, KeyCode.S);
+		WaitForAsyncUtils.waitForFxEvents();
+		// The person has no name, which the core profile doesn't require
+		if (lookup("Save Anyway").tryQuery().isPresent()) {
+			clickOn("Save Anyway");
+		}
+		assertTrue(Files.readString(file).contains("Person"));
+		assertEquals(title(name, false), stage.getTitle());
+		// Saved: nothing to ask about
+		push(KeyCode.SHORTCUT, KeyCode.N);
+		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
+	}
+
+	/**
+	 * Closing (here File > New) with unsaved changes: Save saves them first.
+	 */
+	@Test
+	public void saveWhenAsked() throws Exception {
+		Path file = openNewCrate();
+		addEntity("person");
+		push(KeyCode.SHORTCUT, KeyCode.N);
+		// The dialog's, not the toolbar's Save
+		clickOn(lookup(".dialog-pane .button").match((Button b) -> b.getText().equals("Save")).queryButton());
+		WaitForAsyncUtils.waitForFxEvents();
+		if (lookup("Save Anyway").tryQuery().isPresent()) {
+			clickOn("Save Anyway");
+		}
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(Files.readString(file).contains("Person"));
+		assertEquals(1, entities().getItems().size());
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertEquals(title(CrateFile.UNTITLED, false), stage.getTitle());
+	}
+
+	/**
+	 * A text field pastes once, also with Edit > Paste's shortcut; and the
+	 * menu's text commands are only enabled in a text field.
+	 */
+	@Test
+	public void textEditing() {
+		entities();
+		MenuItem paste = menuItem("menuPaste");
+		clickOn("#entities");
+		assertTrue(paste.isDisable());
+		TextField name = lookup("#value-name-0").queryAs(TextField.class);
+		clickOn(name).write("abc");
+		assertFalse(paste.isDisable());
+		push(KeyCode.SHORTCUT, KeyCode.A);
+		push(KeyCode.SHORTCUT, KeyCode.C);
+		push(KeyCode.END);
+		push(KeyCode.SHORTCUT, KeyCode.V);
+		assertEquals("abcabc", name.getText());
+		// From the menu
+		interact(paste::fire);
+		assertEquals("abcabcabc", name.getText());
+	}
+
+	/** View > Sidebar hides the entities, and shows them again */
+	@Test
+	public void sidebar() {
+		entities();
+		SplitPane split = lookup(".split-pane").queryAs(SplitPane.class);
+		assertEquals(3, split.getItems().size());
+		MenuItem sidebar = menuItem("menuSidebar");
+		// As choosing it: a checked item on Windows and Linux, Hide/Show Sidebar on macOS
+		Runnable choose = () -> {
+			if (sidebar instanceof CheckMenuItem check) {
+				check.setSelected(!check.isSelected());
+			} else {
+				sidebar.fire();
+			}
+		};
+		interact(choose);
+		assertEquals(2, split.getItems().size());
+		assertTrue(lookup("#entities").tryQuery().isEmpty());
+		interact(choose);
+		assertEquals(3, split.getItems().size());
+		assertTrue(lookup("#entities").tryQuery().isPresent());
+	}
+
+	private MenuItem menuItem(String id) {
+		MenuBar bar = lookup("#menuBar").queryAs(MenuBar.class);
+		return bar.getMenus().stream().flatMap(m -> m.getItems().stream()).filter(i -> id.equals(i.getId()))
+				.findFirst().orElseThrow();
 	}
 
 	/** Properties of the form's visible rows */

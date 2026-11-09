@@ -93,7 +93,7 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   from the field. Suggestions only list entities fitting the field's range
   (or subclasses), with name and type, filtered while typing. Next: open the
   new entity for editing, show the linked entity's name in the field.
-- **Save** *(done)*: "Save RO-Crate Metadata File…" (default
+- **Save** *(done)*: File > Save, and Save As… (default
   `ro-crate-metadata.json`), after `CrateChecks` of the root's required
   properties and of references to local `@id`s not in the crate, with "Save
   anyway". Proper validation will come from MASP rules in Java (no Python).
@@ -228,9 +228,16 @@ profiles".
 
 A File menu and an Edit menu above the toolbar, which keeps its buttons:
 
-- File > New RO-Crate (Ctrl+N), and File > Open RO-Crate Metadata File… (Ctrl+O) for an
-  `ro-crate-metadata.json`. Both ask before discarding changes that aren't
-  saved.
+- File > New RO-Crate (Ctrl+N), and File > Open… (Ctrl+O) for an
+  `ro-crate-metadata.json`. Both, and closing the window, ask whether to
+  save unsaved changes: Save, Don't Save or Cancel.
+- File > Save (Ctrl+S) writes to the file opened or last saved, asking
+  where only for a new crate; Save As… (Shift+Ctrl+S) asks. Both first
+  check the RO-Crate requirements, offering Save Anyway. File > Close
+  Window (Ctrl+W).
+- The window's title names the file (`CrateFile`): its folder and name, or
+  Untitled, as the operating system has it: "name — Edited" while unsaved
+  on macOS, "*name – wpsld" elsewhere.
 - Opening a crate shows the reader's warnings beside it. A crate it can't
   read gives an error, and the current crate stays.
 - An opened crate is saved with its own `@context` and metadata descriptor,
@@ -238,8 +245,11 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
 - The root's `conformsTo` (or, as in 1.1, the descriptor's) chooses the
   profile. A profile that isn't offered yet is loaded. Without one, the core
   RO-Crate profile is used.
-- File > Save RO-Crate Metadata File… (Ctrl+S), Load Profile…, Exit (Ctrl+Q).
-- Edit > Undo (Ctrl+Z) and Redo (Ctrl+Shift+Z, Ctrl+Y), through undo points
+- File > Load Profile…, Exit (Ctrl+Q).
+- Edit > Cut, Copy, Paste and Select All, for the text field being edited
+  (disabled elsewhere; the field handles their shortcuts itself).
+- Edit > Undo (Ctrl+Z) and Redo (Ctrl+Shift+Z, and Ctrl+Y but not on
+  macOS, where Command-Y is not Redo), through undo points
   (`UndoHistory`):
   - A point is the crate's JSON-LD as a string, made after leaving a field,
     after adding (with the type chosen) or removing an entity or value, after
@@ -255,13 +265,15 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
   offered profiles. The core RO-Crate profile and schema.org aren't written,
   as they are RO-Crate itself. Undo and redo choose the profile the crate
   then conforms to.
-- Closing the window, or File > Exit, asks before discarding changes.
 - Edit > Preferences… (Ctrl+,).
 - Help > About wpsld…: version (from the build, `about.properties`), the
   source's address, the Java and JavaFX versions, the licence and the
   third-party notices (`ui/src/notices/THIRD-PARTY-NOTICES.txt`, for the
   built application: the build copies it and LICENSE.txt into the resources
   and into every zip). Update the notices when a dependency changes.
+- View > Sidebar shows or hides the entity list: a checked item, or on
+  macOS Hide Sidebar / Show Sidebar (Control-Command-S), as Apple's
+  guidelines have it.
 - View > Style and View > Colours, kept in `settings.json` (`Theme`):
   - Styles: Classic (JavaFX's Modena), Windows 11 (Modena reshaped after
     Fluent, `win11.css`: Mica window, cards, 4 px corners, accent line under
@@ -303,6 +315,43 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
 
 Next: opening zipped crates and crates from a URL (with `CrateRetriever`),
 and recent files (in the state folder).
+
+Next, from Apple's Human Interface Guidelines (most also good elsewhere):
+on macOS the app menu (About, Settings…, Quit; needs e.g. NSMenuFX, as
+JavaFX makes its own), a Window menu, a Settings window with panes instead
+of the modal Preferences; undo items naming what they undo ("Undo Add
+Type"); the system's accent colour in the Windows 11 and macOS styles; View
+> Profile, as every toolbar item should be a command; and for the macOS
+style's form, − and + at the end of each value row, ⓘ popovers for
+descriptions (keeping ? for help), dividers between rows, "Required" as
+placeholder, and a search field look.
+
+### Entities
+
+- **Copy and paste entities.** Edit > Duplicate within a crate is easy.
+  Across open crates it is trickier, as an entity refers to others: a
+  shallow copy (references left as they are, possibly dangling) or a deep
+  copy (the entities it refers to too), matching those the other crate
+  already has (same `@id`, or same identifier) rather than duplicating
+  them.
+- **A type selector above the entity list**, showing only entities of the
+  chosen type, its subtypes included (e.g. Organization also shows
+  ResearchOrganization). Only types the crate's entities have are offered.
+  Tabs in the OS/2 Warp style, a drop-down in the others.
+
+### To debug: a large workflow run crate
+
+The crate of https://doi.org/10.5281/zenodo.18934348 (a COMPSs workflow
+run) loads, but shows what to work on:
+- **Markdown**: its descriptions are Markdown, shown as plain text. Detect
+  it (e.g. `encodingFormat` `text/markdown`, or the text's own syntax) and
+  render it in the preview.
+- **Browsing its files**: with many data entities, the flat entity list is
+  not enough; needs other ways to navigate, e.g. by folder (`hasPart`), by
+  type (see the type selector above), or by search.
+- **A hang or slowness** when following Orchestration of `#Task_1636` to
+  the Run of "COMPSs runtime version 3.4": find out where the time goes
+  (preview, form building, or reference lookups across many entities).
 
 ### Start-up
 
