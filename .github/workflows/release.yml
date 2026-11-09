@@ -120,6 +120,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd dist
+          # The artifacts keep their folders under ui/build: image-zip/ and distributions/
+          mv */*.zip .
           sha256sum *.zip > SHA256SUMS
           gh release create "$GITHUB_REF_NAME" *.zip SHA256SUMS --repo "$GITHUB_REPOSITORY" \
             --draft --verify-tag --title "wpsld ${GITHUB_REF_NAME#v}" --generate-notes
