@@ -65,6 +65,21 @@ jlink {
     }
 }
 
+// The licence and the third-party notices (src/notices, which covers the
+// built application, not the source), in every zip and in the About box
+def notices = files(rootProject.file('LICENSE.txt'), 'src/notices/THIRD-PARTY-NOTICES.txt')
+
+tasks.named('processResources') {
+    from(notices) {
+        into 'no/s11/wpsld/ui'
+    }
+    // The version for the About box
+    inputs.property('version', version.toString())
+    filesMatching('**/about.properties') {
+        expand(version: version.toString())
+    }
+}
+
 // The app image of the platform Gradle runs on, with its native launcher
 // (wpsld.exe, wpsld.app or bin/wpsld), zipped as
 // build/image-zip/wpsld-<version>-<platform>.zip, e.g. -Pplatform=linux-x64
@@ -73,6 +88,10 @@ if (!crossTargets && project.hasProperty('platform')) {
     tasks.register('appImageZip', Zip) {
         dependsOn tasks.named('jpackageImage')
         from(layout.buildDirectory.dir('jpackage'))
+        // Beside wpsld.app on macOS, else in the wpsld folder
+        from(notices) {
+            into(isMac ? '' : 'wpsld')
+        }
         archiveFileName = "wpsld-${version}-${findProperty('platform')}.zip"
         destinationDirectory = layout.buildDirectory.dir('image-zip')
         useFileSystemPermissions()
@@ -89,6 +108,7 @@ crossTargets.keySet().each { target ->
             // jlink writes both launchers for every platform; keep only this one's
             exclude(target.startsWith('windows') ? 'bin/wpsld' : 'bin/*.bat')
         }
+        from(notices)
         into("wpsld-${target}")
         archiveFileName = "wpsld-${target}.zip"
         destinationDirectory = layout.buildDirectory.dir('image-zip')
@@ -144,6 +164,7 @@ distributions {
     main {
         contents {
             exclude 'javafx-*.jar'
+            from(notices)
         }
     }
 }

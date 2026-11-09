@@ -51,3 +51,8 @@
     -fx-border-radius: 3;
     -fx-padding: 2 4 2 6;
 }
+
+/* Room around a dialog's content, which Modena gives almost none */
+.dialog-pane > .content {
+    -fx-padding: 8 12 8 12;
+}

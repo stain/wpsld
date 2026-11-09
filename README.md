@@ -116,4 +116,16 @@ comes from [`gradle.properties`](gradle.properties).
 
 ## Licence
 
-[Apache License 2.0](LICENSE.txt)
+The source code in this repository is under the
+[Apache License 2.0](LICENSE.txt).
+
+The built application also includes third-party software: Jackson, Ikonli,
+and Microsoft's Fluent UI System Icons, plus a Java runtime and JavaFX in
+the zips for a platform. Their licences and notices are in
+[`ui/src/notices/THIRD-PARTY-NOTICES.txt`](ui/src/notices/THIRD-PARTY-NOTICES.txt),
+which the build puts in every zip and which Help > About wpsld shows. That
+file covers the built application, not the source in this repository.
+
+OS/2 and Warp are trademarks of IBM, and Windows and Segoe are trademarks of
+Microsoft. wpsld is not affiliated with either; its "OS/2 Warp" and
+"Windows 11" styles only resemble their looks.

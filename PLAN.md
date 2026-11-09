@@ -257,6 +257,11 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
   then conforms to.
 - Closing the window, or File > Exit, asks before discarding changes.
 - Edit > Preferences… (Ctrl+,).
+- Help > About wpsld…: version (from the build, `about.properties`), the
+  source's address, the Java and JavaFX versions, the licence and the
+  third-party notices (`ui/src/notices/THIRD-PARTY-NOTICES.txt`, for the
+  built application: the build copies it and LICENSE.txt into the resources
+  and into every zip). Update the notices when a dependency changes.
 - View > Style and View > Colours, kept in `settings.json` (`Theme`):
   - Styles: Classic (JavaFX's Modena), Windows 11 (Modena reshaped after
     Fluent, `win11.css`: Mica window, cards, 4 px corners, accent line under

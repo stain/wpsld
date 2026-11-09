@@ -406,7 +406,7 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * The File, Edit and View menus.
+	 * The File, Edit, View and Help menus.
 	 */
 	private MenuBar menus(Stage stage) {
 		MenuItem newCrate = new MenuItem("New RO-Crate");
@@ -452,7 +452,13 @@ public class CrateEditor extends Application {
 		Menu view = new Menu("View", null, styles(stage), colours(stage));
 		view.setId("menuView");
 
-		MenuBar bar = new MenuBar(file, edit, view);
+		MenuItem about = new MenuItem("About wpsld…");
+		about.setId("menuAbout");
+		about.setOnAction(e -> new AboutDialog(stage, address -> getHostServices().showDocument(address)).show());
+		Menu help = new Menu("Help", null, about);
+		help.setId("menuHelp");
+
+		MenuBar bar = new MenuBar(file, edit, view, help);
 		bar.setId("menuBar");
 		return bar;
 	}
