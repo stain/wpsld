@@ -50,6 +50,7 @@ import javafx.scene.control.MenuBar;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.skin.VirtualFlow;
 import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
 import no.s11.wpsld.crate.Entity;
@@ -1004,12 +1005,32 @@ public class TestCrateEditor extends ApplicationTest {
 	 * list's cells, which made the list flicker.
 	 */
 	@Test
-	public void listUpdatesInPlace() {
-		entities();
-		ListCell<?> cell = from(entities()).lookup(".list-cell").queryAs(ListCell.class);
+	public void listUpdatesInPlace() throws Exception {
+		ListView<Entity> list = entities();
+		boolean[] itemChanged = { false };
+		ListCell<?> cell = WaitForAsyncUtils.asyncFx(() -> {
+			list.getScene().getRoot().applyCss();
+			list.getScene().getRoot().layout();
+			VirtualFlow<?> flow = (VirtualFlow<?>) list.lookup(".virtual-flow");
+			assertNotNull(flow);
+			ListCell<?> rootCell = (ListCell<?>) flow.getVisibleCell(0);
+			assertNotNull(rootCell);
+			assertSame(list.getItems().get(0), rootCell.getItem());
+			assertFalse(rootCell.isEmpty());
+			// A list refresh can reuse the cell but briefly clear its item.
+			rootCell.itemProperty().addListener((obs, old, current) -> itemChanged[0] = true);
+			return rootCell;
+		}).get();
 		clickOn("#header-name").write("My crate");
-		ListCell<?> after = from(entities()).lookup(".list-cell").queryAs(ListCell.class);
-		assertSame(cell, after);
-		assertTrue(after.getText().startsWith("My crate\n"));
+		WaitForAsyncUtils.asyncFx(() -> {
+			list.getScene().getRoot().layout();
+			VirtualFlow<?> flow = (VirtualFlow<?>) list.lookup(".virtual-flow");
+			assertNotNull(flow);
+			ListCell<?> after = (ListCell<?>) flow.getVisibleCell(0);
+			assertSame(cell, after);
+			assertSame(list.getItems().get(0), after.getItem());
+			assertFalse("Root cell's item changed while typing", itemChanged[0]);
+			assertTrue(after.getText().startsWith("My crate\n"));
+		}).get();
 	}
 }
