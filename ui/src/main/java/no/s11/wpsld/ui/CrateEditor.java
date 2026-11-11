@@ -491,7 +491,7 @@ public class CrateEditor extends Application {
 		// What they would undo and redo, e.g. Undo Add Person, as the menu opens
 		edit.setOnShowing(e -> nameUndo(stage, undo, redo));
 		edit.getItems().addAll(textEditing(stage));
-		MenuItem repair = new MenuItem("Re_pair Crate");
+		MenuItem repair = new MenuItem("Repa_ir Crate");
 		repair.setId("menuRepair");
 		repair.setOnAction(e -> repair(stage));
 		edit.getItems().addAll(new SeparatorMenuItem(), repair, new SeparatorMenuItem(), preferences);
