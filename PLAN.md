@@ -473,11 +473,16 @@ Styles:
   (and the list's own menu) puts the selected entity on the clipboard as
   its JSON-LD, both as text (for text editors) and as
   `application/x-wpsld-entity+json`, so wpsld's own fields know it is an
-  entity: reference fields paste its `@id`, other fields nothing. Paste in
-  the list adds it, keeping its `@id` unless the crate has one with it,
-  mentioned by the root. Next: several entities, and what to do with the
-  entities they refer to, as below; check on Windows and macOS that the
-  entity format reaches another wpsld window.
+  entity: reference fields paste its `@id`, other fields nothing; and as
+  `application/ld+json`, a document of the crate's `@context` and a
+  `@graph` of the entity. Paste in the list adds it (also from such a
+  document of one entity), keeping its `@id` unless the crate has one
+  with it, mentioned by the root. Next: when pasting a document whose
+  `@context` differs from the crate's (another RO-Crate version, extra
+  terms), expand its terms with its own context and compact them with the
+  crate's, adding terms the crate's context lacks; several entities, and
+  what to do with the entities they refer to, as below; check on Windows
+  and macOS that the entity formats reach another wpsld window.
   Edit > Duplicate within a crate is easy.
   Across open crates it is trickier, as an entity refers to others: a
   shallow copy (references left as they are, possibly dangling) or a deep

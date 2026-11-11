@@ -30,6 +30,7 @@ import org.junit.Test;
 import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
@@ -437,6 +438,12 @@ public class TestCrateEditor extends ApplicationTest {
 		// Also as an entity, which wpsld's text fields don't take as text
 		assertEquals(copied,
 				WaitForAsyncUtils.asyncFx(() -> Clipboard.getSystemClipboard().getContent(EntityClipboard.ENTITY)).get());
+		// And as a JSON-LD document with the crate's context
+		JsonNode document = new ObjectMapper().readTree((String) WaitForAsyncUtils
+				.asyncFx(() -> Clipboard.getSystemClipboard().getContent(EntityClipboard.LD_JSON)).get());
+		assertEquals("https://w3id.org/ro/crate/1.3/context", document.get("@context").asText());
+		assertEquals(alice.toJson(), document.get("@graph").get(0));
+		assertEquals(1, document.get("@graph").size());
 
 		interact(menuItem("menuPaste")::fire);
 		assertEquals(3, entities().getItems().size());
@@ -471,6 +478,24 @@ public class TestCrateEditor extends ApplicationTest {
 		interact(menuItem("menuPaste")::fire);
 		assertEquals("https://orcid.org/0000-0001-9842-9718", entities().getItems().get(3).getId());
 
+		// A JSON-LD document of one entity, from another tool, or as text
+		String bob = "{\"@context\": \"https://w3id.org/ro/crate/1.2/context\", "
+				+ "\"@graph\": [{\"@id\": \"#bob\", \"@type\": \"Person\", \"name\": \"Bob\"}]}";
+		interact(() -> {
+			ClipboardContent ldJson = new ClipboardContent();
+			ldJson.put(EntityClipboard.LD_JSON, bob);
+			Clipboard.getSystemClipboard().setContent(ldJson);
+		});
+		interact(menuItem("menuPaste")::fire);
+		assertEquals("Bob", entities().getItems().get(4).getLabel());
+		interact(() -> {
+			ClipboardContent text = new ClipboardContent();
+			text.putString(bob.replace("#bob", "#bob-2"));
+			Clipboard.getSystemClipboard().setContent(text);
+		});
+		interact(menuItem("menuPaste")::fire);
+		assertEquals("#bob-2", entities().getItems().get(5).getId());
+
 		// Not an entity: says so, and adds nothing
 		interact(() -> {
 			ClipboardContent text = new ClipboardContent();
@@ -481,7 +506,7 @@ public class TestCrateEditor extends ApplicationTest {
 		WaitForAsyncUtils.waitForFxEvents();
 		assertTrue(lookup("No entity to paste").tryQuery().isPresent());
 		clickOn("OK");
-		assertEquals(4, entities().getItems().size());
+		assertEquals(6, entities().getItems().size());
 	}
 
 	/**

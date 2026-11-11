@@ -588,7 +588,7 @@ public class CrateEditor extends Application {
 	void copyEntity() {
 		Entity entity = entities.getSelectionModel().getSelectedItem();
 		if (entity != null) {
-			EntityClipboard.copy(entity);
+			EntityClipboard.copy(entity, crate.getContext());
 		}
 	}
 
