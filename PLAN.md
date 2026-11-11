@@ -158,6 +158,15 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
   notebook view (which has no search box).
 - **Required types** *(done)*: a notice beside "Add type…" when a profile
   requires a type the entity lacks (subtypes count), with a button to add it.
+- **Multi-line text.** Only the header's Description is a text area now;
+  every other text value is a one-line field, which drops line ends when
+  pasted into and can't show them. Give text fields a button (e.g. ⤢ at
+  their end, also Ctrl+Enter or a context menu item) that turns the field
+  into a text area of a few rows, wrapping, where Enter adds a line and
+  Tab still moves on (as Description does); and back, if it has one line.
+  A value that already has line ends opens as a text area. Useful for
+  `description`s outside the header, `text`, `abstract`, `citation` and
+  values pasted from elsewhere. Keep `EntityClipboard.guard` on it.
 - **Later:** an "External types" section in the type dialog; rows per page
   of the notebook view fitted to its height; report upstream that the core
   MASP profile's `datePublished` rule points to `schema:datePubished`.
@@ -469,26 +478,108 @@ Styles:
 
 ### Entities
 
-- **Copy and paste entities.** Started: in the entity list, Edit > Copy
-  (and the list's own menu) puts the selected entity on the clipboard as
-  its JSON-LD, both as text (for text editors) and as
+- **Copy and paste entities.** Done for one entity: in the entity list,
+  Edit > Copy (and the list's own menu) puts the selected entity on the
+  clipboard as its JSON-LD, both as text (for text editors) and as
   `application/x-wpsld-entity+json`, so wpsld's own fields know it is an
   entity: reference fields paste its `@id`, other fields nothing; and as
   `application/ld+json`, a document of the crate's `@context` and a
   `@graph` of the entity. Paste in the list adds it (also from such a
   document of one entity), keeping its `@id` unless the crate has one
-  with it, mentioned by the root. Next: when pasting a document whose
-  `@context` differs from the crate's (another RO-Crate version, extra
-  terms), expand its terms with its own context and compact them with the
-  crate's, adding terms the crate's context lacks; several entities, and
-  what to do with the entities they refer to, as below; check on Windows
-  and macOS that the entity formats reach another wpsld window.
-  Edit > Duplicate within a crate is easy.
-  Across open crates it is trickier, as an entity refers to others: a
-  shallow copy (references left as they are, possibly dangling) or a deep
-  copy (the entities it refers to too), matching those the other crate
-  already has (same `@id`, or same identifier) rather than duplicating
-  them.
+  with it, mentioned by the root. Next, in this order:
+  1. **Several entities.** Select several in the entity list (multiple
+     selection); Copy puts them all in one `@graph`; Paste adds them all
+     and selects them. A shallow copy: references to entities outside the
+     copied set stay as they are. Pasting a reference field still takes a
+     single entity's `@id`; with several on the clipboard, nothing (or one
+     row each, if wanted).
+     - **Which crate it came from.** Each crate has an `arcp://uuid,<uuid>/`
+       base (RO-Crate's scheme for crates without a location). The
+       `application/ld+json` document gets it as `@base` in its
+       `@context` (`[<crate context>, {"@base": "arcp://uuid,…/"}]`), so
+       other JSON-LD tools expanding it keep `#uom` of one crate apart from
+       `#uom` of another. The wpsld format wraps the same document:
+       `{"crate": "arcp://uuid,…/", "copied": [ids], "referenced":
+       [entities], "document": {…}}`. A document without `@base`, or text,
+       counts as from another crate (the safe default).
+     - **Assigning the UUID**: random per opened crate, kept in
+       `CrateFile` and not in the crate. File > New and Open: a new one.
+       Save As…: a new one, as the copy is a different crate from then on
+       (entities copied before still count as from the original: harmless,
+       as the rules below are safe either way). Reload after a change on
+       disk keeps it. Each window is its own process now, so two windows
+       with the same file have different UUIDs, and pasting between them
+       is as between crates (renaming `#` ids that are taken). Later, when
+       one wpsld process has several crates open: windows of the same file
+       share it, and perhaps a UUID derived from the file (e.g. a
+       name-based UUID of its path, as `arcp://name,…`; moving or copying
+       the folder changes it). Relates to watching the file for changes
+       (under Menus). A crate whose root `@id` is absolute (published)
+       could use that as its base instead.
+     - **`@id`s when pasting**, into the same crate or another: absolute
+       ones (`https:`, `mailto:`, `urn:`, `arcp:`) name the same entity in
+       any crate, so are kept; if the crate has it already, offer to merge
+       (the dialogue of renaming to an existing `@id`) rather than add a
+       copy. `#local` ones are kept if free and get a new one if taken (a
+       copy within one crate; another crate's `#uom` may be another
+       organisation). `_:` blank nodes always get a new `#` id. Relative
+       paths (data entities) are kept if free; if taken, they name this
+       crate's file, so offer to merge as for absolute ones, never a `#`
+       id. References among the pasted entities follow a new `@id` (not
+       those of the crate's own entities).
+     - **Referenced entities that weren't selected**: the wpsld format
+       carries them one level deep (`referenced`), but not the
+       `application/ld+json` document, which would be an incomplete deep
+       copy (they may refer to others again). Paste keeps the references
+       and asks nothing; using the carried copies, it reports those that
+       may be wrong. Same `@id` in the crate: linked; in another crate a
+       local `#` one whose entity differs from the carried copy is
+       ambiguous (it may be another organisation of the same `#uom`), so
+       linked and reported (an absolute one is the same entity, a question
+       of merging, not ambiguity). Not in the crate: dangling, kept and
+       reported (Edit > Repair Crate would make it a Thing). Within one
+       crate, the usual case, nothing is reported.
+  2. **Paste options and Paste Special…** Powerful even without a deep
+     copy.
+     - **A notice after Paste**, when it reported anything, as the
+       reader's warnings beside the list: "Pasted 2 entities. 1 reference
+       to an entity not copied: `#uom` (missing here). [Add it]
+       [Paste Special…]", like Office's paste options. A button undoes the
+       paste and pastes again with that option, one undo step in all. A
+       plain warning to start with.
+     - **Edit > Paste Special…** (Ctrl+Alt+V, as in Excel; ⌥⇧⌘V on macOS)
+       opens a dialogue that lists what is on the clipboard (copied, and
+       only referenced) and offers:
+       - References to entities not copied: *keep as they are* (default),
+         *add them* (the carried copies, one level, `#` ids renamed if
+         taken, their own references kept as they are), *remove these
+         references*; later *add all* (deep copy, step 5).
+       - Pasted entities whose `@id` the crate has: *ask for each* (the
+         merge dialogue), *merge all*, *keep the existing ones*, *paste as
+         copies with new `@id`s* (which Edit > Duplicate is, step 6).
+       - Later, how to treat the `@context` (step 4).
+     - Enabled whenever Paste is, in the entity list.
+  3. **Merge Entities**: select two or more entities in the list and merge
+     them with the dialogue of renaming to an existing `@id` (`Crate.merge`,
+     one undo step), choosing which `@id` stays. For duplicates found
+     later, e.g. a pasted person who was already there under another `@id`.
+  4. **Context merging.** When the pasted document's `@context` differs
+     from the crate's (another RO-Crate version, e.g. Bioschemas IRIs of
+     1.2 against 1.3, or extra terms such as `ldac:` or a custom `@vocab`),
+     expand its terms with its own context (see `JsonLdContext`, which
+     reads contexts without fetching) and compact them with the crate's,
+     adding to the crate's context the terms it lacks. On the whole
+     `@graph` at once, so it builds on several entities.
+  5. **Deep copy**: optionally the entities the copied ones refer to as
+     well, all the way, matching those the other crate already has (same
+     `@id`, or same identifier) rather than duplicating them; offering to
+     merge where they differ.
+  6. Edit > Duplicate within a crate, which is easy on top of these: Paste
+     Special's *paste as copies with new `@id`s*, so unlike Paste every copy
+     gets a new `#` id, absolute ones too (a template for "another person
+     like this").
+  7. Check on Windows and macOS that the entity formats reach another
+     wpsld window.
 - **An SPDX licence selector** for `license`: search the SPDX License
   List by identifier or name (e.g. "Apache", "CC-BY"), adding the licence
   as a contextual entity `{"@id": "http://spdx.org/licenses/Apache-2.0",
