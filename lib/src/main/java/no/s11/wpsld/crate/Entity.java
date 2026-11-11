@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -117,6 +118,30 @@ public class Entity {
 	 */
 	public String getLabel() {
 		return get("name").filter(JsonNode::isTextual).map(JsonNode::asText).filter(n -> !n.isBlank()).orElse(id);
+	}
+
+	/**
+	 * An entity from a node of a flattened JSON-LD <code>@graph</code>, as
+	 * {@link #toJson()} writes it, e.g. copied to the clipboard: a Thing if
+	 * it has no string <code>@type</code>; other <code>@</code> keys and
+	 * null values are left out. None if it is not an object with an
+	 * <code>@id</code>.
+	 */
+	public static Optional<Entity> fromJson(JsonNode json) {
+		JsonNode id = json.path("@id");
+		if (!json.isObject() || !id.isTextual() || id.asText().isBlank()) {
+			return Optional.empty();
+		}
+		JsonNode type = json.path("@type");
+		List<String> types = (type.isArray() ? StreamSupport.stream(type.spliterator(), false) : Stream.of(type))
+				.filter(JsonNode::isTextual).map(JsonNode::asText).toList();
+		Entity entity = new Entity(id.asText(), types.isEmpty() ? new String[] { "Thing" } : types.toArray(String[]::new));
+		json.properties().stream().filter(p -> !p.getKey().startsWith("@")).forEach(p -> {
+			JsonNode value = p.getValue();
+			entity.setAll(p.getKey(), (value.isArray() ? StreamSupport.stream(value.spliterator(), false)
+					: Stream.of(value)).filter(v -> !v.isNull()).toList());
+		});
+		return Optional.of(entity);
 	}
 
 	/**

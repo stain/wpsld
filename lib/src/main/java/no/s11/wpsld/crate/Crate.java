@@ -131,15 +131,36 @@ public class Crate {
 	 * Add an entity with a new local identifier like <code>#person-1</code>.
 	 */
 	public Entity add(String type) {
-		// e.g. #person-1, or #ldac-speaker-1 for ldac:Speaker
+		Entity entity = new Entity(newId(type), type);
+		entities.add(entity);
+		return entity;
+	}
+
+	/**
+	 * Add a copy of an entity, e.g. pasted from the clipboard, with its own
+	 * <code>@id</code>; or if another entity already has that, a new local
+	 * identifier as for {@link #add(String)} of its first type.
+	 */
+	public Entity paste(Entity copy) {
+		Entity entity = new Entity(get(copy.getId()).isPresent() ? newId(copy.getTypes().get(0)) : copy.getId(),
+				copy.getTypes().toArray(String[]::new));
+		copy.getValues().forEach((property, value) -> entity.set(property, Optional.of(value.deepCopy())));
+		entities.add(entity);
+		return entity;
+	}
+
+	/**
+	 * A new local identifier for an entity of this type, e.g.
+	 * <code>#person-1</code>, or <code>#ldac-speaker-1</code> for
+	 * <code>ldac:Speaker</code>.
+	 */
+	private String newId(String type) {
 		String prefix = "#" + type.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-") + "-";
 		int n = 1;
 		while (get(prefix + n).isPresent()) {
 			n++;
 		}
-		Entity entity = new Entity(prefix + n, type);
-		entities.add(entity);
-		return entity;
+		return prefix + n;
 	}
 
 	/**

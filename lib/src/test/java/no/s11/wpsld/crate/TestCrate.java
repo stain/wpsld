@@ -20,6 +20,7 @@ package no.s11.wpsld.crate;
 import static org.junit.Assert.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import java.io.InputStream;
@@ -29,6 +30,7 @@ import org.junit.Test;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class TestCrate {
 	private static final JsonNodeFactory JSON = JsonNodeFactory.instance;
@@ -147,6 +149,45 @@ public class TestCrate {
 		file.set("citation", Optional.of(ref(cited.getId())));
 		assertEquals(List.of(folder, file), crate.dataEntities());
 		assertEquals(List.of(), crate.unlinked());
+	}
+
+	@Test
+	public void pasteKeepsIdUnlessTaken() {
+		Crate crate = new Crate();
+		Entity alice = crate.add("Person");
+		alice.set("knows", Optional.of(JSON.arrayNode().add(ref("#bob"))));
+		Entity copy = crate.paste(alice);
+		assertEquals("#person-2", copy.getId());
+		assertEquals(alice.getValues(), copy.getValues());
+		// A copy of the values, not the same
+		((com.fasterxml.jackson.databind.node.ArrayNode) copy.get("knows").orElseThrow()).add(ref("#carol"));
+		assertEquals(List.of(ref("#bob")), alice.getAll("knows"));
+
+		Entity other = new Entity("https://orcid.org/0000-0001-9842-9718", "Person");
+		assertEquals("https://orcid.org/0000-0001-9842-9718", crate.paste(other).getId());
+	}
+
+	@Test
+	public void entityFromJson() {
+		Entity alice = crate("Person").get();
+		alice.set("name", Optional.of(JSON.textNode("Alice")));
+		alice.setAll("knows", List.of(ref("#bob"), ref("#carol")));
+		assertEquals(alice.toJson(), Entity.fromJson(alice.toJson()).orElseThrow().toJson());
+
+		ObjectNode json = JSON.objectNode().put("@id", "#x");
+		json.putArray("@type").add("Person").add(1);
+		json.put("@reverse", "ignored");
+		json.putNull("name");
+		Entity x = Entity.fromJson(json).orElseThrow();
+		assertEquals(List.of("Person"), x.getTypes());
+		assertEquals(Map.of(), x.getValues());
+		assertEquals(List.of("Thing"), Entity.fromJson(JSON.objectNode().put("@id", "#y")).orElseThrow().getTypes());
+		assertTrue(Entity.fromJson(JSON.objectNode().put("name", "No @id")).isEmpty());
+		assertTrue(Entity.fromJson(JSON.textNode("#z")).isEmpty());
+	}
+
+	private static Optional<Entity> crate(String type) {
+		return Optional.of(new Crate().add(type));
 	}
 
 	@Test(expected = IllegalArgumentException.class)

@@ -64,6 +64,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Separator;
@@ -376,6 +377,15 @@ public class CrateEditor extends Application {
 				entityPreview.show(entity);
 			}
 		});
+		// Copy and paste entities, as Edit > Copy and Paste do in the list
+		MenuItem copyEntity = new MenuItem("Copy");
+		copyEntity.setId("copyEntity");
+		copyEntity.disableProperty().bind(entities.getSelectionModel().selectedItemProperty().isNull());
+		copyEntity.setOnAction(e -> copyEntity());
+		MenuItem pasteEntity = new MenuItem("Paste");
+		pasteEntity.setId("pasteEntity");
+		pasteEntity.setOnAction(e -> pasteEntity(stage));
+		entities.setContextMenu(new ContextMenu(copyEntity, pasteEntity));
 
 		Button add = new Button("Add entity");
 		add.setId("addEntity");
@@ -529,32 +539,81 @@ public class CrateEditor extends Application {
 
 	/**
 	 * Edit > Cut, Copy, Paste and Select All, for the text field being edited;
-	 * disabled elsewhere. A text field handles their shortcuts itself first,
-	 * so these act when chosen from the menu.
+	 * in the entity list, Copy and Paste copy and paste entities; disabled
+	 * elsewhere. A text field handles their shortcuts itself first, so these
+	 * act when chosen from the menu.
 	 */
 	private List<MenuItem> textEditing(Stage stage) {
 		List<MenuItem> items = new ArrayList<>();
 		BooleanBinding noField = Bindings.createBooleanBinding(
 				() -> !(stage.getScene().getFocusOwner() instanceof TextInputControl),
 				stage.getScene().focusOwnerProperty());
-		record Command(String label, String id, KeyCode key, Consumer<TextInputControl> action) {
+		BooleanBinding inEntities = Bindings.createBooleanBinding(() -> stage.getScene().getFocusOwner() == entities,
+				stage.getScene().focusOwnerProperty());
+		BooleanBinding never = Bindings.createBooleanBinding(() -> false);
+		record Command(String label, String id, KeyCode key, Consumer<TextInputControl> action,
+				BooleanBinding forEntities, Runnable entityAction) {
 		}
-		for (Command command : List.of(new Command("Cu_t", "menuCut", KeyCode.X, TextInputControl::cut),
-				new Command("_Copy", "menuCopy", KeyCode.C, TextInputControl::copy),
-				new Command("_Paste", "menuPaste", KeyCode.V, TextInputControl::paste),
-				new Command("Select _All", "menuSelectAll", KeyCode.A, TextInputControl::selectAll))) {
+		for (Command command : List.of(
+				new Command("Cu_t", "menuCut", KeyCode.X, TextInputControl::cut, never, () -> {
+				}),
+				new Command("_Copy", "menuCopy", KeyCode.C, TextInputControl::copy,
+						inEntities.and(entities.getSelectionModel().selectedItemProperty().isNotNull()),
+						this::copyEntity),
+				new Command("_Paste", "menuPaste", KeyCode.V, TextInputControl::paste, inEntities,
+						() -> pasteEntity(stage)),
+				new Command("Select _All", "menuSelectAll", KeyCode.A, TextInputControl::selectAll, never, () -> {
+				}))) {
 			MenuItem item = new MenuItem(command.label());
 			item.setId(command.id());
 			item.setAccelerator(new KeyCodeCombination(command.key(), KeyCombination.SHORTCUT_DOWN));
-			item.disableProperty().bind(noField);
+			item.disableProperty().bind(noField.and(command.forEntities().not()));
 			item.setOnAction(e -> {
 				if (stage.getScene().getFocusOwner() instanceof TextInputControl field) {
 					command.action().accept(field);
+				} else if (command.forEntities().get()) {
+					command.entityAction().run();
 				}
 			});
 			items.add(item);
 		}
 		return items;
+	}
+
+	/**
+	 * Copy the entity selected in the list to the clipboard, as its JSON-LD
+	 * (see {@link EntityClipboard}), e.g. to paste it in another crate (see
+	 * {@link #pasteEntity(Stage)}), as a reference, or as text elsewhere.
+	 */
+	void copyEntity() {
+		Entity entity = entities.getSelectionModel().getSelectedItem();
+		if (entity != null) {
+			EntityClipboard.copy(entity);
+		}
+	}
+
+	/**
+	 * Paste an entity from the clipboard, as copied by {@link #copyEntity()},
+	 * or its JSON-LD as text: with its own @id unless the crate already has
+	 * one with it (see {@link Crate#paste(Entity)}), mentioned by the root
+	 * until linked otherwise, and selected.
+	 */
+	void pasteEntity(Stage stage) {
+		Optional<Entity> copy = EntityClipboard.entity();
+		if (copy.isEmpty()) {
+			Alert alert = new Alert(AlertType.WARNING,
+					"Copy an entity first: the clipboard should have its JSON-LD, an object with an @id.",
+					ButtonType.OK);
+			alert.initOwner(stage);
+			alert.setHeaderText("No entity to paste");
+			alert.showAndWait();
+			return;
+		}
+		Entity entity = crate.paste(copy.get());
+		crate.mentionUnlinked();
+		entities.getItems().add(entity);
+		entities.getSelectionModel().select(entity);
+		changed();
 	}
 
 	/**

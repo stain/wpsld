@@ -30,9 +30,12 @@ import org.junit.Test;
 import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
 import javafx.scene.Node;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.Clipboard;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Button;
@@ -413,14 +416,87 @@ public class TestCrateEditor extends ApplicationTest {
 	}
 
 	/**
+	 * Edit > Copy in the entity list copies the selected entity as JSON-LD;
+	 * Paste adds it, with a new @id as the crate has the copied one, and
+	 * mentions it.
+	 */
+	@Test
+	public void copyAndPasteEntity() throws Exception {
+		entities();
+		addEntity("person");
+		Entity root = entities().getItems().get(0);
+		Entity alice = entities().getItems().get(1);
+		interact(() -> alice.set("name", Optional.of(JsonNodeFactory.instance.textNode("Alice"))));
+		clickOn("#entities");
+		interact(() -> entities().getSelectionModel().select(alice));
+		MenuItem copy = menuItem("menuCopy");
+		assertFalse(copy.isDisable());
+		interact(copy::fire);
+		String copied = WaitForAsyncUtils.asyncFx(() -> Clipboard.getSystemClipboard().getString()).get();
+		assertEquals(alice.toJson(), new ObjectMapper().readTree(copied));
+		// Also as an entity, which wpsld's text fields don't take as text
+		assertEquals(copied,
+				WaitForAsyncUtils.asyncFx(() -> Clipboard.getSystemClipboard().getContent(EntityClipboard.ENTITY)).get());
+
+		interact(menuItem("menuPaste")::fire);
+		assertEquals(3, entities().getItems().size());
+		Entity pasted = entities().getItems().get(2);
+		// Added as #thing-1, so a new @id for the copy, from its type
+		assertEquals("#thing-1", alice.getId());
+		assertEquals("#person-1", pasted.getId());
+		assertEquals("Alice", pasted.getLabel());
+		assertEquals(pasted, entities().getSelectionModel().getSelectedItem());
+		assertTrue(root.getAll("mentions").stream().anyMatch(v -> v.get("@id").asText().equals("#person-1")));
+
+		// In the form, a reference field pastes its @id, a text field nothing
+		interact(() -> entities().getSelectionModel().select(root));
+		clickOn("#propertySearch").write("author");
+		Node author = lookup("#value-author-0").query();
+		clickOn(author);
+		push(KeyCode.SHORTCUT, KeyCode.V);
+		assertEquals("#thing-1", ((ComboBox<?>) author).getEditor().getText());
+		assertEquals(List.of(JsonNodeFactory.instance.objectNode().put("@id", "#thing-1")), root.getAll("author"));
+		TextField name = lookup("#header-name").queryAs(TextField.class);
+		clickOn(name).write("Crate");
+		push(KeyCode.SHORTCUT, KeyCode.V);
+		assertEquals("Crate", name.getText());
+
+		// JSON-LD copied as text in a text editor pastes as an entity too
+		interact(() -> {
+			ClipboardContent text = new ClipboardContent();
+			text.putString("{\"@id\": \"https://orcid.org/0000-0001-9842-9718\", \"@type\": \"Person\"}");
+			Clipboard.getSystemClipboard().setContent(text);
+		});
+		clickOn("#entities");
+		interact(menuItem("menuPaste")::fire);
+		assertEquals("https://orcid.org/0000-0001-9842-9718", entities().getItems().get(3).getId());
+
+		// Not an entity: says so, and adds nothing
+		interact(() -> {
+			ClipboardContent text = new ClipboardContent();
+			text.putString("Alice");
+			Clipboard.getSystemClipboard().setContent(text);
+		});
+		WaitForAsyncUtils.asyncFx(menuItem("menuPaste")::fire);
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup("No entity to paste").tryQuery().isPresent());
+		clickOn("OK");
+		assertEquals(4, entities().getItems().size());
+	}
+
+	/**
 	 * A text field pastes once, also with Edit > Paste's shortcut; and the
-	 * menu's text commands are only enabled in a text field.
+	 * menu's text commands are only enabled in a text field, except Copy and
+	 * Paste of entities in the entity list.
 	 */
 	@Test
 	public void textEditing() {
 		entities();
 		MenuItem paste = menuItem("menuPaste");
 		clickOn("#entities");
+		assertTrue(menuItem("menuCut").isDisable());
+		assertTrue(menuItem("menuSelectAll").isDisable());
+		clickOn("#preview");
 		assertTrue(paste.isDisable());
 		TextField name = lookup("#value-name-0").queryAs(TextField.class);
 		clickOn(name).write("abc");

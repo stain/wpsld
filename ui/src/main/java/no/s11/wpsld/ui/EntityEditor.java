@@ -358,6 +358,7 @@ public class EntityEditor extends ScrollPane {
 		GridPane header = grid();
 		TextField idField = new TextField(entity.getId());
 		idField.setId("entityId");
+		EntityClipboard.guard(idField, false);
 		// Applied when done (Enter or leaving the field), not on every key,
 		// as intermediate identifiers could clash with other entities
 		// The entity of this form, even if focus leaves the field because
@@ -422,6 +423,7 @@ public class EntityEditor extends ScrollPane {
 			// A search, not a field to fill in: small, on the right
 			TextField search = new TextField(propertyQuery);
 			search.setId("propertySearch");
+			EntityClipboard.guard(search, false);
 			search.setPromptText("Search properties");
 			search.setPrefColumnCount(14);
 			search.textProperty().addListener((obs, old, query) -> {
@@ -919,6 +921,7 @@ public class EntityEditor extends ScrollPane {
 			text = new TextField();
 		}
 		text.setId(id("header", field.name()));
+		EntityClipboard.guard(text, false);
 		text.getProperties().put(PROPERTY, field.name());
 		text.setPromptText("Text");
 		Runnable show = () -> {
@@ -1100,16 +1103,20 @@ public class EntityEditor extends ScrollPane {
 			}
 			case DATE -> {
 				DatePicker picker = isoDatePicker(current);
+				EntityClipboard.guard(picker.getEditor(), false);
 				control = picker;
 				// Only valid ISO 8601 dates are stored
 				text = () -> isoDate(picker.getEditor().getText()).orElse("");
 			}
 			case REFERENCE, TEXT_OR_REFERENCE -> {
 				control = referenceCombo(field, rangeNames, current);
+				// An entity copied pastes as its @id, linking it
+				EntityClipboard.guard(((ComboBox<?>) control).getEditor(), true);
 				text = ((ComboBox<?>) control).getEditor()::getText;
 			}
 			default -> {
 				TextField textField = new TextField(current);
+				EntityClipboard.guard(textField, false);
 				textField.setPromptText(rangeNames);
 				textField.textProperty().addListener((obs, old, v) -> update());
 				control = textField;

@@ -469,7 +469,16 @@ Styles:
 
 ### Entities
 
-- **Copy and paste entities.** Edit > Duplicate within a crate is easy.
+- **Copy and paste entities.** Started: in the entity list, Edit > Copy
+  (and the list's own menu) puts the selected entity on the clipboard as
+  its JSON-LD, both as text (for text editors) and as
+  `application/x-wpsld-entity+json`, so wpsld's own fields know it is an
+  entity: reference fields paste its `@id`, other fields nothing. Paste in
+  the list adds it, keeping its `@id` unless the crate has one with it,
+  mentioned by the root. Next: several entities, and what to do with the
+  entities they refer to, as below; check on Windows and macOS that the
+  entity format reaches another wpsld window.
+  Edit > Duplicate within a crate is easy.
   Across open crates it is trickier, as an entity refers to others: a
   shallow copy (references left as they are, possibly dangling) or a deep
   copy (the entities it refers to too), matching those the other crate
