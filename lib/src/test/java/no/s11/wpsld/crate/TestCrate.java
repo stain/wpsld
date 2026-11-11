@@ -20,6 +20,7 @@ package no.s11.wpsld.crate;
 import static org.junit.Assert.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import java.io.InputStream;
@@ -29,6 +30,7 @@ import org.junit.Test;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class TestCrate {
 	private static final JsonNodeFactory JSON = JsonNodeFactory.instance;
@@ -147,6 +149,175 @@ public class TestCrate {
 		file.set("citation", Optional.of(ref(cited.getId())));
 		assertEquals(List.of(folder, file), crate.dataEntities());
 		assertEquals(List.of(), crate.unlinked());
+	}
+
+	@Test
+	public void pasteKeepsIdUnlessTaken() {
+		Crate crate = new Crate();
+		Entity alice = crate.add("Person");
+		alice.set("knows", Optional.of(JSON.arrayNode().add(ref("#bob"))));
+		Entity copy = crate.paste(alice);
+		assertEquals("#person-2", copy.getId());
+		assertEquals(alice.getValues(), copy.getValues());
+		// A copy of the values, not the same
+		((com.fasterxml.jackson.databind.node.ArrayNode) copy.get("knows").orElseThrow()).add(ref("#carol"));
+		assertEquals(List.of(ref("#bob")), alice.getAll("knows"));
+
+		Entity other = new Entity("https://orcid.org/0000-0001-9842-9718", "Person");
+		assertEquals("https://orcid.org/0000-0001-9842-9718", crate.paste(other).getId());
+	}
+
+	/**
+	 * Two persons with a shared affiliation, as copied from another crate
+	 */
+	private static List<Entity> aliceBobAndUom() {
+		Entity alice = new Entity("https://orcid.org/0000-0002-1825-0097", "Person");
+		alice.set("name", Optional.of(JSON.textNode("Alice")));
+		alice.set("affiliation", Optional.of(ref("#uom")));
+		Entity bob = new Entity("#bob", "Person");
+		bob.set("name", Optional.of(JSON.textNode("Bob")));
+		bob.set("affiliation", Optional.of(ref("#uom")));
+		bob.set("knows", Optional.of(ref("https://orcid.org/0000-0002-1825-0097")));
+		Entity uom = new Entity("#uom", "Organization");
+		uom.set("name", Optional.of(JSON.textNode("University of Manchester")));
+		return List.of(alice, bob, uom);
+	}
+
+	@Test
+	public void pasteSeveralIntoAnotherCrate() {
+		Crate crate = new Crate();
+		Crate.Pasted pasted = crate.paste(aliceBobAndUom(), Map.of(), false);
+		assertEquals(List.of("https://orcid.org/0000-0002-1825-0097", "#bob", "#uom"),
+				pasted.added().stream().map(Entity::getId).toList());
+		assertEquals(Map.of(), pasted.renamed());
+		assertEquals(List.of(), pasted.dangling());
+		assertEquals(List.of(), pasted.ambiguous());
+		assertEquals(Map.of(), pasted.existing());
+	}
+
+	@Test
+	public void pasteSeveralRenamesTakenLocalIds() {
+		Crate crate = new Crate();
+		Entity uppsala = crate.add("Organization");
+		crate.rename(uppsala, "#uom");
+		crate.add("Organization");
+		Crate.Pasted pasted = crate.paste(aliceBobAndUom(), Map.of(), false);
+		// #organization-1 is taken too
+		assertEquals(Map.of("#uom", "#organization-2"), pasted.renamed());
+		Entity alice = crate.get("https://orcid.org/0000-0002-1825-0097").orElseThrow();
+		Entity bob = crate.get("#bob").orElseThrow();
+		assertEquals(ref("#organization-2"), alice.get("affiliation").orElseThrow());
+		assertEquals(ref("#organization-2"), bob.get("affiliation").orElseThrow());
+		assertEquals("University of Manchester", crate.get("#organization-2").orElseThrow().getLabel());
+		// The crate's own #uom is left alone
+		assertEquals("#uom", uppsala.getId());
+
+		// Pasted again: the local ones are copies, the absolute one is there
+		List<Entity> again = aliceBobAndUom();
+		Crate.Pasted second = crate.paste(again, Map.of(), false);
+		assertEquals(List.of("#person-1", "#organization-3"), second.added().stream().map(Entity::getId).toList());
+		assertEquals(ref("#organization-3"), second.added().get(0).get("affiliation").orElseThrow());
+		// Alice there, but with another affiliation: to merge
+		assertEquals(1, second.existing().size());
+		Map.Entry<Entity, Entity> merge = second.existing().entrySet().iterator().next();
+		assertSame(alice, merge.getValue());
+		assertEquals(ref("#organization-3"), merge.getKey().get("affiliation").orElseThrow());
+		// Copies left as they were
+		assertEquals(ref("#uom"), again.get(1).get("affiliation").orElseThrow());
+	}
+
+	@Test
+	public void pasteRenamesAtOnce() {
+		Crate crate = new Crate();
+		crate.rename(crate.add("Organization"), "#a");
+		crate.rename(crate.add("Organization"), "#organization-1");
+		// #a becomes #organization-2: a later copy's rename doesn't take it on
+		Entity a = new Entity("#a", "Organization");
+		Entity org = new Entity("#organization-1", "Organization");
+		Entity x = new Entity("#x", "Person");
+		x.setAll("affiliation", List.of(ref("#a"), ref("#organization-1")));
+		crate.paste(List.of(a, org, x), Map.of(), false);
+		assertEquals(List.of(ref("#organization-2"), ref("#organization-3")),
+				crate.get("#x").orElseThrow().getAll("affiliation"));
+	}
+
+	@Test
+	public void pasteSameAsExistingLeavesItOut() {
+		Crate crate = new Crate();
+		Crate.Pasted first = crate.paste(aliceBobAndUom(), Map.of(), false);
+		Crate.Pasted pasted = crate.paste(aliceBobAndUom().subList(0, 1), Map.of(), true);
+		assertEquals(List.of(), pasted.added());
+		assertEquals(Map.of(), pasted.existing());
+		assertEquals(3, first.added().size());
+		assertEquals(4, crate.getEntities().size());
+	}
+
+	@Test
+	public void pasteBlankNodesGetLocalIds() {
+		Crate crate = new Crate();
+		Entity b0 = new Entity("_:b0", "Organization");
+		Entity x = new Entity("#x", "Person");
+		x.set("affiliation", Optional.of(ref("_:b0")));
+		Crate.Pasted pasted = crate.paste(List.of(b0, x), Map.of(), false);
+		assertEquals(Map.of("_:b0", "#organization-1"), pasted.renamed());
+		assertEquals(ref("#organization-1"), crate.get("#x").orElseThrow().get("affiliation").orElseThrow());
+	}
+
+	@Test
+	public void pasteReportsReferencesNotCopied() {
+		List<Entity> copies = aliceBobAndUom();
+		Entity uom = copies.get(2);
+		List<Entity> bobOnly = List.of(copies.get(1));
+		Map<String, Entity> referenced = Map.of("#uom", uom, copies.get(0).getId(), copies.get(0));
+
+		// Neither Alice nor #uom here
+		Crate empty = new Crate();
+		Crate.Pasted pasted = empty.paste(bobOnly, referenced, false);
+		assertEquals(List.of("#uom", "https://orcid.org/0000-0002-1825-0097"), pasted.dangling());
+		assertEquals(List.of(), pasted.ambiguous());
+
+		// Another #uom: may not be the one meant
+		Crate other = new Crate();
+		Entity uppsala = other.add("Organization");
+		uppsala.set("name", Optional.of(JSON.textNode("Uppsala University")));
+		other.rename(uppsala, "#uom");
+		other.paste(List.of(copies.get(0)), Map.of(), false);
+		pasted = other.paste(bobOnly, referenced, false);
+		assertEquals(List.of(), pasted.dangling());
+		assertEquals(List.of("#uom"), pasted.ambiguous());
+
+		// The same #uom as copied
+		Crate same = new Crate();
+		same.paste(List.of(uom), Map.of(), false);
+		assertEquals(List.of("https://orcid.org/0000-0002-1825-0097"),
+				same.paste(bobOnly, referenced, false).dangling());
+		assertEquals(List.of(), same.paste(bobOnly, referenced, false).ambiguous());
+
+		// From this crate: its #uom is the one meant, whatever it is now
+		assertEquals(List.of(), other.paste(bobOnly, Map.of(), true).ambiguous());
+	}
+
+	@Test
+	public void entityFromJson() {
+		Entity alice = crate("Person").get();
+		alice.set("name", Optional.of(JSON.textNode("Alice")));
+		alice.setAll("knows", List.of(ref("#bob"), ref("#carol")));
+		assertEquals(alice.toJson(), Entity.fromJson(alice.toJson()).orElseThrow().toJson());
+
+		ObjectNode json = JSON.objectNode().put("@id", "#x");
+		json.putArray("@type").add("Person").add(1);
+		json.put("@reverse", "ignored");
+		json.putNull("name");
+		Entity x = Entity.fromJson(json).orElseThrow();
+		assertEquals(List.of("Person"), x.getTypes());
+		assertEquals(Map.of(), x.getValues());
+		assertEquals(List.of("Thing"), Entity.fromJson(JSON.objectNode().put("@id", "#y")).orElseThrow().getTypes());
+		assertTrue(Entity.fromJson(JSON.objectNode().put("name", "No @id")).isEmpty());
+		assertTrue(Entity.fromJson(JSON.textNode("#z")).isEmpty());
+	}
+
+	private static Optional<Entity> crate(String type) {
+		return Optional.of(new Crate().add(type));
 	}
 
 	@Test(expected = IllegalArgumentException.class)

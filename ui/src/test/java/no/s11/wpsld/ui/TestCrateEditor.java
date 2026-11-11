@@ -30,9 +30,14 @@ import org.junit.Test;
 import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import javafx.scene.Node;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.Clipboard;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Button;
@@ -113,7 +118,7 @@ public class TestCrateEditor extends ApplicationTest {
 			person.set("affiliation", Optional.of(JsonNodeFactory.instance.objectNode().put("@id", org.getId())));
 			root.setAll("mentions", List.of(JsonNodeFactory.instance.objectNode().put("@id", person.getId())));
 		});
-		interact(() -> entities().getSelectionModel().select(person));
+		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().indexOf(person)));
 		clickOn("#removeEntity");
 		assertTrue(root.getAll("mentions").stream().map(v -> v.get("@id").asText()).toList()
 				.contains(org.getId()));
@@ -413,14 +418,182 @@ public class TestCrateEditor extends ApplicationTest {
 	}
 
 	/**
+	 * Edit > Copy in the entity list copies the selected entity as JSON-LD;
+	 * Paste adds it, with a new @id as the crate has the copied one, and
+	 * mentions it.
+	 */
+	@Test
+	public void copyAndPasteEntity() throws Exception {
+		entities();
+		addEntity("person");
+		Entity root = entities().getItems().get(0);
+		Entity alice = entities().getItems().get(1);
+		interact(() -> alice.set("name", Optional.of(JsonNodeFactory.instance.textNode("Alice"))));
+		clickOn("#entities");
+		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().indexOf(alice)));
+		MenuItem copy = menuItem("menuCopy");
+		assertFalse(copy.isDisable());
+		interact(copy::fire);
+		String copied = WaitForAsyncUtils.asyncFx(() -> Clipboard.getSystemClipboard().getString()).get();
+		assertEquals(alice.toJson(), new ObjectMapper().readTree(copied));
+		// And as a JSON-LD document with the crate's context and its base
+		JsonNode document = new ObjectMapper().readTree((String) WaitForAsyncUtils
+				.asyncFx(() -> Clipboard.getSystemClipboard().getContent(EntityClipboard.LD_JSON)).get());
+		assertEquals("https://w3id.org/ro/crate/1.3/context", document.get("@context").get(0).asText());
+		String base = document.get("@context").get(1).get("@base").asText();
+		assertTrue(base, base.matches("arcp://uuid,[0-9a-f-]{36}/"));
+		assertEquals(alice.toJson(), document.get("@graph").get(0));
+		assertEquals(1, document.get("@graph").size());
+		// Also as wpsld's own, which its text fields don't take as text
+		JsonNode wpsld = new ObjectMapper().readTree((String) WaitForAsyncUtils
+				.asyncFx(() -> Clipboard.getSystemClipboard().getContent(EntityClipboard.ENTITY)).get());
+		assertEquals(1, wpsld.get("version").asInt());
+		assertEquals(base, wpsld.get("crate").asText());
+		assertEquals(document, wpsld.get("document"));
+
+		interact(menuItem("menuPaste")::fire);
+		assertEquals(3, entities().getItems().size());
+		Entity pasted = entities().getItems().get(2);
+		// Added as #thing-1, so a new @id for the copy, from its type
+		assertEquals("#thing-1", alice.getId());
+		assertEquals("#person-1", pasted.getId());
+		assertEquals("Alice", pasted.getLabel());
+		assertEquals(pasted, entities().getSelectionModel().getSelectedItem());
+		assertTrue(root.getAll("mentions").stream().anyMatch(v -> v.get("@id").asText().equals("#person-1")));
+
+		// In the form, a reference field pastes its @id, a text field nothing
+		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().indexOf(root)));
+		clickOn("#propertySearch").write("author");
+		Node author = lookup("#value-author-0").query();
+		clickOn(author);
+		push(KeyCode.SHORTCUT, KeyCode.V);
+		assertEquals("#thing-1", ((ComboBox<?>) author).getEditor().getText());
+		assertEquals(List.of(JsonNodeFactory.instance.objectNode().put("@id", "#thing-1")), root.getAll("author"));
+		TextField name = lookup("#header-name").queryAs(TextField.class);
+		clickOn(name).write("Crate");
+		push(KeyCode.SHORTCUT, KeyCode.V);
+		assertEquals("Crate", name.getText());
+
+		// JSON-LD copied as text in a text editor pastes as an entity too
+		interact(() -> {
+			ClipboardContent text = new ClipboardContent();
+			text.putString("{\"@id\": \"https://orcid.org/0000-0001-9842-9718\", \"@type\": \"Person\"}");
+			Clipboard.getSystemClipboard().setContent(text);
+		});
+		clickOn("#entities");
+		interact(menuItem("menuPaste")::fire);
+		assertEquals("https://orcid.org/0000-0001-9842-9718", entities().getItems().get(3).getId());
+
+		// A JSON-LD document of one entity, from another tool, or as text
+		String bob = "{\"@context\": \"https://w3id.org/ro/crate/1.2/context\", "
+				+ "\"@graph\": [{\"@id\": \"#bob\", \"@type\": \"Person\", \"name\": \"Bob\"}]}";
+		interact(() -> {
+			ClipboardContent ldJson = new ClipboardContent();
+			ldJson.put(EntityClipboard.LD_JSON, bob);
+			Clipboard.getSystemClipboard().setContent(ldJson);
+		});
+		interact(menuItem("menuPaste")::fire);
+		assertEquals("Bob", entities().getItems().get(4).getLabel());
+		interact(() -> {
+			ClipboardContent text = new ClipboardContent();
+			text.putString(bob.replace("#bob", "#bob-2"));
+			Clipboard.getSystemClipboard().setContent(text);
+		});
+		interact(menuItem("menuPaste")::fire);
+		assertEquals("#bob-2", entities().getItems().get(5).getId());
+
+		// Not an entity: says so, and adds nothing
+		interact(() -> {
+			ClipboardContent text = new ClipboardContent();
+			text.putString("Alice");
+			Clipboard.getSystemClipboard().setContent(text);
+		});
+		WaitForAsyncUtils.asyncFx(menuItem("menuPaste")::fire);
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup("No entity to paste").tryQuery().isPresent());
+		clickOn("OK");
+		assertEquals(6, entities().getItems().size());
+	}
+
+	/**
+	 * Several entities copied, with the one they refer to: pasted into the
+	 * same crate, references to the one not copied are right; from another
+	 * crate, they may not be, which is reported.
+	 */
+	@Test
+	public void copyAndPasteSeveralEntities() throws Exception {
+		entities();
+		addEntity("person");
+		addEntity("person");
+		addEntity("organization");
+		Entity alice = entities().getItems().get(1);
+		Entity bob = entities().getItems().get(2);
+		Entity org = entities().getItems().get(3);
+		interact(() -> {
+			alice.set("name", Optional.of(JsonNodeFactory.instance.textNode("Alice")));
+			bob.set("name", Optional.of(JsonNodeFactory.instance.textNode("Bob")));
+			alice.set("affiliation", Optional.of(JsonNodeFactory.instance.objectNode().put("@id", org.getId())));
+			bob.set("affiliation", Optional.of(JsonNodeFactory.instance.objectNode().put("@id", org.getId())));
+			bob.set("knows", Optional.of(JsonNodeFactory.instance.objectNode().put("@id", alice.getId())));
+		});
+		clickOn("#entities");
+		// Selected the other way round: copied in the crate's order
+		interact(() -> {
+			entities().getSelectionModel().clearSelection();
+			entities().getSelectionModel().selectIndices(2, 1);
+		});
+		interact(menuItem("menuCopy")::fire);
+		JsonNode wpsld = new ObjectMapper().readTree((String) WaitForAsyncUtils
+				.asyncFx(() -> Clipboard.getSystemClipboard().getContent(EntityClipboard.ENTITY)).get());
+		assertEquals(List.of(alice.getId(), bob.getId()),
+				wpsld.get("document").get("@graph").valueStream().map(e -> e.get("@id").asText()).toList());
+		assertEquals(org.toJson(), wpsld.get("referenced").get(0));
+		assertEquals(1, wpsld.get("referenced").size());
+		// As text, objects as in a @graph
+		String text = WaitForAsyncUtils.asyncFx(() -> Clipboard.getSystemClipboard().getString()).get();
+		assertEquals(2, new ObjectMapper().readTree("[" + text + "]").size());
+
+		interact(menuItem("menuPaste")::fire);
+		assertEquals(6, entities().getItems().size());
+		Entity alice2 = entities().getItems().get(4);
+		Entity bob2 = entities().getItems().get(5);
+		assertEquals("Alice", alice2.getLabel());
+		// Bob's copy knows Alice's copy; both with the same affiliation
+		assertEquals(alice2.getId(), bob2.get("knows").orElseThrow().get("@id").asText());
+		assertEquals(org.getId(), bob2.get("affiliation").orElseThrow().get("@id").asText());
+		assertEquals(List.of(alice2, bob2), entities().getSelectionModel().getSelectedItems());
+		// Same crate: nothing to report
+		assertFalse(lookup(".alert").tryQuery().isPresent());
+
+		// As if from another crate, whose organization differs from this one
+		interact(() -> {
+			ClipboardContent content = new ClipboardContent();
+			((ObjectNode) wpsld).put("crate", "arcp://uuid,00000000-0000-4000-8000-000000000000/");
+			((ObjectNode) wpsld.get("referenced").get(0)).put("name", "Another organization");
+			content.put(EntityClipboard.ENTITY, wpsld.toString());
+			Clipboard.getSystemClipboard().setContent(content);
+		});
+		interact(menuItem("menuPaste")::fire);
+		assertEquals(8, entities().getItems().size());
+		assertTrue(lookup(org.getId()).tryQuery().isPresent()
+				|| lookup(n -> n instanceof javafx.scene.control.Label l && l.getText() != null
+						&& l.getText().contains(org.getId())).tryQuery().isPresent());
+		clickOn("OK");
+	}
+
+	/**
 	 * A text field pastes once, also with Edit > Paste's shortcut; and the
-	 * menu's text commands are only enabled in a text field.
+	 * menu's text commands are only enabled in a text field, except Copy and
+	 * Paste of entities in the entity list.
 	 */
 	@Test
 	public void textEditing() {
 		entities();
 		MenuItem paste = menuItem("menuPaste");
 		clickOn("#entities");
+		assertTrue(menuItem("menuCut").isDisable());
+		assertTrue(menuItem("menuSelectAll").isDisable());
+		clickOn("#preview");
 		assertTrue(paste.isDisable());
 		TextField name = lookup("#value-name-0").queryAs(TextField.class);
 		clickOn(name).write("abc");
@@ -569,7 +742,7 @@ public class TestCrateEditor extends ApplicationTest {
 		// Back to the window
 		checkDisk();
 		assertTrue(json().contains("Changed elsewhere"));
-		interact(() -> entities().getSelectionModel().select(0));
+		interact(() -> entities().getSelectionModel().clearAndSelect(0));
 		clickOn(lookup("#value-description-0").queryAs(TextField.class)).write(" More");
 		clickOn("#entities");
 		push(KeyCode.SHORTCUT, KeyCode.S);
@@ -661,7 +834,7 @@ public class TestCrateEditor extends ApplicationTest {
 		assertEquals("_Redo Add Person", redo.getText());
 		push(KeyCode.SHORTCUT, KeyCode.SHIFT, KeyCode.Z);
 		// Typing in a field (the root's name): undone first
-		interact(() -> entities().getSelectionModel().select(0));
+		interact(() -> entities().getSelectionModel().clearAndSelect(0));
 		clickOn(lookup("#value-name-0").queryAs(TextField.class)).write("Bob");
 		name.run();
 		assertEquals("_Undo Typing", undo.getText());
@@ -695,7 +868,7 @@ public class TestCrateEditor extends ApplicationTest {
 		WaitForAsyncUtils.waitForFxEvents();
 		Map<String, Boolean> clickable = new java.util.LinkedHashMap<>();
 		for (Entity entity : List.copyOf(entities().getItems())) {
-			interact(() -> entities().getSelectionModel().select(entity));
+			interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().indexOf(entity)));
 			clickable.put(entity.getId(), lookup("#previewId").query() instanceof Hyperlink);
 		}
 		assertEquals(Map.of("./", true, "https://example.com/x", true, "data.csv", true, "missing.csv", false,
@@ -782,7 +955,7 @@ public class TestCrateEditor extends ApplicationTest {
 		clickOn(previewLink("#previewReferencedBy", "./ (distribution)"));
 		assertSame(entities().getItems().get(0), entities().getSelectionModel().getSelectedItem());
 		// And the link to the crate's root from any other entity
-		interact(() -> entities().getSelectionModel().select(download));
+		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().indexOf(download)));
 		clickOn("#previewRoot");
 		assertSame(entities().getItems().get(0), entities().getSelectionModel().getSelectedItem());
 	}
