@@ -1,0 +1,16 @@
+{
+  "skill_name": "ro-crate-js",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Write a Node script that creates a crate with one CSV file and writes ro-crate-metadata.json.",
+      "expected_output": "Uses ro-crate package; sets root fields; handles the 1.2 default.",
+      "files": [],
+      "expectations": [
+        "Uses `require('ro-crate')` and addEntity",
+        "Sets name, description, datePublished and license on the root",
+        "Notes the library defaults to the 1.2 context and fixes or states it"
+      ]
+    }
+  ]
+}

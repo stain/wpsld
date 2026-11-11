@@ -1,0 +1,41 @@
+ro-crate-skills
+Copyright 2026 Stian Soiland-Reyes and contributors
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This repository derives from the RO-Crate specification and related documents
+(https://w3id.org/ro/crate), Copyright 2017-2025 University of Technology Sydney,
+The University of Manchester UK and the RO-Crate contributors, licensed under the
+Apache License, Version 2.0. The specification's copyright statement
+(docs/_specification/1.3/.metadata.md in https://github.com/ResearchObject/ro-crate):
+
+  This specification is Copyright 2017-2025 University of Technology Sydney,
+  The University of Manchester UK and the RO-Crate contributors.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this file except in compliance with the License. You may obtain a copy of
+  the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+  License for the specific language governing permissions and limitations
+  under the License.
+
+  Note: The RO-Crate JSON-LD context (https://w3id.org/ro/crate/1.3/context)
+  and JSON-LD examples within this specification are distributed under CC0 1.0
+  Universal (CC0 1.0) Public Domain Dedication.
+
+The editors and authors of each version are listed at the top of its text
+(for example background/ro-crate-1.3/index.md).
+
+Copies of the specification versions 1.0-1.3 and the project's quick reference
+and migration guides are included under background/, unmodified apart from
+format conversion, splitting 1.2 and 1.3 into one file per chapter and rewriting
+links between the chapters.
+
+The plugin icon (.claude-plugin/icon.png) is the RO-Crate logo from
+https://github.com/ResearchObject/ro-crate/blob/main/docs/assets/img/ro-crate.png,
+licensed under the Apache License, Version 2.0.

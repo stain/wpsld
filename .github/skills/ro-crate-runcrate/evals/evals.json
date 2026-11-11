@@ -1,0 +1,16 @@
+{
+  "skill_name": "ro-crate-runcrate",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "What was run in the crate tests/fixtures/process-run-crate? List tools, inputs and outputs.",
+      "expected_output": "Uses runcrate report in a clean environment or reads the metadata correctly.",
+      "files": [],
+      "expectations": [
+        "Uses `runcrate report` or explains why not",
+        "Names ImageMagick as the instrument and in.jpg/out.jpg as input/output",
+        "Does not execute the crate's workflow"
+      ]
+    }
+  ]
+}

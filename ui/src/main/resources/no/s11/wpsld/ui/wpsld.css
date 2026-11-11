@@ -40,6 +40,10 @@
     -fx-font-size: 0.85em;
 }
 
+.help-content .text {
+    -fx-fill: -fx-text-background-color;
+}
+
 .chip-remove {
     -fx-padding: 0 4 0 4;
 }

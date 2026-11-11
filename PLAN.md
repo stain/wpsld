@@ -50,6 +50,30 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
 
 ## Next steps
 
+### User help
+
+The audience includes researchers and research data managers who may not
+know RO-Crate, JSON-LD or schema.org. Write for tasks first, introduce terms
+only when needed, and distinguish describing metadata from packaging or
+depositing data.
+
+- **Help > wpsld Help** *(started)*: an offline, searchable JavaFX help
+  window with bundled Markdown topics. F1 opens it (Command-? on macOS).
+  The profile chooser's help button opens its topic directly; other controls
+  can open their own topics without replacing the existing field definitions.
+- **Next:** develop a getting-started walkthrough, profiles and required
+  fields, people and organisations, files, saving and troubleshooting; add
+  a glossary and links to further reading. Check every instruction against
+  the app's actual behaviour and the applicable RO-Crate specification.
+- Add contextual links from relevant controls and field descriptions as
+  topics are written. Keep the help navigable by keyboard and screen reader,
+  usable in all styles and offline, and test that packaged releases contain
+  every topic.
+- Author topics in `ui/src/main/resources/no/s11/wpsld/ui/help/` as
+  CommonMark. The native renderer supports headings, paragraphs, lists,
+  emphasis, code and HTTP(S) links; add a topic to `HelpDialog.Topic` to
+  make it searchable and available to contextual help.
+
 ### Editor (Crate-O style)
 
 - **JavaFX model-view binding.** Keep `lib`'s model free of JavaFX; in `ui`,
@@ -409,7 +433,6 @@ For macOS (when running on it, whatever the style):
   even with one window.
 - A **Settings window** with toolbar panes, titled after the pane shown,
   applying changes as they are made, instead of the modal Preferences.
-- **Help > wpsld Help**, for ? (Command-?) to open.
 - The **close button's dot** and real **sheets** are out of JavaFX's reach.
 
 For every platform:

@@ -16,6 +16,13 @@ and Describo.
 It is a work in progress. See [PLAN.md](PLAN.md) for the plan and
 [MASP.md](MASP.md) for how profiles are read and used.
 
+## Help in the app
+
+Choose **Help > wpsld Help** (F1, or Command-? on macOS) for offline help.
+The question-mark button beside the profile chooser opens help about
+profiles. The manual is being developed; the existing field help buttons
+also show definitions of individual properties.
+
 ## Screenshots
 
 An example crate with made-up data, in some of the styles under View >
@@ -171,16 +178,16 @@ comes from [`gradle.properties`](gradle.properties).
 | Module | Contents |
 |--------|----------|
 | [`lib`](lib) (`no.s11.wpsld`) | No JavaFX. The schema.org model, form fields, the RO-Crate model, reading and retrieving crates, JSON-LD contexts, MASP profiles and registries, and settings. Its only dependency is Jackson. |
-| [`ui`](ui) (`no.s11.wpsld.ui`) | The JavaFX editor: the crate window (`CrateEditor`), the entity form (`EntityEditor`), the preview, the type chooser and the preferences, and its styles (`Theme`). Besides JavaFX, it uses [Ikonli](https://kordamp.org/ikonli/) for the Fluent icons of the Windows 11 style. |
+| [`ui`](ui) (`no.s11.wpsld.ui`) | The JavaFX editor: the crate window (`CrateEditor`), the entity form (`EntityEditor`), the preview, the type chooser and the preferences, and its styles (`Theme`). Besides JavaFX, it uses [Ikonli](https://kordamp.org/ikonli/) for the Fluent icons of the Windows 11 style and [commonmark-java](https://github.com/commonmark/commonmark-java) for help. |
 
 ## Licence
 
 The source code in this repository is under the
 [Apache License 2.0](LICENSE.txt).
 
-The built application also includes third-party software: Jackson, Ikonli,
-and Microsoft's Fluent UI System Icons, plus a Java runtime and JavaFX in
-the zips for a platform. Their licences and notices are in
+The built application also includes third-party software: Jackson,
+commonmark-java, Ikonli, and Microsoft's Fluent UI System Icons, plus a
+Java runtime and JavaFX in the zips for a platform. Their licences and notices are in
 [`ui/src/notices/THIRD-PARTY-NOTICES.txt`](ui/src/notices/THIRD-PARTY-NOTICES.txt),
 which the build puts in every zip and which Help > About wpsld shows. That
 file covers the built application, not the source in this repository.

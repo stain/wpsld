@@ -1,0 +1,16 @@
+{
+  "skill_name": "ro-crate-retrieve",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Get me the RO-Crate behind https://doi.org/10.48546/workflowhub.workflow.120.5",
+      "expected_output": "Follows redirects and Signposting to the ro_crate zip; extracts metadata safely.",
+      "files": [],
+      "expectations": [
+        "Uses Signposting Link headers (item/describedby), not just the DOI landing page",
+        "Finds the application/zip item with profile https://w3id.org/ro/crate",
+        "Extracts ro-crate-metadata.json safely and finds the root"
+      ]
+    }
+  ]
+}

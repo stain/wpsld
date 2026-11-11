@@ -1,0 +1,16 @@
+{
+  "skill_name": "ro-crate-tabulate",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Count how many entities of each @type are in tests/fixtures/process-run-crate using SQL.",
+      "expected_output": "Uses tabulator to build SQLite or reads the property table.",
+      "files": [],
+      "expectations": [
+        "Runs tabulator (from the GitHub install) in a scratch directory",
+        "Queries the property table (property_label/value) rather than assuming per-type tables",
+        "Does not write into the fixture directory"
+      ]
+    }
+  ]
+}

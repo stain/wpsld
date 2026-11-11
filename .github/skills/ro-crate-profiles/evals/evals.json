@@ -1,0 +1,27 @@
+{
+  "skill_name": "ro-crate-profiles",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Declare that my crate is a Workflow Run Crate and Process Run Crate.",
+      "expected_output": "conformsTo on the root with Profile entities for released versioned permalinks.",
+      "files": [],
+      "expectations": [
+        "conformsTo is on the root data entity, not the descriptor",
+        "Each profile has a contextual entity with Profile in @type",
+        "Uses released versioned URIs (0.6), no -DRAFT"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Create a Profile Crate for my lab's profile at https://example.org/my-profile/1.0.",
+      "expected_output": "Root typed Dataset and Profile, isProfileOf, hasPart description, ResourceDescriptor.",
+      "files": [],
+      "expectations": [
+        "Root @type includes Dataset and Profile",
+        "Lists the profile description in hasPart",
+        "Uses a ResourceDescriptor with hasRole and hasArtifact"
+      ]
+    }
+  ]
+}

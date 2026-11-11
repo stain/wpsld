@@ -1,0 +1,28 @@
+{
+  "skill_name": "ro-crate-validator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Validate tests/fixtures/invalid-crate and tell me what to fix.",
+      "expected_output": "Reports missing description, datePublished and licence and the missing file, with fixes.",
+      "files": [],
+      "expectations": [
+        "Reports root lacks description, license and datePublished",
+        "Reports missing.txt",
+        "Gives fixes as add/replace/remove with concrete values or asks for them",
+        "Does not invent a licence"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I have no internet. Is tests/fixtures/minimal-crate OK?",
+      "expected_output": "Uses the offline lint script; says what it did not check.",
+      "files": [],
+      "expectations": [
+        "Runs scripts/lint_crate.py",
+        "Reports 0 errors",
+        "States that profile/SHACL checks were not run"
+      ]
+    }
+  ]
+}

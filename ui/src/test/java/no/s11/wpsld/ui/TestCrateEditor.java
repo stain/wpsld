@@ -95,6 +95,24 @@ public class TestCrateEditor extends ApplicationTest {
 	}
 
 	@Test
+	public void helpMenuAndProfileContext() {
+		entities();
+		interact(menuItem("menuManual")::fire);
+		assertTrue(TestHelpDialog.text(lookup("#helpContent").queryAs(javafx.scene.text.TextFlow.class))
+				.startsWith("Getting started"));
+		clickOn("Close");
+		if (!CrateFile.onMac()) {
+			push(KeyCode.F1);
+			assertTrue(lookup("#helpContent").tryQuery().isPresent());
+			clickOn("Close");
+		}
+		clickOn("#profileHelp");
+		assertTrue(TestHelpDialog.text(lookup("#helpContent").queryAs(javafx.scene.text.TextFlow.class))
+				.startsWith("Profiles"));
+		clickOn("Close");
+	}
+
+	@Test
 	public void addEntityChoosesType() {
 		assertEquals(1, entities().getItems().size());
 		addEntity("person");

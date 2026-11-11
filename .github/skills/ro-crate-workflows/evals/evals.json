@@ -1,0 +1,17 @@
+{
+  "skill_name": "ro-crate-workflows",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Package my Snakemake workflow workflow/Snakefile as a Workflow RO-Crate.",
+      "expected_output": "ComputationalWorkflow entity as mainEntity with programmingLanguage.",
+      "files": [],
+      "expectations": [
+        "Workflow @type includes File, SoftwareSourceCode and ComputationalWorkflow",
+        "Root mainEntity references the workflow",
+        "programmingLanguage ComputerLanguage entity with name, url and version",
+        "Suggests the crate is zipped as *.crate.zip"
+      ]
+    }
+  ]
+}

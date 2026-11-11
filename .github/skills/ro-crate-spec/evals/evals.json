@@ -1,0 +1,16 @@
+{
+  "skill_name": "ro-crate-spec",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Is license required on the root data entity in RO-Crate 1.3, and what may its value be?",
+      "expected_output": "Must be present; SHOULD link to an entity; may be text.",
+      "files": [],
+      "expectations": [
+        "Says the root must have a license property",
+        "Says the value should reference a contextual or data entity with name and description",
+        "Cites the root-data-entity section or the quick reference"
+      ]
+    }
+  ]
+}

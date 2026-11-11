@@ -321,8 +321,13 @@ public class CrateEditor extends Application {
 			loadProfile.setId("loadProfile");
 			loadProfile.setOnAction(e -> askForProfile(stage));
 			profileStatus.setId("profileStatus");
+			Button profileHelp = new Button("?");
+			profileHelp.setId("profileHelp");
+			profileHelp.setAccessibleText("Help with profiles");
+			profileHelp.setTooltip(new Tooltip("Help with profiles"));
+			profileHelp.setOnAction(e -> showHelp(HelpDialog.Topic.PROFILES));
 			root.setTop(new VBox(menus(stage), new ToolBar(save, new Separator(), new Label("Profile"), profiles,
-					loadProfile, profileStatus)));
+					loadProfile, profileStatus, profileHelp)));
 		}));
 	}
 
@@ -519,10 +524,16 @@ public class CrateEditor extends Application {
 		Menu view = new Menu("_View", null, sidebarItem(), new SeparatorMenuItem(), styles(stage), colours(stage));
 		view.setId("menuView");
 
+		MenuItem manual = new MenuItem("_wpsld Help");
+		manual.setId("menuManual");
+		manual.setAccelerator(CrateFile.onMac()
+				? new KeyCodeCombination(KeyCode.SLASH, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN)
+				: new KeyCodeCombination(KeyCode.F1));
+		manual.setOnAction(e -> showHelp(HelpDialog.Topic.GETTING_STARTED));
 		MenuItem about = new MenuItem("_About wpsld…");
 		about.setId("menuAbout");
 		about.setOnAction(e -> new AboutDialog(stage, address -> getHostServices().showDocument(address)).show());
-		Menu help = new Menu("_Help", null, about);
+		Menu help = new Menu("_Help", null, manual, new SeparatorMenuItem(), about);
 		help.setId("menuHelp");
 
 		MenuBar bar = new MenuBar(file, edit, view, help);
@@ -532,6 +543,10 @@ public class CrateEditor extends Application {
 		bar.setUseSystemMenuBar(Theme.style().get() == Theme.Style.MACOS);
 		Theme.style().addListener((obs, old, style) -> bar.setUseSystemMenuBar(style == Theme.Style.MACOS));
 		return bar;
+	}
+
+	private void showHelp(HelpDialog.Topic topic) {
+		new HelpDialog(stage, topic, address -> getHostServices().showDocument(address)).show();
 	}
 
 	/**

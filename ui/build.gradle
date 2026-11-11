@@ -131,6 +131,7 @@ dependencies {
 
     implementation project(':lib')
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.4'
+    implementation 'org.commonmark:commonmark:0.24.0'
     // Icons as font glyphs: Microsoft's Fluent System Icons, for the
     // Windows 11 style (see Theme)
     implementation 'org.kordamp.ikonli:ikonli-javafx:12.4.0'
