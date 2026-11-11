@@ -43,6 +43,8 @@ import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.Label;
+import javafx.scene.control.DatePicker;
+import javafx.scene.control.MenuButton;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Menu;
@@ -110,6 +112,53 @@ public class TestCrateEditor extends ApplicationTest {
 		assertTrue(TestHelpDialog.text(lookup("#helpContent").queryAs(javafx.scene.text.TextFlow.class))
 				.startsWith("Profiles"));
 		clickOn("Close");
+	}
+
+	@Test
+	public void gettingStartedCreatesLinkedDescriptions() throws Exception {
+		ListView<Entity> list = entities();
+		Entity root = list.getItems().get(0);
+		interact(() -> {
+			lookup("#header-name").queryAs(TextField.class).setText("Example dataset");
+			lookup("#header-description").queryAs(javafx.scene.control.TextArea.class)
+					.setText("A sample file described with wpsld.");
+			lookup("#value-datePublished-0").queryAs(DatePicker.class).getEditor().setText("2025-01-31");
+			lookup("#value-license-0").queryAs(ComboBox.class).getEditor()
+					.setText("For tutorial practice only; not for reuse");
+			MenuButton parts = lookup("#headerNew-hasPart").queryAs(MenuButton.class);
+			parts.getItems().stream().filter(item -> item.getText().equals("File")).findFirst().orElseThrow().fire();
+		});
+		Entity file = list.getItems().stream().filter(e -> e.getTypes().contains("File")).findFirst().orElseThrow();
+		interact(() -> list.getSelectionModel().clearAndSelect(list.getItems().indexOf(file)));
+		renameTo("data.csv");
+		interact(() -> lookup("#header-name").queryAs(TextField.class).setText("Sample data"));
+		interact(() -> list.getSelectionModel().clearAndSelect(0));
+		assertEquals("data.csv", root.getAll("hasPart").get(0).path("@id").asText());
+
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("author"));
+		interact(() -> {
+			MenuButton author = lookup("#new-author").queryAs(MenuButton.class);
+			author.getItems().stream().filter(item -> item.getText().equals("Person")).findFirst().orElseThrow().fire();
+		});
+		Entity person = list.getItems().stream().filter(e -> e.getTypes().contains("Person")).findFirst().orElseThrow();
+		interact(() -> list.getSelectionModel().clearAndSelect(list.getItems().indexOf(person)));
+		interact(() -> lookup("#header-name").queryAs(TextField.class).setText("Example author"));
+
+		assertEquals(person.getId(), root.getAll("author").get(0).path("@id").asText());
+		assertEquals("2025-01-31", root.get("datePublished").orElseThrow().asText());
+		assertEquals("For tutorial practice only; not for reuse", root.get("license").orElseThrow().asText());
+
+		Path metadata = Files.createTempFile("wpsld-help-", ".json");
+		try {
+			Stage stage = (Stage) list.getScene().getWindow();
+			assertTrue(WaitForAsyncUtils.asyncFx(() -> app.saveTo(stage, metadata)).get());
+			JsonNode graph = new ObjectMapper().readTree(metadata.toFile()).path("@graph");
+			assertTrue(graph.toString().contains("\"data.csv\""));
+			assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, metadata)).get());
+			assertTrue(list.getItems().stream().anyMatch(e -> e.getId().equals("data.csv")));
+		} finally {
+			Files.deleteIfExists(metadata);
+		}
 	}
 
 	@Test

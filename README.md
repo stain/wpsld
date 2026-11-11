@@ -23,6 +23,9 @@ The question-mark button beside the profile chooser opens help about
 profiles. The manual is being developed; the existing field help buttons
 also show definitions of individual properties.
 
+The help topics can also be read here: [Getting started](ui/src/main/resources/no/s11/wpsld/ui/help/getting-started.md)
+and [Profiles](ui/src/main/resources/no/s11/wpsld/ui/help/profiles.md).
+
 ## Screenshots
 
 An example crate with made-up data, in some of the styles under View >

@@ -32,6 +32,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.StackPane;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 public class TestHelpDialog extends ApplicationTest {
@@ -46,7 +47,12 @@ public class TestHelpDialog extends ApplicationTest {
 
 	@Test
 	public void opensAtContextAndSearchesContent() {
-		interact(() -> new HelpDialog(stage, HelpDialog.Topic.PROFILES, address -> {}).show());
+		HelpDialog[] dialog = new HelpDialog[1];
+		interact(() -> {
+			dialog[0] = new HelpDialog(stage, HelpDialog.Topic.PROFILES, address -> {});
+			dialog[0].show();
+		});
+		assertEquals(Modality.NONE, dialog[0].getModality());
 		ListView<?> topics = lookup("#helpTopics").queryListView();
 		TextFlow content = lookup("#helpContent").queryAs(TextFlow.class);
 		assertEquals("Profiles", topics.getSelectionModel().getSelectedItem().toString());
@@ -54,10 +60,10 @@ public class TestHelpDialog extends ApplicationTest {
 		assertTrue(content.getAccessibleText().contains("profile"));
 
 		TextField search = lookup("#helpSearch").queryAs(TextField.class);
-		interact(() -> search.setText("organisations"));
+		interact(() -> search.setText("sensitive data"));
 		assertEquals(1, topics.getItems().size());
 		assertEquals("Getting started", topics.getSelectionModel().getSelectedItem().toString());
-		assertTrue(text(content).contains("organisations"));
+		assertTrue(text(content).contains("sensitive data"));
 
 		interact(() -> search.setText("no such help topic"));
 		assertTrue(topics.getItems().isEmpty());

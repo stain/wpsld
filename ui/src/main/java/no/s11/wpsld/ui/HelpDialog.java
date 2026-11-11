@@ -38,6 +38,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.TextFlow;
+import javafx.stage.Modality;
 import javafx.stage.Window;
 
 /** Offline help, opened at the contents or at a topic from the editor. */
@@ -69,6 +70,7 @@ class HelpDialog extends Dialog<Void> {
 
 	HelpDialog(Window owner, Topic initialTopic, Consumer<String> browse) {
 		initOwner(owner);
+		initModality(Modality.NONE);
 		setTitle("wpsld Help");
 		setResizable(true);
 

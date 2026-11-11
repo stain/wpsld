@@ -61,10 +61,11 @@ depositing data.
   window with bundled Markdown topics. F1 opens it (Command-? on macOS).
   The profile chooser's help button opens its topic directly; other controls
   can open their own topics without replacing the existing field definitions.
-- **Next:** develop a getting-started walkthrough, profiles and required
-  fields, people and organisations, files, saving and troubleshooting; add
-  a glossary and links to further reading. Check every instruction against
-  the app's actual behaviour and the applicable RO-Crate specification.
+- **Next:** expand the getting-started walkthrough and add guidance on
+  profiles and required fields, people and organisations, files, saving and
+  troubleshooting; add a glossary and links to further reading. Check every
+  instruction against the app's actual behaviour and the applicable RO-Crate
+  specification.
 - Add contextual links from relevant controls and field descriptions as
   topics are written. Keep the help navigable by keyboard and screen reader,
   usable in all styles and offline, and test that packaged releases contain
