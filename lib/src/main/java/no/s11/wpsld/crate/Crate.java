@@ -17,11 +17,19 @@
  */
 package no.s11.wpsld.crate;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Stream;
 
 import com.fasterxml.jackson.core.util.DefaultIndenter;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
@@ -41,6 +49,8 @@ import com.fasterxml.jackson.databind.node.TextNode;
  */
 public class Crate {
 	public static final String RO_CRATE_METADATA_JSON = "ro-crate-metadata.json";
+	/** The crate's HTML preview, beside its metadata file */
+	public static final String RO_CRATE_PREVIEW_HTML = "ro-crate-preview.html";
 
 	/**
 	 * Writes an RO-Crate Metadata File as Jackson's pretty printer does, but
@@ -64,6 +74,11 @@ public class Crate {
 	public static final String RO_CRATE_1_3_CONTEXT = RO_CRATE_1_3 + "/context";
 	/** Identifier of a new crate's root data entity; it may also be an absolute URI */
 	public static final String ROOT_ID = "./";
+	/**
+	 * Properties of the root data entity that link the crate's entities to
+	 * it: its parts (data entities) and the other entities it mentions
+	 */
+	public static final List<String> ROOT_LINKS = List.of("hasPart", "mentions");
 
 	private final List<Entity> entities = new ArrayList<>();
 	/** The <code>@context</code> to write, as read or RO-Crate 1.3's */
@@ -183,11 +198,169 @@ public class Crate {
 		replaceReferences(other.getId(), entity.getId());
 	}
 
+	/**
+	 * The data entities: the root data entity's parts (<code>hasPart</code>),
+	 * their parts, and so on. A File or Dataset only linked otherwise, e.g.
+	 * as a <code>citation</code>, is a contextual entity.
+	 */
+	public List<Entity> dataEntities() {
+		Map<String, Entity> byId = byId();
+		Set<Entity> parts = new LinkedHashSet<>();
+		Deque<Entity> queue = new ArrayDeque<>(List.of(getRoot()));
+		while (!queue.isEmpty()) {
+			references(queue.poll(), "hasPart").map(byId::get)
+					.filter(e -> e != null && e != getRoot() && parts.add(e)).forEach(queue::add);
+		}
+		return List.copyOf(parts);
+	}
+
+	/**
+	 * Entities not linked from the root data entity: not referred to by any
+	 * of its properties (e.g. its parts in <code>hasPart</code>, or
+	 * <code>mentions</code>), nor by any property of an entity that is,
+	 * recursively. These are left dangling, see {@link #mentionUnlinked()}.
+	 * The metadata descriptor and the HTML preview need no link.
+	 */
+	public List<Entity> unlinked() {
+		Entity root = getRoot();
+		Set<Entity> linked = linkedFrom(root.getId(), List.copyOf(root.getValues().keySet()), new HashSet<>());
+		return entities.stream().filter(e -> e != root && !linked.contains(e) && !isCrateFile(e)).toList();
+	}
+
+	/**
+	 * Add the entities not linked from the root data entity (see
+	 * {@link #unlinked()}) to its <code>mentions</code>, so that none is left
+	 * dangling: in the crate's order, leaving out those linked from an entity
+	 * mentioned before.
+	 *
+	 * @return The entities added to <code>mentions</code>
+	 */
+	public List<Entity> mentionUnlinked() {
+		Entity root = getRoot();
+		Set<Entity> linked = linkedFrom(root.getId(), List.copyOf(root.getValues().keySet()), new HashSet<>());
+		List<Entity> mentioned = new ArrayList<>();
+		for (Entity entity : entities) {
+			if (entity != root && !linked.contains(entity) && !isCrateFile(entity)) {
+				mentioned.add(entity);
+				linked.add(entity);
+				linkedFrom(entity.getId(), List.copyOf(entity.getValues().keySet()), linked);
+			}
+		}
+		if (!mentioned.isEmpty()) {
+			List<JsonNode> mentions = new ArrayList<>(root.getAll("mentions"));
+			mentioned.forEach(e -> mentions.add(JsonNodeFactory.instance.objectNode().put("@id", e.getId())));
+			root.setAll("mentions", mentions);
+		}
+		return mentioned;
+	}
+
+	/**
+	 * Add a Thing for each <code>@id</code> the crate's entities refer to
+	 * that is not an entity in the crate, e.g. an external IRI, a local
+	 * identifier of an entity removed or not yet added, or a typo, so that it
+	 * can be given a name and type, or renamed to the <code>@id</code> meant
+	 * (see {@link #merge}). Not for the metadata descriptor.
+	 *
+	 * @return The entities added, in the order first referred to
+	 */
+	public List<Entity> addReferenced() {
+		Map<String, Entity> byId = byId();
+		List<Entity> added = new ArrayList<>();
+		for (Entity entity : List.copyOf(entities)) {
+			for (String property : entity.getValues().keySet()) {
+				references(entity, property)
+						.filter(id -> !byId.containsKey(id) && !id.equals(RO_CRATE_METADATA_JSON)
+								&& !id.equals(getRoot().getId() + RO_CRATE_METADATA_JSON))
+						.forEach(id -> {
+							Entity thing = new Entity(id, "Thing");
+							byId.put(id, thing);
+							entities.add(thing);
+							added.add(thing);
+						});
+			}
+		}
+		return added;
+	}
+
+	/**
+	 * Remove from the root data entity's <code>mentions</code> the entities
+	 * linked from its other properties (e.g. as parts, or as their authors),
+	 * recursively through any property of the entities reached, as they need
+	 * no mention. Entities only linked from other mentioned entities stay
+	 * mentioned, as which of those could go would depend on their order.
+	 *
+	 * @return The entities removed from <code>mentions</code>
+	 */
+	public List<Entity> unmentionLinked() {
+		Entity root = getRoot();
+		List<String> properties = root.getValues().keySet().stream().filter(p -> !p.equals("mentions")).toList();
+		Set<Entity> linked = linkedFrom(root.getId(), properties, new HashSet<>());
+		Map<String, Entity> byId = byId();
+		List<Entity> unmentioned = new ArrayList<>();
+		List<JsonNode> mentions = new ArrayList<>();
+		for (JsonNode mention : root.getAll("mentions")) {
+			Entity entity = mention.isObject() && mention.has("@id") ? byId.get(mention.get("@id").asText()) : null;
+			if (entity != null && entity != root && linked.contains(entity)) {
+				unmentioned.add(entity);
+			} else {
+				mentions.add(mention);
+			}
+		}
+		if (!unmentioned.isEmpty()) {
+			root.setAll("mentions", mentions);
+		}
+		return unmentioned;
+	}
+
+	/**
+	 * Add to <code>linked</code> the entities referred to by these properties
+	 * of an entity, and recursively those referred to by any of their
+	 * properties.
+	 */
+	private Set<Entity> linkedFrom(String id, List<String> properties, Set<Entity> linked) {
+		Map<String, Entity> byId = byId();
+		Deque<Entity> queue = new ArrayDeque<>();
+		Entity start = byId.get(id);
+		for (String property : properties) {
+			references(start, property).map(byId::get).filter(e -> e != null && linked.add(e)).forEach(queue::add);
+		}
+		while (!queue.isEmpty()) {
+			Entity entity = queue.poll();
+			for (String property : entity.getValues().keySet()) {
+				references(entity, property).map(byId::get).filter(e -> e != null && linked.add(e))
+						.forEach(queue::add);
+			}
+		}
+		return linked;
+	}
+
+	/**
+	 * Whether the entity is the crate's metadata descriptor or HTML preview,
+	 * by its <code>@id</code> relative to the crate or to the root's.
+	 */
+	private boolean isCrateFile(Entity entity) {
+		return List.of(RO_CRATE_METADATA_JSON, RO_CRATE_PREVIEW_HTML).stream()
+				.anyMatch(name -> entity.getId().equals(name) || entity.getId().equals(getRoot().getId() + name));
+	}
+
+	private Map<String, Entity> byId() {
+		Map<String, Entity> byId = new HashMap<>();
+		entities.forEach(e -> byId.putIfAbsent(e.getId(), e));
+		return byId;
+	}
+
+	private static Stream<String> references(Entity entity, String property) {
+		return entity.getAll(property).stream().filter(v -> v.isObject() && v.has("@id"))
+				.map(v -> v.get("@id").asText());
+	}
+
 	private void replaceReferences(String oldId, String newId) {
 		for (Entity entity : entities) {
 			for (String property : List.copyOf(entity.getValues().keySet())) {
-				entity.setAll(property, entity.getAll(property).stream()
-						.map(v -> replaceReference(v, oldId, newId)).toList());
+				List<JsonNode> values = entity.getAll(property);
+				List<JsonNode> replaced = values.stream().map(v -> replaceReference(v, oldId, newId)).toList();
+				// Once each, e.g. mentions of two entities merged
+				entity.setAll(property, replaced.equals(values) ? values : replaced.stream().distinct().toList());
 			}
 		}
 	}

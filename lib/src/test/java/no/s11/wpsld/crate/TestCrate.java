@@ -54,6 +54,101 @@ public class TestCrate {
 		assertEquals(Optional.of(bob), crate.get("#person-2"));
 	}
 
+	private static JsonNode ref(String id) {
+		return JSON.objectNode().put("@id", id);
+	}
+
+	@Test
+	public void linkedFromAnyPropertyOfTheRoot() {
+		Crate crate = new Crate();
+		Entity file = crate.add("File");
+		Entity alice = crate.add("Person");
+		Entity org = crate.add("Organization");
+		Entity topic = crate.add("DefinedTerm");
+		Entity workflow = crate.add("File");
+		Entity lone = crate.add("Person");
+		// Need no link
+		Entity preview = crate.add("CreativeWork");
+		crate.rename(preview, Crate.RO_CRATE_PREVIEW_HTML);
+		crate.getRoot().set("hasPart", Optional.of(ref(file.getId())));
+		// Contextual entities, linked from a data entity, or from another
+		// contextual entity
+		file.set("author", Optional.of(ref(alice.getId())));
+		alice.set("affiliation", Optional.of(ref(org.getId())));
+		// Other properties of the root link too, not only hasPart and mentions
+		crate.getRoot().set("about", Optional.of(ref(topic.getId())));
+		crate.getRoot().set("mainEntity", Optional.of(ref(workflow.getId())));
+		assertEquals(List.of(lone), crate.unlinked());
+	}
+
+	@Test
+	public void mentionUnlinked() {
+		Crate crate = new Crate();
+		Entity alice = crate.add("Person");
+		Entity org = crate.add("Organization");
+		Entity bob = crate.add("Person");
+		crate.getRoot().set("mentions", Optional.of(ref("http://example.com/elsewhere")));
+		alice.set("affiliation", Optional.of(ref(org.getId())));
+		bob.set("affiliation", Optional.of(ref(org.getId())));
+		// The organization is linked through Alice, mentioned before it
+		assertEquals(List.of(alice, bob), crate.mentionUnlinked());
+		assertEquals(List.of(ref("http://example.com/elsewhere"), ref(alice.getId()), ref(bob.getId())),
+				crate.getRoot().getAll("mentions"));
+		assertEquals(List.of(), crate.unlinked());
+		assertEquals(List.of(), crate.mentionUnlinked());
+	}
+
+	@Test
+	public void unmentionLinked() {
+		Crate crate = new Crate();
+		Entity file = crate.add("File");
+		Entity alice = crate.add("Person");
+		Entity bob = crate.add("Person");
+		Entity org = crate.add("Organization");
+		crate.getRoot().set("hasPart", Optional.of(ref(file.getId())));
+		file.set("author", Optional.of(ref(alice.getId())));
+		// Organization is linked only from a mentioned entity
+		bob.set("affiliation", Optional.of(ref(org.getId())));
+		crate.getRoot().setAll("mentions", List.of(ref(file.getId()), ref("http://example.com/elsewhere"),
+				ref(alice.getId()), ref(bob.getId()), ref(org.getId()), ref("#missing")));
+		assertEquals(List.of(file, alice), crate.unmentionLinked());
+		// Kept: other mentions, in their order, even those linked through them
+		assertEquals(List.of(ref("http://example.com/elsewhere"), ref(bob.getId()), ref(org.getId()),
+				ref("#missing")), crate.getRoot().getAll("mentions"));
+		assertEquals(List.of(), crate.unmentionLinked());
+		assertEquals(List.of(), crate.unlinked());
+	}
+
+	@Test
+	public void addReferenced() {
+		Crate crate = new Crate();
+		Entity alice = crate.add("Person");
+		crate.getRoot().setAll("author", List.of(ref(alice.getId()), ref("#bob")));
+		alice.set("affiliation", Optional.of(ref("https://ror.org/027m9bs27")));
+		// Once each, and not for the metadata descriptor
+		alice.set("knows", Optional.of(ref("#bob")));
+		alice.set("subjectOf", Optional.of(ref(Crate.RO_CRATE_METADATA_JSON)));
+		List<Entity> added = crate.addReferenced();
+		assertEquals(List.of("#bob", "https://ror.org/027m9bs27"), added.stream().map(Entity::getId).toList());
+		assertTrue(added.stream().allMatch(e -> e.getTypes().equals(List.of("Thing"))));
+		assertEquals(Optional.of(added.get(0)), crate.get("#bob"));
+		assertEquals(List.of(), crate.addReferenced());
+	}
+
+	@Test
+	public void dataEntitiesArePartsOfParts() {
+		Crate crate = new Crate();
+		Entity folder = crate.add("Dataset");
+		Entity file = crate.add("File");
+		Entity cited = crate.add("File");
+		crate.getRoot().set("hasPart", Optional.of(ref(folder.getId())));
+		folder.set("hasPart", Optional.of(ref(file.getId())));
+		// A File only cited is a contextual entity
+		file.set("citation", Optional.of(ref(cited.getId())));
+		assertEquals(List.of(folder, file), crate.dataEntities());
+		assertEquals(List.of(), crate.unlinked());
+	}
+
 	@Test(expected = IllegalArgumentException.class)
 	public void rootCantBeRemoved() {
 		Crate crate = new Crate();

@@ -45,6 +45,9 @@ public class SchemaOrgFormFields implements FormFields {
 	private static final URI S_NUMBER = URI.create(S + "Number");
 	private static final URI S_DATE = URI.create(S + "Date");
 	private static final URI S_DATE_TIME = URI.create(S + "DateTime");
+	/** Types of the root data entity's parts: File, Dataset and CreativeWork */
+	private static final List<URI> ROOT_PARTS = List.of(URI.create(S + "MediaObject"), URI.create(S + "Dataset"),
+			URI.create(S + "CreativeWork"));
 
 	private final SchemaFromJsonLd schema;
 	private final CrateTerms terms;
@@ -70,6 +73,30 @@ public class SchemaOrgFormFields implements FormFields {
 	@Override
 	public List<FormField> fieldsFor(Set<URI> types) {
 		return propertyFields(types, false);
+	}
+
+	/**
+	 * As {@link #fieldsFor(Set)}, but for the root data entity its
+	 * <code>hasPart</code> offers its files and folders, see
+	 * {@link #forRoot(List)}.
+	 */
+	@Override
+	public List<FormField> fieldsFor(Set<URI> types, boolean root) {
+		List<FormField> fields = fieldsFor(types);
+		return root ? forRoot(fields) : fields;
+	}
+
+	/**
+	 * The fields of the root data entity: <code>hasPart</code>, the crate's
+	 * data entities, ranges over File and Dataset (files and folders) before
+	 * other CreativeWorks, unless a profile gave it a range.
+	 */
+	private List<FormField> forRoot(List<FormField> fields) {
+		List<ClassDef> parts = ROOT_PARTS.stream().map(schema.getClasses()::get).filter(Objects::nonNull).toList();
+		return fields.stream().map(f -> !f.name().equals("hasPart") || f.tier() != FieldTier.OTHER ? f
+				: new FormField(f.name(), f.property(), f.label(), f.comment(), f.group(), parts, kindOf(parts),
+						f.minCount(), f.maxCount(), f.tier()))
+				.toList();
 	}
 
 	/**

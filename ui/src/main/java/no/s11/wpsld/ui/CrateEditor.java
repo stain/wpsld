@@ -383,6 +383,9 @@ public class CrateEditor extends Application {
 			// A Thing to start with, and straight away choose its type, which
 			// replaces Thing (not needed for entities added from a property)
 			Entity entity = crate.add("Thing");
+			// Mentioned by the root until something else links to it, as
+			// no entity may be left dangling
+			crate.mentionUnlinked();
 			entities.getItems().add(entity);
 			entities.getSelectionModel().select(entity);
 			// One undo point with the type chosen next (see EntityEditor's
@@ -399,6 +402,8 @@ public class CrateEditor extends Application {
 		remove.setOnAction(e -> {
 			Entity entity = entities.getSelectionModel().getSelectedItem();
 			crate.remove(entity);
+			// The entities only it linked to the root are now mentioned
+			crate.mentionUnlinked();
 			entities.getItems().remove(entity);
 			changed();
 		});
@@ -486,7 +491,10 @@ public class CrateEditor extends Application {
 		// What they would undo and redo, e.g. Undo Add Person, as the menu opens
 		edit.setOnShowing(e -> nameUndo(stage, undo, redo));
 		edit.getItems().addAll(textEditing(stage));
-		edit.getItems().addAll(new SeparatorMenuItem(), preferences);
+		MenuItem repair = new MenuItem("Repa_ir Crate");
+		repair.setId("menuRepair");
+		repair.setOnAction(e -> repair(stage));
+		edit.getItems().addAll(new SeparatorMenuItem(), repair, new SeparatorMenuItem(), preferences);
 		edit.setId("menuEdit");
 		Menu view = new Menu("_View", null, sidebarItem(), new SeparatorMenuItem(), styles(stage), colours(stage));
 		view.setId("menuView");
@@ -1228,9 +1236,10 @@ public class CrateEditor extends Application {
 
 	/**
 	 * Whether the crate meets the RO-Crate requirements, or the user chooses
-	 * to save it anyway.
+	 * to save it anyway; first the entities left dangling are mentioned.
 	 */
 	private boolean meetsRequirements(Stage stage) {
+		mentionUnlinked();
 		// The profile's required properties, then RO-Crate's own checks
 		// (worded alike, so each problem only once)
 		List<String> problems = Stream.concat(RequiredFields.check(crate, profiles.getValue(), terms).stream(),
@@ -1244,6 +1253,74 @@ public class CrateEditor extends Application {
 		alert.initOwner(stage);
 		alert.setHeaderText("The crate does not yet meet the RO-Crate requirements");
 		return alert.showAndWait().orElse(ButtonType.CANCEL) == saveAnyway;
+	}
+
+	/**
+	 * Edit > Repair Crate: add a Thing for each reference to an entity not in
+	 * the crate, to be named and typed (see {@link Crate#addReferenced()});
+	 * no longer mention the entities linked otherwise from the root data
+	 * entity (see {@link Crate#unmentionLinked()}), and mention those not
+	 * linked (see {@link Crate#mentionUnlinked()}). One undoable step, then
+	 * tells what was done.
+	 */
+	void repair(Stage stage) {
+		List<Entity> added = crate.addReferenced();
+		List<Entity> unmentioned = crate.unmentionLinked();
+		List<Entity> mentioned = crate.mentionUnlinked();
+		List<String> done = new ArrayList<>();
+		if (!added.isEmpty()) {
+			done.add("Added as Thing, referred to but not in the crate:\n" + list(added)
+					+ "\nGive them a name and type, or if an @id is mistyped, change it to the one meant"
+					+ " to merge them.");
+		}
+		if (!unmentioned.isEmpty()) {
+			done.add("No longer mentioned by the root, as linked otherwise:\n" + list(unmentioned));
+		}
+		if (!mentioned.isEmpty()) {
+			done.add("Mentioned by the root, as not linked otherwise:\n" + list(mentioned));
+		}
+		if (!done.isEmpty()) {
+			entities.getItems().addAll(added);
+			if (entityEditor.getEntity() == crate.getRoot()) {
+				entityEditor.edit(crate.getRoot());
+			}
+			refresh();
+			checkpoint(placeOf(null), Optional.of("Repair"));
+		}
+		Alert report = new Alert(AlertType.INFORMATION,
+				done.isEmpty() ? "Nothing to repair." : String.join("\n\n", done), ButtonType.OK);
+		report.initOwner(stage);
+		report.setHeaderText("Repair Crate");
+		report.showAndWait();
+	}
+
+	/**
+	 * The entities, one per line, the first {@value #LISTED} of them.
+	 */
+	private static String list(List<Entity> listed) {
+		String list = listed.stream().limit(LISTED)
+				.map(e -> "• " + (e.getLabel().equals(e.getId()) ? e.getId() : e.getLabel() + " (" + e.getId() + ")"))
+				.collect(Collectors.joining("\n"));
+		return listed.size() > LISTED ? list + "\n… and " + (listed.size() - LISTED) + " more" : list;
+	}
+
+	/** How many entities {@link #repair} lists of each change */
+	private static final int LISTED = 10;
+
+	/**
+	 * Add the entities not linked from the root data entity to its
+	 * <code>mentions</code> (see {@link Crate#mentionUnlinked()}), e.g. after
+	 * removing the only reference to one, as an undoable step.
+	 */
+	private void mentionUnlinked() {
+		if (crate.mentionUnlinked().isEmpty()) {
+			return;
+		}
+		if (entityEditor.getEntity() == crate.getRoot()) {
+			entityEditor.edit(crate.getRoot());
+		}
+		refresh();
+		checkpoint();
 	}
 
 	/**
