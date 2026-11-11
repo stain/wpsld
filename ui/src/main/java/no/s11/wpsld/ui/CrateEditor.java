@@ -25,14 +25,17 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -73,6 +76,7 @@ import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
@@ -377,6 +381,8 @@ public class CrateEditor extends Application {
 				entityPreview.show(entity);
 			}
 		});
+		// Several to copy or remove; the last selected is edited
+		entities.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
 		// Copy and paste entities, as Edit > Copy and Paste do in the list
 		MenuItem copyEntity = new MenuItem("Copy");
 		copyEntity.setId("copyEntity");
@@ -397,7 +403,7 @@ public class CrateEditor extends Application {
 			// no entity may be left dangling
 			crate.mentionUnlinked();
 			entities.getItems().add(entity);
-			entities.getSelectionModel().select(entity);
+			show(entity);
 			// One undo point with the type chosen next (see EntityEditor's
 			// step), or for the Thing if none is
 			refresh();
@@ -408,13 +414,17 @@ public class CrateEditor extends Application {
 		});
 		Button remove = new Button("Remove");
 		remove.setId("removeEntity");
-		remove.disableProperty().bind(entities.getSelectionModel().selectedIndexProperty().lessThanOrEqualTo(0));
+		// Not the root data entity, which may be among those selected
+		remove.disableProperty().bind(Bindings.createBooleanBinding(
+				() -> entities.getSelectionModel().getSelectedItems().stream().allMatch(e -> e == crate.getRoot()),
+				entities.getSelectionModel().getSelectedItems()));
 		remove.setOnAction(e -> {
-			Entity entity = entities.getSelectionModel().getSelectedItem();
-			crate.remove(entity);
-			// The entities only it linked to the root are now mentioned
+			List<Entity> removed = entities.getSelectionModel().getSelectedItems().stream()
+					.filter(entity -> entity != crate.getRoot()).toList();
+			removed.forEach(crate::remove);
+			// The entities only they linked to the root are now mentioned
 			crate.mentionUnlinked();
-			entities.getItems().remove(entity);
+			entities.getItems().removeAll(removed);
 			changed();
 		});
 		HBox buttons = new HBox(6, add, remove);
@@ -428,7 +438,7 @@ public class CrateEditor extends Application {
 
 		// On the right, a preview of the entity (with links to the entities it
 		// refers to, which open them) and the crate's JSON-LD
-		entityPreview = new EntityPreview(() -> crate, entities.getSelectionModel()::select,
+		entityPreview = new EntityPreview(() -> crate, this::show,
 				address -> getHostServices().showDocument(address), property -> entityEditor.label(property));
 		entityPreview.setFolder(() -> crateFile.path().map(file -> file.toAbsolutePath().getParent()));
 		Tab previewTab = new Tab("Preview", entityPreview);
@@ -439,7 +449,7 @@ public class CrateEditor extends Application {
 		views.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 		split = new SplitPane(sidebar, entityEditor, views);
 		split.setDividerPositions(0.2, 0.66);
-		entities.getSelectionModel().select(crate.getRoot());
+		show(crate.getRoot());
 		changed();
 		return split;
 	}
@@ -581,26 +591,47 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * Copy the entity selected in the list to the clipboard, as its JSON-LD
-	 * (see {@link EntityClipboard}), e.g. to paste it in another crate (see
-	 * {@link #pasteEntity(Stage)}), as a reference, or as text elsewhere.
+	 * Copy the entities selected in the list to the clipboard, in the
+	 * crate's order, as their JSON-LD (see {@link EntityClipboard}), e.g. to
+	 * paste them in another crate (see {@link #pasteEntity(Stage)}), a
+	 * single one as a reference, or as text elsewhere. With them the
+	 * entities they refer to, not copied, to tell when pasting whether
+	 * references to those are right.
 	 */
 	void copyEntity() {
-		Entity entity = entities.getSelectionModel().getSelectedItem();
-		if (entity != null) {
-			EntityClipboard.copy(entity, crate.getContext());
+		List<Entity> selected = crate.getEntities().stream()
+				.filter(entities.getSelectionModel().getSelectedItems()::contains).toList();
+		if (selected.isEmpty()) {
+			return;
 		}
+		Set<String> copied = selected.stream().map(Entity::getId).collect(Collectors.toSet());
+		List<Entity> referenced = selected.stream()
+				.flatMap(e -> e.getValues().values().stream())
+				.flatMap(v -> v.isArray() ? StreamSupport.stream(v.spliterator(), false) : Stream.of(v))
+				.filter(v -> v.isObject() && v.path("@id").isTextual()).map(v -> v.get("@id").asText())
+				.filter(id -> !copied.contains(id)).distinct().map(crate::get).flatMap(Optional::stream).toList();
+		EntityClipboard.copy(selected, referenced, crate.getContext(), crateFile.base());
 	}
 
 	/**
-	 * Paste an entity from the clipboard, as copied by {@link #copyEntity()},
-	 * or its JSON-LD as text: with its own @id unless the crate already has
-	 * one with it (see {@link Crate#paste(Entity)}), mentioned by the root
-	 * until linked otherwise, and selected.
+	 * Select only this entity in the list, and edit it.
+	 */
+	private void show(Entity entity) {
+		entities.getSelectionModel().clearAndSelect(entities.getItems().indexOf(entity));
+	}
+
+	/**
+	 * Paste entities from the clipboard, as copied by {@link #copyEntity()},
+	 * or their JSON-LD as text (see {@link Crate#paste(List, Map, boolean)}):
+	 * local <code>@id</code>s are kept unless taken; an absolute one (or a
+	 * relative path) the crate has already offers to merge them; references
+	 * among those pasted follow new <code>@id</code>s. Mentioned by the root
+	 * until linked otherwise, and selected. References to entities not
+	 * copied that may be wrong are reported.
 	 */
 	void pasteEntity(Stage stage) {
-		Optional<Entity> copy = EntityClipboard.entity();
-		if (copy.isEmpty()) {
+		Optional<EntityClipboard.Clip> clip = EntityClipboard.entities();
+		if (clip.isEmpty()) {
 			Alert alert = new Alert(AlertType.WARNING,
 					"Copy an entity first: the clipboard should have its JSON-LD, an object with an @id.",
 					ButtonType.OK);
@@ -609,11 +640,59 @@ public class CrateEditor extends Application {
 			alert.showAndWait();
 			return;
 		}
-		Entity entity = crate.paste(copy.get());
+		boolean sameCrate = clip.get().crate().filter(crateFile.base()::equals).isPresent();
+		Crate.Pasted pasted = crate.paste(clip.get().entities(), clip.get().referenced(), sameCrate);
+		List<Entity> shown = new ArrayList<>(pasted.added());
+		pasted.existing().forEach((copy, existing) -> {
+			ButtonType merge = new ButtonType("Merge", ButtonData.OK_DONE);
+			ButtonType keep = new ButtonType("Keep Existing", ButtonData.CANCEL_CLOSE);
+			Alert alert = new Alert(AlertType.CONFIRMATION, "This crate already has " + existing.getLabel() + " ("
+					+ String.join(", ", existing.getTypes()) + ") with the @id " + existing.getId()
+					+ ", which differs from the one pasted.\n\nMerge the one pasted into it? Their types and values"
+					+ " are combined. Keep Existing leaves it as it is.", merge, keep);
+			alert.initOwner(stage);
+			alert.setHeaderText("Merge entities?");
+			if (alert.showAndWait().orElse(keep) == merge) {
+				crate.merge(existing, copy);
+				existing.setTypes(entityTypes.simplify(existing.getTypes()));
+			}
+			shown.add(existing);
+		});
 		crate.mentionUnlinked();
-		entities.getItems().add(entity);
-		entities.getSelectionModel().select(entity);
-		changed();
+		entities.getItems().setAll(crate.getEntities());
+		entities.getSelectionModel().clearSelection();
+		shown.stream().map(entities.getItems()::indexOf).forEach(entities.getSelectionModel()::select);
+		refresh();
+		checkpoint(placeOf(null), Optional.of("Paste"));
+		reportPasted(stage, pasted);
+	}
+
+	/**
+	 * Report references of entities pasted to entities not pasted that may
+	 * be wrong: missing in this crate, or another entity of the same local
+	 * @id than the one copied. Beside the crate, as the reader's warnings.
+	 */
+	private void reportPasted(Stage stage, Crate.Pasted pasted) {
+		List<String> problems = new ArrayList<>();
+		if (!pasted.dangling().isEmpty()) {
+			problems.add("Not in this crate: " + String.join(", ", pasted.dangling())
+					+ ". Paste them too, or Edit > Repair Crate to add them as Things.");
+		}
+		if (!pasted.ambiguous().isEmpty()) {
+			problems.add("Another entity in this crate than the one copied may have the same @id: "
+					+ String.join(", ", pasted.ambiguous()) + ". Check that these references are the ones meant.");
+		}
+		if (problems.isEmpty()) {
+			return;
+		}
+		int count = pasted.dangling().size() + pasted.ambiguous().size();
+		Alert alert = new Alert(AlertType.WARNING, String.join("\n\n", problems), ButtonType.OK);
+		alert.initOwner(stage);
+		alert.setHeaderText("Pasted " + pasted.added().size() + (pasted.added().size() == 1 ? " entity" : " entities")
+				+ ", with " + count + (count == 1 ? " reference" : " references") + " to an entity not copied");
+		alert.setResizable(true);
+		alert.initModality(javafx.stage.Modality.NONE);
+		alert.show();
 	}
 
 	/**
@@ -737,9 +816,9 @@ public class CrateEditor extends Application {
 	 */
 	private void edit(Crate other, Optional<Path> path) {
 		crate = other;
-		crateFile.reset(path, crate.toJson());
+		crateFile.open(path, crate.toJson());
 		entities.getItems().setAll(crate.getEntities());
-		entities.getSelectionModel().select(crate.getRoot());
+		show(crate.getRoot());
 		// The undo history is for one crate
 		history.reset(crate.toJson());
 		changed();
@@ -1133,7 +1212,7 @@ public class CrateEditor extends Application {
 			change = Optional.of("Merge Entities");
 		}
 		entities.getItems().setAll(crate.getEntities());
-		entities.getSelectionModel().select(edited);
+		show(edited);
 		entityEditor.edit(edited);
 		refresh();
 		// Also when confirmed with Enter in the @id field
@@ -1266,7 +1345,7 @@ public class CrateEditor extends Application {
 		crate = document.crate().get();
 		crateFile.reset(Optional.of(path), crate.toJson());
 		entities.getItems().setAll(crate.getEntities());
-		entities.getSelectionModel().select(selected.flatMap(crate::get).orElse(crate.getRoot()));
+		show(selected.flatMap(crate::get).orElse(crate.getRoot()));
 		refresh();
 		checkpoint(placeOf(null), Optional.of("Reload"));
 	}
@@ -1482,7 +1561,7 @@ public class CrateEditor extends Application {
 		Optional<Entity> changed = step.place().entity().flatMap(crate::get);
 		Entity show = changed.or(() -> UndoHistory.changedEntity(before, step.crate()).flatMap(crate::get))
 				.or(() -> shown.flatMap(crate::get)).orElse(crate.getRoot());
-		entities.getSelectionModel().select(show);
+		show(show);
 		entityEditor.edit(show);
 		if (changed.isPresent()) {
 			step.place().property().ifPresent(property -> Platform.runLater(() -> entityEditor.focusProperty(property)));

@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -137,16 +138,134 @@ public class Crate {
 	}
 
 	/**
-	 * Add a copy of an entity, e.g. pasted from the clipboard, with its own
-	 * <code>@id</code>; or if another entity already has that, a new local
-	 * identifier as for {@link #add(String)} of its first type.
+	 * What {@link #paste(List, Map, boolean)} did.
+	 *
+	 * @param added     The entities added, in the order pasted
+	 * @param existing  Copies whose <code>@id</code> (absolute, or a relative
+	 *                  path) names an entity the crate already has, which
+	 *                  differs: each with that entity, to merge into it
+	 *                  (see {@link Crate#merge}) or leave out. Copies the
+	 *                  same as the crate's entity are left out silently.
+	 * @param renamed   New <code>@id</code>s of copies, by their own
+	 * @param dangling  <code>@id</code>s the pasted entities refer to, not
+	 *                  pasted, that the crate has no entity for
+	 * @param ambiguous Local <code>@id</code>s the pasted entities refer to,
+	 *                  not pasted, that the crate has an entity for, but
+	 *                  from another crate and not as copied: it may be
+	 *                  another entity of the same <code>@id</code>
+	 */
+	public record Pasted(List<Entity> added, Map<Entity, Entity> existing, Map<String, String> renamed,
+			List<String> dangling, List<String> ambiguous) {
+	}
+
+	/**
+	 * Add a copy of an entity, see {@link #paste(List, Map, boolean)}.
+	 *
+	 * @return The entity added, or else the crate's own of its
+	 *         <code>@id</code>
 	 */
 	public Entity paste(Entity copy) {
-		Entity entity = new Entity(get(copy.getId()).isPresent() ? newId(copy.getTypes().get(0)) : copy.getId(),
-				copy.getTypes().toArray(String[]::new));
-		copy.getValues().forEach((property, value) -> entity.set(property, Optional.of(value.deepCopy())));
-		entities.add(entity);
-		return entity;
+		Pasted pasted = paste(List.of(copy), Map.of(), false);
+		return pasted.added().isEmpty() ? get(copy.getId()).orElseThrow() : pasted.added().get(0);
+	}
+
+	/**
+	 * Add copies of entities, e.g. pasted from the clipboard, with the
+	 * values copied too. Their <code>@id</code>s:
+	 * <ul>
+	 * <li>absolute ones (<code>https:</code>, <code>mailto:</code>,
+	 * <code>urn:</code>, …) name the same entity in any crate, and relative
+	 * paths the crate's own file or folder: kept, and if the crate already
+	 * has an entity with it, not added, but given in
+	 * {@link Pasted#existing()} to merge (unless the same);
+	 * <li>local identifiers (<code>#bob</code>) are kept, or if taken, a new
+	 * one as for {@link #add(String)} of the first type;
+	 * <li>blank nodes (<code>_:b0</code>) always get a new local identifier,
+	 * as they only mean something within their document.
+	 * </ul>
+	 * References among the copies follow their new <code>@id</code>s, not
+	 * references of the crate's own entities. Other references are kept as
+	 * they are (a shallow copy), and reported if they may be wrong.
+	 *
+	 * @param referenced The entities the copies refer to that were not
+	 *                   copied, as they were when copied, by
+	 *                   <code>@id</code>: tells whether the crate's entity
+	 *                   of the same <code>@id</code> is the one meant
+	 * @param sameCrate  Whether copied from this crate, so that references
+	 *                   to its entities are right as they are
+	 */
+	public Pasted paste(List<Entity> copies, Map<String, Entity> referenced, boolean sameCrate) {
+		Map<String, String> renamed = new LinkedHashMap<>();
+		Map<Entity, Entity> existing = new LinkedHashMap<>();
+		List<Entity> added = new ArrayList<>();
+		Set<String> copiedIds = new HashSet<>();
+		for (Entity copy : copies) {
+			String id = copy.getId();
+			copiedIds.add(id);
+			Optional<Entity> taken = get(id);
+			Entity entity = new Entity(id, copy.getTypes().toArray(String[]::new));
+			copy.getValues().forEach((property, value) -> entity.set(property, Optional.of(value.deepCopy())));
+			if (isBlankNode(id) || (isLocal(id) && taken.isPresent())) {
+				entity.setId(newId(copy.getTypes().get(0)));
+				renamed.put(id, entity.getId());
+			} else if (taken.isPresent()) {
+				if (!taken.get().toJson().equals(copy.toJson())) {
+					existing.put(entity, taken.get());
+				}
+				continue;
+			}
+			// Added straight away, so that newId sees it
+			entities.add(entity);
+			added.add(entity);
+		}
+		List<Entity> pasted = new ArrayList<>(added);
+		pasted.addAll(existing.keySet());
+		replaceReferences(pasted, renamed);
+
+		Set<String> dangling = new LinkedHashSet<>();
+		Set<String> ambiguous = new LinkedHashSet<>();
+		Map<String, Entity> byId = byId();
+		pasted.stream().flatMap(e -> e.getValues().keySet().stream().flatMap(p -> references(e, p)))
+				.filter(id -> !copiedIds.contains(id) && !renamed.containsValue(id) && !isDescriptor(id))
+				.forEach(id -> {
+					Entity entity = byId.get(id);
+					if (entity == null) {
+						dangling.add(id);
+					} else if (!sameCrate && (isLocal(id) || isBlankNode(id))
+							&& !Optional.ofNullable(referenced.get(id)).map(Entity::toJson)
+									.equals(Optional.of(entity.toJson()))) {
+						ambiguous.add(id);
+					}
+				});
+		return new Pasted(added, existing, renamed, List.copyOf(dangling), List.copyOf(ambiguous));
+	}
+
+	/**
+	 * Whether an <code>@id</code> is an absolute IRI, with a scheme such as
+	 * <code>https:</code>, rather than relative to the crate (a path, or a
+	 * local <code>#</code> identifier) or a blank node.
+	 */
+	public static boolean isAbsolute(String id) {
+		return id.matches("[A-Za-z][A-Za-z0-9+.-]*:.*") && !isBlankNode(id);
+	}
+
+	/**
+	 * Whether an <code>@id</code> is a local identifier such as
+	 * <code>#bob</code>, which only means something within its crate.
+	 */
+	public static boolean isLocal(String id) {
+		return id.startsWith("#");
+	}
+
+	/**
+	 * Whether an <code>@id</code> is a blank node such as <code>_:b0</code>.
+	 */
+	public static boolean isBlankNode(String id) {
+		return id.startsWith("_:");
+	}
+
+	private boolean isDescriptor(String id) {
+		return id.equals(RO_CRATE_METADATA_JSON) || id.equals(getRoot().getId() + RO_CRATE_METADATA_JSON);
 	}
 
 	/**
@@ -290,8 +409,7 @@ public class Crate {
 		for (Entity entity : List.copyOf(entities)) {
 			for (String property : entity.getValues().keySet()) {
 				references(entity, property)
-						.filter(id -> !byId.containsKey(id) && !id.equals(RO_CRATE_METADATA_JSON)
-								&& !id.equals(getRoot().getId() + RO_CRATE_METADATA_JSON))
+						.filter(id -> !byId.containsKey(id) && !isDescriptor(id))
 						.forEach(id -> {
 							Entity thing = new Entity(id, "Thing");
 							byId.put(id, thing);
@@ -376,18 +494,31 @@ public class Crate {
 	}
 
 	private void replaceReferences(String oldId, String newId) {
+		replaceReferences(entities, Map.of(oldId, newId));
+	}
+
+	/**
+	 * Replace references to the old <code>@id</code>s with the new ones, all
+	 * at once, so that one renamed to another's old <code>@id</code> is not
+	 * renamed again.
+	 */
+	private static void replaceReferences(List<Entity> entities, Map<String, String> renamed) {
 		for (Entity entity : entities) {
 			for (String property : List.copyOf(entity.getValues().keySet())) {
 				List<JsonNode> values = entity.getAll(property);
-				List<JsonNode> replaced = values.stream().map(v -> replaceReference(v, oldId, newId)).toList();
-				// Once each, e.g. mentions of two entities merged
-				entity.setAll(property, replaced.equals(values) ? values : replaced.stream().distinct().toList());
+				List<JsonNode> replaced = values.stream().map(v -> replaceReference(v, renamed)).toList();
+				// Once each, e.g. mentions of two entities merged; others as they were
+				if (!replaced.equals(values)) {
+					entity.setAll(property, replaced.stream().distinct().toList());
+				}
 			}
 		}
 	}
 
-	private static JsonNode replaceReference(JsonNode value, String oldId, String newId) {
-		if (value.isObject() && value.path("@id").asText("").equals(oldId)) {
+	private static JsonNode replaceReference(JsonNode value, Map<String, String> renamed) {
+		String newId = value.isObject() && value.path("@id").isTextual() ? renamed.get(value.get("@id").asText())
+				: null;
+		if (newId != null) {
 			ObjectNode copy = ((ObjectNode) value).deepCopy();
 			copy.put("@id", newId);
 			return copy;

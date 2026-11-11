@@ -26,6 +26,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -59,6 +60,8 @@ final class CrateFile {
 	private String lineEnd = "\n";
 	/** The SHA-256 of a changed file the user chose to keep their changes over */
 	private Optional<String> keptOver = Optional.empty();
+	/** The crate's base, to tell entities copied from it, see {@link #base()} */
+	private String base = newBase();
 
 	/**
 	 * @param saved A new crate, not saved anywhere yet
@@ -68,10 +71,24 @@ final class CrateFile {
 	}
 
 	/**
-	 * A crate opened from, or saved to, a file, remembering the file as it is
-	 * on disk now; or a new one (no path).
+	 * Another crate, opened from a file or a new one (no path), remembering
+	 * the file as it is on disk now: with a new {@link #base()}.
+	 */
+	void open(Optional<Path> path, JsonNode saved) {
+		base = newBase();
+		reset(path, saved);
+	}
+
+	/**
+	 * The crate saved to, or reloaded from, a file, remembering the file as
+	 * it is on disk now. Saved to another file (Save As…), it is another
+	 * crate from now on, with a new {@link #base()}; not when a new crate is
+	 * saved for the first time, or reloaded.
 	 */
 	void reset(Optional<Path> path, JsonNode saved) {
+		if (this.path.isPresent() && !this.path.equals(path)) {
+			base = newBase();
+		}
 		this.path = path;
 		this.saved = saved;
 		this.stamp = path.flatMap(CrateFile::stamp);
@@ -86,6 +103,23 @@ final class CrateFile {
 				// As before
 			}
 		}
+	}
+
+	/**
+	 * An <code>arcp://uuid,…/</code> base for the crate, as RO-Crate has for
+	 * crates without a location: random for each crate opened or made, kept
+	 * when saving or reloading it, but not in the crate itself. Entities
+	 * copied tell by it which crate they came from (see
+	 * {@link EntityClipboard}), so that pasting them into the same crate
+	 * knows its references are right. Another window, being another process,
+	 * has another base for the same file.
+	 */
+	String base() {
+		return base;
+	}
+
+	private static String newBase() {
+		return "arcp://uuid," + UUID.randomUUID() + "/";
 	}
 
 	/**

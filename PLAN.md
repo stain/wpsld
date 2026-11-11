@@ -478,16 +478,16 @@ Styles:
 
 ### Entities
 
-- **Copy and paste entities.** Done for one entity: in the entity list,
-  Edit > Copy (and the list's own menu) puts the selected entity on the
-  clipboard as its JSON-LD, both as text (for text editors) and as
-  `application/x-wpsld-entity+json`, so wpsld's own fields know it is an
-  entity: reference fields paste its `@id`, other fields nothing; and as
-  `application/ld+json`, a document of the crate's `@context` and a
-  `@graph` of the entity. Paste in the list adds it (also from such a
-  document of one entity), keeping its `@id` unless the crate has one
-  with it, mentioned by the root. Next, in this order:
-  1. **Several entities.** Select several in the entity list (multiple
+- **Copy and paste entities.** In the entity list, Edit > Copy (and the
+  list's own menu) puts the selected entities on the clipboard as their
+  JSON-LD (`EntityClipboard`): as text for text editors (an object, or
+  several separated by commas, as in a `@graph`); as `application/ld+json`,
+  a document of the crate's `@context` and a `@graph` of the entities; and
+  as wpsld's own `application/vnd.s11.wpsld.entities+json`, so wpsld's own
+  fields know they are entities: reference fields paste a single entity's
+  `@id`, other fields nothing. Paste in the list adds them (also from such
+  a document, or the text), mentioned by the root.
+  1. **Several entities** *(done)*. Select several in the entity list (multiple
      selection); Copy puts them all in one `@graph`; Paste adds them all
      and selects them. A shallow copy: references to entities outside the
      copied set stay as they are. Pasting a reference field still takes a
@@ -499,9 +499,12 @@ Styles:
        `@context` (`[<crate context>, {"@base": "arcp://uuid,…/"}]`), so
        other JSON-LD tools expanding it keep `#uom` of one crate apart from
        `#uom` of another. The wpsld format wraps the same document:
-       `{"crate": "arcp://uuid,…/", "copied": [ids], "referenced":
+       `{"version": 1, "crate": "arcp://uuid,…/", "referenced":
        [entities], "document": {…}}`. A document without `@base`, or text,
-       counts as from another crate (the safe default).
+       counts as from another crate (the safe default). The version is
+       raised only for changes that would mislead an older wpsld, which
+       then ignores it and pastes from `application/ld+json`; added keys
+       keep it.
      - **Assigning the UUID**: random per opened crate, kept in
        `CrateFile` and not in the crate. File > New and Open: a new one.
        Save As…: a new one, as the copy is a different crate from then on
