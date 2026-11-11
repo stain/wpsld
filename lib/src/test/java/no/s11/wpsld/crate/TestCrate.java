@@ -99,6 +99,43 @@ public class TestCrate {
 	}
 
 	@Test
+	public void unmentionLinked() {
+		Crate crate = new Crate();
+		Entity file = crate.add("File");
+		Entity alice = crate.add("Person");
+		Entity bob = crate.add("Person");
+		Entity org = crate.add("Organization");
+		crate.getRoot().set("hasPart", Optional.of(ref(file.getId())));
+		file.set("author", Optional.of(ref(alice.getId())));
+		// Organization is linked only from a mentioned entity
+		bob.set("affiliation", Optional.of(ref(org.getId())));
+		crate.getRoot().setAll("mentions", List.of(ref(file.getId()), ref("http://example.com/elsewhere"),
+				ref(alice.getId()), ref(bob.getId()), ref(org.getId()), ref("#missing")));
+		assertEquals(List.of(file, alice), crate.unmentionLinked());
+		// Kept: other mentions, in their order, even those linked through them
+		assertEquals(List.of(ref("http://example.com/elsewhere"), ref(bob.getId()), ref(org.getId()),
+				ref("#missing")), crate.getRoot().getAll("mentions"));
+		assertEquals(List.of(), crate.unmentionLinked());
+		assertEquals(List.of(), crate.unlinked());
+	}
+
+	@Test
+	public void addReferenced() {
+		Crate crate = new Crate();
+		Entity alice = crate.add("Person");
+		crate.getRoot().setAll("author", List.of(ref(alice.getId()), ref("#bob")));
+		alice.set("affiliation", Optional.of(ref("https://ror.org/027m9bs27")));
+		// Once each, and not for the metadata descriptor
+		alice.set("knows", Optional.of(ref("#bob")));
+		alice.set("subjectOf", Optional.of(ref(Crate.RO_CRATE_METADATA_JSON)));
+		List<Entity> added = crate.addReferenced();
+		assertEquals(List.of("#bob", "https://ror.org/027m9bs27"), added.stream().map(Entity::getId).toList());
+		assertTrue(added.stream().allMatch(e -> e.getTypes().equals(List.of("Thing"))));
+		assertEquals(Optional.of(added.get(0)), crate.get("#bob"));
+		assertEquals(List.of(), crate.addReferenced());
+	}
+
+	@Test
 	public void dataEntitiesArePartsOfParts() {
 		Crate crate = new Crate();
 		Entity folder = crate.add("Dataset");

@@ -146,6 +146,49 @@ public class TestCrateEditor extends ApplicationTest {
 		assertFalse(entities().getItems().contains(person));
 	}
 
+	/**
+	 * Repairing adds a Thing for each reference to an entity not in the
+	 * crate, and mentions what is not linked otherwise, and only that.
+	 */
+	@Test
+	public void repairCrate() {
+		entities();
+		addEntity("person");
+		addEntity("person");
+		Entity root = entities().getItems().get(0);
+		Entity alice = entities().getItems().get(1);
+		Entity bob = entities().getItems().get(2);
+		// Alice is now the crate's author, with a mistyped affiliation; Bob is
+		// still only mentioned
+		interact(() -> {
+			root.set("author", Optional.of(JsonNodeFactory.instance.objectNode().put("@id", alice.getId())));
+			alice.set("affiliation", Optional.of(JsonNodeFactory.instance.objectNode().put("@id", "#uni")));
+		});
+		// Saving leaves the mentions as they are
+		clickOn("#save");
+		clickOn("Cancel");
+		assertEquals(List.of(alice.getId(), bob.getId()),
+				root.getAll("mentions").stream().map(v -> v.get("@id").asText()).toList());
+
+		MenuItem repair = menuItem("menuRepair");
+		WaitForAsyncUtils.asyncFx(repair::fire);
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup(".dialog-pane").queryAs(javafx.scene.control.DialogPane.class).getContentText()
+				.contains("#uni"));
+		clickOn("OK");
+		assertEquals(List.of(bob.getId()),
+				root.getAll("mentions").stream().map(v -> v.get("@id").asText()).toList());
+		Entity uni = entities().getItems().get(3);
+		assertEquals("#uni", uni.getId());
+		assertEquals(List.of("Thing"), uni.getTypes());
+
+		// Nothing more to repair
+		WaitForAsyncUtils.asyncFx(repair::fire);
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup("Nothing to repair.").tryQuery().isPresent());
+		clickOn("OK");
+	}
+
 	@Test
 	public void saveWarnsAboutRequirements() {
 		entities();

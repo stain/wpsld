@@ -255,6 +255,64 @@ public class Crate {
 	}
 
 	/**
+	 * Add a Thing for each <code>@id</code> the crate's entities refer to
+	 * that is not an entity in the crate, e.g. an external IRI, a local
+	 * identifier of an entity removed or not yet added, or a typo, so that it
+	 * can be given a name and type, or renamed to the <code>@id</code> meant
+	 * (see {@link #merge}). Not for the metadata descriptor.
+	 *
+	 * @return The entities added, in the order first referred to
+	 */
+	public List<Entity> addReferenced() {
+		Map<String, Entity> byId = byId();
+		List<Entity> added = new ArrayList<>();
+		for (Entity entity : List.copyOf(entities)) {
+			for (String property : entity.getValues().keySet()) {
+				references(entity, property)
+						.filter(id -> !byId.containsKey(id) && !id.equals(RO_CRATE_METADATA_JSON)
+								&& !id.equals(getRoot().getId() + RO_CRATE_METADATA_JSON))
+						.forEach(id -> {
+							Entity thing = new Entity(id, "Thing");
+							byId.put(id, thing);
+							entities.add(thing);
+							added.add(thing);
+						});
+			}
+		}
+		return added;
+	}
+
+	/**
+	 * Remove from the root data entity's <code>mentions</code> the entities
+	 * linked from its other properties (e.g. as parts, or as their authors),
+	 * recursively through any property of the entities reached, as they need
+	 * no mention. Entities only linked from other mentioned entities stay
+	 * mentioned, as which of those could go would depend on their order.
+	 *
+	 * @return The entities removed from <code>mentions</code>
+	 */
+	public List<Entity> unmentionLinked() {
+		Entity root = getRoot();
+		List<String> properties = root.getValues().keySet().stream().filter(p -> !p.equals("mentions")).toList();
+		Set<Entity> linked = linkedFrom(root.getId(), properties, new HashSet<>());
+		Map<String, Entity> byId = byId();
+		List<Entity> unmentioned = new ArrayList<>();
+		List<JsonNode> mentions = new ArrayList<>();
+		for (JsonNode mention : root.getAll("mentions")) {
+			Entity entity = mention.isObject() && mention.has("@id") ? byId.get(mention.get("@id").asText()) : null;
+			if (entity != null && entity != root && linked.contains(entity)) {
+				unmentioned.add(entity);
+			} else {
+				mentions.add(mention);
+			}
+		}
+		if (!unmentioned.isEmpty()) {
+			root.setAll("mentions", mentions);
+		}
+		return unmentioned;
+	}
+
+	/**
 	 * Add to <code>linked</code> the entities referred to by these properties
 	 * of an entity, and recursively those referred to by any of their
 	 * properties.
