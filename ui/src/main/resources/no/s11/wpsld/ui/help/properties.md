@@ -29,6 +29,42 @@ Some properties also accept plain text, such as licence terms. Check that
 the value is appropriate and that references point to the intended
 entities.
 
+## Licences
+
+RO-Crate asks for a **License** on the crate itself (the root dataset), and
+on any file whose licence differs from the crate's. The licence should be
+a description of its own, a CreativeWork, whose `@id` is the licence's web
+address. For the common licences, use their address in the
+[SPDX License List](https://spdx.org/licenses/), which gives each licence
+a short identifier, for example:
+
+- `http://spdx.org/licenses/CC-BY-4.0` for Creative Commons Attribution 4.0
+- `http://spdx.org/licenses/CC0-1.0` for the CC0 public domain dedication
+- `http://spdx.org/licenses/Apache-2.0` for the Apache License 2.0
+- `http://spdx.org/licenses/MIT` for the MIT License
+
+Look up other identifiers on the SPDX License List's page, and put the
+identifier after `http://spdx.org/licenses/`.
+
+wpsld does not look licences up for you yet, so add one like this:
+
+1. On the crate (or file), find **License** and choose **New >
+   CreativeWork**.
+2. Select the new CreativeWork in the entity list, and enter the licence's
+   full name as its **Name**, for example `Creative Commons Attribution
+   4.0 International`.
+3. Set its `@id` to the SPDX address, for example
+   `http://spdx.org/licenses/CC-BY-4.0`, and press Enter. The crate's
+   link to it follows the new `@id`.
+
+To give another file the same licence, don't make a second description:
+open the file's **License** drop-down and choose the licence the crate
+already has. For a licence that isn't on the SPDX list, use its own web
+address as the `@id`, and add a **Description** summarising it.
+
+[Getting started](getting-started.md) walks through adding a licence, with
+screenshots.
+
 ## Places
 
 To say where something is, or which area it covers, link it to a
