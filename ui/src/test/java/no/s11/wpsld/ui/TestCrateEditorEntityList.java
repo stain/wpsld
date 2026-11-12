@@ -505,6 +505,68 @@ public class TestCrateEditorEntityList extends ApplicationTest {
 		assertTrue(Files.exists(target));
 	}
 
+	/**
+	 * In an attached crate, entities whose files are not in its folder are
+	 * marked; Crate > Check Web Availability marks web parts not available
+	 */
+	@Test
+	public void problems() throws Exception {
+		com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer
+				.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+		server.createContext("/ok.csv", exchange -> {
+			exchange.sendResponseHeaders(200, -1);
+			exchange.close();
+		});
+		server.start();
+		String web = "http://127.0.0.1:" + server.getAddress().getPort();
+		try {
+			Path folder = Files.createDirectories(temp.resolve("survey"));
+			Files.writeString(folder.resolve("counts.csv"), "");
+			Files.writeString(folder.resolve("ro-crate-metadata.json"), """
+					{"@context": "https://w3id.org/ro/crate/1.3/context", "@graph": [
+					 {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"}},
+					 {"@id": "./", "@type": "Dataset", "name": "Survey", "hasPart": [{"@id": "counts.csv"},
+					  {"@id": "gone.csv"}, {"@id": "WEB/ok.csv"}, {"@id": "WEB/gone.csv"}]},
+					 {"@id": "counts.csv", "@type": "File"},
+					 {"@id": "gone.csv", "@type": "File"},
+					 {"@id": "WEB/ok.csv", "@type": "File"},
+					 {"@id": "WEB/gone.csv", "@type": "File"}
+					]}""".replace("WEB", web));
+			Stage stage = (Stage) entities().getScene().getWindow();
+			assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, folder.resolve("ro-crate-metadata.json"))).get());
+			EntityTreeView tree = openTree();
+			assertEquals(List.of("  gone.csv"), problemRows(tree));
+
+			var task = WaitForAsyncUtils.asyncFx(() -> app.checkWeb(stage).orElseThrow()).get();
+			assertEquals(2, task.get(10, TimeUnit.SECONDS).size());
+			WaitForAsyncUtils.waitForFxEvents();
+			assertTrue(lookup("1 of 2 web resources are not available").tryQuery().isPresent());
+			assertEquals(List.of("  gone.csv", "  " + web + "/gone.csv"), problemRows(tree));
+
+			// Detached, its files are not looked for
+			interact(() -> ((javafx.scene.control.CheckMenuItem) menuItem("menuAttached")).setSelected(false));
+			interact(() -> menuItem("menuAttached").fire());
+			WaitForAsyncUtils.waitForFxEvents();
+			assertEquals(List.of("  " + web + "/gone.csv"), problemRows(tree));
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	private EntityTreeView openTree() {
+		choose("menuListByFolder");
+		WaitForAsyncUtils.waitForFxEvents();
+		return lookup("#entityTree").queryAs(EntityTreeView.class);
+	}
+
+	/** The tree's rows shown as having a problem */
+	private List<String> problemRows(EntityTreeView tree) {
+		return lookup("#entityTree .tree-cell").queryAllAs(javafx.scene.control.TreeCell.class).stream()
+				.filter(cell -> cell.getStyleClass().contains("problem") && cell.getTreeItem() != null)
+				.sorted(java.util.Comparator.comparing(cell -> tree.getRow(cell.getTreeItem())))
+				.map(cell -> rows(tree).get(tree.getRow(cell.getTreeItem()))).toList();
+	}
+
 	@Test
 	public void editedNotListed() throws Exception {
 		addNamed("Person", "Alice");

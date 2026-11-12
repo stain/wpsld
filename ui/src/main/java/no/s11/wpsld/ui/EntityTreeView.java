@@ -58,6 +58,8 @@ class EntityTreeView extends TreeView<Node> {
 	private final Map<String, Boolean> expanded = new HashMap<>();
 	/** The tree as last made, to make it again only if it changed */
 	private List<Object> made = List.of();
+	/** Entities with a problem, e.g. a file not found, and what it is */
+	private Map<Entity, String> problems = Map.of();
 	/** While selecting the other places of the entities selected */
 	private boolean selectingAlso;
 
@@ -85,7 +87,7 @@ class EntityTreeView extends TreeView<Node> {
 			}
 
 			private void show(Node node, boolean empty) {
-				getStyleClass().remove("not-data");
+				getStyleClass().removeAll("not-data", "problem");
 				if (empty || node == null) {
 					setText(null);
 					setGraphic(null);
@@ -96,12 +98,17 @@ class EntityTreeView extends TreeView<Node> {
 				if (!Objects.equals(text, getText())) {
 					setText(text);
 				}
-				icon.set(EntityIcons.of(node, listing));
+				Optional<String> problem = node.entity().map(problems::get);
+				icon.set(problem.isPresent() ? EntityIcons.problem(node.entity().get(), listing)
+						: EntityIcons.of(node, listing));
 				setGraphic(icon);
-				if ((node.kind() == Kind.FILE || node.kind() == Kind.FOLDER) && !node.data()) {
+				if (problem.isPresent()) {
+					getStyleClass().add("problem");
+				} else if ((node.kind() == Kind.FILE || node.kind() == Kind.FOLDER) && !node.data()) {
 					getStyleClass().add("not-data");
 				}
-				Optional<String> tip = tip(node);
+				Optional<String> tip = tip(node).map(t -> problem.map(p -> p + "\n" + t).orElse(t))
+						.or(() -> problem);
 				tooltip.setText(tip.orElse(""));
 				setTooltip(tip.isPresent() ? tooltip : null);
 			}
@@ -300,6 +307,17 @@ class EntityTreeView extends TreeView<Node> {
 			scrollTo(Math.max(0, last - 3));
 		}
 		return all;
+	}
+
+	/**
+	 * Mark these entities as having a problem, e.g. a file not found, saying
+	 * what it is
+	 */
+	void setProblems(Map<Entity, String> problems) {
+		if (!problems.equals(this.problems)) {
+			this.problems = Map.copyOf(problems);
+			refresh();
+		}
 	}
 
 	/** The files selected that have no entity, by their @ids */

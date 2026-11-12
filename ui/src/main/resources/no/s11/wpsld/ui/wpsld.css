@@ -185,6 +185,7 @@
 .entity-icon.icon-product { -icon-line: #7a6a1f; -icon-fill: #e0d080; } /* products: olive */
 .entity-icon.icon-term { -icon-line: #a3337f; -icon-fill: #f5a3d8; } /* terms and values: magenta */
 .entity-icon.icon-thing { -icon-line: #6b6b6b; -icon-fill: #d0d0d0; } /* anything else: grey */
+.entity-icon.icon-problem { -icon-line: #c42b1c; -icon-fill: #ff6b5e; } /* not found, not available: red */
 
 .colours-dark .entity-icon.icon-crate { -icon-line: #d9a66b; -icon-fill: #7a4f22; }
 .colours-dark .entity-icon.icon-data { -icon-line: #f0c050; -icon-fill: #8a6000; }
@@ -198,4 +199,26 @@
 .colours-dark .entity-icon.icon-nature { -icon-line: #74d68b; -icon-fill: #1a6b33; }
 .colours-dark .entity-icon.icon-product { -icon-line: #d8c76a; -icon-fill: #6b5d1a; }
 .colours-dark .entity-icon.icon-term { -icon-line: #f28fd0; -icon-fill: #8c2c6e; }
+.colours-dark .entity-icon.icon-problem { -icon-line: #ff99a4; -icon-fill: #c42b1c; }
 .colours-dark .entity-icon.icon-thing { -icon-line: #b0b0b0; -icon-fill: #5a5a5a; }
+
+/*
+ * Entities with a problem (a file not found in an attached crate's folder,
+ * a web resource not available): a pale red row, with a red icon; when
+ * selected, as the style shows selected rows
+ */
+.list-cell.problem, .tree-cell.problem {
+    -fx-background-color: #fde4e1;
+}
+
+.colours-dark .list-cell.problem, .colours-dark .tree-cell.problem {
+    -fx-background-color: #4d2626;
+}
+
+.list-cell.problem:filled:selected, .tree-cell.problem:filled:selected {
+    -fx-background-color: -fx-selection-bar-non-focused;
+}
+
+.list-view:focused .list-cell.problem:filled:selected, .tree-view:focused .tree-cell.problem:filled:selected {
+    -fx-background-color: -fx-selection-bar;
+}

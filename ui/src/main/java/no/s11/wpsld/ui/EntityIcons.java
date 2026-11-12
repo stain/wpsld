@@ -30,6 +30,7 @@ import javafx.scene.control.Cell;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
+import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.form.EntityListing;
 import no.s11.wpsld.form.EntityTree;
@@ -45,7 +46,9 @@ import no.s11.wpsld.form.EntityTree;
 final class EntityIcons {
 	/** Kinds of things, each icon coloured as its family */
 	enum Family {
-		CRATE, DATA, WORK, SOFTWARE, WEB, PERSON, ORGANIZATION, PLACE, EVENT, NATURE, PRODUCT, TERM, THING;
+		CRATE, DATA, WORK, SOFTWARE, WEB, PERSON, ORGANIZATION, PLACE, EVENT, NATURE, PRODUCT, TERM, THING,
+		/** A file not found, or a web resource not available */
+		PROBLEM;
 
 		String styleClass() {
 			return "icon-" + name().toLowerCase();
@@ -69,6 +72,20 @@ final class EntityIcons {
 	static final Glyph EXTERNAL = Glyph.of(FluentUiRegularAL.GLOBE_20, Family.WEB);
 	static final Glyph RESOURCE = Glyph.of(FluentUiRegularAL.LINK_20, Family.WEB);
 	static final Glyph THING = Glyph.of(FluentUiRegularAL.CUBE_20, Family.THING);
+	/** A file of the crate not in its folder */
+	static final Glyph MISSING_FILE = Glyph.of(FluentUiRegularAL.DOCUMENT_ERROR_20, Family.PROBLEM);
+	/** A folder of the crate not in its folder */
+	static final Glyph MISSING_FOLDER = Glyph.of(FluentUiRegularAL.ERROR_CIRCLE_20, Family.PROBLEM);
+	/** A web resource not available */
+	static final Glyph UNAVAILABLE = Glyph.of(FluentUiRegularMZ.PLUG_DISCONNECTED_20, Family.PROBLEM);
+
+	/** The icon of an entity with a problem, by what it is */
+	static Glyph problem(Entity entity, EntityListing listing) {
+		if (Crate.isAbsolute(entity.getId())) {
+			return UNAVAILABLE;
+		}
+		return entity.getId().endsWith("/") || listing.isA(entity, "Dataset") ? MISSING_FOLDER : MISSING_FILE;
+	}
 
 	/**
 	 * The icon of an entity of a type: of the type, a subtype, or by name,

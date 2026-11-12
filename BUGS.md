@@ -84,3 +84,5 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
 - **Refresh the folder's files**: they are listed again at most every 5
   seconds as the crate changes; a View > Refresh (F5) would list them at
   once, e.g. after copying files in.
+- **The "Entities" heading in OS/2 Warp dark** is dark grey on the dark
+  sidebar, barely readable.

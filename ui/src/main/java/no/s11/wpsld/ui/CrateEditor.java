@@ -28,6 +28,7 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -65,6 +66,7 @@ import javafx.scene.Scene;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
@@ -123,6 +125,7 @@ import no.s11.wpsld.lookup.GeoNames;
 import no.s11.wpsld.lookup.ORCID;
 import no.s11.wpsld.lookup.ROR;
 import no.s11.wpsld.lookup.PRONOMFormats;
+import no.s11.wpsld.lookup.WebAvailability;
 import no.s11.wpsld.lookup.SPDXLicenses;
 import no.s11.wpsld.crate.UndoHistory;
 import no.s11.wpsld.crate.UndoHistory.Place;
@@ -459,11 +462,19 @@ public class CrateEditor extends Application {
 			protected void updateItem(Entity entity, boolean empty) {
 				super.updateItem(entity, empty);
 				label(empty ? null : entity);
+				getStyleClass().remove("problem");
 				if (empty || entity == null) {
 					setGraphic(null);
+					setTooltip(null);
+				} else if (problems.containsKey(entity)) {
+					icon.set(EntityIcons.problem(entity, listing));
+					setGraphic(icon);
+					getStyleClass().add("problem");
+					setTooltip(new Tooltip(problems.get(entity)));
 				} else {
 					icon.set(EntityIcons.of(entity, listing));
 					setGraphic(icon);
+					setTooltip(null);
 				}
 			}
 
@@ -795,8 +806,11 @@ public class CrateEditor extends Application {
 			relist();
 			refresh();
 		});
+		MenuItem web = new MenuItem("Check _Web Availability…");
+		web.setId("menuCheckWeb");
+		web.setOnAction(e -> checkWeb(stage));
 		Menu menu = new Menu("_Crate", null, parts.toArray(MenuItem[]::new));
-		menu.getItems().addAll(new SeparatorMenuItem(), attached, new SeparatorMenuItem(), repair);
+		menu.getItems().addAll(new SeparatorMenuItem(), attached, new SeparatorMenuItem(), web, repair);
 		menu.setOnShowing(e -> {
 			enableParts(parts);
 			attached.setSelected(crateFile.isAttached());
@@ -865,6 +879,100 @@ public class CrateEditor extends Application {
 			listedAt = now;
 		}
 		return listed;
+	}
+
+	/**
+	 * Entities with a problem, saying what it is: in an attached crate, a
+	 * relative path that is not in its folder (for a part of a file, e.g.
+	 * page.html#t2, the file); and the web resources found unavailable by
+	 * Crate > Check Web Availability
+	 */
+	private Map<Entity, String> problems() {
+		Map<Entity, String> found = new HashMap<>();
+		crateFile.folder().ifPresent(folder -> {
+			for (Entity entity : crate.getEntities()) {
+				String id = entity.getId();
+				String file = id.contains("#") ? id.substring(0, id.indexOf('#')) : id;
+				if (EntityTree.isPath(id) && !file.isEmpty() && !CrateFolder.exists(folder, file)) {
+					found.put(entity, "Not found in the crate's folder: " + CrateFolder.decode(file));
+				}
+			}
+		});
+		unavailable.forEach((id, problem) -> crate.get(id).ifPresent(entity -> found.put(entity, problem)));
+		return found;
+	}
+
+	/** The entities with a problem shown, see {@link #problems()} */
+	private Map<Entity, String> problems = Map.of();
+	/** Web resources found unavailable, by @id, and why */
+	private Map<String, String> unavailable = Map.of();
+
+	/** Asks web resources whether they are available */
+	WebAvailability webAvailability = new WebAvailability(ProfileCache.httpClient(Duration.ofSeconds(15)),
+			Duration.ofSeconds(15), USER_AGENT);
+
+	/**
+	 * Crate > Check Web Availability: ask each part of the crate on the web
+	 * (see {@link WebAvailability}), in the background, and mark those not
+	 * available as entities with a problem, until checked again or another
+	 * crate is opened; then tell how many are.
+	 *
+	 * @return The check, running, if there is anything to check
+	 */
+	Optional<Task<List<WebAvailability.Result>>> checkWeb(Stage stage) {
+		List<String> addresses = WebAvailability.addresses(crate);
+		if (addresses.isEmpty()) {
+			Alert none = new Alert(AlertType.INFORMATION, "The crate has no parts on the web, under External"
+					+ " resources in View > Entities by Folder, to check.", ButtonType.OK);
+			none.initOwner(stage);
+			none.setHeaderText("Nothing to check");
+			none.show();
+			return Optional.empty();
+		}
+		Crate checked = crate;
+		Task<List<WebAvailability.Result>> task = new Task<>() {
+			@Override
+			protected List<WebAvailability.Result> call() throws InterruptedException {
+				return webAvailability.check(addresses);
+			}
+		};
+		Alert progress = new Alert(AlertType.INFORMATION, "Asking " + addresses.size()
+				+ (addresses.size() == 1 ? " web address" : " web addresses") + " whether they are available…",
+				ButtonType.CANCEL);
+		progress.initOwner(stage);
+		progress.initModality(javafx.stage.Modality.NONE);
+		progress.setHeaderText("Checking web availability");
+		progress.setOnHidden(e -> task.cancel(true));
+		task.setOnSucceeded(e -> {
+			progress.setOnHidden(null);
+			progress.close();
+			if (crate != checked) {
+				return;
+			}
+			List<WebAvailability.Result> results = task.getValue();
+			Map<String, String> found = new HashMap<>();
+			results.stream().filter(r -> !r.available()).forEach(r -> found.put(r.address(), r.problem().get()));
+			unavailable = found;
+			relist();
+			Alert done = new Alert(found.isEmpty() ? AlertType.INFORMATION : AlertType.WARNING,
+					results.stream().filter(r -> !r.available()).map(r -> r.address() + ": " + r.problem().get())
+							.collect(Collectors.joining("\n")),
+					ButtonType.OK);
+			done.initOwner(stage);
+			done.setHeaderText(found.isEmpty() ? "All " + results.size() + " web resources are available"
+					: found.size() + " of " + results.size() + " web resources are not available");
+			done.setResizable(true);
+			done.show();
+		});
+		task.setOnFailed(e -> {
+			progress.setOnHidden(null);
+			progress.close();
+		});
+		progress.show();
+		Thread thread = new Thread(task, "Web availability");
+		thread.setDaemon(true);
+		thread.start();
+		return Optional.of(task);
 	}
 
 	/** The most files of a folder to list */
@@ -1119,6 +1227,12 @@ public class CrateEditor extends Application {
 					entities.getSelectionModel().select(edited);
 				}
 			}
+			Map<Entity, String> found = problems();
+			if (!found.equals(problems)) {
+				problems = found;
+				entities.refresh();
+			}
+			tree.setProblems(problems);
 			if (byFolder) {
 				tree.setNodes(byPart ? EntityTree.logical(crate, listing)
 						: EntityTree.physical(crate, listing, filesOnDisk()), edited);
@@ -1357,6 +1471,7 @@ public class CrateEditor extends Application {
 	 */
 	private void edit(Crate other, Optional<Path> path) {
 		crate = other;
+		unavailable = Map.of();
 		crateFile.open(path, crate.toJson());
 		// All types of another crate
 		entityType.setValue(null);

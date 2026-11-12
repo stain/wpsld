@@ -42,6 +42,18 @@ itself if that folder has none; select the outer folders too to add them
 all at once. Add to Has Part also makes a File or Dataset on the web a
 part of the crate, under **External resources**.
 
+In an attached crate (see [Opening and saving crates](files.md)), an
+entity whose file or folder is not in the crate's folder, e.g. moved or
+renamed since, is shown on a pale red background with a red icon, also
+in the list by type; its tooltip says what was not found. A detached
+crate's files are not looked for.
+
+**Crate > Check Web Availability...** asks each part of the crate on the
+web (under **External resources**) whether it is there, following
+redirects, and marks those that are not the same way, saying what they
+answered, until checked again. It needs an internet connection, and asks
+a few addresses at a time.
+
 Selecting an entity selects it in each place it is shown; **Copy** and
 **Remove** act on it once. Each entity has an icon for its type. **View > Entities by Type** shows the
 list again.
