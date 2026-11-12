@@ -701,12 +701,56 @@ Styles:
   write the `ror_display` name as a plain `name`, without `@language`,
   which is not yet common in RO-Crates, and let the user choose another of
   its names instead, e.g. its local name.
+- **Publications and datasets by DOI**, for `citation` (which RO-Crate
+  says MUST have a URL such as a DOI as `@id`), the crate's own
+  `identifier`, and data entities' DOIs: paste or search a DOI and import
+  its title, authors (as Persons, with ORCIDs where given), date,
+  journal/publisher and type. Both registration agencies are needed:
+  Crossref (journal articles, books) and DataCite (datasets, software,
+  e.g. Zenodo). Findings (2026-11-12):
+  - `https://doi.org/ra/<doi>` says which agency registered a DOI.
+  - Content negotiation at `https://doi.org/<doi>`: both answer
+    `Accept: application/vnd.citationstyles.csl+json` (CSL-JSON, one common
+    schema for title, author, issued, container-title, publisher, type),
+    but only DataCite answers `application/vnd.schemaorg.ld+json`
+    (schema.org, e.g. `ScholarlyArticle` with `identifier` PropertyValues);
+    Crossref gives 406. So import CSL-JSON from both, mapped to schema.org
+    by us, and maybe prefer DataCite's own schema.org where present.
+  - Searching by title needs each agency's own API: Crossref's REST API
+    (`api.crossref.org/works?query=`) and DataCite's (`api.datacite.org/dois?query=`),
+    with their different schemas; check their usage terms (Crossref asks
+    for a `mailto` in the User-Agent for its polite pool).
+  - Always write DOIs as `https://doi.org/10…`: Repair Crate should turn
+    `http://dx.doi.org/10…`, `https://dx.doi.org/…`, `http://doi.org/…` and
+    `doi:10…` into that form, in `@id`s, references and `identifier` text,
+    as for SPDX addresses.
 - **More lookups for RO-Crate's recommended identifiers** (Recommended
   Identifiers in RO-Crate 1.3's metadata page): people from ORCID (with
-  affiliations from ROR), and citations and the crate's own `identifier`
-  from a DOI's metadata. Smaller helpers: `keywords` edited as tags but
+  affiliations from ROR). Smaller helpers: `keywords` edited as tags but
   written as one comma-separated string, and `temporalCoverage` as a
   from/to date range (`1950/1975`).
+- **Offline use, e.g. inside a Trusted Research Environment (TRE)** whose
+  firewall blocks GeoNames, OpenStreetMap, ROR, ORCID, DOI and the profile
+  registries. Every online lookup must fail gracefully and say so, never
+  block typing an identifier by hand, and never send crate content outside
+  (lookups send only the search text; tell the user what goes where). A
+  preference to turn all online services off, and per service. Bundled or
+  downloadable offline data, chosen by size:
+  - Places: GeoNames' dumps (https://download.geonames.org/export/dump/,
+    CC BY 4.0, daily): `cities15000.zip` (3.2 MB, about 25,000 places with
+    population over 15,000 or capitals), `cities5000` (5.5 MB), `cities1000`
+    (11 MB), `cities500` (13 MB), with `countryInfo.txt` and
+    `admin1CodesASCII.txt` for countries and regions; `allCountries.zip`
+    (403 MB) is too big to bundle but could be imported by a TRE's admin.
+    Coarse: towns, not parks or buildings, so clicking the map stays the way
+    to a precise point.
+  - Maps: OpenStreetMap has no coarse street-level download, but
+    https://osmdata.openstreetmap.de/data/ has land and water polygons and
+    coastlines (ODbL), enough for an offline outline map to place a point
+    on; or a tile server inside the TRE, set as the map's tile address.
+  - Licences (SPDX) are bundled already; PRONOM's signature file can be
+    bundled too (see above). ROR publishes a full data dump on Zenodo,
+    which a TRE could load; ORCID and DOI lookups stay online-only.
 - **An explorer for entities**, like Explorer, the Finder or a Workplace
   Shell folder: a window (or view) of the crate with virtual folders for
   each kind of contextual entity on top, e.g. "Persons", "Organizations"
