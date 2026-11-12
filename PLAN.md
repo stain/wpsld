@@ -720,29 +720,49 @@ Styles:
   write the `ror_display` name as a plain `name`, without `@language`,
   which is not yet common in RO-Crates, and let the user choose another of
   its names instead, e.g. its local name.
-- **Publications and datasets by DOI**, for `citation` (which RO-Crate
-  says MUST have a URL such as a DOI as `@id`), the crate's own
-  `identifier`, and data entities' DOIs: paste or search a DOI and import
-  its title, authors (as Persons, with ORCIDs where given), date,
-  journal/publisher and type. Both registration agencies are needed:
-  Crossref (journal articles, books) and DataCite (datasets, software,
-  e.g. Zenodo). Findings (2026-11-12):
-  - `https://doi.org/ra/<doi>` says which agency registered a DOI.
-  - Content negotiation at `https://doi.org/<doi>`: both answer
-    `Accept: application/vnd.citationstyles.csl+json` (CSL-JSON, one common
-    schema for title, author, issued, container-title, publisher, type),
-    but only DataCite answers `application/vnd.schemaorg.ld+json`
-    (schema.org, e.g. `ScholarlyArticle` with `identifier` PropertyValues);
-    Crossref gives 406. So import CSL-JSON from both, mapped to schema.org
-    by us, and maybe prefer DataCite's own schema.org where present.
-  - Searching by title needs each agency's own API: Crossref's REST API
-    (`api.crossref.org/works?query=`) and DataCite's (`api.datacite.org/dois?query=`),
-    with their different schemas; check their usage terms (Crossref asks
-    for a `mailto` in the User-Agent for its polite pool).
-  - Always write DOIs as `https://doi.org/10…`: Repair Crate should turn
-    `http://dx.doi.org/10…`, `https://dx.doi.org/…`, `http://doi.org/…` and
-    `doi:10…` into that form, in `@id`s, references and `identifier` text,
-    as for SPDX addresses.
+- **Publications and datasets by DOI** *(done)*: "New ▾ Work by DOI…" on
+  `citation`, `isBasedOn` and `subjectOf`, and a DOI row on a work whose
+  `@id` is a DOI ("Fill in from DOI", keeping its values) or on an article,
+  book, chapter, report or thesis without one ("Find DOI…") (`WorkFinder`,
+  `Dois`). A DOI in any form (bare `10.…`, `doi:`, `https://doi.org/`,
+  `dx.doi.org`, percent-encoded) is looked up at its agency
+  (`https://doi.org/ra/<doi>`): Crossref's REST API (`api.crossref.org/works/`)
+  or DataCite's (`api.datacite.org/dois/`), whose records have more than
+  content negotiation gives (DataCite's CSL has no ORCIDs; Crossref answers
+  no schema.org), else CSL-JSON at doi.org for other agencies. Words are
+  searched at both, alternately: Crossref's `query.bibliographic`, and
+  DataCite's with all words required (`a AND b`), as its ranking of loose
+  words is poor. The work is described as RO-Crate's citation example has
+  it: DOI as `@id` and `identifier`, `name`, `datePublished`, `creditText`
+  (APA-like), `abstract` as plain text (Crossref's JATS or DataCite's HTML;
+  Crossref has abstracts only where the publisher deposited one), the first
+  10 authors as Persons (by ORCID iD, or a Person of the crate with the same
+  name), and the journal by `isPartOf` a Periodical with `issn`, `@id`
+  `https://portal.issn.org/resource/ISSN/<ISSN>`. RO-Crate's example has
+  `"journal": "…"`, but the RO-Crate context defines no `journal` property
+  (only `Journal` for `Periodical`), so wpsld uses `isPartOf`. Repair Crate
+  writes DOIs as `https://doi.org/…`, merges works whose DOIs differ only in
+  case, and turns `identifier` and `citation` text that is a DOI into that
+  (a link for `citation`); a DOI alone as `@id` is left, being a path.
+  Crossref's public pool allowed 1 request per second (2026-11-12).
+  - *Short forms* such as "Xuan et al. (2015): Topic Model for Graph
+    Mining": RO-Crate suggests none, only `creditText` for a full citation
+    (whose examples use "et al.") and `name` for the title. A short form is
+    derived, so rather than storing it (e.g. as schema.org's
+    `alternateName`, an alias of anything), show it as the work's label in
+    the entity list, references and preview, computed from its authors'
+    family names, `datePublished` and `name`.
+  - *Next:* explore the kinds of objects DataCite registers besides
+    articles (its `resourceTypeGeneral`: Dataset, Software,
+    ComputationalNotebook, Workflow, Image, Audiovisual, PhysicalObject,
+    Collection, Model, Instrument, …), and describe each as RO-Crate would:
+    a Dataset, possibly an RO-Crate itself (`conformsTo`
+    `https://w3id.org/ro/crate`, e.g. from WorkflowHub or Zenodo, see
+    Referencing other RO-Crates), software as `SoftwareSourceCode` or
+    `SoftwareApplication`, a workflow as `ComputationalWorkflow` (Workflow
+    RO-Crate), an instrument as in Provenance's equipment; and their
+    licences (DataCite's `rightsList`, often SPDX ids) and keywords.
+    Also the publisher as an Organization (from ROR, once it is there).
 - **People from ORCID** *(done)*: "New ▾ Person from ORCID…" on fields
   that take a Person, and "Find in ORCID…" in an ORCID row on a Person's
   form (`PersonFinder`, `Orcid`), search ORCID's public API
