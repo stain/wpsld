@@ -18,6 +18,7 @@
 module no.s11.wpsld.ui {
 	requires javafx.graphics;
 	requires javafx.controls;
+	requires java.net.http;
     requires no.s11.wpsld;
     requires com.fasterxml.jackson.databind;
     requires org.commonmark;

@@ -127,13 +127,14 @@ public class CrateTerms {
 	 * The types the RO-Crate context names outside schema.org, e.g.
 	 * <code>ComputationalWorkflow</code> and <code>RepositoryCollection</code>:
 	 * its terms starting with a capital letter, as types do, for IRIs that are
-	 * not schema.org's (or RDF's datatypes).
+	 * not schema.org's (or RDF's datatypes), nor defined in the schema model
+	 * (e.g. <code>Geometry</code>).
 	 */
 	public List<ClassDef> contextClasses() {
 		return context.getTerms().stream().filter(t -> !t.isEmpty() && Character.isUpperCase(t.charAt(0))).sorted()
 				.flatMap(t -> context.expandTerm(t).stream())
 				.filter(iri -> !iri.startsWith("http://schema.org/") && !iri.startsWith("https://schema.org/")
-						&& !iri.startsWith(RDF))
+						&& !iri.startsWith(RDF) && !schema.getClasses().containsKey(URI.create(iri)))
 				.distinct().map(iri -> otherClass(URI.create(iri), Optional.of("From the RO-Crate context: " + iri)))
 				.toList();
 	}

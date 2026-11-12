@@ -23,6 +23,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -104,6 +105,7 @@ import no.s11.wpsld.crate.CrateDocument.Problem;
 import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.crate.GeoNames;
 import no.s11.wpsld.crate.UndoHistory;
 import no.s11.wpsld.crate.UndoHistory.Place;
 import no.s11.wpsld.crate.UndoHistory.Step;
@@ -142,6 +144,11 @@ public class CrateEditor extends Application {
 	private final CrateFile crateFile = new CrateFile(crate.toJson());
 	/** The window, once shown, whose title names the crate's file */
 	private Stage stage;
+	/** Names wpsld to the web services of places, as they ask */
+	private static final String USER_AGENT = "wpsld/" + AboutDialog.version() + " (https://github.com/stain/wpsld)";
+	private final MapTiles mapTiles = MapTiles.forApplication(USER_AGENT);
+	private PlaceFinder.Search placeSearch = new GeoNames(ProfileCache.httpClient(Duration.ofSeconds(15)),
+			Duration.ofSeconds(20), USER_AGENT)::search;
 	/** Undo points of this crate: after leaving a field, adding, removing, changing types or @ids */
 	private final UndoHistory history = new UndoHistory(crate.toJson());
 	private final BooleanProperty canUndo = new SimpleBooleanProperty();
@@ -356,6 +363,11 @@ public class CrateEditor extends Application {
 					return entity;
 				}, this::rename);
 		entityEditor.setBrowse(address -> getHostServices().showDocument(address));
+		// Places: a map, and looking them up in GeoNames
+		entityEditor.setMapTiles(mapTiles);
+		entityEditor.setFindPlace(name -> new PlaceFinder(stage, name, () -> settings.geonamesUsername(), placeSearch,
+				owner -> showPreferences(stage), mapTiles, address -> getHostServices().showDocument(address))
+				.showAndWait());
 		entityEditor.setTypeHelp(owner -> showHelp(HelpDialog.Topic.TYPES, owner));
 		// As the style lays it out, e.g. as a notebook in the OS/2 Warp style
 		entityEditor.setFormLayout(Theme.style().get().form());
@@ -1030,11 +1042,19 @@ public class CrateEditor extends Application {
 	}
 
 	/**
+	 * Look places up with this instead of GeoNames, e.g. in tests.
+	 */
+	void setPlaceSearch(PlaceFinder.Search placeSearch) {
+		this.placeSearch = Objects.requireNonNull(placeSearch);
+	}
+
+	/**
 	 * Show the preferences, and keep them on OK.
 	 */
 	void showPreferences(Stage stage) {
 		new PreferencesDialog(stage, settings, profileCache, this::forgotten,
-				owner -> showHelp(HelpDialog.Topic.PROFILES, owner)).showAndWait().ifPresent(changed -> {
+				owner -> showHelp(HelpDialog.Topic.PROFILES, owner),
+				address -> getHostServices().showDocument(address)).showAndWait().ifPresent(changed -> {
 			settings = changed;
 			profileCache.setDisabledRegistries(changed.disabledRegistries());
 			saveSettings(stage);

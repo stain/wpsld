@@ -89,6 +89,9 @@ depositing data.
 
       HELP_SCREENSHOTS=$PWD/ui/src/main/resources/no/s11/wpsld/ui/help/images ./gradlew :ui:test --tests '*ReadmeScreenshots.helpScreenshots' --rerun
 
+  The places' screenshots (`placeScreenshots`, same folder) show
+  OpenStreetMap's tiles, so they need the internet; GeoNames is not asked.
+
 ### Editor (Crate-O style)
 
 - **JavaFX model-view binding.** Keep `lib`'s model free of JavaFX; in `ui`,
@@ -195,6 +198,27 @@ depositing data.
   it in the profile's group. Next: offer to move the value to the
   replacement (e.g. `fileFormat` → `encodingFormat`); search reveal in the
   notebook view (which has no search box).
+- **Places** *(done)*: as RO-Crate 1.2 and later describe them, a `Place`
+  (from `contentLocation` or `spatialCoverage`) whose `geo` is a GeoSPARQL
+  `Geometry` with Well-Known Text in `asWKT`. Both terms are fields like
+  schema.org's (`ro-crate-terms.jsonld`). Places are found by name in
+  GeoNames (`GeoNames`, `PlaceFinder`; the user's own GeoNames username in
+  Preferences > Places): "New ▾ Place from GeoNames…" on a field whose range
+  includes Place, or "Find place…" on a place, sets its GeoNames `@id`,
+  `name`, `identifier`, `url` and a Geometry at GeoNames' point. A place's
+  form shows it on a map (`MapView`, OpenStreetMap tiles kept in memory;
+  none in the tests), and a click moves it (`Places.setPoint`, keeping
+  GeoCoordinates or latitude/longitude where a crate has them). The preview
+  links to it on OpenStreetMap. Next: tiles kept on disk between runs,
+  drawing lines and areas on the map, and `_:` blank node ids for new
+  geometries, as the specification's example has.
+  - *Map in the preview:* not shown there for now, as the form beside it
+    already has the map, and the two would duplicate each other. If the
+    preview is used on its own, e.g. a read-only viewer of crates, the
+    preview of several entities, or an exported `ro-crate-preview.html`,
+    show a read-only `MapView` (no `setOnPick`) of `Places.of(entity)` there,
+    for places, geometries, GeoCoordinates, and entities whose
+    `contentLocation` or `spatialCoverage` lead to a place.
 - **Required types** *(done)*: a notice beside "Add type…" when a profile
   requires a type the entity lacks (subtypes count), with a button to add it.
 - **Multi-line text.** Only the header's Description is a text area now;

@@ -51,9 +51,12 @@ import javafx.scene.image.Image;
 import javafx.scene.image.PixelReader;
 import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
+import javafx.application.Platform;
+import no.s11.wpsld.Settings;
 import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.crate.GeoNames;
 import no.s11.wpsld.masp.ProfileCache;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
@@ -77,10 +80,21 @@ public class ReadmeScreenshots extends ApplicationTest {
 	public void start(Stage stage) throws Exception {
 		this.stage = stage;
 		Path temp = Files.createTempDirectory("wpsld-screenshots");
+		String help = System.getenv("HELP_SCREENSHOTS");
+		if (help != null && !help.isBlank()) {
+			// The help's maps with OpenStreetMap's tiles (the tests have none),
+			// and a GeoNames username, as the user would have set
+			System.setProperty("wpsld.mapTiles", "osm");
+			Settings.DEFAULT.withGeonamesUsername("example").save(temp.resolve("settings.json"));
+		}
 		app = new CrateEditor(SchemaFromJsonLd::new, CrateTerms::prewarm,
 				new ProfileCache(getClass().getClassLoader(), new CrateReader(), Duration.ofSeconds(5),
 						Optional.of(temp.resolve("profiles")), List.of()),
 				Optional.of(temp.resolve("settings.json")));
+		// GeoNames' Catalina Park, as in the RO-Crate specification's example,
+		// without asking GeoNames
+		app.setPlaceSearch((query, username) -> List.of(new GeoNames.Place(8152662, "Catalina Park",
+				Optional.of("New South Wales"), Optional.of("Australia"), Optional.of("park"), -33.7152, 150.301195)));
 		app.init();
 		app.start(stage);
 	}
@@ -236,6 +250,46 @@ public class ReadmeScreenshots extends ApplicationTest {
 			}
 		}
 		return target;
+	}
+
+	/**
+	 * Screenshots of places for the help: finding one in GeoNames, and its
+	 * map. They need the internet, for OpenStreetMap's map tiles.
+	 */
+	@Test
+	public void placeScreenshots() throws Exception {
+		String folder = System.getenv("HELP_SCREENSHOTS");
+		Assume.assumeTrue("Set HELP_SCREENSHOTS to the folder for them", folder != null && !folder.isBlank());
+		Path out = Files.createDirectories(Path.of(folder));
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		interact(() -> {
+			stage.setWidth(1400);
+			stage.setHeight(900);
+		});
+		look("classic", "light");
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("contentLocation"));
+		MenuButton create = lookup("#new-contentLocation").queryAs(MenuButton.class);
+		// The dialog waits for an answer, so not inside interact()
+		Platform.runLater(() -> create.getItems().stream()
+				.filter(i -> "newGeoNames-contentLocation".equals(i.getId())).findFirst().orElseThrow().fire());
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#placeQuery").tryQuery().isPresent());
+		interact(() -> lookup("#placeQuery").queryAs(TextField.class).setText("Catalina Park"));
+		interact(() -> lookup("#placeSearch").queryButton().fire());
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
+				() -> !lookup("#placeResults").queryListView().getItems().isEmpty());
+		waitForTiles();
+		png(out.resolve("place-finder.png"), lookup(".dialog-pane").match(n -> n.lookup("#placeQuery") != null).query());
+		interact(() -> lookup("#placeOk").queryButton().fire());
+		select("http://sws.geonames.org/8152662/");
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText(""));
+		waitForTiles();
+		png(out.resolve("place-location.png"), lookup(n -> n instanceof EntityEditor).query());
+	}
+
+	/** Time for the map's tiles to come from OpenStreetMap */
+	private void waitForTiles() throws InterruptedException {
+		Thread.sleep(6000);
+		WaitForAsyncUtils.waitForFxEvents();
 	}
 
 	/** View > Style and Colours, as chosen from the menu */

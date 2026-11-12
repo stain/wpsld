@@ -59,6 +59,18 @@ public class TestSettings {
 	}
 
 	@Test
+	public void geonamesUsername() throws Exception {
+		Path file = temp.getRoot().toPath().resolve("settings.json");
+		assertEquals("", Settings.DEFAULT.geonamesUsername());
+		Settings settings = Settings.DEFAULT.withStyle("warp").withGeonamesUsername(" someone ");
+		assertEquals("someone", settings.geonamesUsername());
+		settings.save(file);
+		assertEquals(settings, Settings.load(file));
+		// Kept when the look changes
+		assertEquals("someone", settings.withColours("dark").geonamesUsername());
+	}
+
+	@Test
 	public void brokenFileIgnored() throws Exception {
 		Path file = temp.newFile("settings.json").toPath();
 		Files.writeString(file, "{ not json");

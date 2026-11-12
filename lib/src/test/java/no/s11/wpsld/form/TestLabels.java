@@ -29,6 +29,7 @@ public class TestLabels {
 		assertEquals("Is based on", Labels.fromTerm("isBasedOn"));
 		assertEquals("URL", Labels.fromTerm("url"));
 		assertEquals("Content URL", Labels.fromTerm("contentUrl"));
+		assertEquals("As WKT", Labels.fromTerm("asWKT"));
 		assertEquals("ISBN", Labels.fromTerm("isbn"));
 		assertEquals("GTIN-13", Labels.fromTerm("gtin13"));
 		assertEquals("IATA code", Labels.fromTerm("iataCode"));

@@ -41,8 +41,10 @@ import no.s11.wpsld.util.AppDirectories;
  *                           <code>win11</code>; the user interface decides
  *                           which it knows
  * @param colours            The name of its colours, e.g. <code>dark</code>
+ * @param geonamesUsername   The user's GeoNames account, to look up places
+ *                           with; empty if none
  */
-public record Settings(Set<String> disabledRegistries, String style, String colours) {
+public record Settings(Set<String> disabledRegistries, String style, String colours, String geonamesUsername) {
 	public static final String FILE = "settings.json";
 	public static final String DEFAULT_STYLE = "classic";
 	public static final String DEFAULT_COLOURS = "light";
@@ -53,6 +55,11 @@ public record Settings(Set<String> disabledRegistries, String style, String colo
 		disabledRegistries = Set.copyOf(disabledRegistries);
 		style = style == null || style.isBlank() ? DEFAULT_STYLE : style;
 		colours = colours == null || colours.isBlank() ? DEFAULT_COLOURS : colours;
+		geonamesUsername = geonamesUsername == null ? "" : geonamesUsername.strip();
+	}
+
+	public Settings(Set<String> disabledRegistries, String style, String colours) {
+		this(disabledRegistries, style, colours, "");
 	}
 
 	public Settings(Set<String> disabledRegistries) {
@@ -60,15 +67,19 @@ public record Settings(Set<String> disabledRegistries, String style, String colo
 	}
 
 	public Settings withDisabledRegistries(Set<String> disabledRegistries) {
-		return new Settings(disabledRegistries, style, colours);
+		return new Settings(disabledRegistries, style, colours, geonamesUsername);
 	}
 
 	public Settings withStyle(String style) {
-		return new Settings(disabledRegistries, style, colours);
+		return new Settings(disabledRegistries, style, colours, geonamesUsername);
 	}
 
 	public Settings withColours(String colours) {
-		return new Settings(disabledRegistries, style, colours);
+		return new Settings(disabledRegistries, style, colours, geonamesUsername);
+	}
+
+	public Settings withGeonamesUsername(String geonamesUsername) {
+		return new Settings(disabledRegistries, style, colours, geonamesUsername);
 	}
 
 	/**
@@ -91,7 +102,7 @@ public record Settings(Set<String> disabledRegistries, String style, String colo
 			Set<String> disabled = new TreeSet<>();
 			json.path("disabledRegistries").forEach(n -> disabled.add(n.asText()));
 			return new Settings(disabled, json.path("style").asText(DEFAULT_STYLE),
-					json.path("colours").asText(DEFAULT_COLOURS));
+					json.path("colours").asText(DEFAULT_COLOURS), json.path("geonamesUsername").asText(""));
 		} catch (IOException e) {
 			return DEFAULT;
 		}
@@ -106,6 +117,9 @@ public record Settings(Set<String> disabledRegistries, String style, String colo
 		new TreeSet<>(disabledRegistries).forEach(json.putArray("disabledRegistries")::add);
 		json.put("style", style);
 		json.put("colours", colours);
+		if (!geonamesUsername.isEmpty()) {
+			json.put("geonamesUsername", geonamesUsername);
+		}
 		Path temp = Files.createTempFile(dir, "settings-", ".tmp");
 		MAPPER.writer(SerializationFeature.INDENT_OUTPUT).writeValue(temp.toFile(), json);
 		Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);

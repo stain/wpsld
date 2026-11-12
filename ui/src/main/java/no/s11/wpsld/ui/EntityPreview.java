@@ -24,6 +24,7 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -45,13 +46,14 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.crate.Places;
 
 /**
  * A read-only preview of one entity of the crate, like an RO-Crate's
  * <code>ro-crate-preview.html</code>: its name, types and identifier, a table
  * of its properties, and the entities referring to it. References to other
  * entities of the crate are links that open them; absolute URLs open in the
- * browser.
+ * browser, as does where a place is, on OpenStreetMap.
  */
 public class EntityPreview extends ScrollPane {
 	private final Supplier<Crate> crate;
@@ -129,6 +131,16 @@ public class EntityPreview extends ScrollPane {
 			root.setId("previewRoot");
 			content.getChildren().add(root);
 		}
+		// Where a place, its geometry or coordinates are
+		Places.of(entity, current).ifPresent(area -> {
+			Hyperlink map = new Hyperlink(area.isPoint() ? "Show on OpenStreetMap"
+					: "Show the area on OpenStreetMap");
+			map.setId("previewMap");
+			map.setTooltip(new Tooltip(String.format(Locale.ROOT, "Latitude %.6f, longitude %.6f",
+					area.latitude(), area.longitude())));
+			map.setOnAction(e -> browse.accept(area.openStreetMap()));
+			content.getChildren().add(map);
+		});
 
 		GridPane properties = table();
 		properties.setId("previewProperties");
