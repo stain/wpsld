@@ -53,8 +53,10 @@ encoding, for example `data%20files/results.csv` for a folder named
 `data files`.
 
 Give the file a **Name**, such as "Sample data". Optionally, find
-**Encoding format** and enter `text/csv` if it is a CSV file. Select the
-dataset again: **Has part** should now reference `data.csv`.
+**Encoding format** and enter `text/csv` if it is a CSV file; **New >
+Format from PRONOM...** beside it also links a description of the format
+(see [Properties and links](properties.md)). Select the dataset again:
+**Has part** should now reference `data.csv`.
 
 ![The file form with identifier data.csv, name Sample data and encoding format text/csv](images/file-form.png)
 
@@ -65,9 +67,11 @@ shown, or open the relevant field group or notebook page. Choose **New >
 Person** beside Author; this creates a person and links them to the dataset.
 Select the new Person in the left list and enter their **Name**.
 
-The generated `@id` identifies this person within the crate. If you have
-their real ORCID, you may replace it with their ORCID URL and press Enter;
-do not invent identifiers. Return to the dataset to see the Author link.
+The generated `@id` identifies this person within the crate. If they have
+an ORCID iD, choose **Find in ORCID...** on the person's form and choose
+them from the people found, or choose **New > Person from ORCID...**
+beside Author in the first place; wpsld then uses their ORCID iD as their
+`@id`. Do not invent identifiers. Return to the dataset to see the Author link.
 Use `+` to add another value where the field permits it.
 
 ![The dataset form with its Author field linked to the person identified as #person-1](images/author-link.png)

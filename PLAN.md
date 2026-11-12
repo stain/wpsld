@@ -743,9 +743,25 @@ Styles:
     `http://dx.doi.org/10…`, `https://dx.doi.org/…`, `http://doi.org/…` and
     `doi:10…` into that form, in `@id`s, references and `identifier` text,
     as for SPDX addresses.
+- **People from ORCID** *(done)*: "New ▾ Person from ORCID…" on fields
+  that take a Person, and "Find in ORCID…" in an ORCID row on a Person's
+  form (`PersonFinder`, `Orcid`), search ORCID's public API
+  (`pub.orcid.org/v3.0/expanded-search`, no credentials needed, tried
+  2026-11-12) by name or iD, on Enter, listing ORCID iD, other names and
+  institutions (as text: no ROR ids), and add the Person with
+  `https://orcid.org/<iD>` as `@id`, `name`, `givenName` and
+  `familyName`; e-mail addresses ORCID may give are ignored. Offline, the
+  search fails saying the iD can still be typed. Repair Crate writes ORCID
+  addresses given otherwise (`http:`, no scheme, trailing slash, small
+  `x`) as `https://orcid.org/<iD>`, if the ISO 7064 check digit is right,
+  merging duplicates; sandbox iDs are left. Next: affiliations as ROR
+  Organizations, from ORCID's employment records (`/v3.0/<iD>/employments`),
+  once ROR lookups exist: their organisations are disambiguated by ROR,
+  Ringgold or GRID (Josiah Carberry's by Ringgold only), so those without
+  a ROR id need a ROR search by name and country; tests and help use
+  ORCID's fictional Josiah Carberry, 0000-0002-1825-0097.
 - **More lookups for RO-Crate's recommended identifiers** (Recommended
-  Identifiers in RO-Crate 1.3's metadata page): people from ORCID (with
-  affiliations from ROR). Smaller helpers: `keywords` edited as tags but
+  Identifiers in RO-Crate 1.3's metadata page). Smaller helpers: `keywords` edited as tags but
   written as one comma-separated string, and `temporalCoverage` as a
   from/to date range (`1950/1975`).
 - **Offline use, e.g. inside a Trusted Research Environment (TRE)** whose

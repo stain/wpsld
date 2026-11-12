@@ -20,14 +20,15 @@ other descriptions: check and remove or replace those references as needed.
 **Edit > Repair Crate** can add placeholder Things for references to
 entities not described in the crate, and update the root's mentions for
 otherwise unlinked entities. It also tidies licences from the SPDX License
-List and file formats from PRONOM, see [Properties and links](properties.md). It reports what it changed. Give any
+List, file formats from PRONOM and ORCID iDs, see [Properties and links](properties.md). It reports what it changed. Give any
 placeholders appropriate types and names, or correct mistaken identifiers.
 Use **Edit > Undo** if needed.
 
 ## Identifiers and merging
 
 Each entity has an `@id`. For a file, use its path relative to the crate
-folder; for a person you may use a real ORCID or another appropriate
+folder; for a person, their ORCID iD (**Find in ORCID...** on their form,
+see [Properties and links](properties.md)) or another appropriate
 persistent identifier. A generated identifier beginning with `#` identifies
 an entity within this crate.
 

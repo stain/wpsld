@@ -106,6 +106,7 @@ import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.GeoNames;
+import no.s11.wpsld.crate.Orcid;
 import no.s11.wpsld.crate.PronomFormats;
 import no.s11.wpsld.crate.SpdxLicenses;
 import no.s11.wpsld.crate.UndoHistory;
@@ -370,6 +371,8 @@ public class CrateEditor extends Application {
 		entityEditor.setFindPlace(name -> new PlaceFinder(stage, name, () -> settings.geonamesUsername(), placeSearch,
 				owner -> showPreferences(stage), mapTiles, address -> getHostServices().showDocument(address))
 				.showAndWait());
+		entityEditor.setFindPerson(name -> new PersonFinder(stage, name, personSearch,
+				address -> getHostServices().showDocument(address)).showAndWait());
 		entityEditor.setFindFormat(query -> new FormatFinder(stage, query, PronomFormats.bundled(),
 				address -> getHostServices().showDocument(address)).showAndWait());
 		entityEditor.setFindLicense(() -> new LicenseFinder(stage, "", SpdxLicenses.bundled(),
@@ -1047,6 +1050,16 @@ public class CrateEditor extends Application {
 		return a.replaceFirst("/$", "").equals(b.replaceFirst("/$", ""));
 	}
 
+	private PersonFinder.Search personSearch = new Orcid(ProfileCache.httpClient(Duration.ofSeconds(15)),
+			Duration.ofSeconds(20), USER_AGENT)::search;
+
+	/**
+	 * Look people up with this instead of ORCID, e.g. in tests.
+	 */
+	void setPersonSearch(PersonFinder.Search personSearch) {
+		this.personSearch = Objects.requireNonNull(personSearch);
+	}
+
 	/**
 	 * Look places up with this instead of GeoNames, e.g. in tests.
 	 */
@@ -1491,12 +1504,14 @@ public class CrateEditor extends Application {
 	 * are described from the SPDX License List (see
 	 * {@link SpdxLicenses#repair}), and PRONOM file formats likewise, also
 	 * for a media type that only one format has (see
-	 * {@link PronomFormats#repair}). One undoable step, then tells what was
+	 * {@link PronomFormats#repair}), and ORCID iDs written otherwise (see
+	 * {@link Orcid#repair}). One undoable step, then tells what was
 	 * done.
 	 */
 	void repair(Stage stage) {
 		List<String> licences = SpdxLicenses.bundled().repair(crate);
 		List<String> formats = PronomFormats.bundled().repair(crate);
+		List<String> people = Orcid.repair(crate);
 		List<Entity> added = crate.addReferenced();
 		List<Entity> unmentioned = crate.unmentionLinked();
 		List<Entity> mentioned = crate.mentionUnlinked();
@@ -1505,6 +1520,11 @@ public class CrateEditor extends Application {
 			done.add("Licences of the SPDX License List:\n" + licences.stream().limit(LISTED).map(l -> "• " + l)
 					.collect(Collectors.joining("\n"))
 					+ (licences.size() > LISTED ? "\n• and " + (licences.size() - LISTED) + " more" : ""));
+		}
+		if (!people.isEmpty()) {
+			done.add("ORCID iDs:\n" + people.stream().limit(LISTED).map(f -> "• " + f)
+					.collect(Collectors.joining("\n"))
+					+ (people.size() > LISTED ? "\n• and " + (people.size() - LISTED) + " more" : ""));
 		}
 		if (!formats.isEmpty()) {
 			done.add("File formats of PRONOM:\n" + formats.stream().limit(LISTED).map(f -> "• " + f)

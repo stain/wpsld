@@ -94,6 +94,7 @@ import no.s11.wpsld.crate.CrateDocument;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.GeoNames;
+import no.s11.wpsld.crate.Orcid;
 import no.s11.wpsld.crate.Places;
 import no.s11.wpsld.crate.PronomFormats;
 import no.s11.wpsld.crate.SpdxLicenses;
@@ -183,6 +184,8 @@ public class EntityEditor extends ScrollPane {
 	private MapTiles mapTiles = MapTiles.NONE;
 	/** Asks the user for a place in GeoNames, starting from a name */
 	private Function<String, Optional<GeoNames.Place>> findPlace = name -> Optional.empty();
+	/** Asks the user for a person in ORCID, starting from a name */
+	private Function<String, Optional<Orcid.Person>> findPerson = name -> Optional.empty();
 	/** Asks the user for a file format of PRONOM, starting from a search */
 	private Function<String, Optional<PronomFormats.Format>> findFormat = query -> Optional.empty();
 	/** Asks the user for a licence of the SPDX License List */
@@ -448,6 +451,12 @@ public class EntityEditor extends ScrollPane {
 				header.addRow(headerRow++, fieldLabel(field.get()), new FieldEditor(field.get(), true).node());
 			}
 		}
+		// A person's ORCID iD, looked up rather than typed
+		if (isA(PERSON)) {
+			Label orcid = new Label("ORCID");
+			orcid.setId("label-orcid");
+			header.addRow(headerRow++, orcid, orcidEditor());
+		}
 		// Where a place is, on a map, rather than as coordinates to type
 		if (isA(PLACE) || entity.getTypes().contains("Geometry") || isA(GEO_COORDINATES)) {
 			Label location = new Label("Location");
@@ -581,6 +590,7 @@ public class EntityEditor extends ScrollPane {
 	}
 
 	private static final URI PLACE = URI.create("http://schema.org/Place");
+	private static final URI PERSON = URI.create("http://schema.org/Person");
 	private static final URI GEO_COORDINATES = URI.create("http://schema.org/GeoCoordinates");
 
 	/** Whether the entity is of the class or one of its subclasses */
@@ -591,6 +601,50 @@ public class EntityEditor extends ScrollPane {
 
 	private Optional<Entity> crateEntity(String id) {
 		return crateEntities.get().stream().filter(e -> e.getId().equals(id)).findFirst();
+	}
+
+	/**
+	 * The person's ORCID iD, if their <code>@id</code> is one, and finding
+	 * them in ORCID by name, which gives them their ORCID iD as
+	 * <code>@id</code> (merging if the crate has them already).
+	 */
+	private Node orcidEditor() {
+		Entity edited = entity;
+		Button find = new Button("Find in ORCID…");
+		find.setId("findPerson");
+		find.setMinWidth(Region.USE_PREF_SIZE);
+		find.setTooltip(new Tooltip("Look the person up in ORCID by their name"));
+		find.setOnAction(e -> findPerson.apply(edited.get("name").map(JsonNode::asText).orElse(""))
+				.ifPresent(found -> {
+					Orcid.describe(edited, found);
+					onChange.run();
+					String id = edited.getId();
+					// Their ORCID iD, unless they have an identifier of their own
+					if (!id.equals(found.iri())
+							&& (id.startsWith("#") || id.startsWith("_:") || Orcid.idOf(id).isPresent())) {
+						renameEntity.accept(edited, found.iri());
+					} else {
+						showForm();
+					}
+				}));
+		Node shown;
+		Optional<String> id = edited.getId().startsWith(Orcid.NAMESPACE) ? Orcid.idOf(edited.getId())
+				: Optional.empty();
+		if (id.isPresent()) {
+			Hyperlink link = new Hyperlink(id.get());
+			link.setId("orcidLink");
+			link.setTooltip(new Tooltip("Open their ORCID record"));
+			link.setOnAction(e -> browse.accept(edited.getId()));
+			shown = link;
+		} else {
+			Label none = new Label("No ORCID iD as @id yet");
+			none.setId("orcidNone");
+			none.getStyleClass().add("dim-text");
+			shown = none;
+		}
+		HBox box = new HBox(8, find, shown);
+		box.setAlignment(Pos.CENTER_LEFT);
+		return box;
 	}
 
 	/**
@@ -952,6 +1006,14 @@ public class EntityEditor extends ScrollPane {
 	}
 
 	/**
+	 * Set how to ask the user for a person in ORCID, given a name to start
+	 * from; empty if they cancel.
+	 */
+	public void setFindPerson(Function<String, Optional<Orcid.Person>> findPerson) {
+		this.findPerson = Objects.requireNonNull(findPerson);
+	}
+
+	/**
 	 * Set how to ask the user for a file format of PRONOM, given what to
 	 * search for first; empty if they cancel.
 	 */
@@ -1188,6 +1250,12 @@ public class EntityEditor extends ScrollPane {
 					item.setOnAction(e -> link(newEntity.apply(terms.name(type)).getId()));
 					create.getItems().add(item);
 				}
+				if (entityTypes.stream().anyMatch(c -> c.getID().equals(PERSON))) {
+					MenuItem fromOrcid = new MenuItem("Person from ORCID…");
+					fromOrcid.setId(id(prefix("newOrcid"), field.name()));
+					fromOrcid.setOnAction(e -> findPerson.apply("").ifPresent(this::linkPerson));
+					create.getItems().add(fromOrcid);
+				}
 				if (field.name().equals("encodingFormat")) {
 					MenuItem fromPronom = new MenuItem("Format from PRONOM…");
 					fromPronom.setId(id(prefix("newPronom"), field.name()));
@@ -1249,6 +1317,20 @@ public class EntityEditor extends ScrollPane {
 				// Not linked from anywhere yet, so its identifier can just change
 				place.setId(found.iri());
 				Places.describe(place, found, EntityEditor.this::crateEntity, () -> newEntity.apply("Geometry"));
+			}
+			link(found.iri());
+		}
+
+		/**
+		 * Link the person found in ORCID: the crate's entity for them, or a
+		 * new one with their ORCID iD as <code>@id</code>.
+		 */
+		private void linkPerson(Orcid.Person found) {
+			if (crateEntity(found.iri()).isEmpty()) {
+				Entity person = newEntity.apply("Person");
+				// Not linked from anywhere yet, so its identifier can just change
+				person.setId(found.iri());
+				Orcid.describe(person, found);
 			}
 			link(found.iri());
 		}
