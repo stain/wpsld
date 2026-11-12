@@ -74,6 +74,11 @@
     -fx-fill: -fx-text-inner-color;
 }
 
+/* Links start where labels do, not 4px in as in Modena */
+.hyperlink {
+    -fx-padding: 0.166667em 0 0.166667em 0;
+}
+
 .help-dialog .help-content .hyperlink {
     -fx-padding: 0;
 }

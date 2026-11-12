@@ -25,6 +25,7 @@ import java.util.stream.Stream;
 
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
@@ -193,7 +194,11 @@ class OrganizationFinder extends Dialog<OrganizationFinder.Chosen> {
 		Label title = new Label(organization.name());
 		title.setWrapText(true);
 		title.setStyle("-fx-font-weight: bold;");
-		details.getChildren().addAll(title, new Label("ROR: " + organization.id()));
+		Hyperlink record = new Hyperlink(organization.id());
+		record.setOnAction(e -> browse.accept(organization.iri()));
+		HBox ror = new HBox(4, new Label("ROR:"), record);
+		ror.setAlignment(Pos.BASELINE_LEFT);
+		details.getChildren().addAll(title, ror);
 		if (!organization.where().isEmpty()) {
 			details.getChildren().add(new Label("In: " + organization.where()));
 		}
@@ -218,8 +223,5 @@ class OrganizationFinder extends Dialog<OrganizationFinder.Chosen> {
 			site.setOnAction(e -> browse.accept(website));
 			details.getChildren().add(site);
 		});
-		Hyperlink record = new Hyperlink("Its ROR record");
-		record.setOnAction(e -> browse.accept(organization.iri()));
-		details.getChildren().add(record);
 	}
 }

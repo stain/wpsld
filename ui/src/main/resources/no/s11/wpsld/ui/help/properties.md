@@ -37,7 +37,7 @@ RO-Crate recommends identifying people by their
 person) from ORCID, choose **New** beside **Author**, then **Person from
 ORCID...**. Type their name, or their ORCID iD, and choose **Search**: the
 people found are listed with their ORCID iD and institutions, and the one
-selected with their other names and a link to their ORCID record. Several
+selected with their other names, its ORCID iD a link to their record. Several
 people may have the same name, so check before choosing. Choose one and
 **OK**: wpsld adds them as a Person with their ORCID iD as `@id`, their
 name, and their given and family names. If the crate already has them,
@@ -148,7 +148,7 @@ SPDX...**. Type part of the licence's identifier or name, for example
 `cc-by-4.0`, `apache` or `creative commons attribution 4.0`: the list
 narrows while you type, with whether a licence is OSI approved or FSF free.
 The licence selected is described beside the list, with links to its
-page on the SPDX License List and to the licence itself. Choose one and
+SPDX entry and to the licence itself. Choose one and
 **OK**.
 
 ![Choosing a licence from the SPDX License List: the Creative Commons Attribution 4.0 licences, with CC-BY-4.0 selected](images/licence-finder.png)
