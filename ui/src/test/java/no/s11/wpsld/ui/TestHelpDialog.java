@@ -148,6 +148,7 @@ public class TestHelpDialog extends ApplicationTest {
 	public void allHelpImagesAreBundledAndReadable() {
 		List<String> paths = new ArrayList<>();
 		for (HelpDialog.Topic topic : HelpDialog.Topic.values()) {
+			int previousCount = paths.size();
 			Parser.builder().build().parse(topic.content).accept(new AbstractVisitor() {
 				@Override
 				public void visit(org.commonmark.node.Image image) {
@@ -156,6 +157,19 @@ public class TestHelpDialog extends ApplicationTest {
 					paths.add(image.getDestination());
 				}
 			});
+			TextFlow flow = new TextFlow();
+			interact(() -> HelpMarkdown.show(flow, topic.content, address -> fail("Must not open a URL"),
+					new SimpleDoubleProperty(400)));
+			List<ImageView> images = flow.getChildren().stream().filter(ImageView.class::isInstance)
+					.map(ImageView.class::cast).toList();
+			assertEquals("Rendered images in " + topic, paths.size() - previousCount, images.size());
+			for (ImageView image : images) {
+				assertNotNull(image.getImage());
+				assertFalse(image.getImage().isError());
+				assertTrue(image.getImage().getWidth() > 0 && image.getImage().getHeight() > 0);
+				assertNotNull(image.getAccessibleText());
+				assertFalse(image.getAccessibleText().isBlank());
+			}
 		}
 		assertFalse("Expected screenshots in the help", paths.isEmpty());
 		for (String path : paths) {
