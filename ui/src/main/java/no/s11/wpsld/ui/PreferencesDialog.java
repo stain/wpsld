@@ -47,7 +47,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import no.s11.wpsld.Settings;
-import no.s11.wpsld.crate.GeoNames;
+import no.s11.wpsld.lookup.GeoNames;
 import no.s11.wpsld.masp.Profile;
 import no.s11.wpsld.masp.ProfileCache;
 import no.s11.wpsld.masp.ProfileRegistry;

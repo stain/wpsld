@@ -39,15 +39,15 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
-import no.s11.wpsld.crate.SpdxLicenses;
-import no.s11.wpsld.crate.SpdxLicenses.License;
+import no.s11.wpsld.lookup.SPDXLicenses;
+import no.s11.wpsld.lookup.SPDXLicenses.License;
 
 /**
  * Choose a licence from the SPDX License List bundled with wpsld, found by
  * its identifier or name while typing. Gives the licence chosen on OK.
  */
 class LicenseFinder extends Dialog<License> {
-	private final SpdxLicenses spdx;
+	private final SPDXLicenses spdx;
 	private final TextField query = new TextField();
 	private final CheckBox deprecated = new CheckBox("Show deprecated identifiers");
 	private final ListView<License> results = new ListView<>();
@@ -55,7 +55,7 @@ class LicenseFinder extends Dialog<License> {
 	private final VBox details = new VBox(6);
 	private final Consumer<String> browse;
 
-	LicenseFinder(Window owner, String initial, SpdxLicenses spdx, Consumer<String> browse) {
+	LicenseFinder(Window owner, String initial, SPDXLicenses spdx, Consumer<String> browse) {
 		this.spdx = Objects.requireNonNull(spdx);
 		this.browse = Objects.requireNonNull(browse);
 		initOwner(owner);

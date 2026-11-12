@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package no.s11.wpsld.crate;
+package no.s11.wpsld.lookup;
 
 import java.io.IOException;
 import java.net.URI;
@@ -33,9 +33,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.crate.Places;
+import com.fasterxml.jackson.databind.node.TextNode;
 
 /**
  * Looks up places by name in <a href="https://www.geonames.org/">GeoNames</a>,
@@ -203,5 +209,19 @@ public class GeoNames {
 		} catch (NumberFormatException e) {
 			return Optional.empty();
 		}
+	}
+
+	/**
+	 * Describe a place as found in GeoNames: its name, GeoNames identifier
+	 * and page, and its point (see {@link Places#setPoint}). Its
+	 * <code>@id</code> is left to the caller, who may have to merge it with
+	 * an entity of the crate that already has the GeoNames identifier.
+	 */
+	public static void describe(Entity place, Place found, Function<String, Optional<Entity>> lookup,
+			Supplier<Entity> newGeometry) {
+		place.set("name", Optional.of(TextNode.valueOf(found.name())));
+		place.set("identifier", Optional.of(TextNode.valueOf(found.iri())));
+		place.set("url", Optional.of(TextNode.valueOf(found.page())));
+		Places.setPoint(place, found.latitude(), found.longitude(), lookup, newGeometry);
 	}
 }

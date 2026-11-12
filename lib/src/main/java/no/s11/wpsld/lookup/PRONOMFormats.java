@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package no.s11.wpsld.crate;
+package no.s11.wpsld.lookup;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -36,6 +36,9 @@ import com.fasterxml.jackson.databind.node.TextNode;
 
 import no.s11.wpsld.util.Value;
 
+import no.s11.wpsld.crate.Crate;
+import no.s11.wpsld.crate.Entity;
+
 /**
  * The file formats of <a href="https://pronom.nationalarchives.gov.uk/">PRONOM</a>,
  * The National Archives' registry, bundled from its DROID signature file
@@ -47,7 +50,7 @@ import no.s11.wpsld.util.Value;
  *
  * @see <a href="https://w3id.org/ro/crate/1.3/data-entities#adding-detailed-descriptions-of-file-encodings">RO-Crate 1.3: File encodings</a>
  */
-public final class PronomFormats {
+public final class PRONOMFormats {
 	public static final String RESOURCE = "/pronom/formats.json";
 	/** Formats' addresses as RO-Crate writes them, e.g. …/PRONOM/fmt/19 */
 	public static final String NAMESPACE = "https://www.nationalarchives.gov.uk/PRONOM/";
@@ -59,7 +62,7 @@ public final class PronomFormats {
 	 */
 	private static final Pattern PRONOM_IRI = Pattern.compile(
 			"https?://(?:www\\.nationalarchives\\.gov\\.uk/(?i:pronom)/|pronom\\.nationalarchives\\.gov\\.uk/)((?:x-)?(?:fmt|sfw|chr)/\\d+)(?:\\.(?:json|xml|html))?/?");
-	private static final Value<PronomFormats> BUNDLED = Value.lazy(PronomFormats::readBundled);
+	private static final Value<PRONOMFormats> BUNDLED = Value.lazy(PRONOMFormats::readBundled);
 
 	/**
 	 * A file format of PRONOM.
@@ -85,7 +88,7 @@ public final class PronomFormats {
 	private final String version;
 	private final List<Format> formats;
 
-	public PronomFormats(String version, List<Format> formats) {
+	public PRONOMFormats(String version, List<Format> formats) {
 		this.version = Objects.requireNonNull(version);
 		this.formats = List.copyOf(formats);
 	}
@@ -93,17 +96,17 @@ public final class PronomFormats {
 	/**
 	 * The formats bundled with wpsld, read once.
 	 */
-	public static PronomFormats bundled() {
+	public static PRONOMFormats bundled() {
 		return BUNDLED.get();
 	}
 
-	private static PronomFormats readBundled() {
-		try (InputStream in = PronomFormats.class.getResourceAsStream(RESOURCE)) {
+	private static PRONOMFormats readBundled() {
+		try (InputStream in = PRONOMFormats.class.getResourceAsStream(RESOURCE)) {
 			if (in == null) {
 				throw new IllegalStateException("Can't find the bundled PRONOM formats " + RESOURCE);
 			}
 			JsonNode json = new ObjectMapper().readTree(in);
-			return new PronomFormats(json.path("version").asText("?"), parse(json));
+			return new PRONOMFormats(json.path("version").asText("?"), parse(json));
 		} catch (IOException e) {
 			throw new UncheckedIOException("Can't read the bundled PRONOM formats", e);
 		}

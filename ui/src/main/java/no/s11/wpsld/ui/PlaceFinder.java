@@ -41,8 +41,8 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.TextFlow;
 import javafx.stage.Window;
-import no.s11.wpsld.crate.GeoNames;
-import no.s11.wpsld.crate.GeoNames.Place;
+import no.s11.wpsld.lookup.GeoNames;
+import no.s11.wpsld.lookup.GeoNames.Place;
 import no.s11.wpsld.crate.Places.Area;
 
 /**

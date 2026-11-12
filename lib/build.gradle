@@ -9,6 +9,9 @@
 plugins {
     // Apply the java-library plugin for API and implementation separation.
     id 'java-library'
+    // Online, the category of tests that use web services, and keeping the
+    // other tests offline: shared with ui's tests
+    id 'java-test-fixtures'
 }
 
 repositories {

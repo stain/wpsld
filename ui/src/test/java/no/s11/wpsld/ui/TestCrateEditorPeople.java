@@ -41,7 +41,7 @@ import javafx.stage.Stage;
 import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
-import no.s11.wpsld.crate.Orcid;
+import no.s11.wpsld.lookup.ORCID;
 import no.s11.wpsld.masp.ProfileCache;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
@@ -50,7 +50,7 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
  * researcher).
  */
 public class TestCrateEditorPeople extends ApplicationTest {
-	private static final Orcid.Person CARBERRY = new Orcid.Person("0000-0002-1825-0097", Optional.of("Josiah"),
+	private static final ORCID.Person CARBERRY = new ORCID.Person("0000-0002-1825-0097", Optional.of("Josiah"),
 			Optional.of("Carberry"), Optional.empty(), List.of("Josiah Stinkney Carberry"),
 			List.of("Brown University", "Wesleyan University"));
 	private final List<String> searches = new ArrayList<>();

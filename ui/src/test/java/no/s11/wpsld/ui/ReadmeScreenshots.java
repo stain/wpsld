@@ -55,10 +55,11 @@ import javafx.application.Platform;
 import no.s11.wpsld.Settings;
 import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
-import no.s11.wpsld.crate.Dois;
+import no.s11.wpsld.lookup.DOI;
 import no.s11.wpsld.crate.Entity;
-import no.s11.wpsld.crate.GeoNames;
-import no.s11.wpsld.crate.Orcid;
+import no.s11.wpsld.lookup.GeoNames;
+import no.s11.wpsld.lookup.ORCID;
+import no.s11.wpsld.lookup.ROR;
 import no.s11.wpsld.masp.ProfileCache;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
@@ -98,18 +99,28 @@ public class ReadmeScreenshots extends ApplicationTest {
 		app.setPlaceSearch((query, username) -> List.of(new GeoNames.Place(8152662, "Catalina Park",
 				Optional.of("New South Wales"), Optional.of("Australia"), Optional.of("park"), -33.7152, 150.301195)));
 		// ORCID's fictional researcher, as ORCID has him, without asking ORCID
-		app.setPersonSearch(query -> List.of(new Orcid.Person("0000-0002-1825-0097", Optional.of("Josiah"),
+		app.setPersonSearch(query -> List.of(new ORCID.Person("0000-0002-1825-0097", Optional.of("Josiah"),
 				Optional.of("Carberry"), Optional.empty(),
 				List.of("Josiah Stinkney Carberry", "J. Carberry", "J. S. Carberry"),
 				List.of("Brown University", "Wesleyan University"))));
+		// The University of Oslo as ROR has it, without asking ROR
+		app.setOrganizationSearch(query -> List.of(new ROR.Organization("01xtthb56", "University of Oslo",
+				List.of(new ROR.Name("University of Oslo", Optional.of("en"), List.of("ror_display", "label")),
+						new ROR.Name("Oslon Yliopisto", Optional.of("fi"), List.of("label")),
+						new ROR.Name("Universitetet i Oslo", Optional.of("no"), List.of("label")),
+						new ROR.Name("Royal Frederick University", Optional.of("en"), List.of("alias")),
+						new ROR.Name("UiO", Optional.empty(), List.of("acronym"))),
+				List.of("education", "funder"), "active", Optional.of("https://www.uio.no/"),
+				Optional.of(new GeoNames.Place(3143244, "Oslo", Optional.of("Oslo"), Optional.of("Norway"),
+						Optional.empty(), 59.91273, 10.74609)))));
 		// The RO-Crate 1.0 specification as DataCite has it, without asking it
-		app.setWorkSearch(query -> List.of(new Dois.Work("10.5281/zenodo.3541888", "ScholarlyArticle",
+		app.setWorkSearch(query -> List.of(new DOI.Work("10.5281/zenodo.3541888", "ScholarlyArticle",
 				"RO-Crate Metadata Specification 1.0",
-				List.of(new Dois.Author("Peter Sefton", Optional.of("Peter"), Optional.of("Sefton"),
+				List.of(new DOI.Author("Peter Sefton", Optional.of("Peter"), Optional.of("Sefton"),
 						Optional.of("0000-0002-3545-944X")),
-						new Dois.Author("Eoghan Ó Carragáin", Optional.of("Eoghan Ó"), Optional.of("Carragáin"),
+						new DOI.Author("Eoghan Ó Carragáin", Optional.of("Eoghan Ó"), Optional.of("Carragáin"),
 								Optional.of("0000-0001-8131-2150")),
-						new Dois.Author("Stian Soiland-Reyes", Optional.of("Stian"), Optional.of("Soiland-Reyes"),
+						new DOI.Author("Stian Soiland-Reyes", Optional.of("Stian"), Optional.of("Soiland-Reyes"),
 								Optional.of("0000-0001-9842-9718"))),
 				Optional.of("2019-11-15"), Optional.empty(), List.of(), Optional.empty(), Optional.empty(),
 				Optional.empty(), Optional.of("Zenodo"),
@@ -385,6 +396,33 @@ public class ReadmeScreenshots extends ApplicationTest {
 		interact(() -> lookup("#personOk").queryButton().fire());
 		select("https://orcid.org/0000-0002-1825-0097");
 		png(out.resolve("person-orcid.png"), lookup(n -> n instanceof EntityEditor).query());
+	}
+
+	/**
+	 * Screenshots of finding an organisation in ROR, for the help.
+	 */
+	@Test
+	public void organizationScreenshots() throws Exception {
+		String folder = System.getenv("HELP_SCREENSHOTS");
+		Assume.assumeTrue("Set HELP_SCREENSHOTS to the folder for them", folder != null && !folder.isBlank());
+		Path out = Files.createDirectories(Path.of(folder));
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		look("classic", "light");
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("publisher"));
+		MenuButton create = lookup("#new-publisher").queryAs(MenuButton.class);
+		// The dialog waits for an answer, so not inside interact()
+		Platform.runLater(() -> create.getItems().stream().filter(i -> "newRor-publisher".equals(i.getId()))
+				.findFirst().orElseThrow().fire());
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#organizationQuery").tryQuery().isPresent());
+		interact(() -> lookup("#organizationQuery").queryAs(TextField.class).setText("University of Oslo"));
+		interact(() -> lookup("#organizationSearch").queryButton().fire());
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
+				() -> !lookup("#organizationResults").queryListView().getItems().isEmpty());
+		png(out.resolve("organization-finder.png"),
+				lookup(".dialog-pane").match(n -> n.lookup("#organizationQuery") != null).query());
+		interact(() -> lookup("#organizationOk").queryButton().fire());
+		select("https://ror.org/01xtthb56");
+		png(out.resolve("organization-ror.png"), lookup(n -> n instanceof EntityEditor).query());
 	}
 
 	/**

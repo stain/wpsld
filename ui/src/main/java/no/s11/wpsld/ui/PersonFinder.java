@@ -38,8 +38,8 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
-import no.s11.wpsld.crate.Orcid;
-import no.s11.wpsld.crate.Orcid.Person;
+import no.s11.wpsld.lookup.ORCID;
+import no.s11.wpsld.lookup.ORCID.Person;
 
 /**
  * Find a person in ORCID by name (or ORCID iD): the matches in a list, with
@@ -47,7 +47,7 @@ import no.s11.wpsld.crate.Orcid.Person;
  * chosen on OK.
  */
 class PersonFinder extends Dialog<Person> {
-	/** Searches ORCID, e.g. {@link Orcid#search}, off the JavaFX thread */
+	/** Searches ORCID, e.g. {@link ORCID#search}, off the JavaFX thread */
 	@FunctionalInterface
 	interface Search {
 		List<Person> search(String query) throws Exception;

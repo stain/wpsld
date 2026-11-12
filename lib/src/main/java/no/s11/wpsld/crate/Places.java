@@ -199,20 +199,6 @@ public final class Places {
 		return holds ? Optional.of(entity) : Optional.empty();
 	}
 
-	/**
-	 * Describe a place as found in GeoNames: its name, GeoNames identifier
-	 * and page, and its point (see {@link #setPoint}). Its
-	 * <code>@id</code> is left to the caller, who may have to merge it with
-	 * an entity of the crate that already has the GeoNames identifier.
-	 */
-	public static void describe(Entity place, GeoNames.Place found, Function<String, Optional<Entity>> lookup,
-			Supplier<Entity> newGeometry) {
-		place.set("name", Optional.of(TextNode.valueOf(found.name())));
-		place.set("identifier", Optional.of(TextNode.valueOf(found.iri())));
-		place.set("url", Optional.of(TextNode.valueOf(found.page())));
-		setPoint(place, found.latitude(), found.longitude(), lookup, newGeometry);
-	}
-
 	private static Optional<Area> coordinates(Entity entity) {
 		Optional<Double> latitude = entity.get("latitude").flatMap(Places::number);
 		Optional<Double> longitude = entity.get("longitude").flatMap(Places::number);

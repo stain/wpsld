@@ -22,6 +22,7 @@ import static org.junit.Assert.*;
 import java.util.List;
 import java.util.Optional;
 
+import no.s11.wpsld.lookup.GeoNames;
 import org.junit.Test;
 
 import com.fasterxml.jackson.databind.node.DoubleNode;
@@ -153,7 +154,7 @@ public class TestPlaces {
 		Entity place = crate.add("Place");
 		GeoNames.Place found = new GeoNames.Place(8152662, "Catalina Park", Optional.of("New South Wales"),
 				Optional.of("Australia"), Optional.of("park"), -33.7152, 150.30119);
-		Places.describe(place, found, crate::get, () -> crate.add("Geometry"));
+		GeoNames.describe(place, found, crate::get, () -> crate.add("Geometry"));
 		assertEquals("Catalina Park", place.getLabel());
 		assertEquals("http://sws.geonames.org/8152662/", place.get("identifier").orElseThrow().asText());
 		assertEquals("https://www.geonames.org/8152662/", place.get("url").orElseThrow().asText());

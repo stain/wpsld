@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package no.s11.wpsld.crate;
+package no.s11.wpsld.lookup;
 
 import java.io.IOException;
 import java.net.URI;
@@ -43,6 +43,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.TextNode;
 
+import no.s11.wpsld.crate.Crate;
+import no.s11.wpsld.crate.Entity;
+
 /**
  * Publications, datasets and software by their DOI, from the two agencies
  * that register most research DOIs: Crossref (journal articles, books) and
@@ -54,7 +57,7 @@ import com.fasterxml.jackson.databind.node.TextNode;
  *
  * @see <a href="https://w3id.org/ro/crate/1.3/contextual-entities#publications-via-citation-property">RO-Crate 1.3: Publications via citation property</a>
  */
-public class Dois {
+public class DOI {
 	public static final String NAMESPACE = "https://doi.org/";
 	public static final URI CROSSREF = URI.create("https://api.crossref.org/");
 	public static final URI DATACITE = URI.create("https://api.datacite.org/");
@@ -66,7 +69,7 @@ public class Dois {
 	 * A DOI alone (10.1234/abc), as <code>doi:</code>, or at doi.org or
 	 * dx.doi.org, http or https; percent-encoded in addresses
 	 */
-	private static final Pattern DOI = Pattern.compile(
+	private static final Pattern DOI_PATTERN = Pattern.compile(
 			"(?:(?:https?://(?:dx\\.)?doi\\.org/)|(?:doi:\\s*)|(?:info:doi/))?(10\\.\\d{4,9}/\\S+)",
 			Pattern.CASE_INSENSITIVE);
 	/** Characters of Elasticsearch's query syntax, escaped for DataCite */
@@ -93,7 +96,7 @@ public class Dois {
 			Optional<String> pages, Optional<String> publisher, Optional<String> summary, String agency) {
 		/** The DOI as RO-Crate writes it, the <code>@id</code> of the work */
 		public String iri() {
-			return Dois.iri(doi);
+			return DOI.iri(doi);
 		}
 
 		/** The year it was issued, if known */
@@ -131,7 +134,7 @@ public class Dois {
 	private final String userAgent;
 	private final Map<String, URI> services;
 
-	public Dois(HttpClient http, Duration timeout, String userAgent) {
+	public DOI(HttpClient http, Duration timeout, String userAgent) {
 		this(http, timeout, userAgent, Map.of("crossref", CROSSREF, "datacite", DATACITE, "resolver", RESOLVER));
 	}
 
@@ -140,7 +143,7 @@ public class Dois {
 	 *                 <code>datacite</code> and <code>resolver</code>
 	 *                 (doi.org), e.g. a test server
 	 */
-	public Dois(HttpClient http, Duration timeout, String userAgent, Map<String, URI> services) {
+	public DOI(HttpClient http, Duration timeout, String userAgent, Map<String, URI> services) {
 		this.http = Objects.requireNonNull(http);
 		this.timeout = Objects.requireNonNull(timeout);
 		this.userAgent = Objects.requireNonNull(userAgent);
@@ -163,7 +166,7 @@ public class Dois {
 				return Optional.empty();
 			}
 		}
-		Matcher matcher = DOI.matcher(doi);
+		Matcher matcher = DOI_PATTERN.matcher(doi);
 		return matcher.matches() ? Optional.of(matcher.group(1)) : Optional.empty();
 	}
 
@@ -210,9 +213,12 @@ public class Dois {
 	}
 
 	/**
-	 * The work of a DOI, from the agency that registered it.
+	 * The work of a DOI, in any form {@link #doiOf} reads (e.g.
+	 * <code>https://doi.org/10.5281/zenodo.3541888</code>), from the agency
+	 * that registered it.
 	 */
-	public Work lookUp(String doi) throws IOException, InterruptedException {
+	public Work lookUp(String text) throws IOException, InterruptedException {
+		String doi = doiOf(text).orElseThrow(() -> new DoiException("Not a DOI: " + text));
 		JsonNode ra = get(service("resolver", "ra/" + encode(doi)), "application/json");
 		String agency = ra.path(0).path("RA").asText("");
 		if (agency.isEmpty() || ra.path(0).has("status")) {
@@ -315,14 +321,14 @@ public class Dois {
 			String name = text(a.path("name")).or(() -> text(a.path("literal")))
 					.orElse(Stream.of(given, family).flatMap(Optional::stream).collect(Collectors.joining(" ")));
 			if (!name.isBlank()) {
-				authors.add(new Author(name, given, family, text(a.path("ORCID")).flatMap(Orcid::idOf)));
+				authors.add(new Author(name, given, family, text(a.path("ORCID")).flatMap(ORCID::idOf)));
 			}
 		}
 		return new Work(text(item.path("DOI")).orElse(""), schemaType(text(item.path("type")).orElse("")),
 				first(item.path("title")).orElse(""), authors, date(item.path("issued").path("date-parts").path(0)),
 				first(item.path("container-title")), texts(item.path("ISSN")), text(item.path("volume")),
 				text(item.path("issue")), text(item.path("page")), text(item.path("publisher")),
-				text(item.path("abstract")).map(Dois::plainText).filter(a -> !a.isEmpty()), agency);
+				text(item.path("abstract")).map(DOI::plainText).filter(a -> !a.isEmpty()), agency);
 	}
 
 	/** A work as DataCite's REST API has it */
@@ -332,7 +338,7 @@ public class Dois {
 			Optional<String> orcid = Optional.empty();
 			for (JsonNode id : c.path("nameIdentifiers")) {
 				if ("ORCID".equalsIgnoreCase(id.path("nameIdentifierScheme").asText())) {
-					orcid = Orcid.idOf(id.path("nameIdentifier").asText(""));
+					orcid = ORCID.idOf(id.path("nameIdentifier").asText(""));
 				}
 			}
 			Optional<String> given = text(c.path("givenName"));
@@ -355,7 +361,7 @@ public class Dois {
 		Optional<String> summary = Optional.empty();
 		for (JsonNode description : attributes.path("descriptions")) {
 			if (summary.isEmpty() && "Abstract".equals(description.path("descriptionType").asText())) {
-				summary = text(description.path("description")).map(Dois::plainText).filter(a -> !a.isEmpty());
+				summary = text(description.path("description")).map(DOI::plainText).filter(a -> !a.isEmpty());
 			}
 		}
 		JsonNode publisher = attributes.path("publisher");
@@ -487,7 +493,7 @@ public class Dois {
 
 	/** The crate's Person for an author, or a new one */
 	private static Entity person(Author author, List<Entity> entities, BiFunction<String, String, Entity> newEntity) {
-		Optional<String> iri = author.orcid().map(o -> Orcid.NAMESPACE + o);
+		Optional<String> iri = author.orcid().map(o -> ORCID.NAMESPACE + o);
 		Optional<Entity> existing = iri.isPresent()
 				? entities.stream().filter(e -> e.getId().equals(iri.get())).findFirst()
 				: entities.stream().filter(e -> e.getTypes().contains("Person"))
@@ -584,6 +590,6 @@ public class Dois {
 		String lower = id.strip().toLowerCase(Locale.ROOT);
 		boolean address = lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("doi:")
 				|| lower.startsWith("info:doi/");
-		return address ? doiOf(id).map(Dois::iri) : Optional.empty();
+		return address ? doiOf(id).map(DOI::iri) : Optional.empty();
 	}
 }

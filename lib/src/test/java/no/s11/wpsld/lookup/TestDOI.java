@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package no.s11.wpsld.crate;
+package no.s11.wpsld.lookup;
 
 import static org.junit.Assert.*;
 
@@ -37,9 +37,12 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.TextNode;
 import com.sun.net.httpserver.HttpServer;
 
-import no.s11.wpsld.crate.Dois.Work;
+import no.s11.wpsld.lookup.DOI.Work;
 
-public class TestDois {
+import no.s11.wpsld.crate.Crate;
+import no.s11.wpsld.crate.Entity;
+
+public class TestDOI {
 	/** As Crossref's REST API has RO-Crate's example citation, abbreviated */
 	private static final String CROSSREF = """
 			{"message": {"items": [
@@ -69,20 +72,20 @@ public class TestDois {
 
 	@Test
 	public void doiOf() {
-		assertEquals(Optional.of("10.5281/zenodo.3541888"), Dois.doiOf("https://doi.org/10.5281/zenodo.3541888"));
-		assertEquals(Optional.of("10.5281/zenodo.3541888"), Dois.doiOf("http://dx.doi.org/10.5281/zenodo.3541888"));
-		assertEquals(Optional.of("10.5281/zenodo.3541888"), Dois.doiOf("doi:10.5281/zenodo.3541888"));
-		assertEquals(Optional.of("10.5281/zenodo.3541888"), Dois.doiOf("DOI: 10.5281/zenodo.3541888"));
-		assertEquals(Optional.of("10.5281/zenodo.3541888"), Dois.doiOf("https://doi.org/10.5281%2Fzenodo.3541888"));
-		assertEquals(Optional.of("10.1109/TCYB.2014.2386282"), Dois.doiOf("10.1109/TCYB.2014.2386282"));
-		assertEquals(Optional.empty(), Dois.doiOf("https://zenodo.org/record/3541888"));
-		assertEquals(Optional.empty(), Dois.doiOf("Topic Model for Graph Mining"));
-		assertEquals("https://doi.org/10.1000/a%23b", Dois.iri("10.1000/a#b"));
+		assertEquals(Optional.of("10.5281/zenodo.3541888"), DOI.doiOf("https://doi.org/10.5281/zenodo.3541888"));
+		assertEquals(Optional.of("10.5281/zenodo.3541888"), DOI.doiOf("http://dx.doi.org/10.5281/zenodo.3541888"));
+		assertEquals(Optional.of("10.5281/zenodo.3541888"), DOI.doiOf("doi:10.5281/zenodo.3541888"));
+		assertEquals(Optional.of("10.5281/zenodo.3541888"), DOI.doiOf("DOI: 10.5281/zenodo.3541888"));
+		assertEquals(Optional.of("10.5281/zenodo.3541888"), DOI.doiOf("https://doi.org/10.5281%2Fzenodo.3541888"));
+		assertEquals(Optional.of("10.1109/TCYB.2014.2386282"), DOI.doiOf("10.1109/TCYB.2014.2386282"));
+		assertEquals(Optional.empty(), DOI.doiOf("https://zenodo.org/record/3541888"));
+		assertEquals(Optional.empty(), DOI.doiOf("Topic Model for Graph Mining"));
+		assertEquals("https://doi.org/10.1000/a%23b", DOI.iri("10.1000/a#b"));
 	}
 
 	@Test
 	public void crossref() throws Exception {
-		Work work = Dois.parseCrossref(MAPPER.readTree(CROSSREF)).get(0);
+		Work work = DOI.parseCrossref(MAPPER.readTree(CROSSREF)).get(0);
 		assertEquals("ScholarlyArticle", work.type());
 		assertEquals("https://doi.org/10.1109/tcyb.2014.2386282", work.iri());
 		assertEquals(Optional.of("2015-12"), work.issued());
@@ -94,7 +97,7 @@ public class TestDois {
 
 	@Test
 	public void datacite() throws Exception {
-		Work work = Dois.parseDatacite(MAPPER.readTree(DATACITE)).get(0);
+		Work work = DOI.parseDatacite(MAPPER.readTree(DATACITE)).get(0);
 		assertEquals("ScholarlyArticle", work.type());
 		assertEquals(Optional.of("2019-11-15"), work.issued());
 		assertEquals(Optional.of("0000-0002-3545-944X"), work.authors().get(0).orcid());
@@ -116,14 +119,14 @@ public class TestDois {
 
 	@Test
 	public void plainText() {
-		assertEquals("Presented at BOSC, Basel.\n\nAccepted & shown.", Dois.plainText(
+		assertEquals("Presented at BOSC, Basel.\n\nAccepted & shown.", DOI.plainText(
 				"<jats:p>Presented at <jats:ext-link ext-link-type=\"uri\">BOSC</jats:ext-link>,\n   Basel.</jats:p>"
 						+ "<jats:p>Accepted &amp; shown.</jats:p>"));
 	}
 
 	@Test
 	public void dataciteQuery() {
-		assertEquals("sefton AND RO\\-Crate AND 1.0\\/2", Dois.dataciteQuery(" sefton  RO-Crate 1.0/2 "));
+		assertEquals("sefton AND RO\\-Crate AND 1.0\\/2", DOI.dataciteQuery(" sefton  RO-Crate 1.0/2 "));
 	}
 
 	@Test
@@ -132,10 +135,10 @@ public class TestDois {
 		// A co-author the crate has already, by name
 		Entity lu = crate.add("Person");
 		lu.set("name", Optional.of(TextNode.valueOf("Jie Lu")));
-		Work work = Dois.parseCrossref(MAPPER.readTree(CROSSREF)).get(0);
+		Work work = DOI.parseCrossref(MAPPER.readTree(CROSSREF)).get(0);
 		Entity article = crate.add("Thing");
 		crate.rename(article, work.iri());
-		Dois.describe(article, work, crate.getEntities(), (type, id) -> {
+		DOI.describe(article, work, crate.getEntities(), (type, id) -> {
 			Entity added = crate.add(type);
 			if (id != null) {
 				crate.rename(added, id);
@@ -157,9 +160,9 @@ public class TestDois {
 		assertEquals(journal.getId(), article.get("isPartOf").orElseThrow().path("@id").asText());
 
 		// Authors by ORCID iD, from DataCite
-		Work spec = Dois.parseDatacite(MAPPER.readTree(DATACITE)).get(0);
+		Work spec = DOI.parseDatacite(MAPPER.readTree(DATACITE)).get(0);
 		Entity cited = crate.add("CreativeWork");
-		Dois.describe(cited, spec, crate.getEntities(), (type, id) -> {
+		DOI.describe(cited, spec, crate.getEntities(), (type, id) -> {
 			Entity added = crate.add(type);
 			if (id != null) {
 				crate.rename(added, id);
@@ -185,7 +188,7 @@ public class TestDois {
 		Entity file = crate.add("File");
 		crate.rename(file, "10.1000/data.csv");
 
-		assertFalse(Dois.repair(crate).isEmpty());
+		assertFalse(DOI.repair(crate).isEmpty());
 		// The same DOI, whatever its case: one entity
 		assertSame(again, crate.get("https://doi.org/10.1109/tcyb.2014.2386282").orElseThrow());
 		assertFalse(crate.getEntities().contains(old));
@@ -194,7 +197,7 @@ public class TestDois {
 		assertEquals("https://doi.org/10.5281/zenodo.1313066", root.get("identifier").orElseThrow().asText());
 		// A DOI alone as @id is a path
 		assertSame(file, crate.get("10.1000/data.csv").orElseThrow());
-		assertEquals(List.of(), Dois.repair(crate));
+		assertEquals(List.of(), DOI.repair(crate));
 	}
 
 	@Test
@@ -219,13 +222,15 @@ public class TestDois {
 		server.start();
 		try {
 			URI local = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/");
-			Dois dois = new Dois(HttpClient.newHttpClient(), Duration.ofSeconds(5), "wpsld/test",
+			DOI dois = new DOI(HttpClient.newHttpClient(), Duration.ofSeconds(5), "wpsld/test",
 					Map.of("crossref", local, "datacite", local, "resolver", local));
 			// A DOI is looked up at its agency
 			assertEquals("RO-Crate Metadata Specification 1.0", dois.search("doi:10.5281/zenodo.3541888").get(0).title());
 			assertEquals(List.of("/ra/10.5281%2Fzenodo.3541888", "/dois/10.5281%2Fzenodo.3541888"), asked);
 			asked.clear();
 			assertEquals("Topic Model for Graph Mining", dois.lookUp("10.1109/x").title());
+			// In any form
+			assertEquals("Topic Model for Graph Mining", dois.lookUp("https://doi.org/10.1109/x").title());
 			// A bare DOI, and a DOI's address, are looked up too, not searched for
 			for (String doi : List.of("10.5281/zenodo.3541888", "https://doi.org/10.5281/zenodo.3541888",
 					" http://dx.doi.org/10.5281/zenodo.3541888 ")) {

@@ -39,9 +39,9 @@ import javafx.scene.control.TextField;
 import javafx.stage.Stage;
 import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
-import no.s11.wpsld.crate.Dois;
-import no.s11.wpsld.crate.Dois.Author;
-import no.s11.wpsld.crate.Dois.Work;
+import no.s11.wpsld.lookup.DOI;
+import no.s11.wpsld.lookup.DOI.Author;
+import no.s11.wpsld.lookup.DOI.Work;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.masp.ProfileCache;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
@@ -74,7 +74,7 @@ public class TestCrateEditorWorks extends ApplicationTest {
 				Optional.of(temp.resolve("settings.json")));
 		app.setWorkSearch(query -> {
 			searches.add(query);
-			return Dois.doiOf(query).isPresent() ? List.of(SPEC)
+			return DOI.doiOf(query).isPresent() ? List.of(SPEC)
 					: query.toLowerCase().contains("graph") ? List.of(GRAPHS) : List.of();
 		});
 		app.init();

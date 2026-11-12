@@ -130,6 +130,16 @@ JavaFX comes from Maven Central.
 The GUI tests run headless, with JavaFX's headless platform, so they need
 no display. On Linux, JavaFX needs GTK 3 and the X11/GL libraries.
 
+The tests run offline: those of the lookups (GeoNames, ORCID, ROR, DOIs)
+answer from local test servers, and any other host name fails to resolve
+(`OfflineResolverProvider`), so the build neither depends on web services
+nor asks them on every run. A few tests check the services themselves, as
+they answer today; they are in the JUnit category `Online` and left out of
+`build`:
+
+    ./gradlew onlineTest                         # ORCID, ROR, Crossref, DataCite, OpenStreetMap
+    GEONAMES_USERNAME=<you> ./gradlew onlineTest # and GeoNames
+
 ### With conda
 
 [`environment.yml`](environment.yml) gives OpenJDK 25 and the libraries
@@ -167,6 +177,10 @@ The portable zip, without JavaFX, is `./gradlew :ui:distZip`, written to
 runs its tests, the headless GUI tests too, for every pull request: they must
 pass on Linux, and are reported for Windows and macOS. The release workflow
 also runs them on each platform before making a release.
+[`.github/workflows/online-tests.yml`](.github/workflows/online-tests.yml)
+runs the online tests once a month, when run by hand, and on each release
+(reported, without holding the release up). GeoNames' test needs the
+repository secret `GEONAMES_USERNAME`, and is skipped without it.
 
 ### Releases
 
@@ -181,8 +195,8 @@ comes from [`gradle.properties`](gradle.properties).
 
 | Module | Contents |
 |--------|----------|
-| [`lib`](lib) (`no.s11.wpsld`) | No JavaFX. The schema.org model, form fields, the RO-Crate model, reading and retrieving crates, JSON-LD contexts, MASP profiles and registries, and settings. Its only dependency is Jackson. |
-| [`ui`](ui) (`no.s11.wpsld.ui`) | The JavaFX editor: the crate window (`CrateEditor`), the entity form (`EntityEditor`), the preview, the type chooser and the preferences, and its styles (`Theme`). Besides JavaFX, it uses [Ikonli](https://kordamp.org/ikonli/) for the Fluent icons of the Windows 11 style and [commonmark-java](https://github.com/commonmark/commonmark-java) for help. |
+| [`lib`](lib) (`no.s11.wpsld`) | No JavaFX. The schema.org model, form fields, the RO-Crate model, reading and retrieving crates, JSON-LD contexts, MASP profiles and registries, and settings. The lookups of RO-Crate's recommended identifiers are in `no.s11.wpsld.lookup` (`GeoNames`, `ORCID`, `ROR`, `DOI`, and the bundled `SPDXLicenses` and `PRONOMFormats`), which uses the crate model but not the other way round. Its only dependency is Jackson. |
+| [`ui`](ui) (`no.s11.wpsld.ui`) | The JavaFX editor: the crate window (`CrateEditor`), the entity form (`EntityEditor`), the preview, the type chooser, the preferences, the lookup dialogs (`PlaceFinder`, `PersonFinder`, `OrganizationFinder`, `WorkFinder`, `LicenseFinder`, `FormatFinder`), and its styles (`Theme`). Besides JavaFX, it uses [Ikonli](https://kordamp.org/ikonli/) for the Fluent icons of the Windows 11 style and [commonmark-java](https://github.com/commonmark/commonmark-java) for help. |
 
 ## Licence
 

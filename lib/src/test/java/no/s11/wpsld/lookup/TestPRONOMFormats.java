@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package no.s11.wpsld.crate;
+package no.s11.wpsld.lookup;
 
 import static org.junit.Assert.*;
 
@@ -28,12 +28,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.TextNode;
 
-import no.s11.wpsld.crate.PronomFormats.Format;
+import no.s11.wpsld.lookup.PRONOMFormats.Format;
 
-public class TestPronomFormats {
+import no.s11.wpsld.crate.Crate;
+import no.s11.wpsld.crate.Entity;
+
+public class TestPRONOMFormats {
 	@Test
 	public void bundled() {
-		PronomFormats pronom = PronomFormats.bundled();
+		PRONOMFormats pronom = PRONOMFormats.bundled();
 		assertEquals("125", pronom.getVersion());
 		assertEquals(2571, pronom.getFormats().size());
 		Format pdf = pronom.get("fmt/19").orElseThrow();
@@ -45,7 +48,7 @@ public class TestPronomFormats {
 
 	@Test
 	public void search() {
-		PronomFormats pronom = PronomFormats.bundled();
+		PRONOMFormats pronom = PRONOMFormats.bundled();
 		// An extension, with or without its dot, or a media type
 		assertEquals("x-fmt/18", pronom.search(".csv").get(0).puid());
 		assertEquals("x-fmt/18", pronom.search("text/csv").get(0).puid());
@@ -60,7 +63,7 @@ public class TestPronomFormats {
 
 	@Test
 	public void mediaTypes() {
-		PronomFormats pronom = PronomFormats.bundled();
+		PRONOMFormats pronom = PRONOMFormats.bundled();
 		assertEquals(List.of("x-fmt/18"), pronom.withMediaType("TEXT/CSV").stream().map(Format::puid).toList());
 		// PDF has many versions, so a media type doesn't say which
 		assertTrue(pronom.withMediaType("application/pdf").size() > 10);
@@ -68,25 +71,25 @@ public class TestPronomFormats {
 
 	@Test
 	public void puidOf() {
-		assertEquals(Optional.of("fmt/19"), PronomFormats.puidOf("https://www.nationalarchives.gov.uk/PRONOM/fmt/19"));
-		assertEquals(Optional.of("x-fmt/263"), PronomFormats.puidOf("http://www.nationalarchives.gov.uk/PRONOM/x-fmt/263"));
-		assertEquals(Optional.of("fmt/19"), PronomFormats.puidOf("https://pronom.nationalarchives.gov.uk/fmt/19.json"));
-		assertEquals(Optional.of("fmt/19"), PronomFormats.puidOf("https://www.nationalarchives.gov.uk/pronom/fmt/19"));
-		assertEquals(Optional.empty(), PronomFormats.puidOf("https://www.nationalarchives.gov.uk/fmt/19"));
-		assertEquals(Optional.empty(), PronomFormats.puidOf("text/csv"));
+		assertEquals(Optional.of("fmt/19"), PRONOMFormats.puidOf("https://www.nationalarchives.gov.uk/PRONOM/fmt/19"));
+		assertEquals(Optional.of("x-fmt/263"), PRONOMFormats.puidOf("http://www.nationalarchives.gov.uk/PRONOM/x-fmt/263"));
+		assertEquals(Optional.of("fmt/19"), PRONOMFormats.puidOf("https://pronom.nationalarchives.gov.uk/fmt/19.json"));
+		assertEquals(Optional.of("fmt/19"), PRONOMFormats.puidOf("https://www.nationalarchives.gov.uk/pronom/fmt/19"));
+		assertEquals(Optional.empty(), PRONOMFormats.puidOf("https://www.nationalarchives.gov.uk/fmt/19"));
+		assertEquals(Optional.empty(), PRONOMFormats.puidOf("text/csv"));
 	}
 
 	@Test
 	public void addTo() {
 		Entity file = new Entity("data.csv", "File");
-		Format csv = PronomFormats.bundled().get("x-fmt/18").orElseThrow();
-		assertTrue(PronomFormats.addTo(file, csv));
+		Format csv = PRONOMFormats.bundled().get("x-fmt/18").orElseThrow();
+		assertTrue(PRONOMFormats.addTo(file, csv));
 		assertEquals(List.of(TextNode.valueOf("text/csv"), reference(csv.iri())), file.getAll("encodingFormat"));
-		assertFalse(PronomFormats.addTo(file, csv));
+		assertFalse(PRONOMFormats.addTo(file, csv));
 		// A media type it has is kept, not added to
 		Entity other = new Entity("data.txt", "File");
 		other.set("encodingFormat", Optional.of(TextNode.valueOf("text/plain")));
-		PronomFormats.addTo(other, csv);
+		PRONOMFormats.addTo(other, csv);
 		assertEquals(List.of(TextNode.valueOf("text/plain"), reference(csv.iri())), other.getAll("encodingFormat"));
 	}
 
@@ -107,7 +110,7 @@ public class TestPronomFormats {
 		Entity zip = crate.add("WebPage");
 		crate.rename(zip, "http://www.nationalarchives.gov.uk/PRONOM/x-fmt/263");
 
-		List<String> done = PronomFormats.bundled().repair(crate);
+		List<String> done = PRONOMFormats.bundled().repair(crate);
 		assertFalse(done.isEmpty());
 		assertEquals(List.of(TextNode.valueOf("text/csv"),
 				reference("https://www.nationalarchives.gov.uk/PRONOM/x-fmt/18")), table.getAll("encodingFormat"));
@@ -120,7 +123,7 @@ public class TestPronomFormats {
 		assertEquals("ZIP Format", zip.getLabel());
 		Entity csv = crate.get("https://www.nationalarchives.gov.uk/PRONOM/x-fmt/18").orElseThrow();
 		assertEquals("Comma Separated Values", csv.getLabel());
-		assertEquals(List.of(), PronomFormats.bundled().repair(crate));
+		assertEquals(List.of(), PRONOMFormats.bundled().repair(crate));
 	}
 
 	private static JsonNode reference(String id) {

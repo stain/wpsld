@@ -30,6 +30,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import com.fasterxml.jackson.core.util.DefaultIndenter;
@@ -494,10 +495,51 @@ public class Crate {
 	}
 
 	/**
+	 * Write <code>@id</code>s and references in the form an identifier
+	 * scheme gives, e.g. ORCID iDs as <code>https://orcid.org/…</code>,
+	 * merging entities that turn out to be the same.
+	 *
+	 * @param canonical The <code>@id</code> an <code>@id</code> means, if it
+	 *                  is one of the scheme's
+	 * @return What was changed, one line each
+	 */
+	public List<String> normaliseIds(Function<String, Optional<String>> canonical) {
+		List<String> done = new ArrayList<>();
+		for (Entity entity : List.copyOf(entities)) {
+			Optional<String> iri = canonical.apply(entity.getId());
+			if (iri.isEmpty() || entity.getId().equals(iri.get())) {
+				continue;
+			}
+			String old = entity.getId();
+			Optional<Entity> existing = get(iri.get());
+			if (existing.isPresent()) {
+				merge(existing.get(), entity);
+				done.add(old + " merged into " + iri.get());
+			} else {
+				rename(entity, iri.get());
+				done.add(old + " is now " + iri.get());
+			}
+		}
+		for (Entity entity : List.copyOf(entities)) {
+			for (String property : List.copyOf(entity.getValues().keySet())) {
+				for (JsonNode value : entity.getAll(property)) {
+					String id = value.path("@id").asText(null);
+					Optional<String> iri = id == null ? Optional.empty() : canonical.apply(id);
+					if (iri.isPresent() && !id.equals(iri.get())) {
+						replaceReferences(id, iri.get());
+						done.add("Links to " + id + " now go to " + iri.get());
+					}
+				}
+			}
+		}
+		return done;
+	}
+
+	/**
 	 * Point the references to one <code>@id</code> to another, e.g. to an
 	 * entity known by another address.
 	 */
-	void replaceReferences(String oldId, String newId) {
+	public void replaceReferences(String oldId, String newId) {
 		replaceReferences(entities, Map.of(oldId, newId));
 	}
 

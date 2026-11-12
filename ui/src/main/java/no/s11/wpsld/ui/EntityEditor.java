@@ -95,13 +95,14 @@ import org.kordamp.ikonli.javafx.FontIcon;
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.CrateDocument;
 import no.s11.wpsld.crate.CrateTerms;
-import no.s11.wpsld.crate.Dois;
+import no.s11.wpsld.lookup.DOI;
 import no.s11.wpsld.crate.Entity;
-import no.s11.wpsld.crate.GeoNames;
-import no.s11.wpsld.crate.Orcid;
+import no.s11.wpsld.lookup.GeoNames;
+import no.s11.wpsld.lookup.ORCID;
+import no.s11.wpsld.lookup.ROR;
 import no.s11.wpsld.crate.Places;
-import no.s11.wpsld.crate.PronomFormats;
-import no.s11.wpsld.crate.SpdxLicenses;
+import no.s11.wpsld.lookup.PRONOMFormats;
+import no.s11.wpsld.lookup.SPDXLicenses;
 import no.s11.wpsld.form.EntityTypes;
 import no.s11.wpsld.form.FieldTier;
 import no.s11.wpsld.form.FormField;
@@ -189,7 +190,7 @@ public class EntityEditor extends ScrollPane {
 	/** Asks the user for a place in GeoNames, starting from a name */
 	private Function<String, Optional<GeoNames.Place>> findPlace = name -> Optional.empty();
 	/** Asks the user for a work by DOI, starting from a DOI or its title */
-	private Function<String, Optional<Dois.Work>> findWork = query -> Optional.empty();
+	private Function<String, Optional<DOI.Work>> findWork = query -> Optional.empty();
 	/** Fields that cite or refer to works, which may be found by DOI */
 	private static final Set<String> WORK_FIELDS = Set.of("citation", "isBasedOn", "subjectOf");
 	/** Types of works that usually have a DOI, e.g. articles */
@@ -197,11 +198,13 @@ public class EntityEditor extends ScrollPane {
 			.of("ScholarlyArticle", "Book", "Chapter", "Report", "Thesis")
 			.map(t -> URI.create("http://schema.org/" + t)).toList();
 	/** Asks the user for a person in ORCID, starting from a name */
-	private Function<String, Optional<Orcid.Person>> findPerson = name -> Optional.empty();
+	private Function<String, Optional<ORCID.Person>> findPerson = name -> Optional.empty();
+	/** Asks the user for an organisation in ROR, and its name, starting from a name */
+	private Function<String, Optional<OrganizationFinder.Chosen>> findOrganization = name -> Optional.empty();
 	/** Asks the user for a file format of PRONOM, starting from a search */
-	private Function<String, Optional<PronomFormats.Format>> findFormat = query -> Optional.empty();
+	private Function<String, Optional<PRONOMFormats.Format>> findFormat = query -> Optional.empty();
 	/** Asks the user for a licence of the SPDX License List */
-	private Supplier<Optional<SpdxLicenses.License>> findLicense = Optional::empty;
+	private Supplier<Optional<SPDXLicenses.License>> findLicense = Optional::empty;
 	/** Where the map of an entity was left, kept while the form is rebuilt */
 	private record MapState(Entity entity, int zoom, double latitude, double longitude) {
 	}
@@ -464,7 +467,7 @@ public class EntityEditor extends ScrollPane {
 			}
 		}
 		// A work's DOI, its details filled in from it
-		boolean doiId = Dois.doiOf(entity.getId()).isPresent() && entity.getId().startsWith("http");
+		boolean doiId = DOI.doiOf(entity.getId()).isPresent() && entity.getId().startsWith("http");
 		if (doiId || PUBLICATIONS.stream().anyMatch(this::isA)) {
 			Label doi = new Label("DOI");
 			doi.setId("label-doi");
@@ -475,6 +478,12 @@ public class EntityEditor extends ScrollPane {
 			Label orcid = new Label("ORCID");
 			orcid.setId("label-orcid");
 			header.addRow(headerRow++, orcid, orcidEditor());
+		}
+		// An organisation's ROR identifier, looked up rather than typed
+		if (isA(ORGANIZATION)) {
+			Label ror = new Label("ROR");
+			ror.setId("label-ror");
+			header.addRow(headerRow++, ror, rorEditor());
 		}
 		// Where a place is, on a map, rather than as coordinates to type
 		if (isA(PLACE) || entity.getTypes().contains("Geometry") || isA(GEO_COORDINATES)) {
@@ -610,6 +619,7 @@ public class EntityEditor extends ScrollPane {
 
 	private static final URI PLACE = URI.create("http://schema.org/Place");
 	private static final URI PERSON = URI.create("http://schema.org/Person");
+	private static final URI ORGANIZATION = URI.create("http://schema.org/Organization");
 	private static final URI GEO_COORDINATES = URI.create("http://schema.org/GeoCoordinates");
 
 	/** Whether the entity is of the class or one of its subclasses */
@@ -634,10 +644,10 @@ public class EntityEditor extends ScrollPane {
 		button.setMinWidth(Region.USE_PREF_SIZE);
 		button.setTooltip(new Tooltip(doiId ? "Add what Crossref or DataCite has about it, keeping what it has"
 				: "Look it up in Crossref and DataCite by its title"));
-		String query = doiId ? Dois.doiOf(edited.getId()).orElseThrow()
+		String query = doiId ? DOI.doiOf(edited.getId()).orElseThrow()
 				: edited.get("name").map(JsonNode::asText).orElse("");
 		button.setOnAction(e -> findWork.apply(query).ifPresent(found -> {
-			Dois.describe(edited, found, crateEntities.get(), this::newEntityWithId);
+			DOI.describe(edited, found, crateEntities.get(), this::newEntityWithId);
 			onChange.run();
 			String id = edited.getId();
 			// Its DOI, unless it has an identifier of its own
@@ -650,7 +660,7 @@ public class EntityEditor extends ScrollPane {
 		HBox box = new HBox(8, button);
 		box.setAlignment(Pos.CENTER_LEFT);
 		if (doiId) {
-			Hyperlink link = new Hyperlink(Dois.doiOf(edited.getId()).orElseThrow());
+			Hyperlink link = new Hyperlink(DOI.doiOf(edited.getId()).orElseThrow());
 			link.setId("doiLink");
 			link.setOnAction(e -> browse.accept(edited.getId()));
 			box.getChildren().add(link);
@@ -684,19 +694,19 @@ public class EntityEditor extends ScrollPane {
 		find.setTooltip(new Tooltip("Look the person up in ORCID by their name"));
 		find.setOnAction(e -> findPerson.apply(edited.get("name").map(JsonNode::asText).orElse(""))
 				.ifPresent(found -> {
-					Orcid.describe(edited, found);
+					ORCID.describe(edited, found);
 					onChange.run();
 					String id = edited.getId();
 					// Their ORCID iD, unless they have an identifier of their own
 					if (!id.equals(found.iri())
-							&& (id.startsWith("#") || id.startsWith("_:") || Orcid.idOf(id).isPresent())) {
+							&& (id.startsWith("#") || id.startsWith("_:") || ORCID.idOf(id).isPresent())) {
 						renameEntity.accept(edited, found.iri());
 					} else {
 						showForm();
 					}
 				}));
 		Node shown;
-		Optional<String> id = edited.getId().startsWith(Orcid.NAMESPACE) ? Orcid.idOf(edited.getId())
+		Optional<String> id = edited.getId().startsWith(ORCID.NAMESPACE) ? ORCID.idOf(edited.getId())
 				: Optional.empty();
 		if (id.isPresent()) {
 			Hyperlink link = new Hyperlink(id.get());
@@ -707,6 +717,150 @@ public class EntityEditor extends ScrollPane {
 		} else {
 			Label none = new Label("No ORCID iD as @id yet");
 			none.setId("orcidNone");
+			none.getStyleClass().add("dim-text");
+			shown = none;
+		}
+		HBox box = new HBox(8, find, shown);
+		box.setAlignment(Pos.CENTER_LEFT);
+		return box;
+	}
+
+	/** What can be looked up and added, as Insert in the menu bar offers */
+	enum Lookup {
+		PLACE, PERSON, ORGANIZATION, PUBLICATION, LICENSE, FORMAT
+	}
+
+	/**
+	 * Look up something, e.g. a place in GeoNames, and add it to the crate,
+	 * not linked from anywhere: the crate's entity for it, if it has one,
+	 * else a new one described from the lookup.
+	 *
+	 * @return The entity, or empty if the user cancelled
+	 */
+	public Optional<Entity> lookUp(Lookup lookup) {
+		Optional<String> id = switch (lookup) {
+		case PLACE -> findPlace.apply("").map(this::addPlace);
+		case PERSON -> findPerson.apply("").map(this::addPerson);
+		case ORGANIZATION -> findOrganization.apply("").map(this::addOrganization);
+		case PUBLICATION -> findWork.apply("").map(this::addWork);
+		case LICENSE -> findLicense.get().map(this::addLicense);
+		case FORMAT -> findFormat.apply("").map(this::addFormat);
+		};
+		return id.flatMap(this::crateEntity);
+	}
+
+	/**
+	 * The crate's entity for the place found in GeoNames, or a new one with
+	 * its GeoNames identifier: its <code>@id</code>.
+	 */
+	private String addPlace(GeoNames.Place found) {
+		if (crateEntity(found.iri()).isEmpty()) {
+			Entity place = newEntityWithId("Place", found.iri());
+			GeoNames.describe(place, found, this::crateEntity, () -> newEntity.apply("Geometry"));
+		}
+		return found.iri();
+	}
+
+	/**
+	 * The crate's entity for the work found by DOI (whatever the DOI's
+	 * case), or a new one with its DOI as <code>@id</code>: its
+	 * <code>@id</code>.
+	 */
+	private String addWork(DOI.Work found) {
+		Optional<Entity> existing = crateEntities.get().stream()
+				.filter(e -> e.getId().equalsIgnoreCase(found.iri())).findFirst();
+		if (existing.isPresent()) {
+			return existing.get().getId();
+		}
+		Entity work = newEntityWithId(found.type(), found.iri());
+		DOI.describe(work, found, crateEntities.get(), this::newEntityWithId);
+		return found.iri();
+	}
+
+	/**
+	 * The crate's entity for the person found in ORCID, or a new one with
+	 * their ORCID iD as <code>@id</code>: its <code>@id</code>.
+	 */
+	private String addPerson(ORCID.Person found) {
+		if (crateEntity(found.iri()).isEmpty()) {
+			ORCID.describe(newEntityWithId("Person", found.iri()), found);
+		}
+		return found.iri();
+	}
+
+	/**
+	 * The crate's entity for the organisation found in ROR, or a new one
+	 * with its ROR identifier as <code>@id</code>: its <code>@id</code>.
+	 */
+	private String addOrganization(OrganizationFinder.Chosen found) {
+		String iri = found.organization().iri();
+		if (crateEntity(iri).isEmpty()) {
+			ROR.describe(newEntityWithId("Organization", iri), found.organization(), found.name(),
+					this::crateEntity, this::newEntityWithId);
+		}
+		return iri;
+	}
+
+	/**
+	 * The crate's entity for the file format chosen from PRONOM, or a new
+	 * one with its PRONOM address: its <code>@id</code>.
+	 */
+	private String addFormat(PRONOMFormats.Format format) {
+		if (crateEntity(format.iri()).isEmpty()) {
+			PRONOMFormats.describe(newEntityWithId("WebPage", format.iri()), format);
+		}
+		return format.iri();
+	}
+
+	/**
+	 * The crate's entity for the licence chosen from the SPDX License List,
+	 * or a new one with its SPDX IRI and identifier: its <code>@id</code>.
+	 */
+	private String addLicense(SPDXLicenses.License license) {
+		if (crateEntity(license.iri()).isEmpty()) {
+			SPDXLicenses.describe(newEntityWithId("CreativeWork", license.iri()), license, this::crateEntity,
+					id -> newEntityWithId("PropertyValue", id));
+		}
+		return license.iri();
+	}
+
+	/**
+	 * The organisation's ROR identifier, if its <code>@id</code> is one, and
+	 * finding it in ROR by name, which gives it its ROR identifier as
+	 * <code>@id</code> (merging if the crate has it already) and the name
+	 * chosen.
+	 */
+	private Node rorEditor() {
+		Entity edited = entity;
+		Button find = new Button("Find in ROR…");
+		find.setId("findOrganization");
+		find.setMinWidth(Region.USE_PREF_SIZE);
+		find.setTooltip(new Tooltip("Look the organisation up in ROR by its name"));
+		find.setOnAction(e -> findOrganization.apply(edited.get("name").map(JsonNode::asText).orElse(""))
+				.ifPresent(found -> {
+					ROR.describe(edited, found.organization(), found.name(), this::crateEntity,
+							this::newEntityWithId);
+					onChange.run();
+					String id = edited.getId();
+					String iri = found.organization().iri();
+					// Its ROR identifier, unless it has an identifier of its own
+					if (!id.equals(iri) && (id.startsWith("#") || id.startsWith("_:") || ROR.idOf(id).isPresent())) {
+						renameEntity.accept(edited, iri);
+					} else {
+						showForm();
+					}
+				}));
+		Node shown;
+		Optional<String> id = edited.getId().startsWith(ROR.NAMESPACE) ? ROR.idOf(edited.getId()) : Optional.empty();
+		if (id.isPresent()) {
+			Hyperlink link = new Hyperlink(id.get());
+			link.setId("rorLink");
+			link.setTooltip(new Tooltip("Open its ROR record"));
+			link.setOnAction(e -> browse.accept(edited.getId()));
+			shown = link;
+		} else {
+			Label none = new Label("No ROR identifier as @id yet");
+			none.setId("rorNone");
 			none.getStyleClass().add("dim-text");
 			shown = none;
 		}
@@ -758,7 +912,7 @@ public class EntityEditor extends ScrollPane {
 			find.setTooltip(new Tooltip("Look the place up in GeoNames by its name"));
 			find.setOnAction(e -> findPlace.apply(edited.get("name").map(JsonNode::asText).orElse(""))
 					.ifPresent(found -> {
-						Places.describe(edited, found, this::crateEntity, () -> newEntity.apply("Geometry"));
+						GeoNames.describe(edited, found, this::crateEntity, () -> newEntity.apply("Geometry"));
 						mapState = null;
 						onChange.run();
 						// Its GeoNames identifier, unless it has an identifier of
@@ -1077,7 +1231,7 @@ public class EntityEditor extends ScrollPane {
 	 * Set how to ask the user for a work by DOI, given a DOI or title to
 	 * start from; empty if they cancel.
 	 */
-	public void setFindWork(Function<String, Optional<Dois.Work>> findWork) {
+	public void setFindWork(Function<String, Optional<DOI.Work>> findWork) {
 		this.findWork = Objects.requireNonNull(findWork);
 	}
 
@@ -1085,15 +1239,23 @@ public class EntityEditor extends ScrollPane {
 	 * Set how to ask the user for a person in ORCID, given a name to start
 	 * from; empty if they cancel.
 	 */
-	public void setFindPerson(Function<String, Optional<Orcid.Person>> findPerson) {
+	public void setFindPerson(Function<String, Optional<ORCID.Person>> findPerson) {
 		this.findPerson = Objects.requireNonNull(findPerson);
+	}
+
+	/**
+	 * Set how to ask the user for an organisation in ROR, and which of its
+	 * names to write, given a name to start from; empty if they cancel.
+	 */
+	void setFindOrganization(Function<String, Optional<OrganizationFinder.Chosen>> findOrganization) {
+		this.findOrganization = Objects.requireNonNull(findOrganization);
 	}
 
 	/**
 	 * Set how to ask the user for a file format of PRONOM, given what to
 	 * search for first; empty if they cancel.
 	 */
-	public void setFindFormat(Function<String, Optional<PronomFormats.Format>> findFormat) {
+	public void setFindFormat(Function<String, Optional<PRONOMFormats.Format>> findFormat) {
 		this.findFormat = Objects.requireNonNull(findFormat);
 	}
 
@@ -1101,7 +1263,7 @@ public class EntityEditor extends ScrollPane {
 	 * Set how to ask the user for a licence of the SPDX License List; empty if
 	 * they cancel.
 	 */
-	public void setFindLicense(Supplier<Optional<SpdxLicenses.License>> findLicense) {
+	public void setFindLicense(Supplier<Optional<SPDXLicenses.License>> findLicense) {
 		this.findLicense = Objects.requireNonNull(findLicense);
 	}
 
@@ -1338,6 +1500,12 @@ public class EntityEditor extends ScrollPane {
 					fromOrcid.setOnAction(e -> findPerson.apply("").ifPresent(this::linkPerson));
 					create.getItems().add(fromOrcid);
 				}
+				if (entityTypes.stream().anyMatch(c -> c.getID().equals(ORGANIZATION))) {
+					MenuItem fromRor = new MenuItem("Organization from ROR…");
+					fromRor.setId(id(prefix("newRor"), field.name()));
+					fromRor.setOnAction(e -> findOrganization.apply("").ifPresent(this::linkOrganization));
+					create.getItems().add(fromRor);
+				}
 				if (field.name().equals("encodingFormat")) {
 					MenuItem fromPronom = new MenuItem("Format from PRONOM…");
 					fromPronom.setId(id(prefix("newPronom"), field.name()));
@@ -1386,51 +1554,20 @@ public class EntityEditor extends ScrollPane {
 			return field.maxCount().isPresent() && rows.size() >= field.maxCount().getAsInt();
 		}
 
-		/**
-		 * Link an entity: in the first empty row, or a new row.
-		 */
-		/**
-		 * Link the place found in GeoNames: the crate's entity for it, or a
-		 * new one with its GeoNames identifier.
-		 */
 		private void linkPlace(GeoNames.Place found) {
-			if (crateEntity(found.iri()).isEmpty()) {
-				Entity place = newEntity.apply("Place");
-				// Not linked from anywhere yet, so its identifier can just change
-				place.setId(found.iri());
-				Places.describe(place, found, EntityEditor.this::crateEntity, () -> newEntity.apply("Geometry"));
-			}
-			link(found.iri());
+			link(addPlace(found));
 		}
 
-		/**
-		 * Link the work found by DOI: the crate's entity for it (whatever
-		 * the DOI's case), or a new one with its DOI as <code>@id</code>.
-		 */
-		private void linkWork(Dois.Work found) {
-			Optional<Entity> existing = crateEntities.get().stream()
-					.filter(e -> e.getId().equalsIgnoreCase(found.iri())).findFirst();
-			if (existing.isPresent()) {
-				link(existing.get().getId());
-				return;
-			}
-			Entity work = newEntityWithId(found.type(), found.iri());
-			Dois.describe(work, found, crateEntities.get(), EntityEditor.this::newEntityWithId);
-			link(found.iri());
+		private void linkWork(DOI.Work found) {
+			link(addWork(found));
 		}
 
-		/**
-		 * Link the person found in ORCID: the crate's entity for them, or a
-		 * new one with their ORCID iD as <code>@id</code>.
-		 */
-		private void linkPerson(Orcid.Person found) {
-			if (crateEntity(found.iri()).isEmpty()) {
-				Entity person = newEntity.apply("Person");
-				// Not linked from anywhere yet, so its identifier can just change
-				person.setId(found.iri());
-				Orcid.describe(person, found);
-			}
-			link(found.iri());
+		private void linkPerson(ORCID.Person found) {
+			link(addPerson(found));
+		}
+
+		private void linkOrganization(OrganizationFinder.Chosen found) {
+			link(addOrganization(found));
 		}
 
 		/**
@@ -1449,40 +1586,23 @@ public class EntityEditor extends ScrollPane {
 		}
 
 		/**
-		 * Add the format chosen from PRONOM: a link to the crate's entity for
-		 * it, or a new one with its PRONOM address, and its media type if the
-		 * file has none.
+		 * Add the format chosen from PRONOM to the file, and its media type if
+		 * the file has none.
 		 */
-		private void linkFormat(PronomFormats.Format format) {
-			if (crateEntity(format.iri()).isEmpty()) {
-				Entity described = newEntity.apply("WebPage");
-				// Not linked from anywhere yet, so its identifier can just change
-				described.setId(format.iri());
-				PronomFormats.describe(described, format);
-			}
-			PronomFormats.addTo(entity, format);
+		private void linkFormat(PRONOMFormats.Format format) {
+			addFormat(format);
+			PRONOMFormats.addTo(entity, format);
 			onChange.run();
 			showForm();
 		}
 
-		/**
-		 * Link the licence chosen from the SPDX License List: the crate's
-		 * entity for it, or a new one with its SPDX IRI and identifier.
-		 */
-		private void linkLicense(SpdxLicenses.License license) {
-			if (crateEntity(license.iri()).isEmpty()) {
-				Entity licence = newEntity.apply("CreativeWork");
-				// Not linked from anywhere yet, so its identifier can just change
-				licence.setId(license.iri());
-				SpdxLicenses.describe(licence, license, EntityEditor.this::crateEntity, id -> {
-					Entity identifier = newEntity.apply("PropertyValue");
-					identifier.setId(id);
-					return identifier;
-				});
-			}
-			link(license.iri());
+		private void linkLicense(SPDXLicenses.License license) {
+			link(addLicense(license));
 		}
 
+		/**
+		 * Link an entity: in the first empty row, or a new row.
+		 */
 		private void link(String id) {
 			Optional<Row> empty = rows.stream().filter(r -> r.text().get().isBlank()).findFirst();
 			if (empty.isPresent()) {
@@ -1677,11 +1797,11 @@ public class EntityEditor extends ScrollPane {
 			Set<String> asked = new HashSet<>();
 			Runnable lookUp = () -> {
 				String typed = combo.getEditor().getText().strip();
-				Optional<String> doi = Dois.doiOf(typed);
+				Optional<String> doi = DOI.doiOf(typed);
 				if (doi.isEmpty() || entityIds.contains(typed)) {
 					return;
 				}
-				String iri = Dois.iri(doi.get());
+				String iri = DOI.iri(doi.get());
 				Optional<Entity> existing = crateEntities.get().stream()
 						.filter(e -> e.getId().equalsIgnoreCase(iri)).findFirst();
 				if (existing.isPresent()) {
@@ -1696,7 +1816,7 @@ public class EntityEditor extends ScrollPane {
 					Platform.runLater(() -> findWork.apply(doi.get()).ifPresent(found -> {
 						if (crateEntities.get().stream().noneMatch(e -> e.getId().equalsIgnoreCase(iri))) {
 							Entity work = newEntityWithId(found.type(), iri);
-							Dois.describe(work, found, crateEntities.get(), EntityEditor.this::newEntityWithId);
+							DOI.describe(work, found, crateEntities.get(), EntityEditor.this::newEntityWithId);
 							onChange.run();
 						}
 					}));

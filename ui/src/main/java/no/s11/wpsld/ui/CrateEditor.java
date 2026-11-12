@@ -104,12 +104,13 @@ import no.s11.wpsld.crate.CrateDocument;
 import no.s11.wpsld.crate.CrateDocument.Problem;
 import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
-import no.s11.wpsld.crate.Dois;
+import no.s11.wpsld.lookup.DOI;
 import no.s11.wpsld.crate.Entity;
-import no.s11.wpsld.crate.GeoNames;
-import no.s11.wpsld.crate.Orcid;
-import no.s11.wpsld.crate.PronomFormats;
-import no.s11.wpsld.crate.SpdxLicenses;
+import no.s11.wpsld.lookup.GeoNames;
+import no.s11.wpsld.lookup.ORCID;
+import no.s11.wpsld.lookup.ROR;
+import no.s11.wpsld.lookup.PRONOMFormats;
+import no.s11.wpsld.lookup.SPDXLicenses;
 import no.s11.wpsld.crate.UndoHistory;
 import no.s11.wpsld.crate.UndoHistory.Place;
 import no.s11.wpsld.crate.UndoHistory.Step;
@@ -148,8 +149,8 @@ public class CrateEditor extends Application {
 	private final CrateFile crateFile = new CrateFile(crate.toJson());
 	/** The window, once shown, whose title names the crate's file */
 	private Stage stage;
-	/** Names wpsld to the web services of places, as they ask */
-	private static final String USER_AGENT = "wpsld/" + AboutDialog.version() + " (https://github.com/stain/wpsld)";
+	/** How wpsld names itself to web services, as their policies ask */
+	static final String USER_AGENT = "wpsld/" + AboutDialog.version() + " (https://github.com/stain/wpsld)";
 	private final MapTiles mapTiles = MapTiles.forApplication(USER_AGENT);
 	private PlaceFinder.Search placeSearch = new GeoNames(ProfileCache.httpClient(Duration.ofSeconds(15)),
 			Duration.ofSeconds(20), USER_AGENT)::search;
@@ -376,9 +377,11 @@ public class CrateEditor extends Application {
 				address -> getHostServices().showDocument(address)).showAndWait());
 		entityEditor.setFindPerson(name -> new PersonFinder(stage, name, personSearch,
 				address -> getHostServices().showDocument(address)).showAndWait());
-		entityEditor.setFindFormat(query -> new FormatFinder(stage, query, PronomFormats.bundled(),
+		entityEditor.setFindOrganization(name -> new OrganizationFinder(stage, name, organizationSearch,
 				address -> getHostServices().showDocument(address)).showAndWait());
-		entityEditor.setFindLicense(() -> new LicenseFinder(stage, "", SpdxLicenses.bundled(),
+		entityEditor.setFindFormat(query -> new FormatFinder(stage, query, PRONOMFormats.bundled(),
+				address -> getHostServices().showDocument(address)).showAndWait());
+		entityEditor.setFindLicense(() -> new LicenseFinder(stage, "", SPDXLicenses.bundled(),
 				address -> getHostServices().showDocument(address)).showAndWait());
 		entityEditor.setTypeHelp(owner -> showHelp(HelpDialog.Topic.TYPES, owner));
 		// As the style lays it out, e.g. as a notebook in the OS/2 Warp style
@@ -431,23 +434,7 @@ public class CrateEditor extends Application {
 
 		Button add = new Button("Add entity");
 		add.setId("addEntity");
-		add.setOnAction(e -> {
-			// A Thing to start with, and straight away choose its type, which
-			// replaces Thing (not needed for entities added from a property)
-			Entity entity = crate.add("Thing");
-			// Mentioned by the root until something else links to it, as
-			// no entity may be left dangling
-			crate.mentionUnlinked();
-			entities.getItems().add(entity);
-			show(entity);
-			// One undo point with the type chosen next (see EntityEditor's
-			// step), or for the Thing if none is
-			refresh();
-			Platform.runLater(() -> {
-				entityEditor.chooseType();
-				checkpoint();
-			});
-		});
+		add.setOnAction(e -> addEntity());
 		Button remove = new Button("Remove");
 		remove.setId("removeEntity");
 		// Not the root data entity, which may be among those selected
@@ -492,7 +479,67 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * The File, Edit, View and Help menus.
+	 * Add an entity, choosing its type straight away.
+	 */
+	private void addEntity() {
+		// A Thing to start with, and straight away choose its type, which
+		// replaces Thing (not needed for entities added from a property)
+		Entity entity = crate.add("Thing");
+		// Mentioned by the root until something else links to it, as
+		// no entity may be left dangling
+		crate.mentionUnlinked();
+		entities.getItems().add(entity);
+		show(entity);
+		// One undo point with the type chosen next (see EntityEditor's
+		// step), or for the Thing if none is
+		refresh();
+		Platform.runLater(() -> {
+			entityEditor.chooseType();
+			checkpoint();
+		});
+	}
+
+	/**
+	 * Look something up, e.g. a place in GeoNames, and add it to the crate,
+	 * mentioned by the root until something else links to it, then show it;
+	 * if the crate has it already, just show it.
+	 */
+	private void insert(EntityEditor.Lookup lookup) {
+		entityEditor.lookUp(lookup).ifPresent(entity -> {
+			crate.mentionUnlinked();
+			show(entity);
+			changed();
+		});
+	}
+
+	/**
+	 * The Insert menu: a new entity of any type, as Add entity, then those
+	 * looked up, under which more lookups may come.
+	 */
+	private Menu insertMenu() {
+		MenuItem entity = new MenuItem("_Entity…");
+		entity.setId("menuInsertEntity");
+		entity.setOnAction(e -> addEntity());
+		Menu insert = new Menu("_Insert", null, entity, new SeparatorMenuItem(),
+				insertItem("_Person from ORCID…", "menuInsertPerson", EntityEditor.Lookup.PERSON),
+				insertItem("_Organization from ROR…", "menuInsertOrganization", EntityEditor.Lookup.ORGANIZATION),
+				insertItem("Publication by _DOI…", "menuInsertPublication", EntityEditor.Lookup.PUBLICATION),
+				insertItem("_Licence from SPDX…", "menuInsertLicense", EntityEditor.Lookup.LICENSE),
+				insertItem("File _format from PRONOM…", "menuInsertFormat", EntityEditor.Lookup.FORMAT),
+				insertItem("Pl_ace from GeoNames…", "menuInsertPlace", EntityEditor.Lookup.PLACE));
+		insert.setId("menuInsert");
+		return insert;
+	}
+
+	private MenuItem insertItem(String text, String id, EntityEditor.Lookup lookup) {
+		MenuItem item = new MenuItem(text);
+		item.setId(id);
+		item.setOnAction(e -> insert(lookup));
+		return item;
+	}
+
+	/**
+	 * The File, Edit, View, Insert and Help menus.
 	 */
 	private MenuBar menus(Stage stage) {
 		MenuItem newCrate = new MenuItem("_New RO-Crate");
@@ -568,7 +615,7 @@ public class CrateEditor extends Application {
 		Menu help = new Menu("_Help", null, manual, new SeparatorMenuItem(), about);
 		help.setId("menuHelp");
 
-		MenuBar bar = new MenuBar(file, edit, view, help);
+		MenuBar bar = new MenuBar(file, edit, view, insertMenu(), help);
 		bar.setId("menuBar");
 		// In the macOS style, on macOS the menus are in the screen's menu bar
 		// (set, as JavaFX doesn't allow binding it)
@@ -1053,10 +1100,10 @@ public class CrateEditor extends Application {
 		return a.replaceFirst("/$", "").equals(b.replaceFirst("/$", ""));
 	}
 
-	private PersonFinder.Search personSearch = new Orcid(ProfileCache.httpClient(Duration.ofSeconds(15)),
+	private PersonFinder.Search personSearch = new ORCID(ProfileCache.httpClient(Duration.ofSeconds(15)),
 			Duration.ofSeconds(20), USER_AGENT)::search;
 
-	private WorkFinder.Search workSearch = new Dois(ProfileCache.httpClient(Duration.ofSeconds(15)),
+	private WorkFinder.Search workSearch = new DOI(ProfileCache.httpClient(Duration.ofSeconds(15)),
 			Duration.ofSeconds(20), USER_AGENT)::search;
 
 	/**
@@ -1064,6 +1111,16 @@ public class CrateEditor extends Application {
 	 */
 	void setWorkSearch(WorkFinder.Search workSearch) {
 		this.workSearch = Objects.requireNonNull(workSearch);
+	}
+
+	private OrganizationFinder.Search organizationSearch = new ROR(ProfileCache.httpClient(Duration.ofSeconds(15)),
+			Duration.ofSeconds(20), USER_AGENT)::search;
+
+	/**
+	 * Look organisations up with this instead of ROR, e.g. in tests.
+	 */
+	void setOrganizationSearch(OrganizationFinder.Search organizationSearch) {
+		this.organizationSearch = Objects.requireNonNull(organizationSearch);
 	}
 
 	/**
@@ -1515,17 +1572,19 @@ public class CrateEditor extends Application {
 	 * written otherwise (e.g. <code>https://spdx.org/licenses/MIT.html</code>,
 	 * or the text <code>CC-BY-4.0</code>) become the licence's SPDX IRI, and
 	 * are described from the SPDX License List (see
-	 * {@link SpdxLicenses#repair}), and PRONOM file formats likewise, also
+	 * {@link SPDXLicenses#repair}), and PRONOM file formats likewise, also
 	 * for a media type that only one format has (see
-	 * {@link PronomFormats#repair}), and ORCID iDs and DOIs written otherwise
-	 * (see {@link Orcid#repair} and {@link Dois#repair}). One undoable step, then tells what was
+	 * {@link PRONOMFormats#repair}), and ORCID iDs, ROR identifiers and DOIs
+	 * written otherwise (see {@link ORCID#repair}, {@link ROR#repair} and
+	 * {@link DOI#repair}). One undoable step, then tells what was
 	 * done.
 	 */
 	void repair(Stage stage) {
-		List<String> licences = SpdxLicenses.bundled().repair(crate);
-		List<String> formats = PronomFormats.bundled().repair(crate);
-		List<String> people = Orcid.repair(crate);
-		List<String> dois = Dois.repair(crate);
+		List<String> licences = SPDXLicenses.bundled().repair(crate);
+		List<String> formats = PRONOMFormats.bundled().repair(crate);
+		List<String> people = ORCID.repair(crate);
+		List<String> organizations = ROR.repair(crate);
+		List<String> dois = DOI.repair(crate);
 		List<Entity> added = crate.addReferenced();
 		List<Entity> unmentioned = crate.unmentionLinked();
 		List<Entity> mentioned = crate.mentionUnlinked();
@@ -1544,6 +1603,11 @@ public class CrateEditor extends Application {
 			done.add("ORCID iDs:\n" + people.stream().limit(LISTED).map(f -> "• " + f)
 					.collect(Collectors.joining("\n"))
 					+ (people.size() > LISTED ? "\n• and " + (people.size() - LISTED) + " more" : ""));
+		}
+		if (!organizations.isEmpty()) {
+			done.add("ROR identifiers:\n" + organizations.stream().limit(LISTED).map(f -> "• " + f)
+					.collect(Collectors.joining("\n"))
+					+ (organizations.size() > LISTED ? "\n• and " + (organizations.size() - LISTED) + " more" : ""));
 		}
 		if (!formats.isEmpty()) {
 			done.add("File formats of PRONOM:\n" + formats.stream().limit(LISTED).map(f -> "• " + f)

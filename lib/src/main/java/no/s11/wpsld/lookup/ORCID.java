@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package no.s11.wpsld.crate;
+package no.s11.wpsld.lookup;
 
 import java.io.IOException;
 import java.net.URI;
@@ -39,6 +39,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.TextNode;
 
+import no.s11.wpsld.crate.Crate;
+import no.s11.wpsld.crate.Entity;
+
 /**
  * Finds people by name in <a href="https://orcid.org/">ORCID</a>, whose
  * identifiers RO-Crate recommends for people, through its public API's
@@ -47,14 +50,14 @@ import com.fasterxml.jackson.databind.node.TextNode;
  *
  * @see <a href="https://info.orcid.org/documentation/api-tutorials/api-tutorial-searching-the-orcid-registry/">Searching the ORCID registry</a>
  */
-public class Orcid {
+public class ORCID {
 	/** ORCID's public API */
 	public static final URI SERVICE = URI.create("https://pub.orcid.org/v3.0/");
 	/** ORCID iDs as RO-Crate writes them, e.g. https://orcid.org/0000-0002-1825-0097 */
 	public static final String NAMESPACE = "https://orcid.org/";
 	private static final int ROWS = 25;
 	/** An iD, alone or in an address, e.g. orcid.org/0000-0002-1825-0097 */
-	private static final Pattern ORCID = Pattern.compile(
+	private static final Pattern ORCID_PATTERN = Pattern.compile(
 			"(?:(?:https?://)?(?:www\\.)?orcid\\.org/)?(\\d{4})-?(\\d{4})-?(\\d{4})-?(\\d{3}[\\dXx])/?",
 			Pattern.CASE_INSENSITIVE);
 	private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -81,10 +84,10 @@ public class Orcid {
 	}
 
 	/** ORCID said no, e.g. an invalid query, with its reason */
-	public static class OrcidException extends IOException {
+	public static class ORCIDException extends IOException {
 		private static final long serialVersionUID = 1L;
 
-		public OrcidException(String message) {
+		public ORCIDException(String message) {
 			super(message);
 		}
 	}
@@ -94,11 +97,11 @@ public class Orcid {
 	private final URI service;
 	private final String userAgent;
 
-	public Orcid(HttpClient http, Duration timeout, String userAgent) {
+	public ORCID(HttpClient http, Duration timeout, String userAgent) {
 		this(http, timeout, userAgent, SERVICE);
 	}
 
-	public Orcid(HttpClient http, Duration timeout, String userAgent, URI service) {
+	public ORCID(HttpClient http, Duration timeout, String userAgent, URI service) {
 		this.http = Objects.requireNonNull(http);
 		this.timeout = Objects.requireNonNull(timeout);
 		this.userAgent = Objects.requireNonNull(userAgent);
@@ -113,7 +116,7 @@ public class Orcid {
 	 * <code>0000000218250097</code>.
 	 */
 	public static Optional<String> idOf(String text) {
-		Matcher matcher = ORCID.matcher(text.strip());
+		Matcher matcher = ORCID_PATTERN.matcher(text.strip());
 		if (!matcher.matches()) {
 			return Optional.empty();
 		}
@@ -150,12 +153,12 @@ public class Orcid {
 				.header("User-Agent", userAgent).GET().build();
 		HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
 		if (response.statusCode() != 200) {
-			throw new OrcidException("ORCID answered " + response.statusCode());
+			throw new ORCIDException("ORCID answered " + response.statusCode());
 		}
 		try {
 			return parse(MAPPER.readTree(response.body()));
 		} catch (IOException e) {
-			throw new OrcidException("ORCID answered with no results");
+			throw new ORCIDException("ORCID answered with no results");
 		}
 	}
 
@@ -221,35 +224,7 @@ public class Orcid {
 	 * @return What was changed, one line each
 	 */
 	public static List<String> repair(Crate crate) {
-		List<String> done = new ArrayList<>();
-		for (Entity entity : List.copyOf(crate.getEntities())) {
-			Optional<String> iri = canonical(entity.getId());
-			if (iri.isEmpty() || entity.getId().equals(iri.get())) {
-				continue;
-			}
-			String old = entity.getId();
-			Optional<Entity> existing = crate.get(iri.get());
-			if (existing.isPresent()) {
-				crate.merge(existing.get(), entity);
-				done.add(old + " merged into " + iri.get());
-			} else {
-				crate.rename(entity, iri.get());
-				done.add(old + " is now " + iri.get());
-			}
-		}
-		for (Entity entity : List.copyOf(crate.getEntities())) {
-			for (String property : List.copyOf(entity.getValues().keySet())) {
-				for (JsonNode value : entity.getAll(property)) {
-					String id = value.path("@id").asText(null);
-					Optional<String> iri = id == null ? Optional.empty() : canonical(id);
-					if (iri.isPresent() && !id.equals(iri.get())) {
-						crate.replaceReferences(id, iri.get());
-						done.add("Links to " + id + " now go to " + iri.get());
-					}
-				}
-			}
-		}
-		return done;
+		return crate.normaliseIds(ORCID::canonical);
 	}
 
 	/**
