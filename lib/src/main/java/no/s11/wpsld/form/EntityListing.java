@@ -55,17 +55,33 @@ public class EntityListing {
 	}
 
 	/**
-	 * The root data entity first; then by types (as listed, e.g.
-	 * <code>File, SoftwareSourceCode</code> after <code>File</code>), name
-	 * (else <code>@id</code>, as shown) and <code>@id</code>, ignoring case
-	 * and as sorted in the user's language.
+	 * The root data entity first; then by {@link #primaryType}, all its
+	 * types (as named, e.g. <code>File, SoftwareSourceCode</code> after
+	 * <code>File</code>), name (else <code>@id</code>, as shown) and
+	 * <code>@id</code>, ignoring case and as sorted in the user's language.
 	 */
-	public static Comparator<Entity> order(Entity root) {
+	public Comparator<Entity> order(Entity root) {
 		Collator collator = Collator.getInstance();
 		collator.setStrength(Collator.SECONDARY);
-		return Comparator.comparing((Entity e) -> e != root)
-				.thenComparing(e -> String.join(", ", e.getTypes()), collator)
+		return Comparator.comparing((Entity e) -> e != root).thenComparing(this::primaryType, collator)
+				.thenComparing(e -> String.join(", ", typeNames(e)), collator)
 				.thenComparing(Entity::getLabel, collator).thenComparing(Entity::getId);
+	}
+
+	/**
+	 * The type an entity is listed by: its first a known class, e.g.
+	 * <code>Person</code> for <code>foaf:Agent, schema:Person</code>, else
+	 * its first; Thing if it has none.
+	 */
+	public String primaryType(Entity entity) {
+		return entity.getTypes().stream().filter(t -> terms.classDef(t).isPresent()).findFirst()
+				.or(() -> entity.getTypes().stream().findFirst()).map(this::typeName).orElse(EntityTypes.THING);
+	}
+
+	/** An entity's types, as named by {@link #typeName}, each once; Thing if none */
+	public List<String> typeNames(Entity entity) {
+		List<String> names = entity.getTypes().stream().map(this::typeName).distinct().toList();
+		return names.isEmpty() ? List.of(EntityTypes.THING) : names;
 	}
 
 	/**

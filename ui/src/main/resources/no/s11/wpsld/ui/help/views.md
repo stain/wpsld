@@ -22,9 +22,14 @@ file manager shows files:
   part**), e.g. only cited.
 - Then **External resources**: parts of the crate on the web, by their
   addresses.
-- Then a folder for each type of the other entities, e.g. **Person**.
+- Then a folder for each type of the other entities, e.g. **Person**. An
+  entity of several types, e.g. Organization and Place, is in the folder
+  of each. A part of a file, with an `@id` such as `report.html#table2`,
+  is in the folder of its type, and under the file, if the crate
+  describes it.
 
-Each entity has an icon for its type. **View > Entities by Type** shows the
+Selecting an entity selects it in each place it is shown; **Copy** and
+**Remove** act on it once. Each entity has an icon for its type. **View > Entities by Type** shows the
 list again.
 
 ![The entity tree, with the data folder open](images/entity-tree.png)

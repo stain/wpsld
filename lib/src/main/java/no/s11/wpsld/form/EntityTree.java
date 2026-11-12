@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,10 +41,15 @@ import no.s11.wpsld.crate.Entity;
  * into folders by their paths, from the root data entity, with folders for
  * the paths even without a Dataset entity for them, and with the entities
  * that have a path but are contextual (not in <code>hasPart</code>), not
- * being data entities (see {@link Node#data()}). Then "External
- * resources": the data entities (in <code>hasPart</code>) with absolute
- * URIs, by URI. Then the contextual entities, in a folder for each of
- * their (first) types.
+ * being data entities (see {@link Node#data()}). An entity of a part of a
+ * file, e.g. <code>page.html#table2</code>, is under the file's entity, if
+ * it has one. Then "External resources": the data entities (in
+ * <code>hasPart</code>) with absolute URIs, by URI. Then the contextual
+ * entities and the parts of files, in a folder for each of their types: in
+ * several, if they have several types.
+ * <p>
+ * An entity is in the tree at least once, so it can be found by its
+ * entity, and may be in it more than once, each with its own key.
  */
 public class EntityTree {
 	/** What a node of the tree is */
@@ -87,27 +93,38 @@ public class EntityTree {
 	/**
 	 * The physical tree: its top nodes, the root data entity first.
 	 */
-	public static List<Node> physical(Crate crate) {
+	public static List<Node> physical(Crate crate, EntityListing listing) {
 		Collator collator = Collator.getInstance();
 		collator.setStrength(Collator.SECONDARY);
 		Entity root = crate.getRoot();
 		Set<Entity> data = Set.copyOf(crate.dataEntities());
-		Folder top = new Folder("", "", data);
+		Map<Entity, List<Entity>> parts = new HashMap<>();
+		Folder top = new Folder("", "", data, parts);
 		top.entity = root;
 		List<Entity> external = new ArrayList<>();
+		List<Entity> fragments = new ArrayList<>();
 		Map<String, List<Entity>> contextual = new TreeMap<>(collator);
 		for (Entity entity : crate.getEntities()) {
 			String id = entity.getId();
 			if (entity == root) {
 				continue;
 			}
-			if (isPath(id)) {
+			if (isPath(id) && id.contains("#")) {
+				fragments.add(entity);
+			} else if (isPath(id)) {
 				top.add(entity, path(id));
 			} else if (data.contains(entity) && Crate.isAbsolute(id)) {
 				external.add(entity);
 			} else {
-				contextual.computeIfAbsent(entity.getTypes().get(0), t -> new ArrayList<>()).add(entity);
+				listing.typeNames(entity).forEach(t -> contextual.computeIfAbsent(t, k -> new ArrayList<>()).add(entity));
 			}
+		}
+		// Parts of files: under the file's entity if it has one, and by type
+		for (Entity fragment : fragments) {
+			String file = fragment.getId().substring(0, fragment.getId().indexOf('#'));
+			crate.get(file).filter(f -> f != root && isPath(file))
+					.ifPresent(f -> parts.computeIfAbsent(f, k -> new ArrayList<>()).add(fragment));
+			listing.typeNames(fragment).forEach(t -> contextual.computeIfAbsent(t, k -> new ArrayList<>()).add(fragment));
 		}
 		List<Node> nodes = new ArrayList<>();
 		nodes.add(top.node(Kind.ROOT, collator));
@@ -117,10 +134,10 @@ public class EntityTree {
 							e -> new Node("id:" + e.getId(), e.getId(), Kind.RESOURCE, Optional.of(e), true, List.of()))
 							.toList()));
 		}
-		Comparator<Entity> order = EntityListing.order(root);
+		Comparator<Entity> order = listing.order(root);
 		contextual.forEach((type, entities) -> nodes.add(new Node("type:" + type, type, Kind.TYPE, Optional.empty(),
-				false, entities.stream().sorted(order).map(e -> new Node("id:" + e.getId(), e.getLabel(),
-						Kind.CONTEXTUAL, Optional.of(e), false, List.of())).toList())));
+				false, entities.stream().sorted(order).map(e -> new Node("type:" + type + " id:" + e.getId(),
+						e.getLabel(), Kind.CONTEXTUAL, Optional.of(e), false, List.of())).toList())));
 		return nodes;
 	}
 
@@ -188,11 +205,14 @@ public class EntityTree {
 		final List<Entity> files = new ArrayList<>();
 		/** The data entities of the crate */
 		final Set<Entity> data;
+		/** The entities of parts of files, e.g. page.html#table2, by file */
+		final Map<Entity, List<Entity>> parts;
 
-		Folder(String key, String name, Set<Entity> data) {
+		Folder(String key, String name, Set<Entity> data, Map<Entity, List<Entity>> parts) {
 			this.key = key;
 			this.name = name;
 			this.data = data;
+			this.parts = parts;
 		}
 
 		void add(Entity entity, List<String> path) {
@@ -211,7 +231,7 @@ public class EntityTree {
 		}
 
 		Folder folder(String name) {
-			return folders.computeIfAbsent(name, n -> new Folder(key + n + "/", n, data));
+			return folders.computeIfAbsent(name, n -> new Folder(key + n + "/", n, data, parts));
 		}
 
 		Node node(Kind kind, Collator collator) {
@@ -220,11 +240,27 @@ public class EntityTree {
 					.thenComparing(f -> f.key)).map(f -> f.node(Kind.FOLDER, collator)).forEach(children::add);
 			files.stream().sorted(Comparator.comparing((Entity e) -> name(e), collator).thenComparing(Entity::getId))
 					.map(e -> new Node("id:" + e.getId(), name(e), Kind.FILE, Optional.of(e), data.contains(e),
-							List.of()))
+							parts(e, collator)))
 					.forEach(children::add);
+			if (entity != null) {
+				children.addAll(parts(entity, collator));
+			}
 			return new Node("path:" + key, kind == Kind.ROOT ? entity.getLabel() : name, kind,
 					Optional.ofNullable(entity), kind == Kind.ROOT || (entity != null && data.contains(entity)),
 					List.copyOf(children));
+		}
+
+		/** The parts of a file, by their fragments, e.g. #table2 */
+		private List<Node> parts(Entity file, Collator collator) {
+			return parts.getOrDefault(file, List.of()).stream()
+					.sorted(Comparator.comparing((Entity e) -> fragment(e), collator).thenComparing(Entity::getId))
+					.map(e -> new Node("id:" + e.getId(), fragment(e), Kind.FILE, Optional.of(e), data.contains(e),
+							List.of()))
+					.toList();
+		}
+
+		private static String fragment(Entity part) {
+			return decode(part.getId().substring(part.getId().indexOf('#')));
 		}
 
 		private static String name(Entity file) {

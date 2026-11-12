@@ -477,7 +477,8 @@ public class CrateEditor extends Application {
 		// A folder without an entity is selected, but the form stays
 		tree.getSelectionModel().selectedItemProperty().addListener((obs, old, item) -> {
 			if (item != null && !relisting) {
-				item.getValue().entity().ifPresent(entity -> {
+				// Not again for another place of the entity edited
+				item.getValue().entity().filter(entity -> entity != entityEditor.getEntity()).ifPresent(entity -> {
 					entityEditor.edit(entity);
 					entityPreview.show(entity);
 				});
@@ -958,7 +959,7 @@ public class CrateEditor extends Application {
 				}
 			}
 			if (byFolder) {
-				tree.setNodes(EntityTree.physical(crate), edited);
+				tree.setNodes(EntityTree.physical(crate, listing), edited);
 			}
 		} finally {
 			relisting = false;

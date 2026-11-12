@@ -19,15 +19,19 @@ package no.s11.wpsld.ui;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 
+import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
 import javafx.beans.WeakInvalidationListener;
 import javafx.beans.value.ObservableValue;
+import javafx.collections.ListChangeListener;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.Tooltip;
 import javafx.scene.control.TreeCell;
@@ -44,6 +48,9 @@ import no.s11.wpsld.form.EntityTree.Node;
  * each with its icon. Folders of the path without an entity, and entities
  * with a path that are not data entities, are greyed out. Made again when
  * the crate changes, with the same folders open and the same selected.
+ * <p>
+ * An entity may be in the tree more than once, e.g. in the folder of each
+ * of its types: selecting it selects each, also in folders opened later.
  */
 class EntityTreeView extends TreeView<Node> {
 	private final EntityListing listing;
@@ -51,6 +58,8 @@ class EntityTreeView extends TreeView<Node> {
 	private final Map<String, Boolean> expanded = new HashMap<>();
 	/** The tree as last made, to make it again only if it changed */
 	private List<Object> made = List.of();
+	/** While selecting the other places of the entities selected */
+	private boolean selectingAlso;
 
 	/**
 	 * @param labels changes when entities may have been renamed, to show
@@ -97,6 +106,62 @@ class EntityTreeView extends TreeView<Node> {
 				setTooltip(tip.isPresent() ? tooltip : null);
 			}
 		});
+		// The other places of an entity selected, or deselected: after the
+		// change, as the selection can't change while it notifies
+		getSelectionModel().getSelectedItems().addListener((ListChangeListener<TreeItem<Node>>) change -> {
+			if (selectingAlso) {
+				return;
+			}
+			Set<Entity> added = new HashSet<>();
+			Set<Entity> removed = new HashSet<>();
+			while (change.next()) {
+				change.getAddedSubList().stream().filter(Objects::nonNull)
+						.forEach(item -> item.getValue().entity().ifPresent(added::add));
+				change.getRemoved().stream().filter(Objects::nonNull)
+						.forEach(item -> item.getValue().entity().ifPresent(removed::add));
+			}
+			removed.removeAll(added);
+			if (!added.isEmpty() || !removed.isEmpty()) {
+				Platform.runLater(() -> selectAlso(added, removed));
+			}
+		});
+		// Places of the entities selected in a folder opened
+		expandedItemCountProperty().addListener((obs, old, count) -> {
+			if (!selectingAlso && count.intValue() > old.intValue()) {
+				Platform.runLater(() -> selectAlso(Set.copyOf(selectedEntities()), Set.of()));
+			}
+		});
+	}
+
+	/**
+	 * Select each place of these entities shown, and deselect each of
+	 * those, keeping the one selected last, and focused, as it was
+	 */
+	private void selectAlso(Set<Entity> select, Set<Entity> deselect) {
+		selectingAlso = true;
+		try {
+			TreeItem<Node> last = getSelectionModel().getSelectedItem();
+			int focused = getFocusModel().getFocusedIndex();
+			for (int row = 0; row < getExpandedItemCount(); row++) {
+				Optional<Entity> entity = getTreeItem(row).getValue().entity();
+				if (entity.isEmpty()) {
+					continue;
+				}
+				boolean selected = getSelectionModel().isSelected(row);
+				if (select.contains(entity.get()) && !selected) {
+					getSelectionModel().select(row);
+				} else if (deselect.contains(entity.get()) && selected) {
+					getSelectionModel().clearSelection(row);
+				}
+			}
+			if (last != null && getSelectionModel().getSelectedItems().contains(last)) {
+				// Selected last again, as the one edited
+				getSelectionModel().select(last);
+			}
+			getFocusModel().focus(focused);
+		} finally {
+			selectingAlso = false;
+		}
 	}
 
 	/**
@@ -142,14 +207,20 @@ class EntityTreeView extends TreeView<Node> {
 		List<Object> selected = getSelectionModel().getSelectedItems().stream().filter(Objects::nonNull)
 				.map(item -> item.getValue().entity().<Object>map(e -> e).orElse(item.getValue().key())).toList();
 		getRoot().getChildren().setAll(nodes.stream().map(node -> item(node, true)).toList());
-		getSelectionModel().clearSelection();
-		for (Object mark : selected) {
-			if (mark != edited) {
-				find(getRoot(), mark).ifPresent(getSelectionModel()::select);
+		selectingAlso = true;
+		try {
+			getSelectionModel().clearSelection();
+			for (Object mark : selected) {
+				if (mark != edited) {
+					findAll(getRoot(), mark).forEach(getSelectionModel()::select);
+				}
 			}
-		}
-		if (edited != null && selected.contains(edited)) {
-			find(getRoot(), edited).ifPresent(getSelectionModel()::select);
+			if (edited != null && selected.contains(edited)) {
+				findAll(getRoot(), edited).forEach(getSelectionModel()::select);
+				find(getRoot(), edited).ifPresent(getSelectionModel()::select);
+			}
+		} finally {
+			selectingAlso = false;
 		}
 	}
 
@@ -173,7 +244,20 @@ class EntityTreeView extends TreeView<Node> {
 		return item;
 	}
 
-	/** The item of an entity, or of a key (a folder without one) */
+	/** The items of an entity shown (in open folders), or of a key */
+	private static List<TreeItem<Node>> findAll(TreeItem<Node> item, Object mark) {
+		List<TreeItem<Node>> found = new ArrayList<>();
+		Node node = item.getValue();
+		if (node != null && node.entity().<Object>map(e -> e).orElse(node.key()).equals(mark)) {
+			found.add(item);
+		}
+		if (item.isExpanded() || item.getParent() == null) {
+			item.getChildren().forEach(child -> found.addAll(findAll(child, mark)));
+		}
+		return found;
+	}
+
+	/** The (first) item of an entity, or of a key (a folder without one) */
 	private static Optional<TreeItem<Node>> find(TreeItem<Node> item, Object mark) {
 		Node node = item.getValue();
 		if (node != null && (node.entity().<Object>map(e -> e).orElse(node.key()).equals(mark))) {
@@ -187,17 +271,27 @@ class EntityTreeView extends TreeView<Node> {
 	 * scrolled to. False if any is not in the tree.
 	 */
 	boolean select(List<Entity> entities) {
-		getSelectionModel().clearSelection();
 		boolean all = true;
-		for (Entity entity : entities) {
-			Optional<TreeItem<Node>> item = find(getRoot(), entity);
-			all &= item.isPresent();
-			item.ifPresent(found -> {
-				for (TreeItem<Node> parent = found.getParent(); parent != null; parent = parent.getParent()) {
-					parent.setExpanded(true);
-				}
-				getSelectionModel().select(found);
-			});
+		selectingAlso = true;
+		try {
+			getSelectionModel().clearSelection();
+			// Open the folder of each one's first place, and select each place shown
+			for (Entity entity : entities) {
+				Optional<TreeItem<Node>> item = find(getRoot(), entity);
+				all &= item.isPresent();
+				item.ifPresent(found -> {
+					for (TreeItem<Node> parent = found.getParent(); parent != null; parent = parent.getParent()) {
+						parent.setExpanded(true);
+					}
+				});
+			}
+			for (Entity entity : entities) {
+				findAll(getRoot(), entity).forEach(getSelectionModel()::select);
+				// The first place selected last, as the one edited
+				find(getRoot(), entity).ifPresent(getSelectionModel()::select);
+			}
+		} finally {
+			selectingAlso = false;
 		}
 		int last = getSelectionModel().getSelectedIndex();
 		if (last >= 0) {
@@ -206,11 +300,11 @@ class EntityTreeView extends TreeView<Node> {
 		return all;
 	}
 
-	/** The entities selected, the one selected last at the end */
+	/** The entities selected, each once, the one selected last at the end */
 	List<Entity> selectedEntities() {
 		List<Entity> entities = new ArrayList<>(getSelectionModel().getSelectedItems().stream()
 				.filter(Objects::nonNull).map(TreeItem::getValue).map(Node::entity).flatMap(Optional::stream)
-				.toList());
+				.distinct().toList());
 		Optional.ofNullable(getSelectionModel().getSelectedItem()).flatMap(item -> item.getValue().entity())
 				.ifPresent(last -> {
 					entities.remove(last);

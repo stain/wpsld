@@ -109,8 +109,12 @@ public class TestCrateEditorEntityList extends ApplicationTest {
 
 	/** Open the crate above, listed by folder */
 	private EntityTreeView openByFolder() throws Exception {
+		return openByFolder(CRATE);
+	}
+
+	private EntityTreeView openByFolder(String json) throws Exception {
 		Path metadata = temp.resolve("ro-crate-metadata.json");
-		Files.writeString(metadata, CRATE);
+		Files.writeString(metadata, json);
 		Stage stage = (Stage) entities().getScene().getWindow();
 		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, metadata)).get());
 		choose("menuListByFolder");
@@ -281,6 +285,49 @@ public class TestCrateEditorEntityList extends ApplicationTest {
 		TextField id = lookup("#entityId").queryAs(TextField.class);
 		interact(() -> id.setText("https://ror.org/01xtthb56"));
 		assertFalse(lookup("#openId").query().isDisabled());
+	}
+
+	/**
+	 * An entity of several types is in the folder of each; selected in
+	 * one, it is selected in each, also after listing by type and back, and
+	 * copied once
+	 */
+	@Test
+	public void severalPlaces() throws Exception {
+		EntityTreeView tree = openByFolder("""
+				{"@context": "https://w3id.org/ro/crate/1.2/context", "@graph": [
+				{"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"}},
+				{"@id": "./", "@type": "Dataset", "name": "Survey", "hasPart": [{"@id": "report.html"}]},
+				{"@id": "report.html", "@type": "File"},
+				{"@id": "report.html#table2", "@type": "Table", "name": "Counts"},
+				{"@id": "#uio", "@type": ["Organization", "Place"], "name": "UiO"}
+				]}""");
+		assertEquals(List.of("Survey", "  report.html", "Organization", "  UiO", "Place", "  UiO", "Table", "  Counts"),
+				rows(tree));
+		interact(() -> tree.getSelectionModel().clearAndSelect(3));
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals(List.of(3, 5), selectedRows(tree));
+		assertEquals(3, tree.getFocusModel().getFocusedIndex());
+		assertEquals("UiO", lookup("#header-name").queryAs(TextField.class).getText());
+		assertEquals(1, tree.selectedEntities().size());
+		// The part of a file: its place under the file is selected once shown
+		interact(() -> tree.getSelectionModel().clearAndSelect(7));
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals(List.of(7), selectedRows(tree));
+		interact(() -> tree.getTreeItem(1).setExpanded(true));
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals("    #table2 ~", rows(tree).get(2));
+		assertEquals(List.of(2, 8), selectedRows(tree));
+		choose("menuListByType");
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals("Counts", entities().getSelectionModel().getSelectedItem().getLabel());
+		choose("menuListByFolder");
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals(List.of(2, 8), selectedRows(tree));
+	}
+
+	private static List<Integer> selectedRows(EntityTreeView tree) {
+		return tree.getSelectionModel().getSelectedIndices().stream().sorted().toList();
 	}
 
 	@Test

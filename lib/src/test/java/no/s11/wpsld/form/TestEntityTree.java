@@ -23,17 +23,27 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.TextNode;
 
 import no.s11.wpsld.crate.Crate;
+import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.form.EntityTree.Kind;
 import no.s11.wpsld.form.EntityTree.Node;
+import no.s11.wpsld.soss.SchemaFromJsonLd;
 
 public class TestEntityTree {
+	private static EntityListing listing;
+
+	@BeforeClass
+	public static void terms() {
+		listing = new EntityListing(new CrateTerms(new SchemaFromJsonLd()));
+	}
+
 	private static Entity add(Crate crate, String id, String name, String... types) {
 		Entity entity = crate.add(types[0]);
 		crate.rename(entity, id);
@@ -116,22 +126,60 @@ public class TestEntityTree {
 				"  CONTEXTUAL University of Oslo",
 				"TYPE Person *",
 				"  CONTEXTUAL Alice",
-				"  CONTEXTUAL Bob"), lines(EntityTree.physical(crate)));
+				"  CONTEXTUAL Bob"), lines(EntityTree.physical(crate, listing)));
 	}
 
-	/** Each entity once, with keys unique in the tree */
+	/**
+	 * Contextual entities in the folder of each of their types, by name;
+	 * parts of files (page.html#table2) under their file, and by type;
+	 * not so for absolute URIs with fragments
+	 */
+	@Test
+	public void typesAndParts() {
+		Crate crate = new Crate();
+		add(crate, "#alice", "Alice", "http://xmlns.com/foaf/0.1/Agent", "http://schema.org/Person");
+		add(crate, "#uio", "UiO", "Organization", "Place");
+		add(crate, "report.html", null, "File");
+		add(crate, "report.html#table2", "Counts", "Table");
+		add(crate, "report.html#fig1", null, "ImageObject", "Thing");
+		add(crate, "other.html#x", "X", "Table");
+		add(crate, "https://example.com/page#y", "Y", "Table");
+		hasPart(crate.getRoot(), "report.html");
+		assertEquals(List.of(
+				"ROOT ./",
+				"  FILE report.html",
+				"    FILE #fig1 -",
+				"    FILE #table2 -",
+				"TYPE http://xmlns.com/foaf/0.1/Agent *",
+				"  CONTEXTUAL Alice",
+				"TYPE ImageObject *",
+				"  CONTEXTUAL report.html#fig1",
+				"TYPE Organization *",
+				"  CONTEXTUAL UiO",
+				"TYPE Person *",
+				"  CONTEXTUAL Alice",
+				"TYPE Place *",
+				"  CONTEXTUAL UiO",
+				"TYPE Table *",
+				"  CONTEXTUAL Counts",
+				"  CONTEXTUAL X",
+				"  CONTEXTUAL Y",
+				"TYPE Thing *",
+				"  CONTEXTUAL report.html#fig1"), lines(EntityTree.physical(crate, listing)));
+	}
+
+	/** Each entity at least once, with keys unique in the tree */
 	@Test
 	public void keys() {
 		Crate crate = new Crate();
 		add(crate, "data/", null, "Dataset");
 		add(crate, "data", null, "File");
 		add(crate, "#data", null, "Thing");
-		List<Node> nodes = EntityTree.physical(crate);
+		List<Node> nodes = EntityTree.physical(crate, listing);
 		List<String> keys = new ArrayList<>();
 		List<Entity> entities = new ArrayList<>();
 		collect(nodes, keys, entities);
 		assertEquals(keys.size(), keys.stream().distinct().count());
-		assertEquals(crate.getEntities().size(), entities.size());
 		assertTrue(entities.containsAll(crate.getEntities()));
 	}
 
