@@ -5,6 +5,13 @@ Select an entity on the left to edit its form in the middle. On the right,
 crate's metadata. Selecting a link to another described entity in Preview
 opens it in the editor.
 
+The entity list shows the dataset as a whole (the root) first, then the
+other entities by type, name and `@id`. An entity moves to its place in
+the list when you leave the field you are typing its name in. To see only
+entities of one type, choose it above the list: CreativeWork, for example,
+also shows Datasets and Files. Adding an entity of another type lists all
+types again.
+
 Use **View > Sidebar** to hide or show the entity list. On macOS the menu
 item says **Hide Sidebar** or **Show Sidebar**.
 

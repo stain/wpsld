@@ -633,12 +633,12 @@ public class TestCrateEditor extends ApplicationTest {
 
 		interact(menuItem("menuPaste")::fire);
 		assertEquals(3, entities().getItems().size());
-		Entity pasted = entities().getItems().get(2);
+		// Selected, wherever its name sorts it
+		Entity pasted = entities().getSelectionModel().getSelectedItem();
 		// Added as #thing-1, so a new @id for the copy, from its type
 		assertEquals("#thing-1", alice.getId());
 		assertEquals("#person-1", pasted.getId());
 		assertEquals("Alice", pasted.getLabel());
-		assertEquals(pasted, entities().getSelectionModel().getSelectedItem());
 		assertTrue(root.getAll("mentions").stream().anyMatch(v -> v.get("@id").asText().equals("#person-1")));
 
 		// In the form, a reference field pastes its @id, a text field nothing
@@ -662,7 +662,7 @@ public class TestCrateEditor extends ApplicationTest {
 		});
 		clickOn("#entities");
 		interact(menuItem("menuPaste")::fire);
-		assertEquals("https://orcid.org/0000-0001-9842-9718", entities().getItems().get(3).getId());
+		assertEquals("https://orcid.org/0000-0001-9842-9718", entities().getSelectionModel().getSelectedItem().getId());
 
 		// A JSON-LD document of one entity, from another tool, or as text
 		String bob = "{\"@context\": \"https://w3id.org/ro/crate/1.2/context\", "
@@ -673,14 +673,14 @@ public class TestCrateEditor extends ApplicationTest {
 			Clipboard.getSystemClipboard().setContent(ldJson);
 		});
 		interact(menuItem("menuPaste")::fire);
-		assertEquals("Bob", entities().getItems().get(4).getLabel());
+		assertEquals("Bob", entities().getSelectionModel().getSelectedItem().getLabel());
 		interact(() -> {
 			ClipboardContent text = new ClipboardContent();
 			text.putString(bob.replace("#bob", "#bob-2"));
 			Clipboard.getSystemClipboard().setContent(text);
 		});
 		interact(menuItem("menuPaste")::fire);
-		assertEquals("#bob-2", entities().getItems().get(5).getId());
+		assertEquals("#bob-2", entities().getSelectionModel().getSelectedItem().getId());
 
 		// Not an entity: says so, and adds nothing
 		interact(() -> {
@@ -706,9 +706,11 @@ public class TestCrateEditor extends ApplicationTest {
 		addEntity("person");
 		addEntity("person");
 		addEntity("organization");
-		Entity alice = entities().getItems().get(1);
-		Entity bob = entities().getItems().get(2);
-		Entity org = entities().getItems().get(3);
+		// Listed by type: the organisation first
+		Entity org = entities().getItems().get(1);
+		Entity alice = entities().getItems().get(2);
+		Entity bob = entities().getItems().get(3);
+		assertEquals(List.of("Organization"), org.getTypes());
 		interact(() -> {
 			alice.set("name", Optional.of(JsonNodeFactory.instance.textNode("Alice")));
 			bob.set("name", Optional.of(JsonNodeFactory.instance.textNode("Bob")));
@@ -720,7 +722,7 @@ public class TestCrateEditor extends ApplicationTest {
 		// Selected the other way round: copied in the crate's order
 		interact(() -> {
 			entities().getSelectionModel().clearSelection();
-			entities().getSelectionModel().selectIndices(2, 1);
+			entities().getSelectionModel().selectIndices(3, 2);
 		});
 		interact(menuItem("menuCopy")::fire);
 		JsonNode wpsld = new ObjectMapper().readTree((String) WaitForAsyncUtils
@@ -735,13 +737,14 @@ public class TestCrateEditor extends ApplicationTest {
 
 		interact(menuItem("menuPaste")::fire);
 		assertEquals(6, entities().getItems().size());
-		Entity alice2 = entities().getItems().get(4);
-		Entity bob2 = entities().getItems().get(5);
+		// Selected, in the order copied, wherever their names sort them
+		Entity alice2 = entities().getSelectionModel().getSelectedItems().get(0);
+		Entity bob2 = entities().getSelectionModel().getSelectedItems().get(1);
+		assertNotSame(alice, alice2);
 		assertEquals("Alice", alice2.getLabel());
 		// Bob's copy knows Alice's copy; both with the same affiliation
 		assertEquals(alice2.getId(), bob2.get("knows").orElseThrow().get("@id").asText());
 		assertEquals(org.getId(), bob2.get("affiliation").orElseThrow().get("@id").asText());
-		assertEquals(List.of(alice2, bob2), entities().getSelectionModel().getSelectedItems());
 		// Same crate: nothing to report
 		assertFalse(lookup(".alert").tryQuery().isPresent());
 

@@ -114,6 +114,8 @@ import no.s11.wpsld.lookup.SPDXLicenses;
 import no.s11.wpsld.crate.UndoHistory;
 import no.s11.wpsld.crate.UndoHistory.Place;
 import no.s11.wpsld.crate.UndoHistory.Step;
+import no.s11.wpsld.form.EntityListing;
+import no.s11.wpsld.form.EntityListing.TypeCount;
 import no.s11.wpsld.form.EntityTypes;
 import no.s11.wpsld.form.FormFields;
 import no.s11.wpsld.form.ProfileFormFields;
@@ -161,6 +163,11 @@ public class CrateEditor extends Application {
 	/** True while the profile is chosen to follow the crate's conformsTo, rather than by the user */
 	private boolean followingCrate;
 	private final ListView<Entity> entities = new ListView<>();
+	/** Lists only entities of this type, and its subtypes; all if empty */
+	private final ComboBox<TypeCount> entityType = new ComboBox<>();
+	private EntityListing listing;
+	/** True while the list is redone, keeping the selection, so as not to edit it again */
+	private boolean relisting;
 	private final TextArea preview = new TextArea();
 	private EntityPreview entityPreview;
 	private EntityEditor entityEditor;
@@ -352,6 +359,7 @@ public class CrateEditor extends Application {
 	private Node editor(SchemaFromJsonLd schema) {
 		entityTypes = new EntityTypes(schema);
 		terms = new CrateTerms(schema);
+		listing = new EntityListing(terms);
 		schemaOrg = new SchemaOrgFormFields(terms);
 		// The core RO-Crate profile by default: the same schema.org fields,
 		// with those RO-Crate requires first; then the profiles the user loaded
@@ -364,7 +372,7 @@ public class CrateEditor extends Application {
 				this::changed, type -> {
 					// Created from a reference field, which then links to it
 					Entity entity = crate.add(type);
-					entities.getItems().add(entity);
+					relist();
 					return entity;
 				}, this::rename);
 		entityEditor.setBrowse(address -> getHostServices().showDocument(address));
@@ -391,7 +399,27 @@ public class CrateEditor extends Application {
 		entityEditor.setOnStep(this::checkpoint);
 
 		entities.setId("entities");
-		entities.getItems().setAll(crate.getEntities());
+		entityType.setId("entityType");
+		entityType.setMaxWidth(Double.MAX_VALUE);
+		entityType.setAccessibleText("Show entities of type");
+		entityType.setTooltip(new Tooltip("Show only entities of this type, or of its subtypes"));
+		entityType.setConverter(new StringConverter<>() {
+			@Override
+			public String toString(TypeCount type) {
+				return type == null ? "" : type.type().isEmpty() ? "All types (" + type.count() + ")" : type.toString();
+			}
+
+			@Override
+			public TypeCount fromString(String text) {
+				return null;
+			}
+		});
+		entityType.valueProperty().addListener((obs, old, type) -> {
+			if (!relisting) {
+				relist(false);
+			}
+		});
+		relist();
 		entities.setCellFactory(view -> new ListCell<>() {
 			// Update the text in place on changes: refreshing the whole list
 			// on each key typed made it flicker
@@ -415,7 +443,7 @@ public class CrateEditor extends Application {
 			}
 		});
 		entities.getSelectionModel().selectedItemProperty().addListener((obs, old, entity) -> {
-			if (entity != null) {
+			if (entity != null && !relisting) {
 				entityEditor.edit(entity);
 				entityPreview.show(entity);
 			}
@@ -447,13 +475,14 @@ public class CrateEditor extends Application {
 			removed.forEach(crate::remove);
 			// The entities only they linked to the root are now mentioned
 			crate.mentionUnlinked();
-			entities.getItems().removeAll(removed);
+			relist();
 			changed();
 		});
 		HBox buttons = new HBox(6, add, remove);
 		buttons.setPadding(new Insets(6));
 		VBox.setVgrow(entities, Priority.ALWAYS);
-		sidebar = new VBox(new Label(" Entities"), entities, buttons);
+		VBox.setMargin(entityType, new Insets(0, 0, 4, 0));
+		sidebar = new VBox(new Label(" Entities"), entityType, entities, buttons);
 
 		preview.setId("preview");
 		preview.setEditable(false);
@@ -475,6 +504,8 @@ public class CrateEditor extends Application {
 		split.setDividerPositions(0.2, 0.66);
 		show(crate.getRoot());
 		changed();
+		// The list first, as before the type selector above it
+		Platform.runLater(entities::requestFocus);
 		return split;
 	}
 
@@ -488,7 +519,6 @@ public class CrateEditor extends Application {
 		// Mentioned by the root until something else links to it, as
 		// no entity may be left dangling
 		crate.mentionUnlinked();
-		entities.getItems().add(entity);
 		show(entity);
 		// One undo point with the type chosen next (see EntityEditor's
 		// step), or for the Thing if none is
@@ -742,7 +772,72 @@ public class CrateEditor extends Application {
 	 * Select only this entity in the list, and edit it.
 	 */
 	private void show(Entity entity) {
-		entities.getSelectionModel().clearAndSelect(entities.getItems().indexOf(entity));
+		showListed(List.of(entity));
+	}
+
+	/**
+	 * Select these entities in the list, the last one edited, listing all
+	 * types if any of them are not listed.
+	 */
+	private void showListed(List<Entity> shown) {
+		relist();
+		if (!entities.getItems().containsAll(shown)) {
+			entityType.setValue(null);
+		}
+		entities.getSelectionModel().clearSelection();
+		shown.stream().map(entities.getItems()::indexOf).forEach(entities.getSelectionModel()::select);
+	}
+
+	/**
+	 * List the crate's entities again, root first, then by type, name and
+	 * @id (see {@link EntityListing}), only those of the type chosen and its
+	 * subtypes; all types if there are none of it any more, or the entity
+	 * edited and listed no longer is, e.g. its type changed. Those selected
+	 * stay selected, without editing them again; none if the entity edited
+	 * is no longer listed, as the form still shows it, and it is selected
+	 * again when listed again.
+	 */
+	private void relist() {
+		relist(true);
+	}
+
+	/**
+	 * @param followEdited whether to list all types if the entity edited is
+	 *                     no longer of the type chosen, not when choosing it
+	 */
+	private void relist(boolean followEdited) {
+		List<Entity> selected = List.copyOf(entities.getSelectionModel().getSelectedItems());
+		Entity edited = entityEditor.getEntity();
+		relisting = true;
+		try {
+			List<TypeCount> types = listing.types(crate.getEntities());
+			String type = Optional.ofNullable(entityType.getValue()).map(TypeCount::type).orElse("");
+			Optional<TypeCount> chosen = types.stream().filter(t -> t.type().equals(type)).findFirst();
+			if (chosen.isEmpty() || (followEdited && edited != null && crate.getEntities().contains(edited)
+					&& entities.getItems().contains(edited) && !type.isEmpty() && !listing.isA(edited, type))) {
+				chosen = Optional.empty();
+			}
+			List<TypeCount> items = new ArrayList<>();
+			items.add(new TypeCount("", crate.getEntities().size()));
+			items.addAll(types);
+			if (!items.equals(entityType.getItems())) {
+				entityType.getItems().setAll(items);
+			}
+			entityType.setValue(chosen.orElse(items.get(0)));
+			List<Entity> listed = listing.list(crate, entityType.getValue().type());
+			if (!listed.equals(entities.getItems())) {
+				entities.getItems().setAll(listed);
+				entities.getSelectionModel().clearSelection();
+				// Not others than the entity edited, unless it is listed too
+				if (edited != null && listed.contains(edited)) {
+					selected.stream().filter(e -> e != edited).map(listed::indexOf).filter(i -> i >= 0)
+							.forEach(entities.getSelectionModel()::select);
+					entities.getSelectionModel().select(edited);
+				}
+			}
+		} finally {
+			relisting = false;
+		}
 	}
 
 	/**
@@ -784,9 +879,7 @@ public class CrateEditor extends Application {
 			shown.add(existing);
 		});
 		crate.mentionUnlinked();
-		entities.getItems().setAll(crate.getEntities());
-		entities.getSelectionModel().clearSelection();
-		shown.stream().map(entities.getItems()::indexOf).forEach(entities.getSelectionModel()::select);
+		showListed(shown);
 		refresh();
 		checkpoint(placeOf(null), Optional.of("Paste"));
 		reportPasted(stage, pasted);
@@ -942,7 +1035,8 @@ public class CrateEditor extends Application {
 	private void edit(Crate other, Optional<Path> path) {
 		crate = other;
 		crateFile.open(path, crate.toJson());
-		entities.getItems().setAll(crate.getEntities());
+		// All types of another crate
+		entityType.setValue(null);
 		show(crate.getRoot());
 		// The undo history is for one crate
 		history.reset(crate.toJson());
@@ -1381,7 +1475,6 @@ public class CrateEditor extends Application {
 			edited.setTypes(entityTypes.simplify(edited.getTypes()));
 			change = Optional.of("Merge Entities");
 		}
-		entities.getItems().setAll(crate.getEntities());
 		show(edited);
 		entityEditor.edit(edited);
 		refresh();
@@ -1514,7 +1607,6 @@ public class CrateEditor extends Application {
 				.map(Entity::getId);
 		crate = document.crate().get();
 		crateFile.reset(Optional.of(path), crate.toJson());
-		entities.getItems().setAll(crate.getEntities());
 		show(selected.flatMap(crate::get).orElse(crate.getRoot()));
 		refresh();
 		checkpoint(placeOf(null), Optional.of("Reload"));
@@ -1627,7 +1719,7 @@ public class CrateEditor extends Application {
 		}
 		if (!done.isEmpty()) {
 			// Entities may have been added, renamed or merged
-			entities.getItems().setAll(crate.getEntities());
+			relist();
 			Entity edited = entityEditor.getEntity();
 			if (edited != null) {
 				entityEditor.edit(crate.getEntities().contains(edited) ? edited : crate.getRoot());
@@ -1724,6 +1816,8 @@ public class CrateEditor extends Application {
 	 */
 	private void checkpoint(Place place, Optional<String> name) {
 		history.checkpoint(crate.toJson(), place, name);
+		// Sorted again by the names and types changed, not while typing
+		relist();
 		canUndo.set(history.canUndo());
 		canRedo.set(history.canRedo());
 	}
@@ -1767,7 +1861,7 @@ public class CrateEditor extends Application {
 				.orElseThrow();
 		history.settle(crate.toJson());
 		followCrate(List.of(), true);
-		entities.getItems().setAll(crate.getEntities());
+		relist();
 		Optional<Entity> changed = step.place().entity().flatMap(crate::get);
 		Entity show = changed.or(() -> UndoHistory.changedEntity(before, step.crate()).flatMap(crate::get))
 				.or(() -> shown.flatMap(crate::get)).orElse(crate.getRoot());

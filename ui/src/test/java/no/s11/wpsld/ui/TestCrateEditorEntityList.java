@@ -1,0 +1,190 @@
+/*
+ * Copyright 2026 The University of Manchester, UK
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+package no.s11.wpsld.ui;
+
+import static org.junit.Assert.*;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+
+import org.junit.Test;
+import org.testfx.framework.junit.ApplicationTest;
+import org.testfx.util.WaitForAsyncUtils;
+
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.ListView;
+import javafx.scene.control.TextField;
+import javafx.scene.input.KeyCode;
+import javafx.stage.Stage;
+import no.s11.wpsld.crate.CrateReader;
+import no.s11.wpsld.crate.CrateTerms;
+import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.form.EntityListing.TypeCount;
+import no.s11.wpsld.masp.ProfileCache;
+import no.s11.wpsld.soss.SchemaFromJsonLd;
+
+/**
+ * The entity list: the root first, then by type, name and @id; and only
+ * those of a type chosen.
+ */
+public class TestCrateEditorEntityList extends ApplicationTest {
+	@Override
+	public void start(Stage stage) throws Exception {
+		Path temp = Files.createTempDirectory("wpsld-entity-list");
+		CrateEditor app = new CrateEditor(SchemaFromJsonLd::new, CrateTerms::prewarm,
+				new ProfileCache(getClass().getClassLoader(), new CrateReader(), Duration.ofSeconds(5),
+						Optional.of(temp.resolve("profiles")), List.of()),
+				Optional.of(temp.resolve("settings.json")));
+		app.init();
+		app.start(stage);
+	}
+
+	private ListView<Entity> entities() {
+		try {
+			WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#entities").tryQuery().isPresent()
+					&& lookup("#save").tryQuery().isPresent());
+		} catch (Exception e) {
+			throw new AssertionError("Editor did not appear", e);
+		}
+		return lookup("#entities").queryListView();
+	}
+
+	@SuppressWarnings("unchecked")
+	private ComboBox<TypeCount> entityType() {
+		return lookup("#entityType").queryAs(ComboBox.class);
+	}
+
+	private void addNamed(String type, String name) {
+		clickOn("#addEntity");
+		clickOn("#typeSearch").write(type).type(KeyCode.ENTER);
+		clickOn("#header-name").write(name);
+	}
+
+	private List<String> labels() {
+		return entities().getItems().stream().map(Entity::getLabel).toList();
+	}
+
+	private void showType(String type) {
+		interact(() -> entityType().setValue(
+				entityType().getItems().stream().filter(t -> t.type().equals(type)).findFirst().orElseThrow()));
+	}
+
+	/**
+	 * Sorted by type then name once a name is typed and the field left, not
+	 * while typing; the root stays first
+	 */
+	@Test
+	public void sorted() throws Exception {
+		Entity root = entities().getItems().get(0);
+		addNamed("Person", "alice");
+		addNamed("Person", "Zoë");
+		// Not yet sorted, as still typing: listed as when it had no name
+		Entity zoe = entities().getSelectionModel().getSelectedItem();
+		assertEquals("Zoë", zoe.getLabel());
+		assertEquals(zoe, entities().getItems().get(1));
+		addNamed("Organization", "University");
+		assertEquals(List.of(root.getLabel(), "University", "alice", "Zoë"), labels());
+		// Still the one edited, though its place changed
+		assertEquals("University", entities().getSelectionModel().getSelectedItem().getLabel());
+		assertEquals("University", lookup("#header-name").queryAs(TextField.class).getText());
+	}
+
+	/**
+	 * Only entities of a type and its subtypes; all again when one not of it
+	 * is added, or the one edited is no longer of it
+	 */
+	@Test
+	public void ofType() throws Exception {
+		Entity root = entities().getItems().get(0);
+		addNamed("Person", "Alice");
+		addNamed("Person", "Bob");
+		addNamed("File", "Data");
+		clickOn("#entities");
+		assertEquals(List.of("All types (4)", "CreativeWork (2)", "Dataset (1)", "File (1)", "Person (2)"),
+				entityType().getItems().stream().map(entityType().getConverter()::toString).toList());
+
+		showType("Person");
+		assertEquals(List.of("Alice", "Bob"), labels());
+		showType("CreativeWork");
+		assertEquals(List.of(root.getLabel(), "Data"), labels());
+
+		showType("Person");
+		interact(() -> entities().getSelectionModel().clearAndSelect(1));
+		assertEquals("Bob", lookup("#header-name").queryAs(TextField.class).getText());
+		// Bob becomes an Organization: no longer a Person, so all are listed
+		clickOn("#addType");
+		clickOn("#typeSearch").write("Organization").type(KeyCode.ENTER);
+		clickOn("#removeType-Person");
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals("", entityType().getValue().type());
+		assertEquals("Bob", entities().getSelectionModel().getSelectedItem().getLabel());
+
+		showType("Person");
+		assertEquals(List.of("Alice"), labels());
+		addNamed("Place", "Oslo");
+		assertEquals("", entityType().getValue().type());
+		assertEquals("Oslo", entities().getSelectionModel().getSelectedItem().getLabel());
+	}
+
+	/**
+	 * When the entity edited is not of the type chosen, none is selected,
+	 * though others selected are; it is selected again when listed again
+	 */
+	@Test
+	public void editedNotListed() throws Exception {
+		addNamed("Person", "Alice");
+		addNamed("File", "Data");
+		clickOn("#entities");
+		Entity alice = entities().getItems().stream().filter(e -> e.getLabel().equals("Alice")).findFirst()
+				.orElseThrow();
+		Entity data = entities().getItems().stream().filter(e -> e.getLabel().equals("Data")).findFirst()
+				.orElseThrow();
+		interact(() -> {
+			entities().getSelectionModel().clearSelection();
+			entities().getSelectionModel().select(alice);
+			entities().getSelectionModel().select(data);
+		});
+		assertEquals("Data", lookup("#header-name").queryAs(TextField.class).getText());
+
+		showType("Person");
+		assertEquals(List.of("Alice"), labels());
+		assertTrue(entities().getSelectionModel().getSelectedItems().isEmpty());
+		// Still editing Data; nothing to copy or remove
+		assertEquals("Data", lookup("#header-name").queryAs(TextField.class).getText());
+		assertTrue(lookup("#removeEntity").queryButton().isDisabled());
+
+		showType("");
+		assertEquals(List.of(data), entities().getSelectionModel().getSelectedItems());
+		assertEquals("Data", lookup("#header-name").queryAs(TextField.class).getText());
+
+		// The root and Data are both CreativeWorks: both stay selected
+		Entity root = entities().getItems().get(0);
+		interact(() -> {
+			entities().getSelectionModel().clearSelection();
+			entities().getSelectionModel().select(root);
+			entities().getSelectionModel().select(data);
+		});
+		showType("CreativeWork");
+		assertEquals(List.of(root, data), entities().getSelectionModel().getSelectedItems());
+		assertEquals(data, entities().getSelectionModel().getSelectedItem());
+	}
+}

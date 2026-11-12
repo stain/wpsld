@@ -952,10 +952,32 @@ Styles:
   and "Events", each with an icon for its kind, as the Workplace Shell had
   specialised folders; data entities by their folders (`hasPart`). Related
   to the type selector below and to browsing large crates.
-- **A type selector above the entity list**, showing only entities of the
-  chosen type, its subtypes included (e.g. Organization also shows
-  ResearchOrganization). Only types the crate's entities have are offered.
-  Tabs in the OS/2 Warp style, a drop-down in the others.
+- **A type selector above the entity list** *(done, as a drop-down in all
+  styles)*, showing only entities of the chosen type, its subtypes included
+  (e.g. CreativeWork also shows Dataset and File), with how many there are
+  of each. Offered are the types the crate's entities have, and those two
+  or more of them are kinds of, except Thing. Choosing it again lists all
+  types when an entity is added or shown that is not of it, or the entity
+  edited stops being of it. Still to do: tabs in the OS/2 Warp style.
+- **The entity list sorted** *(done)*: the root data entity first, then by
+  types (as listed), name (else `@id`, as shown) and `@id`, ignoring case
+  and in the user's language's order (`EntityListing` in lib). Sorted again
+  at each undo point (leaving a field, adding, renaming), not while typing,
+  so the entity edited doesn't move under the cursor; the selection is
+  kept.
+- **Logical and physical listings** (a tree, next to the flat list by
+  type), proposed after sorting the list:
+  - *Logical*: the root's `hasPart` hierarchy of Datasets and their parts,
+    which may include entities with absolute URIs or in other folders; an
+    entity can appear under more than one Dataset. Contextual entities
+    below, in virtual folders by class ("Persons", "Organizations"…).
+  - *Physical*: the relative `@id`s broken down by path segment, with
+    folders even where there is no Dataset entity for them (shown as
+    such, to add one); data entities with absolute URIs in `hasPart`
+    under "External resources", sorted by URL without a breakdown.
+  - Open questions: where contextual entities go in the physical view;
+    entities neither in `hasPart` nor contextual (e.g. unlinked data);
+    cycles in `hasPart`; files on disk not described (with Open Folder).
 
 - **Opening a folder for annotation**, with or without an
   `ro-crate-metadata.json`: the whole folder opened as a crate, which
