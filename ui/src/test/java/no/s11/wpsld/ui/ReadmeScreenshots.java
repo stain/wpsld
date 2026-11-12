@@ -55,6 +55,7 @@ import javafx.application.Platform;
 import no.s11.wpsld.Settings;
 import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
+import no.s11.wpsld.crate.Dois;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.GeoNames;
 import no.s11.wpsld.crate.Orcid;
@@ -101,6 +102,21 @@ public class ReadmeScreenshots extends ApplicationTest {
 				Optional.of("Carberry"), Optional.empty(),
 				List.of("Josiah Stinkney Carberry", "J. Carberry", "J. S. Carberry"),
 				List.of("Brown University", "Wesleyan University"))));
+		// The RO-Crate 1.0 specification as DataCite has it, without asking it
+		app.setWorkSearch(query -> List.of(new Dois.Work("10.5281/zenodo.3541888", "ScholarlyArticle",
+				"RO-Crate Metadata Specification 1.0",
+				List.of(new Dois.Author("Peter Sefton", Optional.of("Peter"), Optional.of("Sefton"),
+						Optional.of("0000-0002-3545-944X")),
+						new Dois.Author("Eoghan Ó Carragáin", Optional.of("Eoghan Ó"), Optional.of("Carragáin"),
+								Optional.of("0000-0001-8131-2150")),
+						new Dois.Author("Stian Soiland-Reyes", Optional.of("Stian"), Optional.of("Soiland-Reyes"),
+								Optional.of("0000-0001-9842-9718"))),
+				Optional.of("2019-11-15"), Optional.empty(), List.of(), Optional.empty(), Optional.empty(),
+				Optional.empty(), Optional.of("Zenodo"),
+				Optional.of("This document specifies a method, known as RO-Crate (Research Object Crate), of "
+						+ "organizing file-based data with associated metadata, using linked data principles, in "
+						+ "both human and machine readable formats."),
+				"DataCite")));
 		app.init();
 		app.start(stage);
 	}
@@ -369,6 +385,34 @@ public class ReadmeScreenshots extends ApplicationTest {
 		interact(() -> lookup("#personOk").queryButton().fire());
 		select("https://orcid.org/0000-0002-1825-0097");
 		png(out.resolve("person-orcid.png"), lookup(n -> n instanceof EntityEditor).query());
+	}
+
+	/**
+	 * Screenshots of citing a work by its DOI, for the help.
+	 */
+	@Test
+	public void workScreenshots() throws Exception {
+		String folder = System.getenv("HELP_SCREENSHOTS");
+		Assume.assumeTrue("Set HELP_SCREENSHOTS to the folder for them", folder != null && !folder.isBlank());
+		Path out = Files.createDirectories(Path.of(folder));
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		look("classic", "light");
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("citation"));
+		MenuButton create = lookup("#new-citation").queryAs(MenuButton.class);
+		// The dialog waits for an answer, so not inside interact()
+		Platform.runLater(() -> create.getItems().stream().filter(i -> "newDoi-citation".equals(i.getId()))
+				.findFirst().orElseThrow().fire());
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#workQuery").tryQuery().isPresent());
+		interact(() -> lookup("#workQuery").queryAs(TextField.class).setText("10.5281/zenodo.3541888"));
+		interact(() -> lookup("#workSearch").queryButton().fire());
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
+				() -> !lookup("#workResults").queryListView().getItems().isEmpty());
+		png(out.resolve("work-finder.png"),
+				lookup(".dialog-pane").match(n -> n.lookup("#workQuery") != null).query());
+		interact(() -> lookup("#workOk").queryButton().fire());
+		select("https://doi.org/10.5281/zenodo.3541888");
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("author"));
+		png(out.resolve("work-form.png"), lookup(n -> n instanceof EntityEditor).query());
 	}
 
 	/** Time for the map's tiles to come from OpenStreetMap */

@@ -24,6 +24,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -31,6 +32,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -46,6 +48,7 @@ import javafx.collections.FXCollections;
 import javafx.css.PseudoClass;
 import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Bounds;
+import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.VPos;
@@ -92,6 +95,7 @@ import org.kordamp.ikonli.javafx.FontIcon;
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.CrateDocument;
 import no.s11.wpsld.crate.CrateTerms;
+import no.s11.wpsld.crate.Dois;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.GeoNames;
 import no.s11.wpsld.crate.Orcid;
@@ -184,6 +188,14 @@ public class EntityEditor extends ScrollPane {
 	private MapTiles mapTiles = MapTiles.NONE;
 	/** Asks the user for a place in GeoNames, starting from a name */
 	private Function<String, Optional<GeoNames.Place>> findPlace = name -> Optional.empty();
+	/** Asks the user for a work by DOI, starting from a DOI or its title */
+	private Function<String, Optional<Dois.Work>> findWork = query -> Optional.empty();
+	/** Fields that cite or refer to works, which may be found by DOI */
+	private static final Set<String> WORK_FIELDS = Set.of("citation", "isBasedOn", "subjectOf");
+	/** Types of works that usually have a DOI, e.g. articles */
+	private static final List<URI> PUBLICATIONS = Stream
+			.of("ScholarlyArticle", "Book", "Chapter", "Report", "Thesis")
+			.map(t -> URI.create("http://schema.org/" + t)).toList();
 	/** Asks the user for a person in ORCID, starting from a name */
 	private Function<String, Optional<Orcid.Person>> findPerson = name -> Optional.empty();
 	/** Asks the user for a file format of PRONOM, starting from a search */
@@ -451,6 +463,13 @@ public class EntityEditor extends ScrollPane {
 				header.addRow(headerRow++, fieldLabel(field.get()), new FieldEditor(field.get(), true).node());
 			}
 		}
+		// A work's DOI, its details filled in from it
+		boolean doiId = Dois.doiOf(entity.getId()).isPresent() && entity.getId().startsWith("http");
+		if (doiId || PUBLICATIONS.stream().anyMatch(this::isA)) {
+			Label doi = new Label("DOI");
+			doi.setId("label-doi");
+			header.addRow(headerRow++, doi, doiEditor(doiId));
+		}
 		// A person's ORCID iD, looked up rather than typed
 		if (isA(PERSON)) {
 			Label orcid = new Label("ORCID");
@@ -601,6 +620,55 @@ public class EntityEditor extends ScrollPane {
 
 	private Optional<Entity> crateEntity(String id) {
 		return crateEntities.get().stream().filter(e -> e.getId().equals(id)).findFirst();
+	}
+
+	/**
+	 * A work's DOI: for a DOI as <code>@id</code>, filling in what the DOI's
+	 * agency has (keeping values it has); otherwise finding the DOI by its
+	 * name, which becomes its <code>@id</code>.
+	 */
+	private Node doiEditor(boolean doiId) {
+		Entity edited = entity;
+		Button button = new Button(doiId ? "Fill in from DOI" : "Find DOI…");
+		button.setId(doiId ? "fillFromDoi" : "findDoi");
+		button.setMinWidth(Region.USE_PREF_SIZE);
+		button.setTooltip(new Tooltip(doiId ? "Add what Crossref or DataCite has about it, keeping what it has"
+				: "Look it up in Crossref and DataCite by its title"));
+		String query = doiId ? Dois.doiOf(edited.getId()).orElseThrow()
+				: edited.get("name").map(JsonNode::asText).orElse("");
+		button.setOnAction(e -> findWork.apply(query).ifPresent(found -> {
+			Dois.describe(edited, found, crateEntities.get(), this::newEntityWithId);
+			onChange.run();
+			String id = edited.getId();
+			// Its DOI, unless it has an identifier of its own
+			if (!id.equalsIgnoreCase(found.iri()) && (id.startsWith("#") || id.startsWith("_:") || doiId)) {
+				renameEntity.accept(edited, found.iri());
+			} else {
+				showForm();
+			}
+		}));
+		HBox box = new HBox(8, button);
+		box.setAlignment(Pos.CENTER_LEFT);
+		if (doiId) {
+			Hyperlink link = new Hyperlink(Dois.doiOf(edited.getId()).orElseThrow());
+			link.setId("doiLink");
+			link.setOnAction(e -> browse.accept(edited.getId()));
+			box.getChildren().add(link);
+		}
+		return box;
+	}
+
+	/**
+	 * A new entity of the crate, with this <code>@id</code>, or a new one
+	 * for null; it is not linked from anywhere yet, so its identifier can
+	 * just change.
+	 */
+	private Entity newEntityWithId(String type, String id) {
+		Entity created = newEntity.apply(type);
+		if (id != null) {
+			created.setId(id);
+		}
+		return created;
 	}
 
 	/**
@@ -1006,6 +1074,14 @@ public class EntityEditor extends ScrollPane {
 	}
 
 	/**
+	 * Set how to ask the user for a work by DOI, given a DOI or title to
+	 * start from; empty if they cancel.
+	 */
+	public void setFindWork(Function<String, Optional<Dois.Work>> findWork) {
+		this.findWork = Objects.requireNonNull(findWork);
+	}
+
+	/**
 	 * Set how to ask the user for a person in ORCID, given a name to start
 	 * from; empty if they cancel.
 	 */
@@ -1250,6 +1326,12 @@ public class EntityEditor extends ScrollPane {
 					item.setOnAction(e -> link(newEntity.apply(terms.name(type)).getId()));
 					create.getItems().add(item);
 				}
+				if (WORK_FIELDS.contains(field.name())) {
+					MenuItem fromDoi = new MenuItem("Work by DOI…");
+					fromDoi.setId(id(prefix("newDoi"), field.name()));
+					fromDoi.setOnAction(e -> findWork.apply("").ifPresent(this::linkWork));
+					create.getItems().add(0, fromDoi);
+				}
 				if (entityTypes.stream().anyMatch(c -> c.getID().equals(PERSON))) {
 					MenuItem fromOrcid = new MenuItem("Person from ORCID…");
 					fromOrcid.setId(id(prefix("newOrcid"), field.name()));
@@ -1318,6 +1400,22 @@ public class EntityEditor extends ScrollPane {
 				place.setId(found.iri());
 				Places.describe(place, found, EntityEditor.this::crateEntity, () -> newEntity.apply("Geometry"));
 			}
+			link(found.iri());
+		}
+
+		/**
+		 * Link the work found by DOI: the crate's entity for it (whatever
+		 * the DOI's case), or a new one with its DOI as <code>@id</code>.
+		 */
+		private void linkWork(Dois.Work found) {
+			Optional<Entity> existing = crateEntities.get().stream()
+					.filter(e -> e.getId().equalsIgnoreCase(found.iri())).findFirst();
+			if (existing.isPresent()) {
+				link(existing.get().getId());
+				return;
+			}
+			Entity work = newEntityWithId(found.type(), found.iri());
+			Dois.describe(work, found, crateEntities.get(), EntityEditor.this::newEntityWithId);
 			link(found.iri());
 		}
 
@@ -1562,7 +1660,54 @@ public class EntityEditor extends ScrollPane {
 					}
 				});
 			});
+			if (WORK_FIELDS.contains(field.name())) {
+				lookUpTypedDoi(combo, candidates.keySet());
+			}
 			return combo;
+		}
+
+		/**
+		 * A DOI typed or pasted into a citation, in any of its forms, once
+		 * confirmed (Enter, or leaving the field): written as its
+		 * <code>https://doi.org/</code> link, to the crate's entity for it if
+		 * it has one, else looked up, to describe the work if the user
+		 * chooses it. Each DOI is asked about once.
+		 */
+		private void lookUpTypedDoi(ComboBox<String> combo, Set<String> entityIds) {
+			Set<String> asked = new HashSet<>();
+			Runnable lookUp = () -> {
+				String typed = combo.getEditor().getText().strip();
+				Optional<String> doi = Dois.doiOf(typed);
+				if (doi.isEmpty() || entityIds.contains(typed)) {
+					return;
+				}
+				String iri = Dois.iri(doi.get());
+				Optional<Entity> existing = crateEntities.get().stream()
+						.filter(e -> e.getId().equalsIgnoreCase(iri)).findFirst();
+				if (existing.isPresent()) {
+					combo.getEditor().setText(existing.get().getId());
+					return;
+				}
+				if (!typed.equals(iri)) {
+					combo.getEditor().setText(iri);
+				}
+				if (asked.add(iri.toLowerCase(Locale.ROOT))) {
+					// After the field is left: the dialog takes the focus
+					Platform.runLater(() -> findWork.apply(doi.get()).ifPresent(found -> {
+						if (crateEntities.get().stream().noneMatch(e -> e.getId().equalsIgnoreCase(iri))) {
+							Entity work = newEntityWithId(found.type(), iri);
+							Dois.describe(work, found, crateEntities.get(), EntityEditor.this::newEntityWithId);
+							onChange.run();
+						}
+					}));
+				}
+			};
+			combo.getEditor().addEventHandler(ActionEvent.ACTION, e -> lookUp.run());
+			combo.getEditor().focusedProperty().addListener((obs, was, focused) -> {
+				if (!focused) {
+					lookUp.run();
+				}
+			});
 		}
 
 		/**
