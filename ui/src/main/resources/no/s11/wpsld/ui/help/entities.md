@@ -6,10 +6,19 @@ is the root dataset, describing the crate as a whole.
 
 ## Add and remove
 
-Choose **Add entity**, then choose a type. The new entity is mentioned by
-the root dataset until linked otherwise. Alternatively, use **New** beside
-a property to create an entity and link it in one step; see
-[Properties and links](properties.md).
+Choose **Add entity** (or **Insert > Entity...**), then choose a type.
+The new entity is mentioned by the root dataset until linked otherwise.
+Alternatively, use **New** beside a property to create an entity and link
+it in one step; see [Properties and links](properties.md).
+
+The **Insert** menu also adds entities looked up rather than typed:
+**Place from GeoNames...**, **Person from ORCID...**, **Organization from
+ROR...**, **Publication by DOI...**, **Licence from SPDX...** and **File
+format from PRONOM...**. They open the same windows as the **New** menus
+beside properties (see [Properties and links](properties.md)), but add the
+entity without linking it from a property: it is mentioned by the root
+dataset, and shown, so that you can link it later, e.g. by typing its
+`@id` in a property. If the crate already has it, it is just shown.
 
 Select one or more entities and choose **Remove** to remove their
 descriptions. The root dataset cannot be removed. This does not delete
@@ -20,7 +29,7 @@ other descriptions: check and remove or replace those references as needed.
 **Edit > Repair Crate** can add placeholder Things for references to
 entities not described in the crate, and update the root's mentions for
 otherwise unlinked entities. It also tidies licences from the SPDX License
-List, file formats from PRONOM, ORCID iDs and DOIs, see [Properties and links](properties.md). It reports what it changed. Give any
+List, file formats from PRONOM, ORCID iDs, ROR identifiers and DOIs, see [Properties and links](properties.md). It reports what it changed. Give any
 placeholders appropriate types and names, or correct mistaken identifiers.
 Use **Edit > Undo** if needed.
 

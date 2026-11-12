@@ -414,6 +414,11 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
 - View > Sidebar shows or hides the entity list: a checked item, or on
   macOS Hide Sidebar / Show Sidebar (Control-Command-S), as Apple's
   guidelines have it.
+- Insert > Entity… (as Add entity), then items that look an entity up
+  and add it, mentioned by the root and shown, without linking it from a
+  property: Place from GeoNames…, Person from ORCID…, Organization from
+  ROR…, Publication by DOI…, Licence from SPDX…, File format from PRONOM…
+  (`EntityEditor.lookUp`, the same finders and descriptions as New ▾).
 - View > Style and View > Colours, kept in `settings.json` (`Theme`):
   - Styles: Classic (JavaFX's Modena), Windows 11 (Modena reshaped after
     Fluent, `win11.css`: Mica window, cards, 4 px corners, accent line under
@@ -799,11 +804,9 @@ Styles:
   Ringgold or GRID (Josiah Carberry's by Ringgold only), so those without
   a ROR id need a ROR search by name and country (`ROR.search`); tests and help use
   ORCID's fictional Josiah Carberry, 0000-0002-1825-0097.
-- **Insert menu** *(next, after ROR)*: Insert > Place…, Person…,
-  Organization…, Licence…, Publication by DOI… (and File format…), opening
-  the same finders as the New ▾ items, adding the entity to the crate (and
-  showing it) without first having to find the field that links it; later
-  datasets and other kinds of entities.
+- **Insert menu** *(done, see Menus)*: next, datasets and other kinds of
+  entities, e.g. a DataCite dataset or software by DOI as a Dataset or
+  SoftwareSourceCode (see the DataCite types TODO), and a file or folder.
 - **Plugins for other lookup services** *(TODO, consider)*: let others add
   lookups (e.g. Wikidata, ISNI, RRID, a discipline's own registry, an
   institution's internal staff or project list inside a TRE) without
@@ -840,6 +843,46 @@ Styles:
     modules may suit this.
   - Alternatives: OSGi or PF4J add class-loader isolation and lifecycles,
     but ServiceLoader with module layers needs no dependency.
+  - **Moving the six built-in lookups behind it** (looked at 2026-11-12):
+    not a quick change, as each is a lib class plus hand-written UI wiring,
+    and they differ where an interface would need them alike:
+    - lib (`no.s11.wpsld.lookup`): the service (online search, or the
+      bundled list filtered as you type), a result record of its own
+      (`GeoNames.Place`, `ORCID.Person`, `ROR.Organization`, `DOI.Work`,
+      `SPDXLicenses.License`, `PRONOMFormats.Format`), `idOf`, `describe`
+      and `repair`. `search` signatures differ (GeoNames takes the username)
+      and `describe` takes four kinds of helpers (lookup, `newEntity` by
+      type, by type and id, a `newGeometry` supplier).
+    - ui: a finder dialog each, with its own extras (a map for places,
+      the name to write for ROR, abstracts for DOIs, licence flags);
+      `EntityEditor` with an `add…` method each, the New ▾ items and when
+      they show (by range: Place, Person, Organization; by field name:
+      `license`, `encodingFormat`, `citation`…), header rows (Location,
+      ORCID, ROR, DOI), the DOI typed into Citation, the PRONOM media type
+      added to the file; `CrateEditor` with the wiring, settings
+      (GeoNames' username, Preferences tab), test stubs, and Repair Crate's
+      report sections; the Insert menu (`EntityEditor.Lookup`).
+    Steps that each stand alone, in order:
+    1. In lib, a `CrateAccess` (find by `@id`, add of a type with an id or
+       its own) passed to every `describe`, and a common `Found` view of a
+       result (`@id` IRI, label, details, optionally a point), so results
+       can be listed alike.
+    2. A `LookupService<R>` interface in lib: id and name ("Organization
+       from ROR"), the type it adds, which fields it serves (by range or
+       name), `idOf`, `search`, `describe(Entity, R, CrateAccess)`,
+       `repair(Crate)` (default none), whether it works offline, settings
+       it needs. The six implement it; `module-info` says `uses` and
+       `provides` (a module may do both), and the Insert menu, New ▾ items,
+       header rows ("Find in …" plus a link when `@id` matches `idOf`) and
+       Repair Crate loop over `ServiceLoader.load(LookupService.class)`.
+    3. A second SPI in ui, `LookupDialog`, for a richer finder of a
+       service by its id (the map, ROR's names), else a generic finder of
+       a search box, the `Found` list and details. A plugin with no
+       JavaFX of its own gets the generic one; one with a dialog needs a
+       ui plugin module too (`requires javafx.controls`).
+    4. The special cases stay hand-written, behind small hooks: the map,
+       the DOI typed into Citation, PRONOM's media type on the file.
+    Only then plugin JARs from a folder (module layer), as above.
 - **More lookups for RO-Crate's recommended identifiers** (Recommended
   Identifiers in RO-Crate 1.3's metadata page). Smaller helpers: `keywords` edited as tags but
   written as one comma-separated string, and `temporalCoverage` as a

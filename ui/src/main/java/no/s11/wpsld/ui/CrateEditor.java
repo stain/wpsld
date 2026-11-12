@@ -434,23 +434,7 @@ public class CrateEditor extends Application {
 
 		Button add = new Button("Add entity");
 		add.setId("addEntity");
-		add.setOnAction(e -> {
-			// A Thing to start with, and straight away choose its type, which
-			// replaces Thing (not needed for entities added from a property)
-			Entity entity = crate.add("Thing");
-			// Mentioned by the root until something else links to it, as
-			// no entity may be left dangling
-			crate.mentionUnlinked();
-			entities.getItems().add(entity);
-			show(entity);
-			// One undo point with the type chosen next (see EntityEditor's
-			// step), or for the Thing if none is
-			refresh();
-			Platform.runLater(() -> {
-				entityEditor.chooseType();
-				checkpoint();
-			});
-		});
+		add.setOnAction(e -> addEntity());
 		Button remove = new Button("Remove");
 		remove.setId("removeEntity");
 		// Not the root data entity, which may be among those selected
@@ -495,7 +479,66 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * The File, Edit, View and Help menus.
+	 * Add an entity, choosing its type straight away.
+	 */
+	private void addEntity() {
+		// A Thing to start with, and straight away choose its type, which
+		// replaces Thing (not needed for entities added from a property)
+		Entity entity = crate.add("Thing");
+		// Mentioned by the root until something else links to it, as
+		// no entity may be left dangling
+		crate.mentionUnlinked();
+		entities.getItems().add(entity);
+		show(entity);
+		// One undo point with the type chosen next (see EntityEditor's
+		// step), or for the Thing if none is
+		refresh();
+		Platform.runLater(() -> {
+			entityEditor.chooseType();
+			checkpoint();
+		});
+	}
+
+	/**
+	 * Look something up, e.g. a place in GeoNames, and add it to the crate,
+	 * mentioned by the root until something else links to it, then show it;
+	 * if the crate has it already, just show it.
+	 */
+	private void insert(EntityEditor.Lookup lookup) {
+		entityEditor.lookUp(lookup).ifPresent(entity -> {
+			crate.mentionUnlinked();
+			show(entity);
+			changed();
+		});
+	}
+
+	/**
+	 * The Insert menu: a new entity of any type, or one looked up.
+	 */
+	private Menu insertMenu() {
+		MenuItem entity = new MenuItem("_Entity…");
+		entity.setId("menuInsertEntity");
+		entity.setOnAction(e -> addEntity());
+		Menu insert = new Menu("_Insert", null, entity, new SeparatorMenuItem(),
+				insertItem("_Place from GeoNames…", "menuInsertPlace", EntityEditor.Lookup.PLACE),
+				insertItem("Pe_rson from ORCID…", "menuInsertPerson", EntityEditor.Lookup.PERSON),
+				insertItem("_Organization from ROR…", "menuInsertOrganization", EntityEditor.Lookup.ORGANIZATION),
+				insertItem("Publication by _DOI…", "menuInsertPublication", EntityEditor.Lookup.PUBLICATION),
+				insertItem("_Licence from SPDX…", "menuInsertLicense", EntityEditor.Lookup.LICENSE),
+				insertItem("File _format from PRONOM…", "menuInsertFormat", EntityEditor.Lookup.FORMAT));
+		insert.setId("menuInsert");
+		return insert;
+	}
+
+	private MenuItem insertItem(String text, String id, EntityEditor.Lookup lookup) {
+		MenuItem item = new MenuItem(text);
+		item.setId(id);
+		item.setOnAction(e -> insert(lookup));
+		return item;
+	}
+
+	/**
+	 * The File, Edit, View, Insert and Help menus.
 	 */
 	private MenuBar menus(Stage stage) {
 		MenuItem newCrate = new MenuItem("_New RO-Crate");
@@ -571,7 +614,7 @@ public class CrateEditor extends Application {
 		Menu help = new Menu("_Help", null, manual, new SeparatorMenuItem(), about);
 		help.setId("menuHelp");
 
-		MenuBar bar = new MenuBar(file, edit, view, help);
+		MenuBar bar = new MenuBar(file, edit, view, insertMenu(), help);
 		bar.setId("menuBar");
 		// In the macOS style, on macOS the menus are in the screen's menu bar
 		// (set, as JavaFX doesn't allow binding it)

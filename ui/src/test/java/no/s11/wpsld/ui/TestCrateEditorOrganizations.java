@@ -36,7 +36,9 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
+import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
@@ -162,6 +164,53 @@ public class TestCrateEditorOrganizations extends ApplicationTest {
 		assertEquals("https://ror.org/01xtthb56", root.get("publisher").orElseThrow().path("@id").asText());
 		assertEquals("University of Oslo", organization.getLabel());
 		assertEquals("01xtthb56", lookup("#rorLink").queryAs(Hyperlink.class).getText());
+	}
+
+	private MenuItem insertItem(String id) {
+		MenuBar bar = lookup("#menuBar").queryAs(MenuBar.class);
+		return bar.getMenus().stream().filter(m -> "menuInsert".equals(m.getId())).findFirst().orElseThrow()
+				.getItems().stream().filter(i -> id.equals(i.getId())).findFirst().orElseThrow();
+	}
+
+	/**
+	 * Insert > Organization from ROR… adds it, mentioned by the root, and
+	 * shows it; inserting it again just shows it.
+	 */
+	@Test
+	public void insertFromRor() throws Exception {
+		Entity root = entities().getItems().get(0);
+		MenuItem insert = insertItem("menuInsertOrganization");
+		for (int i = 0; i < 2; i++) {
+			// Shown and waited for, so not inside interact()
+			Platform.runLater(insert::fire);
+			WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
+					() -> lookup("#organizationQuery").tryQuery().isPresent());
+			interact(() -> lookup("#organizationQuery").queryAs(TextField.class).setText("Oslo"));
+			interact(() -> lookup("#organizationSearch").queryButton().fire());
+			waitForResults();
+			interact(() -> lookup("#organizationOk").queryButton().fire());
+			WaitForAsyncUtils.waitForFxEvents();
+
+			Entity uio = entity("https://ror.org/01xtthb56").orElseThrow();
+			assertEquals("University of Oslo", uio.getLabel());
+			assertTrue(root.getAll("mentions").stream()
+					.anyMatch(m -> m.path("@id").asText().equals(uio.getId())));
+			assertEquals(uio, entities().getSelectionModel().getSelectedItem());
+			assertEquals("https://ror.org/01xtthb56", lookup("#entityId").queryAs(TextField.class).getText());
+		}
+		assertEquals(1, entities().getItems().stream().filter(e -> e.getId().equals("https://ror.org/01xtthb56"))
+				.count());
+	}
+
+	/** Insert > Entity… adds one, choosing its type, as Add entity does */
+	@Test
+	public void insertEntity() throws Exception {
+		int before = entities().getItems().size();
+		interact(insertItem("menuInsertEntity")::fire);
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#typeSearch").tryQuery().isPresent());
+		clickOn("#typeSearch").write("Organization").type(KeyCode.ENTER);
+		assertEquals(before + 1, entities().getItems().size());
+		assertEquals(List.of("Organization"), entities().getSelectionModel().getSelectedItem().getTypes());
 	}
 
 	/** Offline, the search fails, saying the identifier can still be typed */
