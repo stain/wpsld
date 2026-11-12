@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package no.s11.wpsld.crate;
+package no.s11.wpsld.lookup;
 
 import static org.junit.Assert.*;
 
@@ -30,12 +30,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.TextNode;
 
-import no.s11.wpsld.crate.SpdxLicenses.License;
+import no.s11.wpsld.lookup.SPDXLicenses.License;
 
-public class TestSpdxLicenses {
+import no.s11.wpsld.crate.Crate;
+import no.s11.wpsld.crate.Entity;
+
+public class TestSPDXLicenses {
 	@Test
 	public void bundled() throws Exception {
-		SpdxLicenses spdx = SpdxLicenses.bundled();
+		SPDXLicenses spdx = SPDXLicenses.bundled();
 		assertEquals("3.29.0", spdx.getVersion());
 		assertEquals(740, spdx.getLicenses().size());
 		License ccBy = spdx.get("cc-by-4.0").orElseThrow();
@@ -53,7 +56,7 @@ public class TestSpdxLicenses {
 	/** source.json, as the update script writes it */
 	private record JsonSource(String version, int licences) {
 		static JsonSource read() throws Exception {
-			try (InputStream in = SpdxLicenses.class.getResourceAsStream("/spdx-licenses/source.json")) {
+			try (InputStream in = SPDXLicenses.class.getResourceAsStream("/spdx-licenses/source.json")) {
 				var json = new ObjectMapper().readTree(in);
 				return new JsonSource(json.path("version").asText(), json.path("licences").asInt());
 			}
@@ -62,7 +65,7 @@ public class TestSpdxLicenses {
 
 	@Test
 	public void search() {
-		SpdxLicenses spdx = SpdxLicenses.bundled();
+		SPDXLicenses spdx = SPDXLicenses.bundled();
 		// The identifier itself first, then those starting with it
 		List<String> apache = spdx.search("apache-2.0").stream().map(License::id).toList();
 		assertEquals("Apache-2.0", apache.get(0));
@@ -82,18 +85,18 @@ public class TestSpdxLicenses {
 
 	@Test
 	public void idOf() {
-		assertEquals(Optional.of("CC-BY-4.0"), SpdxLicenses.idOf("http://spdx.org/licenses/CC-BY-4.0"));
-		assertEquals(Optional.of("CC-BY-4.0"), SpdxLicenses.idOf("https://spdx.org/licenses/CC-BY-4.0.html"));
-		assertEquals(Optional.of("GPL-2.0+"), SpdxLicenses.idOf("http://spdx.org/licenses/GPL-2.0+"));
-		assertEquals(Optional.empty(), SpdxLicenses.idOf("https://creativecommons.org/licenses/by/4.0/"));
+		assertEquals(Optional.of("CC-BY-4.0"), SPDXLicenses.idOf("http://spdx.org/licenses/CC-BY-4.0"));
+		assertEquals(Optional.of("CC-BY-4.0"), SPDXLicenses.idOf("https://spdx.org/licenses/CC-BY-4.0.html"));
+		assertEquals(Optional.of("GPL-2.0+"), SPDXLicenses.idOf("http://spdx.org/licenses/GPL-2.0+"));
+		assertEquals(Optional.empty(), SPDXLicenses.idOf("https://creativecommons.org/licenses/by/4.0/"));
 	}
 
 	@Test
 	public void describe() {
 		Crate crate = new Crate();
 		Entity licence = crate.add("Thing");
-		License ccBy = SpdxLicenses.bundled().get("CC-BY-4.0").orElseThrow();
-		Entity identifier = SpdxLicenses.describe(licence, ccBy, crate::get, id -> {
+		License ccBy = SPDXLicenses.bundled().get("CC-BY-4.0").orElseThrow();
+		Entity identifier = SPDXLicenses.describe(licence, ccBy, crate::get, id -> {
 			Entity created = crate.add("PropertyValue");
 			created.setId(id);
 			return created;
@@ -104,11 +107,11 @@ public class TestSpdxLicenses {
 		assertEquals(List.of("PropertyValue"), identifier.getTypes());
 		assertEquals("CC-BY-4.0", identifier.get("value").orElseThrow().asText());
 		assertEquals("SPDX", identifier.get("name").orElseThrow().asText());
-		assertEquals(SpdxLicenses.PROPERTY_ID, identifier.get("propertyID").orElseThrow().asText());
+		assertEquals(SPDXLicenses.PROPERTY_ID, identifier.get("propertyID").orElseThrow().asText());
 		assertEquals("https://spdx.org/licenses/CC-BY-4.0.html", identifier.get("url").orElseThrow().asText());
 		assertEquals("#spdx-CC-BY-4.0", licence.get("identifier").orElseThrow().path("@id").asText());
 		// Again: the same PropertyValue, linked once
-		assertSame(identifier, SpdxLicenses.describe(licence, ccBy, crate::get, id -> {
+		assertSame(identifier, SPDXLicenses.describe(licence, ccBy, crate::get, id -> {
 			throw new AssertionError("Not again");
 		}));
 		assertEquals(1, licence.getAll("identifier").size());
@@ -133,7 +136,7 @@ public class TestSpdxLicenses {
 		Entity docs = crate.add("File");
 		docs.setAll("license", List.of(reference("http://spdx.org/licenses/mit"), TextNode.valueOf("All rights reserved")));
 
-		List<String> done = SpdxLicenses.bundled().repair(crate);
+		List<String> done = SPDXLicenses.bundled().repair(crate);
 		assertFalse(done.isEmpty());
 		assertEquals("http://spdx.org/licenses/Apache-2.0", root.get("license").orElseThrow().path("@id").asText());
 		assertEquals("http://spdx.org/licenses/CC-BY-4.0", data.get("license").orElseThrow().path("@id").asText());
@@ -152,12 +155,12 @@ public class TestSpdxLicenses {
 		assertEquals("Apache License 2.0", apache.getLabel());
 		assertEquals("Apache-2.0", crate.get("#spdx-Apache-2.0").orElseThrow().get("value").orElseThrow().asText());
 		// Nothing more to do
-		assertEquals(List.of(), SpdxLicenses.bundled().repair(crate));
+		assertEquals(List.of(), SPDXLicenses.bundled().repair(crate));
 	}
 
 	@Test
 	public void byLink() {
-		SpdxLicenses spdx = SpdxLicenses.bundled();
+		SPDXLicenses spdx = SPDXLicenses.bundled();
 		// Creative Commons' readable page, though SPDX lists …/legalcode
 		assertEquals("CC-BY-4.0", spdx.byLink("https://creativecommons.org/licenses/by/4.0/").orElseThrow().id());
 		assertEquals("CC-BY-4.0", spdx.byLink("http://creativecommons.org/licenses/by/4.0/deed.en").orElseThrow().id());
@@ -186,7 +189,7 @@ public class TestSpdxLicenses {
 		Entity code = crate.add("File");
 		code.set("license", Optional.of(reference("https://www.gnu.org/licenses/gpl-3.0-standalone.html")));
 
-		SpdxLicenses.bundled().repair(crate);
+		SPDXLicenses.bundled().repair(crate);
 		assertEquals("http://spdx.org/licenses/CC-BY-4.0", root.get("license").orElseThrow().path("@id").asText());
 		assertSame(cc, crate.get("http://spdx.org/licenses/CC-BY-4.0").orElseThrow());
 		assertEquals("CC BY 4.0", cc.getLabel());
@@ -196,7 +199,7 @@ public class TestSpdxLicenses {
 		// GPL-3.0-only or -or-later? Left as it was
 		assertEquals("https://www.gnu.org/licenses/gpl-3.0-standalone.html",
 				code.get("license").orElseThrow().path("@id").asText());
-		assertEquals(List.of(), SpdxLicenses.bundled().repair(crate));
+		assertEquals(List.of(), SPDXLicenses.bundled().repair(crate));
 	}
 
 	private static JsonNode reference(String id) {

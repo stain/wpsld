@@ -43,8 +43,8 @@ import javafx.stage.Stage;
 import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
-import no.s11.wpsld.crate.GeoNames;
-import no.s11.wpsld.crate.Ror;
+import no.s11.wpsld.lookup.GeoNames;
+import no.s11.wpsld.lookup.ROR;
 import no.s11.wpsld.masp.ProfileCache;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
@@ -52,10 +52,10 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
  * Organisations found in ROR (here a stand-in for it).
  */
 public class TestCrateEditorOrganizations extends ApplicationTest {
-	static final Ror.Organization OSLO = new Ror.Organization("01xtthb56", "University of Oslo",
-			List.of(new Ror.Name("University of Oslo", Optional.of("en"), List.of("ror_display", "label")),
-					new Ror.Name("Universitetet i Oslo", Optional.of("no"), List.of("label")),
-					new Ror.Name("UiO", Optional.empty(), List.of("acronym"))),
+	static final ROR.Organization OSLO = new ROR.Organization("01xtthb56", "University of Oslo",
+			List.of(new ROR.Name("University of Oslo", Optional.of("en"), List.of("ror_display", "label")),
+					new ROR.Name("Universitetet i Oslo", Optional.of("no"), List.of("label")),
+					new ROR.Name("UiO", Optional.empty(), List.of("acronym"))),
 			List.of("education", "funder"), "active", Optional.of("https://www.uio.no/"),
 			Optional.of(new GeoNames.Place(3143244, "Oslo", Optional.of("Oslo"), Optional.of("Norway"),
 					Optional.empty(), 59.91273, 10.74609)));
@@ -122,7 +122,7 @@ public class TestCrateEditorOrganizations extends ApplicationTest {
 		assertEquals(List.of("Oslo"), searches);
 		assertEquals("1 organisation found; choose it and OK",
 				lookup("#organizationStatus").queryAs(Label.class).getText());
-		ComboBox<Ror.Name> name = lookup("#organizationName").queryAs(ComboBox.class);
+		ComboBox<ROR.Name> name = lookup("#organizationName").queryAs(ComboBox.class);
 		assertEquals("University of Oslo", name.getValue().value());
 		interact(() -> name.getSelectionModel().select(1));
 		interact(() -> lookup("#organizationOk").queryButton().fire());

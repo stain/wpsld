@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package no.s11.wpsld.crate;
+package no.s11.wpsld.lookup;
 
 import static org.junit.Assert.*;
 
@@ -33,8 +33,8 @@ import org.junit.Test;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 
-import no.s11.wpsld.crate.GeoNames.GeoNamesException;
-import no.s11.wpsld.crate.GeoNames.Place;
+import no.s11.wpsld.lookup.GeoNames.GeoNamesException;
+import no.s11.wpsld.lookup.GeoNames.Place;
 
 public class TestGeoNames {
 	/** As GeoNames answers searchJSON, abbreviated */

@@ -44,7 +44,7 @@ import javafx.stage.Stage;
 import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
-import no.s11.wpsld.crate.SpdxLicenses;
+import no.s11.wpsld.lookup.SPDXLicenses;
 import no.s11.wpsld.masp.ProfileCache;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
@@ -101,7 +101,7 @@ public class TestCrateEditorLicenses extends ApplicationTest {
 		Entity identifier = entity("#spdx-CC-BY-4.0").orElseThrow();
 		assertEquals(List.of("PropertyValue"), identifier.getTypes());
 		assertEquals("CC-BY-4.0", identifier.get("value").orElseThrow().asText());
-		assertEquals(SpdxLicenses.PROPERTY_ID, identifier.get("propertyID").orElseThrow().asText());
+		assertEquals(SPDXLicenses.PROPERTY_ID, identifier.get("propertyID").orElseThrow().asText());
 		assertEquals(identifier.getId(), licence.get("identifier").orElseThrow().path("@id").asText());
 
 		// A file with the same licence links the same entities
@@ -129,10 +129,10 @@ public class TestCrateEditorLicenses extends ApplicationTest {
 		Platform.runLater(() -> create.getItems().stream().filter(i -> "newSpdx-license".equals(i.getId()))
 				.findFirst().orElseThrow().fire());
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#licenseQuery").tryQuery().isPresent());
-		ListView<SpdxLicenses.License> results = lookup("#licenseResults").queryListView();
+		ListView<SPDXLicenses.License> results = lookup("#licenseResults").queryListView();
 		interact(() -> lookup("#licenseQuery").queryAs(TextField.class).setText("gpl-2.0"));
 		assertEquals("GPL-2.0-only", results.getItems().get(0).id());
-		assertTrue(results.getItems().stream().noneMatch(SpdxLicenses.License::deprecated));
+		assertTrue(results.getItems().stream().noneMatch(SPDXLicenses.License::deprecated));
 		interact(() -> lookup("#licenseDeprecated").queryAs(CheckBox.class).setSelected(true));
 		assertEquals("GPL-2.0", results.getItems().get(0).id());
 		interact(() -> lookup("#licenseQuery").queryAs(TextField.class).setText("no such licence"));

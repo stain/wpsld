@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package no.s11.wpsld.crate;
+package no.s11.wpsld.lookup;
 
 import java.io.IOException;
 import java.net.URI;
@@ -43,6 +43,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.TextNode;
 
+import no.s11.wpsld.crate.Crate;
+import no.s11.wpsld.crate.Entity;
+
 /**
  * Finds organisations in the <a href="https://ror.org/">Research
  * Organization Registry</a> (ROR), whose identifiers RO-Crate recommends for
@@ -55,7 +58,7 @@ import com.fasterxml.jackson.databind.node.TextNode;
  *
  * @see <a href="https://ror.readme.io/docs/rest-api">ROR REST API</a>
  */
-public class Ror {
+public class ROR {
 	/** ROR's REST API */
 	public static final URI SERVICE = URI.create("https://api.ror.org/v2/");
 	/** ROR identifiers as RO-Crate writes them, e.g. https://ror.org/027m9bs27 */
@@ -63,7 +66,7 @@ public class Ror {
 	/** Crockford's Base32, as ROR identifiers use */
 	private static final String BASE32 = "0123456789abcdefghjkmnpqrstvwxyz";
 	/** An identifier, alone or in an address, e.g. ror.org/027m9bs27 */
-	private static final Pattern ROR = Pattern.compile(
+	private static final Pattern ROR_PATTERN = Pattern.compile(
 			"(?:(?:https?://)?(?:www\\.)?ror\\.org/)?(0[0-9a-hjkmnp-tv-z]{6})(\\d{2})/?", Pattern.CASE_INSENSITIVE);
 	/** Kinds of names, the more usual first */
 	private static final List<String> NAME_TYPES = List.of("ror_display", "label", "alias", "acronym");
@@ -112,10 +115,10 @@ public class Ror {
 	}
 
 	/** ROR said no, e.g. too many requests, with its reason */
-	public static class RorException extends IOException {
+	public static class RORException extends IOException {
 		private static final long serialVersionUID = 1L;
 
-		public RorException(String message) {
+		public RORException(String message) {
 			super(message);
 		}
 	}
@@ -125,11 +128,11 @@ public class Ror {
 	private final URI service;
 	private final String userAgent;
 
-	public Ror(HttpClient http, Duration timeout, String userAgent) {
+	public ROR(HttpClient http, Duration timeout, String userAgent) {
 		this(http, timeout, userAgent, SERVICE);
 	}
 
-	public Ror(HttpClient http, Duration timeout, String userAgent, URI service) {
+	public ROR(HttpClient http, Duration timeout, String userAgent, URI service) {
 		this.http = Objects.requireNonNull(http);
 		this.timeout = Objects.requireNonNull(timeout);
 		this.userAgent = Objects.requireNonNull(userAgent);
@@ -142,7 +145,7 @@ public class Ror {
 	 * its check digits are right.
 	 */
 	public static Optional<String> idOf(String text) {
-		Matcher matcher = ROR.matcher(text.strip());
+		Matcher matcher = ROR_PATTERN.matcher(text.strip());
 		if (!matcher.matches()) {
 			return Optional.empty();
 		}
@@ -177,16 +180,16 @@ public class Ror {
 			return List.of();
 		}
 		if (response.statusCode() == 429) {
-			throw new RorException("ROR has had too many searches from here; try again in a few minutes");
+			throw new RORException("ROR has had too many searches from here; try again in a few minutes");
 		}
 		if (response.statusCode() != 200) {
-			throw new RorException("ROR answered " + response.statusCode());
+			throw new RORException("ROR answered " + response.statusCode());
 		}
 		JsonNode json;
 		try {
 			json = MAPPER.readTree(response.body());
 		} catch (IOException e) {
-			throw new RorException("ROR answered with no results");
+			throw new RORException("ROR answered with no results");
 		}
 		return parse(id.isPresent() ? json : json.path("items"));
 	}
@@ -214,7 +217,7 @@ public class Ror {
 				names.add(new Name(value.get(), text(name.path("lang")), types));
 			}
 		}
-		names.sort(Comparator.comparingInt(Ror::rank));
+		names.sort(Comparator.comparingInt(ROR::rank));
 		if (id.isEmpty() || names.isEmpty()) {
 			return Optional.empty();
 		}
@@ -282,7 +285,7 @@ public class Ror {
 			GeoNames.Place city = found.location().get();
 			if (lookup.apply(city.iri()).isEmpty()) {
 				Entity place = newEntity.apply("Place", city.iri());
-				Places.describe(place, city, lookup, () -> newEntity.apply("Geometry", null));
+				GeoNames.describe(place, city, lookup, () -> newEntity.apply("Geometry", null));
 			}
 			entity.set("location", Optional.of(JsonNodeFactory.instance.objectNode().put("@id", city.iri())));
 		}
@@ -299,7 +302,7 @@ public class Ror {
 	 * @return What was changed, one line each
 	 */
 	public static List<String> repair(Crate crate) {
-		return crate.normaliseIds(Ror::canonical);
+		return crate.normaliseIds(ROR::canonical);
 	}
 
 	/**

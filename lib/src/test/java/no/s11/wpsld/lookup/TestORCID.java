@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package no.s11.wpsld.crate;
+package no.s11.wpsld.lookup;
 
 import static org.junit.Assert.*;
 
@@ -36,9 +36,12 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.TextNode;
 import com.sun.net.httpserver.HttpServer;
 
-import no.s11.wpsld.crate.Orcid.Person;
+import no.s11.wpsld.lookup.ORCID.Person;
 
-public class TestOrcid {
+import no.s11.wpsld.crate.Crate;
+import no.s11.wpsld.crate.Entity;
+
+public class TestORCID {
 	/**
 	 * As ORCID's expanded search answers, for its fictional researcher; the
 	 * second without a name, the third with a wrong check digit
@@ -54,7 +57,7 @@ public class TestOrcid {
 
 	@Test
 	public void parse() throws Exception {
-		List<Person> people = Orcid.parse(new ObjectMapper().readTree(CARBERRY));
+		List<Person> people = ORCID.parse(new ObjectMapper().readTree(CARBERRY));
 		assertEquals(List.of(new Person("0000-0002-1825-0097", Optional.of("Josiah"), Optional.of("Carberry"),
 				Optional.empty(), List.of("Josiah Stinkney Carberry", "J. Carberry"),
 				List.of("Brown University", "Wesleyan University"))), people);
@@ -66,15 +69,15 @@ public class TestOrcid {
 
 	@Test
 	public void idOf() {
-		assertEquals(Optional.of("0000-0002-1825-0097"), Orcid.idOf("https://orcid.org/0000-0002-1825-0097"));
-		assertEquals(Optional.of("0000-0002-1825-0097"), Orcid.idOf("http://orcid.org/0000-0002-1825-0097/"));
-		assertEquals(Optional.of("0000-0002-1825-0097"), Orcid.idOf("orcid.org/0000-0002-1825-0097"));
-		assertEquals(Optional.of("0000-0002-1825-0097"), Orcid.idOf("0000000218250097"));
+		assertEquals(Optional.of("0000-0002-1825-0097"), ORCID.idOf("https://orcid.org/0000-0002-1825-0097"));
+		assertEquals(Optional.of("0000-0002-1825-0097"), ORCID.idOf("http://orcid.org/0000-0002-1825-0097/"));
+		assertEquals(Optional.of("0000-0002-1825-0097"), ORCID.idOf("orcid.org/0000-0002-1825-0097"));
+		assertEquals(Optional.of("0000-0002-1825-0097"), ORCID.idOf("0000000218250097"));
 		// X as the check digit, also written small
-		assertEquals(Optional.of("0000-0000-0000-001X"), Orcid.idOf("https://orcid.org/0000-0000-0000-001x"));
-		assertEquals(Optional.empty(), Orcid.idOf("https://orcid.org/0000-0002-1825-0098"));
-		assertEquals(Optional.empty(), Orcid.idOf("https://sandbox.orcid.org/0000-0002-1825-0097"));
-		assertEquals(Optional.empty(), Orcid.idOf("#josiah"));
+		assertEquals(Optional.of("0000-0000-0000-001X"), ORCID.idOf("https://orcid.org/0000-0000-0000-001x"));
+		assertEquals(Optional.empty(), ORCID.idOf("https://orcid.org/0000-0002-1825-0098"));
+		assertEquals(Optional.empty(), ORCID.idOf("https://sandbox.orcid.org/0000-0002-1825-0097"));
+		assertEquals(Optional.empty(), ORCID.idOf("#josiah"));
 	}
 
 	@Test
@@ -90,7 +93,7 @@ public class TestOrcid {
 		});
 		server.start();
 		try {
-			Orcid orcid = new Orcid(HttpClient.newHttpClient(), Duration.ofSeconds(5), "wpsld/test",
+			ORCID orcid = new ORCID(HttpClient.newHttpClient(), Duration.ofSeconds(5), "wpsld/test",
 					URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/"));
 			assertEquals("Josiah Carberry", orcid.search("Josiah Carberry").get(0).name());
 			assertEquals("/expanded-search/?q=Josiah+Carberry&rows=25", asked.get());
@@ -107,7 +110,7 @@ public class TestOrcid {
 		Entity person = new Entity("#person-1", "Thing");
 		Person carberry = new Person("0000-0002-1825-0097", Optional.of("Josiah"), Optional.of("Carberry"),
 				Optional.empty(), List.of(), List.of("Brown University"));
-		Orcid.describe(person, carberry);
+		ORCID.describe(person, carberry);
 		assertEquals(List.of("Person"), person.getTypes());
 		assertEquals("Josiah Carberry", person.getLabel());
 		assertEquals("Josiah", person.get("givenName").orElseThrow().asText());
@@ -115,7 +118,7 @@ public class TestOrcid {
 		// A name it has is kept
 		Entity named = new Entity("#j", "Person");
 		named.set("name", Optional.of(TextNode.valueOf("J. Carberry")));
-		Orcid.describe(named, carberry);
+		ORCID.describe(named, carberry);
 		assertEquals("J. Carberry", named.getLabel());
 	}
 
@@ -134,7 +137,7 @@ public class TestOrcid {
 		Entity paper = crate.add("ScholarlyArticle");
 		paper.set("author", Optional.of(reference("https://www.orcid.org/0000-0000-0000-001x")));
 
-		assertFalse(Orcid.repair(crate).isEmpty());
+		assertFalse(ORCID.repair(crate).isEmpty());
 		assertSame(josiah, crate.get("https://orcid.org/0000-0002-1825-0097").orElseThrow());
 		assertTrue(crate.get("orcid.org/0000-0002-1825-0097").isEmpty());
 		assertEquals(List.of(reference("https://orcid.org/0000-0002-1825-0097"),
@@ -142,7 +145,7 @@ public class TestOrcid {
 		// A wrong check digit: left for the user
 		assertSame(wrong, crate.get("https://orcid.org/0000-0002-1825-0098").orElseThrow());
 		assertEquals("https://orcid.org/0000-0000-0000-001X", paper.get("author").orElseThrow().path("@id").asText());
-		assertEquals(List.of(), Orcid.repair(crate));
+		assertEquals(List.of(), ORCID.repair(crate));
 	}
 
 	private static JsonNode reference(String id) {

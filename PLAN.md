@@ -29,7 +29,7 @@ See also [MASP.md](MASP.md) for profile-aware editing with RO-Crate MASP.
 
 | Module | Contents |
 |--------|----------|
-| `lib` (`no.s11.wpsld`), **free of JavaFX** | schema model (`soss`: `SchemaFromJsonLd`, `ClassDef`, `PropertyDef`), form fields (`form`: `FormFields`, `SchemaOrgFormFields`), crate model (`crate`: `Crate`, `Entity`), xattr metadata (`impl.WrittenMetadata`), arcp file system (`arcp`). Only dependency: Jackson. |
+| `lib` (`no.s11.wpsld`), **free of JavaFX** | schema model (`soss`: `SchemaFromJsonLd`, `ClassDef`, `PropertyDef`), form fields (`form`: `FormFields`, `SchemaOrgFormFields`), crate model (`crate`: `Crate`, `Entity`, `Places`), lookups of identifiers (`lookup`: `GeoNames`, `ORCID`, `ROR`, `DOI`, `SPDXLicenses`, `PRONOMFormats`; depends on `crate`, never the reverse), xattr metadata (`impl.WrittenMetadata`), arcp file system (`arcp`). Only dependency: Jackson. |
 | `ui` (`no.s11.wpsld.ui`) | JavaFX 27: `CrateEditor` (main window: entities, editor, JSON-LD preview) and `EntityEditor` (type tree and form for one entity). |
 
 Builds: Java 25, Gradle 9.8; `./gradlew build` in the conda env
@@ -646,7 +646,7 @@ Styles:
   7. Check on Windows and macOS that the entity formats reach another
      wpsld window.
 - **An SPDX licence selector** *(done)*: "New ▾ Licence from SPDX…" on
-  `license` (`LicenseFinder`, `SpdxLicenses`) searches the bundled SPDX
+  `license` (`LicenseFinder`, `SPDXLicenses`) searches the bundled SPDX
   License List by identifier or name while typing, deprecated identifiers
   hidden unless asked for, and adds the licence as a CreativeWork with its
   `http://spdx.org/licenses/<id>` IRI (as SPDX's own JSON-LD has it), its
@@ -686,7 +686,7 @@ Styles:
   is. Credit "Contains public sector information licensed under the Open
   Government Licence v3.0" and the signature version.
   - *Done:* "New ▾ Format from PRONOM…" on `encodingFormat`
-    (`FormatFinder`, `PronomFormats`) searches the bundled formats by name,
+    (`FormatFinder`, `PRONOMFormats`) searches the bundled formats by name,
     version, PUID, extension or media type while typing, starting from the
     file's media type or extension, and links the format (a `WebPage`,
     `Standard` with its PRONOM address and name) beside the media type,
@@ -711,7 +711,7 @@ Styles:
     version; and fill in `contentSize`.
 - **Organisations from ROR** *(done)*: "New ▾ Organization from ROR…" on
   fields that take an Organization, and "Find in ROR…" in a ROR row on an
-  Organization's form (`OrganizationFinder`, `Ror`), searching
+  Organization's form (`OrganizationFinder`, `ROR`), searching
   `api.ror.org/v2/organizations?query=` on Enter, or the record of a ROR
   identifier (checked by its ISO 7064 97-10 check digits). The name to
   write is chosen from all its names (display name first, then labels,
@@ -736,7 +736,7 @@ Styles:
   `citation`, `isBasedOn` and `subjectOf`, and a DOI row on a work whose
   `@id` is a DOI ("Fill in from DOI", keeping its values) or on an article,
   book, chapter, report or thesis without one ("Find DOI…") (`WorkFinder`,
-  `Dois`). A DOI typed or pasted into those fields becomes its
+  `DOI`). A DOI typed or pasted into those fields becomes its
   `https://doi.org/` link when confirmed, and is looked up once to describe
   the work, as RO-Crate asks citations to be URLs. A DOI in any form (bare `10.…`, `doi:`, `https://doi.org/`,
   `dx.doi.org`, percent-encoded) is looked up at its agency
@@ -784,7 +784,7 @@ Styles:
     Also the publisher as an Organization (from ROR, now that it is there).
 - **People from ORCID** *(done)*: "New ▾ Person from ORCID…" on fields
   that take a Person, and "Find in ORCID…" in an ORCID row on a Person's
-  form (`PersonFinder`, `Orcid`), search ORCID's public API
+  form (`PersonFinder`, `ORCID`), search ORCID's public API
   (`pub.orcid.org/v3.0/expanded-search`, no credentials needed, tried
   2026-11-12) by name or iD, on Enter, listing ORCID iD, other names and
   institutions (as text: no ROR ids), and add the Person with
@@ -797,13 +797,49 @@ Styles:
   Organizations, from ORCID's employment records (`/v3.0/<iD>/employments`),
   once ROR lookups exist: their organisations are disambiguated by ROR,
   Ringgold or GRID (Josiah Carberry's by Ringgold only), so those without
-  a ROR id need a ROR search by name and country (`Ror.search`); tests and help use
+  a ROR id need a ROR search by name and country (`ROR.search`); tests and help use
   ORCID's fictional Josiah Carberry, 0000-0002-1825-0097.
 - **Insert menu** *(next, after ROR)*: Insert > Place…, Person…,
   Organization…, Licence…, Publication by DOI… (and File format…), opening
   the same finders as the New ▾ items, adding the entity to the crate (and
   showing it) without first having to find the field that links it; later
   datasets and other kinds of entities.
+- **Plugins for other lookup services** *(TODO, consider)*: let others add
+  lookups (e.g. Wikidata, ISNI, RRID, a discipline's own registry, an
+  institution's internal staff or project list inside a TRE) without
+  changing wpsld, and let the offline data modules (above) plug in the same
+  way. The Java module system's way is still the SPI with
+  `java.util.ServiceLoader`: `lib` declares an interface and `uses` it in
+  its `module-info.java`; a plugin module says `provides
+  no.s11.wpsld.lookup.LookupService with org.example.MyLookup;` (on the
+  class path, a `META-INF/services/` file instead, so ship both).
+  `ServiceLoader.load(LookupService.class)` finds what is on the module
+  path or linked into the jlink/jpackage image. To pick up plugin JARs
+  dropped into a folder at run time (e.g. the user data folder) rather than
+  linked in: `ModuleFinder.of(folder)`, then
+  `Configuration.resolveAndBind(…)` on the boot layer's configuration,
+  `ModuleLayer.defineModulesWithOneLoader(…)`, and
+  `ServiceLoader.load(layer, LookupService.class)`; a plugin then only
+  `requires no.s11.wpsld` (and Jackson). Considerations:
+  - The interface, roughly what the six built-in lookups share: an id and
+    name; which types and properties it serves (Place on `contentLocation`,
+    Organization on `publisher`…), for the New ▾ and Insert menus; `search(query)`
+    giving results with `@id` IRI, label and details (for a generic finder
+    dialog, with a hook for a richer one like the map); `describe(entity,
+    result, lookup, newEntity)`; an optional `repair(crate)`; whether it
+    works offline; the settings it needs (e.g. GeoNames' username) shown in
+    Preferences. Move the built-in ones behind it first, to prove it.
+  - Plugins run with the user's full rights (the Security Manager is gone
+    since Java 24), so only install trusted ones; say where each came from
+    and let users turn them off. No downloading plugins from within wpsld at
+    first.
+  - Versioning of the interface (a `@since`/API version the plugin
+    declares), as plugins outlive releases.
+  - Licences: a plugin of its own module and JAR can carry data under
+    licences incompatible with wpsld's Apache-2.0, which is why the data
+    modules may suit this.
+  - Alternatives: OSGi or PF4J add class-loader isolation and lifecycles,
+    but ServiceLoader with module layers needs no dependency.
 - **More lookups for RO-Crate's recommended identifiers** (Recommended
   Identifiers in RO-Crate 1.3's metadata page). Smaller helpers: `keywords` edited as tags but
   written as one comma-separated string, and `temporalCoverage` as a

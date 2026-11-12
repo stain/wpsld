@@ -39,15 +39,15 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
-import no.s11.wpsld.crate.PronomFormats;
-import no.s11.wpsld.crate.PronomFormats.Format;
+import no.s11.wpsld.lookup.PRONOMFormats;
+import no.s11.wpsld.lookup.PRONOMFormats.Format;
 
 /**
  * Choose a file format from PRONOM, bundled with wpsld, found by name,
  * extension, media type or PUID while typing. Gives the format chosen on OK.
  */
 class FormatFinder extends Dialog<Format> {
-	private final PronomFormats pronom;
+	private final PRONOMFormats pronom;
 	private final TextField query = new TextField();
 	private final ListView<Format> results = new ListView<>();
 	private final Label count = new Label();
@@ -58,7 +58,7 @@ class FormatFinder extends Dialog<Format> {
 	 * @param initial What to search for at first, e.g. the file's media type
 	 *                or extension
 	 */
-	FormatFinder(Window owner, String initial, PronomFormats pronom, Consumer<String> browse) {
+	FormatFinder(Window owner, String initial, PRONOMFormats pronom, Consumer<String> browse) {
 		this.pronom = Objects.requireNonNull(pronom);
 		this.browse = Objects.requireNonNull(browse);
 		initOwner(owner);

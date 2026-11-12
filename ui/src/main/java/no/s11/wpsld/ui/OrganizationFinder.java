@@ -41,9 +41,9 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
-import no.s11.wpsld.crate.Ror;
-import no.s11.wpsld.crate.Ror.Name;
-import no.s11.wpsld.crate.Ror.Organization;
+import no.s11.wpsld.lookup.ROR;
+import no.s11.wpsld.lookup.ROR.Name;
+import no.s11.wpsld.lookup.ROR.Organization;
 
 /**
  * Find an organisation in ROR by name (or ROR identifier): the matches in a
@@ -51,7 +51,7 @@ import no.s11.wpsld.crate.Ror.Organization;
  * name unless another is chosen. Gives the organisation and name chosen on OK.
  */
 class OrganizationFinder extends Dialog<OrganizationFinder.Chosen> {
-	/** Searches ROR, e.g. {@link Ror#search}, off the JavaFX thread */
+	/** Searches ROR, e.g. {@link ROR#search}, off the JavaFX thread */
 	@FunctionalInterface
 	interface Search {
 		List<Organization> search(String query) throws Exception;

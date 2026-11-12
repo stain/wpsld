@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package no.s11.wpsld.crate;
+package no.s11.wpsld.lookup;
 
 import static org.junit.Assert.*;
 
@@ -36,10 +36,13 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
 import com.sun.net.httpserver.HttpServer;
 
-import no.s11.wpsld.crate.Ror.Name;
-import no.s11.wpsld.crate.Ror.Organization;
+import no.s11.wpsld.lookup.ROR.Name;
+import no.s11.wpsld.lookup.ROR.Organization;
 
-public class TestRor {
+import no.s11.wpsld.crate.Crate;
+import no.s11.wpsld.crate.Entity;
+
+public class TestROR {
 	/** As ROR's API answers for the University of Oslo, shortened */
 	private static final String OSLO = """
 			{"id": "https://ror.org/01xtthb56", "names": [
@@ -62,7 +65,7 @@ public class TestRor {
 
 	@Test
 	public void parse() throws Exception {
-		List<Organization> found = Ror.parse(new ObjectMapper().readTree(SEARCH).path("items"));
+		List<Organization> found = ROR.parse(new ObjectMapper().readTree(SEARCH).path("items"));
 		assertEquals(1, found.size());
 		Organization oslo = found.get(0);
 		assertEquals("01xtthb56", oslo.id());
@@ -81,19 +84,19 @@ public class TestRor {
 		assertEquals("http://sws.geonames.org/3143244/", city.iri());
 		assertEquals(59.91273, city.latitude(), 0);
 		// A single record, as for a ROR identifier
-		assertEquals(List.of(oslo), Ror.parse(new ObjectMapper().readTree(OSLO)));
+		assertEquals(List.of(oslo), ROR.parse(new ObjectMapper().readTree(OSLO)));
 	}
 
 	@Test
 	public void idOf() {
-		assertEquals(Optional.of("027m9bs27"), Ror.idOf("https://ror.org/027m9bs27"));
-		assertEquals(Optional.of("027m9bs27"), Ror.idOf("http://www.ror.org/027M9BS27/"));
-		assertEquals(Optional.of("027m9bs27"), Ror.idOf("ror.org/027m9bs27"));
-		assertEquals(Optional.of("01xtthb56"), Ror.idOf("01xtthb56"));
-		assertEquals(Optional.empty(), Ror.idOf("https://ror.org/027m9bs28"));
+		assertEquals(Optional.of("027m9bs27"), ROR.idOf("https://ror.org/027m9bs27"));
+		assertEquals(Optional.of("027m9bs27"), ROR.idOf("http://www.ror.org/027M9BS27/"));
+		assertEquals(Optional.of("027m9bs27"), ROR.idOf("ror.org/027m9bs27"));
+		assertEquals(Optional.of("01xtthb56"), ROR.idOf("01xtthb56"));
+		assertEquals(Optional.empty(), ROR.idOf("https://ror.org/027m9bs28"));
 		// Not in Crockford's Base32, which has no i, l, o or u
-		assertEquals(Optional.empty(), Ror.idOf("https://ror.org/027u9bs27"));
-		assertEquals(Optional.empty(), Ror.idOf("#uio"));
+		assertEquals(Optional.empty(), ROR.idOf("https://ror.org/027u9bs27"));
+		assertEquals(Optional.empty(), ROR.idOf("#uio"));
 	}
 
 	@Test
@@ -113,7 +116,7 @@ public class TestRor {
 		});
 		server.start();
 		try {
-			Ror ror = new Ror(HttpClient.newHttpClient(), Duration.ofSeconds(5), "wpsld/test",
+			ROR ror = new ROR(HttpClient.newHttpClient(), Duration.ofSeconds(5), "wpsld/test",
 					URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/"));
 			assertEquals("University of Oslo", ror.search("Universitetet i Oslo").get(0).name());
 			assertEquals("/organizations?query=Universitetet+i+Oslo", asked.get());
@@ -128,10 +131,10 @@ public class TestRor {
 
 	@Test
 	public void describe() throws Exception {
-		Organization oslo = Ror.parse(new ObjectMapper().readTree(OSLO)).get(0);
+		Organization oslo = ROR.parse(new ObjectMapper().readTree(OSLO)).get(0);
 		Crate crate = new Crate();
 		Entity uio = crate.add("Thing");
-		Ror.describe(uio, oslo, "Universitetet i Oslo", crate::get, (type, id) -> {
+		ROR.describe(uio, oslo, "Universitetet i Oslo", crate::get, (type, id) -> {
 			Entity added = crate.add(type);
 			if (id != null) {
 				crate.rename(added, id);
@@ -150,7 +153,7 @@ public class TestRor {
 		int entities = crate.getEntities().size();
 		Entity other = crate.add("Organization");
 		other.set("url", Optional.of(JsonNodeFactory.instance.textNode("https://example.org/")));
-		Ror.describe(other, oslo, oslo.name(), crate::get, (type, id) -> crate.add(type));
+		ROR.describe(other, oslo, oslo.name(), crate::get, (type, id) -> crate.add(type));
 		assertEquals(entities + 1, crate.getEntities().size());
 		assertEquals("https://example.org/", other.get("url").orElseThrow().asText());
 		assertEquals("University of Oslo", other.getLabel());
@@ -169,14 +172,14 @@ public class TestRor {
 		root.setAll("publisher", List.of(reference("http://ror.org/01xtthb56/"), reference("ror.org/01XTTHB56"),
 				reference("https://ror.org/01xtthb57")));
 
-		assertFalse(Ror.repair(crate).isEmpty());
+		assertFalse(ROR.repair(crate).isEmpty());
 		assertSame(uio, crate.get("https://ror.org/01xtthb56").orElseThrow());
 		assertTrue(crate.get("ror.org/01XTTHB56").isEmpty());
 		assertEquals(List.of(reference("https://ror.org/01xtthb56"), reference("https://ror.org/01xtthb57")),
 				root.getAll("publisher"));
 		// Wrong check digits: left for the user
 		assertSame(wrong, crate.get("https://ror.org/01xtthb57").orElseThrow());
-		assertEquals(List.of(), Ror.repair(crate));
+		assertEquals(List.of(), ROR.repair(crate));
 	}
 
 	private static JsonNode reference(String id) {

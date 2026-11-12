@@ -503,7 +503,7 @@ public class Crate {
 	 *                  is one of the scheme's
 	 * @return What was changed, one line each
 	 */
-	List<String> normaliseIds(Function<String, Optional<String>> canonical) {
+	public List<String> normaliseIds(Function<String, Optional<String>> canonical) {
 		List<String> done = new ArrayList<>();
 		for (Entity entity : List.copyOf(entities)) {
 			Optional<String> iri = canonical.apply(entity.getId());
@@ -539,7 +539,7 @@ public class Crate {
 	 * Point the references to one <code>@id</code> to another, e.g. to an
 	 * entity known by another address.
 	 */
-	void replaceReferences(String oldId, String newId) {
+	public void replaceReferences(String oldId, String newId) {
 		replaceReferences(entities, Map.of(oldId, newId));
 	}
 

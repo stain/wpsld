@@ -42,15 +42,15 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
-import no.s11.wpsld.crate.Dois;
-import no.s11.wpsld.crate.Dois.Work;
+import no.s11.wpsld.lookup.DOI;
+import no.s11.wpsld.lookup.DOI.Work;
 
 /**
  * Find a publication, dataset or software by DOI, or by its title and
  * authors in Crossref and DataCite. Gives the work chosen on OK.
  */
 class WorkFinder extends Dialog<Work> {
-	/** Searches, e.g. {@link Dois#search}, off the JavaFX thread */
+	/** Searches, e.g. {@link DOI#search}, off the JavaFX thread */
 	@FunctionalInterface
 	interface Search {
 		List<Work> search(String query) throws Exception;
@@ -149,7 +149,7 @@ class WorkFinder extends Dialog<Work> {
 		if (text.isEmpty()) {
 			return;
 		}
-		boolean doi = Dois.doiOf(text).isPresent();
+		boolean doi = DOI.doiOf(text).isPresent();
 		status.setText(doi ? "Looking up " + text + "…" : "Searching Crossref and DataCite for " + text + "…");
 		results.getItems().clear();
 		Task<List<Work>> task = new Task<>() {

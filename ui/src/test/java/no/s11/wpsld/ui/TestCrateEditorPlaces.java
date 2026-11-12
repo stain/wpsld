@@ -43,7 +43,7 @@ import no.s11.wpsld.Settings;
 import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
-import no.s11.wpsld.crate.GeoNames;
+import no.s11.wpsld.lookup.GeoNames;
 import no.s11.wpsld.crate.Places;
 import no.s11.wpsld.masp.ProfileCache;
 import no.s11.wpsld.soss.SchemaFromJsonLd;

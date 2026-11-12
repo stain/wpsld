@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package no.s11.wpsld.crate;
+package no.s11.wpsld.lookup;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,6 +42,9 @@ import com.fasterxml.jackson.databind.node.TextNode;
 
 import no.s11.wpsld.util.Value;
 
+import no.s11.wpsld.crate.Crate;
+import no.s11.wpsld.crate.Entity;
+
 /**
  * The licences of the <a href="https://spdx.org/licenses/">SPDX License
  * List</a>, bundled as JSON-LD (see <code>scripts/update-spdx-licenses.sh</code>),
@@ -49,7 +52,7 @@ import no.s11.wpsld.util.Value;
  * RO-Crate recommends: a CreativeWork whose <code>@id</code> is the licence's
  * SPDX address, with its SPDX identifier as a PropertyValue.
  */
-public final class SpdxLicenses {
+public final class SPDXLicenses {
 	/** The bundled list, in the resources */
 	public static final String RESOURCE = "/spdx-licenses/licenses.jsonld";
 	private static final String SOURCE = "/spdx-licenses/source.json";
@@ -60,7 +63,7 @@ public final class SpdxLicenses {
 	/** e.g. http://spdx.org/licenses/CC-BY-4.0, or https://spdx.org/licenses/CC-BY-4.0.html */
 	private static final Pattern SPDX_IRI = Pattern
 			.compile("https?://(?:www\\.)?spdx\\.org/licenses/([0-9A-Za-z.+-]+?)(?:\\.html|\\.json|\\.jsonld)?");
-	private static final Value<SpdxLicenses> BUNDLED = Value.lazy(SpdxLicenses::readBundled);
+	private static final Value<SPDXLicenses> BUNDLED = Value.lazy(SPDXLicenses::readBundled);
 
 	/**
 	 * A licence of the list.
@@ -93,7 +96,7 @@ public final class SpdxLicenses {
 	/** Licences by their links, see {@link #byLink} */
 	private final Value<Map<String, License>> links;
 
-	public SpdxLicenses(String version, List<License> licenses) {
+	public SPDXLicenses(String version, List<License> licenses) {
 		this.version = Objects.requireNonNull(version);
 		this.licenses = List.copyOf(licenses);
 		this.links = Value.lazy(this::indexLinks);
@@ -107,7 +110,7 @@ public final class SpdxLicenses {
 	 */
 	private Map<String, License> indexLinks() {
 		Map<String, List<License>> byKey = new HashMap<>();
-		licenses.stream().filter(l -> !l.deprecated()).forEach(l -> l.seeAlso().stream().map(SpdxLicenses::linkKey)
+		licenses.stream().filter(l -> !l.deprecated()).forEach(l -> l.seeAlso().stream().map(SPDXLicenses::linkKey)
 				.distinct().forEach(key -> byKey.computeIfAbsent(key, k -> new ArrayList<>()).add(l)));
 		Map<String, License> unique = new HashMap<>();
 		byKey.forEach((key, found) -> {
@@ -144,18 +147,18 @@ public final class SpdxLicenses {
 	/**
 	 * The list bundled with wpsld, read once.
 	 */
-	public static SpdxLicenses bundled() {
+	public static SPDXLicenses bundled() {
 		return BUNDLED.get();
 	}
 
-	private static SpdxLicenses readBundled() {
+	private static SPDXLicenses readBundled() {
 		ObjectMapper mapper = new ObjectMapper();
-		try (InputStream list = SpdxLicenses.class.getResourceAsStream(RESOURCE);
-				InputStream source = SpdxLicenses.class.getResourceAsStream(SOURCE)) {
+		try (InputStream list = SPDXLicenses.class.getResourceAsStream(RESOURCE);
+				InputStream source = SPDXLicenses.class.getResourceAsStream(SOURCE)) {
 			if (list == null || source == null) {
 				throw new IllegalStateException("Can't find the bundled SPDX License List " + RESOURCE);
 			}
-			return new SpdxLicenses(mapper.readTree(source).path("version").asText("?"), parse(mapper.readTree(list)));
+			return new SPDXLicenses(mapper.readTree(source).path("version").asText("?"), parse(mapper.readTree(list)));
 		} catch (IOException e) {
 			throw new UncheckedIOException("Can't read the bundled SPDX License List", e);
 		}

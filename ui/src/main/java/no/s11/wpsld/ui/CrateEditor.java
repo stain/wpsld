@@ -104,13 +104,13 @@ import no.s11.wpsld.crate.CrateDocument;
 import no.s11.wpsld.crate.CrateDocument.Problem;
 import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
-import no.s11.wpsld.crate.Dois;
+import no.s11.wpsld.lookup.DOI;
 import no.s11.wpsld.crate.Entity;
-import no.s11.wpsld.crate.GeoNames;
-import no.s11.wpsld.crate.Orcid;
-import no.s11.wpsld.crate.Ror;
-import no.s11.wpsld.crate.PronomFormats;
-import no.s11.wpsld.crate.SpdxLicenses;
+import no.s11.wpsld.lookup.GeoNames;
+import no.s11.wpsld.lookup.ORCID;
+import no.s11.wpsld.lookup.ROR;
+import no.s11.wpsld.lookup.PRONOMFormats;
+import no.s11.wpsld.lookup.SPDXLicenses;
 import no.s11.wpsld.crate.UndoHistory;
 import no.s11.wpsld.crate.UndoHistory.Place;
 import no.s11.wpsld.crate.UndoHistory.Step;
@@ -379,9 +379,9 @@ public class CrateEditor extends Application {
 				address -> getHostServices().showDocument(address)).showAndWait());
 		entityEditor.setFindOrganization(name -> new OrganizationFinder(stage, name, organizationSearch,
 				address -> getHostServices().showDocument(address)).showAndWait());
-		entityEditor.setFindFormat(query -> new FormatFinder(stage, query, PronomFormats.bundled(),
+		entityEditor.setFindFormat(query -> new FormatFinder(stage, query, PRONOMFormats.bundled(),
 				address -> getHostServices().showDocument(address)).showAndWait());
-		entityEditor.setFindLicense(() -> new LicenseFinder(stage, "", SpdxLicenses.bundled(),
+		entityEditor.setFindLicense(() -> new LicenseFinder(stage, "", SPDXLicenses.bundled(),
 				address -> getHostServices().showDocument(address)).showAndWait());
 		entityEditor.setTypeHelp(owner -> showHelp(HelpDialog.Topic.TYPES, owner));
 		// As the style lays it out, e.g. as a notebook in the OS/2 Warp style
@@ -1056,10 +1056,10 @@ public class CrateEditor extends Application {
 		return a.replaceFirst("/$", "").equals(b.replaceFirst("/$", ""));
 	}
 
-	private PersonFinder.Search personSearch = new Orcid(ProfileCache.httpClient(Duration.ofSeconds(15)),
+	private PersonFinder.Search personSearch = new ORCID(ProfileCache.httpClient(Duration.ofSeconds(15)),
 			Duration.ofSeconds(20), USER_AGENT)::search;
 
-	private WorkFinder.Search workSearch = new Dois(ProfileCache.httpClient(Duration.ofSeconds(15)),
+	private WorkFinder.Search workSearch = new DOI(ProfileCache.httpClient(Duration.ofSeconds(15)),
 			Duration.ofSeconds(20), USER_AGENT)::search;
 
 	/**
@@ -1069,7 +1069,7 @@ public class CrateEditor extends Application {
 		this.workSearch = Objects.requireNonNull(workSearch);
 	}
 
-	private OrganizationFinder.Search organizationSearch = new Ror(ProfileCache.httpClient(Duration.ofSeconds(15)),
+	private OrganizationFinder.Search organizationSearch = new ROR(ProfileCache.httpClient(Duration.ofSeconds(15)),
 			Duration.ofSeconds(20), USER_AGENT)::search;
 
 	/**
@@ -1528,19 +1528,19 @@ public class CrateEditor extends Application {
 	 * written otherwise (e.g. <code>https://spdx.org/licenses/MIT.html</code>,
 	 * or the text <code>CC-BY-4.0</code>) become the licence's SPDX IRI, and
 	 * are described from the SPDX License List (see
-	 * {@link SpdxLicenses#repair}), and PRONOM file formats likewise, also
+	 * {@link SPDXLicenses#repair}), and PRONOM file formats likewise, also
 	 * for a media type that only one format has (see
-	 * {@link PronomFormats#repair}), and ORCID iDs, ROR identifiers and DOIs
-	 * written otherwise (see {@link Orcid#repair}, {@link Ror#repair} and
-	 * {@link Dois#repair}). One undoable step, then tells what was
+	 * {@link PRONOMFormats#repair}), and ORCID iDs, ROR identifiers and DOIs
+	 * written otherwise (see {@link ORCID#repair}, {@link ROR#repair} and
+	 * {@link DOI#repair}). One undoable step, then tells what was
 	 * done.
 	 */
 	void repair(Stage stage) {
-		List<String> licences = SpdxLicenses.bundled().repair(crate);
-		List<String> formats = PronomFormats.bundled().repair(crate);
-		List<String> people = Orcid.repair(crate);
-		List<String> organizations = Ror.repair(crate);
-		List<String> dois = Dois.repair(crate);
+		List<String> licences = SPDXLicenses.bundled().repair(crate);
+		List<String> formats = PRONOMFormats.bundled().repair(crate);
+		List<String> people = ORCID.repair(crate);
+		List<String> organizations = ROR.repair(crate);
+		List<String> dois = DOI.repair(crate);
 		List<Entity> added = crate.addReferenced();
 		List<Entity> unmentioned = crate.unmentionLinked();
 		List<Entity> mentioned = crate.mentionUnlinked();
