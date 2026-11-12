@@ -768,9 +768,24 @@ Styles:
     coastlines (ODbL), enough for an offline outline map to place a point
     on; or a tile server inside the TRE, set as the map's tile address.
   - Licences (SPDX) and file formats (PRONOM) are bundled already, small
-    enough (415 and 271 kB) not to bloat the zips. ROR publishes a full
-    data dump on Zenodo, which a TRE could load; ORCID and DOI lookups stay
-    online-only.
+    enough (415 and 271 kB) not to bloat the zips.
+  - ROR's full data dump (https://doi.org/10.5281/zenodo.6347574, CC0;
+    v2.15 of 2026-10-20 is a 39.3 MB zip, 330 MB of JSON unpacked) stays
+    about 39 MB compressed inside a jar: too big for the main zips, but
+    fine as an optional data module. The registry changes daily; the dumps
+    are released as versions on Zenodo (check how often).
+  - ORCID can't be offline: its yearly public data file is about 270 GB
+    (919 GB unpacked). ORCID and DOI lookups stay online-only, with typing
+    the identifier by hand as the fallback.
+  - **Data modules:** a third Gradle module beside `lib` and `ui` for the
+    offline data, or one module (and jar) per dataset, as they update at
+    different rates: SPDX a few times a year, PRONOM 2-4 times a year, ROR
+    with each Zenodo release, GeoNames daily. Each jar carries its data,
+    source, version and licence (shown in Help > About), so the application
+    and the data can be released separately, e.g. by GitHub Actions
+    packaging each data release, and a TRE can take the jars it needs.
+    Small ones (SPDX, PRONOM) stay in the main zips; large ones (ROR,
+    GeoNames' bigger dumps) are added as below.
   - **Data bundles added by the user** (not yet): data too big to bundle,
     or under a licence that doesn't fit with Apache-2.0, dropped into a
     folder that wpsld reads at start (e.g. `data/` beside its settings, or
