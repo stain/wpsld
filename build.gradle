@@ -1,0 +1,36 @@
+// Tests that use web services (ORCID, ROR, Crossref, DataCite, GeoNames),
+// in the JUnit category no.s11.wpsld.test.Online, are left out of test and
+// so of build, which must neither fail when a service is down nor ask the
+// services on every build; the other tests can't reach the network (see
+// OfflineResolverProvider). Run them with ./gradlew onlineTest, as GitHub
+// Actions does on release and monthly (.github/workflows).
+subprojects {
+    plugins.withType(JavaPlugin).configureEach {
+        tasks.named('test', Test) {
+            useJUnit {
+                excludeCategories 'no.s11.wpsld.test.Online'
+            }
+            systemProperty 'wpsld.test.offline', 'true'
+        }
+        // As test (its JVM arguments and properties, e.g. headless JavaFX),
+        // but only the online tests, and on the network
+        tasks.register('onlineTest', Test) {
+            description = 'Runs the tests that use web services.'
+            group = 'verification'
+            def unit = tasks.named('test', Test).get()
+            testClassesDirs = unit.testClassesDirs
+            classpath = unit.classpath
+            jvmArgs unit.jvmArgs
+            systemProperties unit.systemProperties.findAll { it.key != 'wpsld.test.offline' }
+            forkEvery = unit.forkEvery
+            maxHeapSize = unit.maxHeapSize
+            useJUnit {
+                includeCategories 'no.s11.wpsld.test.Online'
+            }
+            // The services may have changed since the last run
+            outputs.upToDateWhen { false }
+            // Passed on from the environment, for GeoNames' tests
+            environment 'GEONAMES_USERNAME', System.getenv('GEONAMES_USERNAME') ?: ''
+        }
+    }
+}

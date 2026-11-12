@@ -1,0 +1,50 @@
+# Runs the tests that use web services (ORCID, ROR, Crossref, DataCite,
+# GeoNames, OpenStreetMap's tiles), which ./gradlew build leaves out so
+# that builds neither fail when a service is down nor ask the services on
+# every push: once a month, when run by hand (Actions -> Run workflow), and
+# on release (release.yml calls it). A failure means a service is down or
+# has changed what wpsld reads from it; see the test reports kept as an
+# artifact. GeoNames' test needs a GeoNames username as the repository
+# secret GEONAMES_USERNAME, and is skipped without one.
+name: Online tests
+
+on:
+  schedule:
+    # The 1st of each month, 05:17 UTC (off the hour, as GitHub asks)
+    - cron: '17 5 1 * *'
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      GEONAMES_USERNAME:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  online-tests:
+    name: Online tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Test with the web services
+        env:
+          GEONAMES_USERNAME: ${{ secrets.GEONAMES_USERNAME }}
+        run: ./gradlew --no-daemon onlineTest
+
+      - name: Keep the test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: online-test-reports
+          path: |
+            lib/build/reports/tests/onlineTest/
+            ui/build/reports/tests/onlineTest/
+          if-no-files-found: ignore

@@ -416,8 +416,9 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
   guidelines have it.
 - Insert > Entity… (as Add entity), then items that look an entity up
   and add it, mentioned by the root and shown, without linking it from a
-  property: Place from GeoNames…, Person from ORCID…, Organization from
-  ROR…, Publication by DOI…, Licence from SPDX…, File format from PRONOM…
+  property, under a separator: Person from ORCID…, Organization from ROR…,
+  Publication by DOI…, Licence from SPDX…, File format from PRONOM…, Place
+  from GeoNames…
   (`EntityEditor.lookUp`, the same finders and descriptions as New ▾).
 - View > Style and View > Colours, kept in `settings.json` (`Theme`):
   - Styles: Classic (JavaFX's Modena), Windows 11 (Modena reshaped after

@@ -213,9 +213,12 @@ public class DOI {
 	}
 
 	/**
-	 * The work of a DOI, from the agency that registered it.
+	 * The work of a DOI, in any form {@link #doiOf} reads (e.g.
+	 * <code>https://doi.org/10.5281/zenodo.3541888</code>), from the agency
+	 * that registered it.
 	 */
-	public Work lookUp(String doi) throws IOException, InterruptedException {
+	public Work lookUp(String text) throws IOException, InterruptedException {
+		String doi = doiOf(text).orElseThrow(() -> new DoiException("Not a DOI: " + text));
 		JsonNode ra = get(service("resolver", "ra/" + encode(doi)), "application/json");
 		String agency = ra.path(0).path("RA").asText("");
 		if (agency.isEmpty() || ra.path(0).has("status")) {

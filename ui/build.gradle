@@ -131,6 +131,7 @@ dependencies {
     testImplementation 'junit:junit:4.13'
     // GUI tests, run headless with JavaFX's own headless platform (JavaFX 26+)
     testImplementation 'org.testfx:testfx-junit:4.0.18'
+    testImplementation testFixtures(project(':lib'))
 
     implementation project(':lib')
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.4'

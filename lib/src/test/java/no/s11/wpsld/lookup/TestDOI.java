@@ -229,6 +229,8 @@ public class TestDOI {
 			assertEquals(List.of("/ra/10.5281%2Fzenodo.3541888", "/dois/10.5281%2Fzenodo.3541888"), asked);
 			asked.clear();
 			assertEquals("Topic Model for Graph Mining", dois.lookUp("10.1109/x").title());
+			// In any form
+			assertEquals("Topic Model for Graph Mining", dois.lookUp("https://doi.org/10.1109/x").title());
 			// A bare DOI, and a DOI's address, are looked up too, not searched for
 			for (String doi : List.of("10.5281/zenodo.3541888", "https://doi.org/10.5281/zenodo.3541888",
 					" http://dx.doi.org/10.5281/zenodo.3541888 ")) {

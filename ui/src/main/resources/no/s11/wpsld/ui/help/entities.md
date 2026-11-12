@@ -12,9 +12,9 @@ Alternatively, use **New** beside a property to create an entity and link
 it in one step; see [Properties and links](properties.md).
 
 The **Insert** menu also adds entities looked up rather than typed:
-**Place from GeoNames...**, **Person from ORCID...**, **Organization from
-ROR...**, **Publication by DOI...**, **Licence from SPDX...** and **File
-format from PRONOM...**. They open the same windows as the **New** menus
+**Person from ORCID...**, **Organization from ROR...**, **Publication by
+DOI...**, **Licence from SPDX...**, **File format from PRONOM...** and
+**Place from GeoNames...**. They open the same windows as the **New** menus
 beside properties (see [Properties and links](properties.md)), but add the
 entity without linking it from a property: it is mentioned by the root
 dataset, and shown, so that you can link it later, e.g. by typing its

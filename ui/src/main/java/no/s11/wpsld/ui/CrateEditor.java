@@ -149,8 +149,8 @@ public class CrateEditor extends Application {
 	private final CrateFile crateFile = new CrateFile(crate.toJson());
 	/** The window, once shown, whose title names the crate's file */
 	private Stage stage;
-	/** Names wpsld to the web services of places, as they ask */
-	private static final String USER_AGENT = "wpsld/" + AboutDialog.version() + " (https://github.com/stain/wpsld)";
+	/** How wpsld names itself to web services, as their policies ask */
+	static final String USER_AGENT = "wpsld/" + AboutDialog.version() + " (https://github.com/stain/wpsld)";
 	private final MapTiles mapTiles = MapTiles.forApplication(USER_AGENT);
 	private PlaceFinder.Search placeSearch = new GeoNames(ProfileCache.httpClient(Duration.ofSeconds(15)),
 			Duration.ofSeconds(20), USER_AGENT)::search;
@@ -513,19 +513,20 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * The Insert menu: a new entity of any type, or one looked up.
+	 * The Insert menu: a new entity of any type, as Add entity, then those
+	 * looked up, under which more lookups may come.
 	 */
 	private Menu insertMenu() {
 		MenuItem entity = new MenuItem("_Entity…");
 		entity.setId("menuInsertEntity");
 		entity.setOnAction(e -> addEntity());
 		Menu insert = new Menu("_Insert", null, entity, new SeparatorMenuItem(),
-				insertItem("_Place from GeoNames…", "menuInsertPlace", EntityEditor.Lookup.PLACE),
-				insertItem("Pe_rson from ORCID…", "menuInsertPerson", EntityEditor.Lookup.PERSON),
+				insertItem("_Person from ORCID…", "menuInsertPerson", EntityEditor.Lookup.PERSON),
 				insertItem("_Organization from ROR…", "menuInsertOrganization", EntityEditor.Lookup.ORGANIZATION),
 				insertItem("Publication by _DOI…", "menuInsertPublication", EntityEditor.Lookup.PUBLICATION),
 				insertItem("_Licence from SPDX…", "menuInsertLicense", EntityEditor.Lookup.LICENSE),
-				insertItem("File _format from PRONOM…", "menuInsertFormat", EntityEditor.Lookup.FORMAT));
+				insertItem("File _format from PRONOM…", "menuInsertFormat", EntityEditor.Lookup.FORMAT),
+				insertItem("Pl_ace from GeoNames…", "menuInsertPlace", EntityEditor.Lookup.PLACE));
 		insert.setId("menuInsert");
 		return insert;
 	}
