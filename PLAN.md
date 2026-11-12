@@ -657,7 +657,13 @@ Styles:
   Edit > Repair Crate turns other forms of SPDX addresses
   (`https://spdx.org/licenses/MIT.html`, another case) and `license` text
   that is an SPDX address or identifier into the IRI, merging duplicates,
-  and completes the licences. Bundled from the latest release, v3.29.0, by
+  and completes the licences; also licences known by an address the list
+  links them with (`rdfs:seeAlso`, compared without http/https, `www.`,
+  trailing slash, `legalcode` or `deed.xx`), e.g. Creative Commons'
+  readable `https://creativecommons.org/licenses/by/4.0/` (SPDX lists only
+  its `…/legalcode`), keeping that address as the licence's `url`; links
+  that several current licences share (46 of 875, e.g. GNU's GPL page for
+  `-only` and `-or-later`) are left alone. Bundled from the latest release, v3.29.0, by
   `scripts/update-spdx-licenses.sh <tag>`: its `jsonld/licenses.jsonld`
   (21 MB, every licence's text) trimmed to the licences' `@id`, name,
   OSI/FSF/deprecation flags and `rdfs:seeAlso` (415 kB), credited under

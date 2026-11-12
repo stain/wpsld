@@ -59,11 +59,15 @@ and `GPL-2.0-or-later`. Those are hidden unless you tick **Show deprecated
 identifiers**, e.g. to match what a crate already says.
 
 Crates made elsewhere may give a licence in other ways, for example as
-the text `CC-BY-4.0`, or with an address copied from the browser such as
-`https://spdx.org/licenses/Apache-2.0.html`. **Edit > Repair Crate** turns
-these into links to the SPDX licence, merges licences that turn out to be
-the same, and adds the SPDX name and identifier where they are missing,
-keeping any name the licence already has.
+the text `CC-BY-4.0`, with an address copied from the browser such as
+`https://spdx.org/licenses/Apache-2.0.html`, or with the licence's own web
+page, such as `https://creativecommons.org/licenses/by/4.0/`. **Edit >
+Repair Crate** turns these into links to the SPDX licence, merges licences
+that turn out to be the same, and adds the SPDX name and identifier where
+they are missing, keeping any name the licence already has; a licence's
+own web page is kept as its **URL**. Some pages can't tell which licence
+is meant, such as GNU's GPL page, which serves both "GPL-3.0-only" and
+"GPL-3.0-or-later": those are left for you to choose.
 
 For a licence that isn't on the SPDX list, choose **New > CreativeWork**
 instead, set its `@id` to the licence's own web address, and give it a

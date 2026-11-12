@@ -22,10 +22,14 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -86,10 +90,55 @@ public final class SpdxLicenses {
 
 	private final String version;
 	private final List<License> licenses;
+	/** Licences by their links, see {@link #byLink} */
+	private final Value<Map<String, License>> links;
 
 	public SpdxLicenses(String version, List<License> licenses) {
 		this.version = Objects.requireNonNull(version);
 		this.licenses = List.copyOf(licenses);
+		this.links = Value.lazy(this::indexLinks);
+	}
+
+	/**
+	 * The licences by their links (<code>rdfs:seeAlso</code>), as
+	 * {@link #linkKey} gives them; only current licences, and only links one
+	 * licence has (not e.g. GNU's GPL page, which both GPL-3.0-only and
+	 * GPL-3.0-or-later list).
+	 */
+	private Map<String, License> indexLinks() {
+		Map<String, List<License>> byKey = new HashMap<>();
+		licenses.stream().filter(l -> !l.deprecated()).forEach(l -> l.seeAlso().stream().map(SpdxLicenses::linkKey)
+				.distinct().forEach(key -> byKey.computeIfAbsent(key, k -> new ArrayList<>()).add(l)));
+		Map<String, License> unique = new HashMap<>();
+		byKey.forEach((key, found) -> {
+			if (found.size() == 1) {
+				unique.put(key, found.get(0));
+			}
+		});
+		return Map.copyOf(unique);
+	}
+
+	/**
+	 * A link compared without what doesn't change the licence: http or
+	 * https, <code>www.</code>, case, a fragment, a trailing slash, and the
+	 * Creative Commons page's <code>legalcode</code> or <code>deed.en</code>,
+	 * e.g. <code>creativecommons.org/licenses/by/4.0</code>.
+	 */
+	static String linkKey(String link) {
+		String key = link.strip().toLowerCase(Locale.ROOT).replaceFirst("^https?://", "").replaceFirst("^www\\.", "")
+				.replaceFirst("#.*$", "").replaceFirst("/+$", "");
+		return key.replaceFirst("/(legalcode|deed)(\\.[a-z-]+)?$", "").replaceFirst("/+$", "");
+	}
+
+	/**
+	 * The licence whose own address this is, as the SPDX License List links
+	 * it, e.g. CC-BY-4.0 for <code>https://creativecommons.org/licenses/by/4.0/</code>
+	 * (listed as <code>…/legalcode</code>) or MIT for
+	 * <code>https://opensource.org/license/mit</code>; none if no licence or
+	 * several have the link.
+	 */
+	public Optional<License> byLink(String address) {
+		return Optional.ofNullable(links.get().get(linkKey(address)));
 	}
 
 	/**
@@ -256,7 +305,10 @@ public final class SpdxLicenses {
 	 * address (<code>https:</code>, <code>.html</code>, another case) use the
 	 * licence's IRI, merging entities that turn out to be the same; a
 	 * <code>license</code> given as text that is an SPDX address or
-	 * identifier becomes a reference; and each SPDX licence referred to is a
+	 * identifier becomes a reference; a licence known by an address the list
+	 * links it with (see {@link #byLink}), e.g. Creative Commons' own, uses
+	 * the licence's IRI instead, keeping that address as its
+	 * <code>url</code>; and each SPDX licence referred to is a
 	 * CreativeWork with a name and its SPDX identifier (see
 	 * {@link #describe}), keeping a name it has.
 	 *
@@ -270,7 +322,9 @@ public final class SpdxLicenses {
 			List<JsonNode> repaired = new ArrayList<>();
 			boolean changed = false;
 			for (JsonNode value : values) {
-				Optional<License> license = value.isTextual() ? meant(value.asText(), true) : Optional.empty();
+				Optional<License> license = value.isTextual()
+						? meant(value.asText(), true).or(() -> byLink(value.asText()))
+						: Optional.empty();
 				if (license.isPresent()) {
 					repaired.add(JsonNodeFactory.instance.objectNode().put("@id", license.get().iri()));
 					done.add("License of " + entity.getLabel() + ": the text \"" + value.asText()
@@ -282,6 +336,36 @@ public final class SpdxLicenses {
 			}
 			if (changed) {
 				entity.setAll("license", repaired.stream().distinct().toList());
+			}
+		}
+		// Licences known by their own address, e.g. Creative Commons'
+		Set<String> licenceLinks = new LinkedHashSet<>();
+		crate.getEntities().forEach(e -> e.getAll("license").stream().map(v -> v.path("@id").asText(""))
+				.filter(id -> !id.isEmpty()).forEach(licenceLinks::add));
+		for (String old : licenceLinks) {
+			Optional<License> license = meant(old, false).isPresent() ? Optional.empty() : byLink(old);
+			if (license.isEmpty()) {
+				continue;
+			}
+			String iri = license.get().iri();
+			Optional<Entity> entity = crate.get(old);
+			Optional<Entity> existing = crate.get(iri);
+			if (entity.isEmpty()) {
+				crate.replaceReferences(old, iri);
+				done.add("Links to the licence " + old + " now go to " + iri);
+				continue;
+			}
+			if (existing.isPresent()) {
+				crate.merge(existing.get(), entity.get());
+				done.add("The licence " + old + " merged into " + iri);
+			} else {
+				crate.rename(entity.get(), iri);
+				done.add("The licence " + old + " is now " + iri);
+			}
+			// Its own page, still to be found
+			Entity licence = crate.get(iri).orElseThrow();
+			if (licence.get("url").isEmpty()) {
+				licence.set("url", Optional.of(TextNode.valueOf(old)));
 			}
 		}
 		// Entities known by another form of their SPDX address

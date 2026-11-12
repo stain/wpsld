@@ -155,6 +155,50 @@ public class TestSpdxLicenses {
 		assertEquals(List.of(), SpdxLicenses.bundled().repair(crate));
 	}
 
+	@Test
+	public void byLink() {
+		SpdxLicenses spdx = SpdxLicenses.bundled();
+		// Creative Commons' readable page, though SPDX lists …/legalcode
+		assertEquals("CC-BY-4.0", spdx.byLink("https://creativecommons.org/licenses/by/4.0/").orElseThrow().id());
+		assertEquals("CC-BY-4.0", spdx.byLink("http://creativecommons.org/licenses/by/4.0/deed.en").orElseThrow().id());
+		assertEquals("CC0-1.0", spdx.byLink("https://creativecommons.org/publicdomain/zero/1.0/").orElseThrow().id());
+		assertEquals("MIT", spdx.byLink("https://opensource.org/license/mit").orElseThrow().id());
+		// Listed for both GPL-3.0-only and GPL-3.0-or-later: can't tell which
+		assertEquals(Optional.empty(), spdx.byLink("https://www.gnu.org/licenses/gpl-3.0-standalone.html"));
+		assertEquals(Optional.empty(), spdx.byLink("https://example.org/licence"));
+	}
+
+	/**
+	 * Repair Crate: a licence known by Creative Commons' own address, as in
+	 * RO-Crate's examples, becomes the SPDX licence, keeping that address as
+	 * its URL; as text too.
+	 */
+	@Test
+	public void repairLicenceLinks() {
+		Crate crate = new Crate();
+		Entity root = crate.getRoot();
+		root.set("license", Optional.of(reference("https://creativecommons.org/licenses/by/4.0/")));
+		Entity cc = crate.add("CreativeWork");
+		crate.rename(cc, "https://creativecommons.org/licenses/by/4.0/");
+		cc.set("name", Optional.of(TextNode.valueOf("CC BY 4.0")));
+		Entity data = crate.add("File");
+		data.set("license", Optional.of(TextNode.valueOf("https://creativecommons.org/publicdomain/zero/1.0/")));
+		Entity code = crate.add("File");
+		code.set("license", Optional.of(reference("https://www.gnu.org/licenses/gpl-3.0-standalone.html")));
+
+		SpdxLicenses.bundled().repair(crate);
+		assertEquals("http://spdx.org/licenses/CC-BY-4.0", root.get("license").orElseThrow().path("@id").asText());
+		assertSame(cc, crate.get("http://spdx.org/licenses/CC-BY-4.0").orElseThrow());
+		assertEquals("CC BY 4.0", cc.getLabel());
+		assertEquals("https://creativecommons.org/licenses/by/4.0/", cc.get("url").orElseThrow().asText());
+		assertEquals("#spdx-CC-BY-4.0", cc.get("identifier").orElseThrow().path("@id").asText());
+		assertEquals("http://spdx.org/licenses/CC0-1.0", data.get("license").orElseThrow().path("@id").asText());
+		// GPL-3.0-only or -or-later? Left as it was
+		assertEquals("https://www.gnu.org/licenses/gpl-3.0-standalone.html",
+				code.get("license").orElseThrow().path("@id").asText());
+		assertEquals(List.of(), SpdxLicenses.bundled().repair(crate));
+	}
+
 	private static JsonNode reference(String id) {
 		return JsonNodeFactory.instance.objectNode().put("@id", id);
 	}
