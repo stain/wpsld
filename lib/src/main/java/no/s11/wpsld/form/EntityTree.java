@@ -146,7 +146,7 @@ public class EntityTree {
 	 * <code>data/counts.csv</code>, rather than absolute, local
 	 * (<code>#bob</code>) or a blank node.
 	 */
-	static boolean isPath(String id) {
+	public static boolean isPath(String id) {
 		return !id.isEmpty() && !Crate.isAbsolute(id) && !Crate.isLocal(id) && !Crate.isBlankNode(id)
 				&& !id.equals("./");
 	}
@@ -165,6 +165,42 @@ public class EntityTree {
 			path = path.substring(0, path.length() - 1);
 		}
 		return List.of(path.split("/+", -1)).stream().map(EntityTree::decode).toList();
+	}
+
+	/**
+	 * The <code>@id</code> for a folder of the path, e.g. <code>raw/</code>,
+	 * with its names percent-encoded where they must be, e.g.
+	 * <code>my%20notes/</code>; none for other nodes.
+	 */
+	public static Optional<String> folderId(Node node) {
+		if (node.kind() != Kind.FOLDER || !node.key().startsWith("path:")) {
+			return Optional.empty();
+		}
+		String path = node.key().substring("path:".length());
+		StringBuilder id = new StringBuilder();
+		for (String name : path.split("/")) {
+			id.append(encode(name)).append('/');
+		}
+		return Optional.of(id.toString());
+	}
+
+	/**
+	 * A name in a path, percent-encoded where a relative URI must be: spaces,
+	 * <code>%</code>, <code>#</code>, <code>?</code> and other characters not
+	 * allowed in a URI; letters of other scripts stay, as IRIs allow them.
+	 */
+	static String encode(String name) {
+		StringBuilder encoded = new StringBuilder();
+		name.codePoints().forEach(c -> {
+			if (c < 0x21 || c == 0x7f || " %#?[]\"<>\\^`{|}".indexOf(c) >= 0) {
+				for (byte b : new String(Character.toChars(c)).getBytes(StandardCharsets.UTF_8)) {
+					encoded.append(String.format("%%%02X", b & 0xff));
+				}
+			} else {
+				encoded.appendCodePoint(c);
+			}
+		});
+		return encoded.toString();
 	}
 
 	/** Percent-decoded as UTF-8, or as it is if it can't be */

@@ -118,7 +118,7 @@ public class TestSPDXLicenses {
 	}
 
 	/**
-	 * Edit > Repair Crate: SPDX licences as people copy them from the browser,
+	 * Crate > Repair Crate: SPDX licences as people copy them from the browser,
 	 * or as RO-Crate 1.1 crates wrote them, become wpsld's form.
 	 */
 	@Test

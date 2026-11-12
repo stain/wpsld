@@ -94,7 +94,7 @@ public class TestPRONOMFormats {
 	}
 
 	/**
-	 * Edit > Repair Crate: PRONOM addresses as copied from the new site, a
+	 * Crate > Repair Crate: PRONOM addresses as copied from the new site, a
 	 * media type only one format has, and formats not described.
 	 */
 	@Test

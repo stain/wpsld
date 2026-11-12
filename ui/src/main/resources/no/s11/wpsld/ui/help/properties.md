@@ -54,7 +54,7 @@ name, and gives them their ORCID iD as `@id`.
 
 Looking people up needs an internet connection, but no account. Without
 one, or if ORCID can't be reached, you can still type the ORCID iD as the
-person's `@id`. **Edit > Repair Crate** writes ORCID iDs given in other
+person's `@id`. **Crate > Repair Crate** writes ORCID iDs given in other
 forms, such as `http://orcid.org/0000-0002-1825-0097/`, as
 `https://orcid.org/0000-0002-1825-0097`, and merges people who turn out to
 be the same; iDs whose check digit is wrong are left for you to correct.
@@ -89,7 +89,7 @@ added, by its name, and gives it its ROR identifier as `@id`.
 
 Looking organisations up needs an internet connection, but no account;
 ROR allows about 50 searches in 5 minutes. Without a connection, you can
-still type the ROR identifier as the organisation's `@id`. **Edit > Repair
+still type the ROR identifier as the organisation's `@id`. **Crate > Repair
 Crate** writes ROR identifiers given in other forms, such as
 `http://ror.org/01xtthb56/`, as `https://ror.org/01xtthb56`, and merges
 organisations that turn out to be the same; identifiers whose check digits
@@ -131,7 +131,7 @@ A work whose `@id` is a DOI has a **DOI** row with **Fill in from DOI**,
 which adds what is missing, keeping what it has; an article, book, chapter,
 report or thesis without a DOI has **Find DOI...**, which looks it up by
 its name. Looking up needs an internet connection; without one, you can
-still type the DOI as `https://doi.org/...` by hand. **Edit > Repair
+still type the DOI as `https://doi.org/...` by hand. **Crate > Repair
 Crate** writes DOIs given in other forms (`http://dx.doi.org/...`,
 `doi:...`) as `https://doi.org/...`, merges works whose DOIs differ only
 in case, and turns a **Citation** given as text that is a DOI into a link.
@@ -168,7 +168,7 @@ identifiers**, e.g. to match what a crate already says.
 Crates made elsewhere may give a licence in other ways, for example as
 the text `CC-BY-4.0`, with an address copied from the browser such as
 `https://spdx.org/licenses/Apache-2.0.html`, or with the licence's own web
-page, such as `https://creativecommons.org/licenses/by/4.0/`. **Edit >
+page, such as `https://creativecommons.org/licenses/by/4.0/`. **Crate >
 Repair Crate** turns these into links to the SPDX licence, merges licences
 that turn out to be the same, and adds the SPDX name and identifier where
 they are missing, keeping any name the licence already has; a licence's
@@ -203,7 +203,7 @@ Many formats have several versions, and PRONOM lists each: PDF 1.4, 1.5,
 `.pdf`. Choose the version the file has, if you know it, or leave just the
 media type.
 
-**Edit > Repair Crate** links the PRONOM format where a file's media type
+**Crate > Repair Crate** links the PRONOM format where a file's media type
 belongs to only one format, such as `text/csv` or `text/markdown`, but not
 `application/pdf`. It also turns PRONOM addresses copied from its web site,
 such as `https://pronom.nationalarchives.gov.uk/fmt/19`, into the form

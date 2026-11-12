@@ -980,7 +980,7 @@ public class TestCrateEditor extends ApplicationTest {
 	public void menuMnemonics() {
 		entities();
 		MenuBar bar = lookup("#menuBar").queryAs(MenuBar.class);
-		assertEquals(List.of("_File", "_Edit", "_View", "_Insert", "_Help"), bar.getMenus().stream().map(Menu::getText).toList());
+		assertEquals(List.of("_File", "_Edit", "_View", "_Insert", "_Crate", "_Help"), bar.getMenus().stream().map(Menu::getText).toList());
 		assertTrue(bar.getMenus().stream().allMatch(Menu::isMnemonicParsing));
 		// Each menu's items have their own letters
 		for (Menu menu : bar.getMenus()) {

@@ -27,7 +27,7 @@ files from your computer. References to removed entities may remain in
 other descriptions: check and remove or replace those references as needed.
 **Edit > Undo** can restore an accidental removal.
 
-**Edit > Repair Crate** can add placeholder Things for references to
+**Crate > Repair Crate** can add placeholder Things for references to
 entities not described in the crate, and update the root's mentions for
 otherwise unlinked entities. It also tidies licences from the SPDX License
 List, file formats from PRONOM, ORCID iDs, ROR identifiers and DOIs, see [Properties and links](properties.md). It reports what it changed. Give any

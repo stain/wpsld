@@ -300,6 +300,13 @@ class EntityTreeView extends TreeView<Node> {
 		return all;
 	}
 
+	/** The folders selected that have no Dataset, by their @ids, e.g. raw/ */
+	List<String> selectedFolderIds() {
+		return getSelectionModel().getSelectedItems().stream().filter(Objects::nonNull).map(TreeItem::getValue)
+				.filter(node -> node.entity().isEmpty()).map(EntityTree::folderId).flatMap(Optional::stream)
+				.distinct().toList();
+	}
+
 	/** The entities selected, each once, the one selected last at the end */
 	List<Entity> selectedEntities() {
 		List<Entity> entities = new ArrayList<>(getSelectionModel().getSelectedItems().stream()

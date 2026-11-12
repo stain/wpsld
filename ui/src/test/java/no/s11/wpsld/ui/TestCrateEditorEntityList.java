@@ -38,6 +38,7 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.RadioMenuItem;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TreeItem;
 import javafx.scene.input.KeyCode;
@@ -328,6 +329,45 @@ public class TestCrateEditorEntityList extends ApplicationTest {
 
 	private static List<Integer> selectedRows(EntityTreeView tree) {
 		return tree.getSelectionModel().getSelectedIndices().stream().sorted().toList();
+	}
+
+	/**
+	 * Crate > Add Dataset for Folder and Add to Has Part bring greyed out
+	 * folders and files into the crate's hasPart
+	 */
+	@Test
+	public void addParts() throws Exception {
+		EntityTreeView tree = openByFolder();
+		javafx.scene.control.Menu crateMenu = lookup("#menuBar").queryAs(MenuBar.class).getMenus().stream()
+				.filter(m -> "menuCrate".equals(m.getId())).findFirst().orElseThrow();
+		Runnable opened = () -> interact(() -> crateMenu.getOnShowing().handle(null));
+		interact(() -> {
+			tree.getSelectionModel().clearSelection();
+			tree.getSelectionModel().selectIndices(2, 3);
+		});
+		opened.run();
+		assertFalse(menuItem("menuAddDataset").isDisable());
+		assertTrue(menuItem("menuAddPart").isDisable());
+		interact(() -> menuItem("menuAddDataset").fire());
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals(List.of("Survey", "  data", "  docs", "  raw", "External resources", "  https://example.com/z.csv",
+				"Person", "  Alice"), rows(tree));
+		assertEquals(List.of("docs/", "raw/"), tree.selectedEntities().stream().map(Entity::getId).toList());
+
+		// The cited file, mentioned by the root, a part of docs/ now
+		interact(() -> tree.getTreeItem(2).setExpanded(true));
+		interact(() -> tree.getSelectionModel().clearAndSelect(3));
+		assertEquals("    cited.pdf ~", rows(tree).get(3));
+		opened.run();
+		assertTrue(menuItem("menuAddDataset").isDisable());
+		assertFalse(menuItem("menuAddPart").isDisable());
+		interact(() -> menuItem("menuAddPart").fire());
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals("    cited.pdf", rows(tree).get(3));
+		assertEquals("docs/cited.pdf", tree.selectedEntities().get(0).getId());
+		// No longer mentioned by the root, as it is linked as a part
+		interact(() -> tree.getSelectionModel().clearAndSelect(0));
+		assertFalse(lookup("#preview").queryAs(TextArea.class).getText().contains("\"mentions\""));
 	}
 
 	@Test

@@ -141,7 +141,7 @@ public class TestCrateEditorLicenses extends ApplicationTest {
 	}
 
 	/**
-	 * Edit > Repair Crate turns a licence copied from the browser into the
+	 * Crate > Repair Crate turns a licence copied from the browser into the
 	 * SPDX licence, described.
 	 */
 	@Test

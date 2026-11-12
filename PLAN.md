@@ -608,7 +608,7 @@ Styles:
        ambiguous (it may be another organisation of the same `#uom`), so
        linked and reported (an absolute one is the same entity, a question
        of merging, not ambiguity). Not in the crate: dangling, kept and
-       reported (Edit > Repair Crate would make it a Thing). Within one
+       reported (Crate > Repair Crate would make it a Thing). Within one
        crate, the usual case, nothing is reported.
   2. **Paste options and Paste Special…** Powerful even without a deep
      copy.
@@ -660,7 +660,7 @@ Styles:
   SPDX, `propertyID` https://registry.identifiers.org/registry/spdx,
   `value` the identifier, `url` its SPDX page), as RO-Crate 1.3's Root Data
   Entity identifier section describes; a licence the crate has is linked.
-  Edit > Repair Crate turns other forms of SPDX addresses
+  Crate > Repair Crate turns other forms of SPDX addresses
   (`https://spdx.org/licenses/MIT.html`, another case) and `license` text
   that is an SPDX address or identifier into the IRI, merging duplicates,
   and completes the licences; also licences known by an address the list
@@ -968,13 +968,16 @@ Styles:
 - **Logical and physical listings** (a tree, next to the flat list by
   type), proposed after sorting the list. The physical one is *done*, as
   View > Entities by Folder (`EntityTree` in lib, `EntityTreeView`), with
-  icons by type (`EntityIcons`, Fluent UI: folder, document, person,
-  building, location, else a cube) also in the list; entities with a path
-  that are not data entities are greyed out at their path. Next: icons for
-  more of schema.org's major types; the Workplace Shell's look in the Warp
-  style (lines joining the tree, hatched icon when selected); a header with
-  the selected folder's path and counts; Add Dataset on a folder without
-  one; the logical tree.
+  icons by type (`EntityIcons`, Fluent UI, for the major schema.org types,
+  coloured by family) also in the list; entities with a path that are not
+  data entities are greyed out at their path; an entity of several types
+  is in the folder of each; parts of files (`page.html#table2`) are under
+  their file. *Done*: Crate > Add Dataset for Folder and Add to Has Part
+  (also on the right-click menu) bring greyed out folders and files into
+  `hasPart`. Next: the logical tree; then Open Folder (see BUGS.md); the
+  Workplace Shell's look in the Warp style (lines joining the tree,
+  hatched icon when selected); a header with the selected folder's path
+  and counts.
   - *Logical*: the root's `hasPart` hierarchy of Datasets and their parts,
     which may include entities with absolute URIs or in other folders; an
     entity can appear under more than one Dataset. Contextual entities

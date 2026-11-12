@@ -522,4 +522,42 @@ public class TestCrate {
 			assertEquals(new String(expected.readAllBytes(), StandardCharsets.UTF_8).strip(), written.strip());
 		}
 	}
+
+	private static List<String> parts(Entity entity) {
+		return entity.getAll("hasPart").stream().map(v -> v.get("@id").asText()).toList();
+	}
+
+	/** Files become parts of the dataset of their folder, else of the root */
+	@Test
+	public void addParts() {
+		Crate crate = new Crate();
+		Entity data = crate.add("Dataset");
+		crate.rename(data, "data/");
+		crate.getRoot().setAll("hasPart", List.of(ref("data/")));
+		Entity counts = crate.add("File");
+		crate.rename(counts, "data/raw/counts.csv");
+		Entity readme = crate.add("File");
+		crate.rename(readme, "./README.md");
+		assertSame(data, crate.partOf("data/raw/counts.csv"));
+		assertSame(crate.getRoot(), crate.partOf("README.md"));
+		assertEquals(List.of(readme, counts), crate.addParts(List.of(counts, readme, crate.getRoot(), data)));
+		assertEquals(List.of("data/raw/counts.csv"), parts(data));
+		assertEquals(List.of("data/", "./README.md"), parts(crate.getRoot()));
+		// Already parts: not again
+		assertEquals(List.of(), crate.addParts(List.of(counts)));
+	}
+
+	/** Datasets for folders, the outer one first, so the inner is its part */
+	@Test
+	public void addFolders() {
+		Crate crate = new Crate();
+		Entity counts = crate.add("File");
+		crate.rename(counts, "raw/2025/counts.csv");
+		List<Entity> added = crate.addFolders(List.of("raw/2025/", "raw/"));
+		assertEquals(List.of("raw/2025/", "raw/"), added.stream().map(Entity::getId).toList());
+		assertEquals(List.of("Dataset"), added.get(0).getTypes());
+		assertEquals(List.of("raw/"), parts(crate.getRoot()));
+		assertEquals(List.of("raw/2025/"), parts(added.get(1)));
+		assertSame(added.get(0), crate.partOf("raw/2025/counts.csv"));
+	}
 }

@@ -20,6 +20,7 @@ package no.s11.wpsld.crate;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -353,6 +354,79 @@ public class Crate {
 					.filter(e -> e != null && e != getRoot() && parts.add(e)).forEach(queue::add);
 		}
 		return List.copyOf(parts);
+	}
+
+	/**
+	 * The dataset whose <code>hasPart</code> a path belongs in: the nearest
+	 * folder above it that is a data entity, e.g. <code>data/</code> for
+	 * <code>data/raw/a.csv</code>, else the root data entity.
+	 */
+	public Entity partOf(String id) {
+		Set<Entity> data = Set.copyOf(dataEntities());
+		String path = withoutDot(id);
+		if (path.endsWith("/")) {
+			path = path.substring(0, path.length() - 1);
+		}
+		for (int slash = path.lastIndexOf('/'); slash > 0; slash = path.lastIndexOf('/', slash - 1)) {
+			String folder = path.substring(0, slash + 1);
+			Optional<Entity> dataset = entities.stream()
+					.filter(e -> data.contains(e) && withoutDot(e.getId()).equals(folder)).findFirst();
+			if (dataset.isPresent()) {
+				return dataset.get();
+			}
+		}
+		return getRoot();
+	}
+
+	private static String withoutDot(String id) {
+		return id.startsWith("./") ? id.substring(2) : id;
+	}
+
+	/**
+	 * Make these entities data entities: each a part (<code>hasPart</code>)
+	 * of the dataset of its folder (see {@link #partOf}), those in folders
+	 * first, so that a folder added becomes the dataset of its files. Not the
+	 * root data entity, nor those that already are.
+	 *
+	 * @return The entities added as parts
+	 */
+	public List<Entity> addParts(List<Entity> parts) {
+		List<Entity> added = new ArrayList<>();
+		List<Entity> sorted = parts.stream().filter(e -> e != getRoot())
+				.sorted(Comparator.comparing((Entity e) -> withoutDot(e.getId()).replaceAll("/$", "").split("/").length))
+				.toList();
+		for (Entity part : sorted) {
+			if (dataEntities().contains(part)) {
+				continue;
+			}
+			Entity dataset = partOf(part.getId());
+			List<JsonNode> hasPart = new ArrayList<>(dataset.getAll("hasPart"));
+			hasPart.add(JsonNodeFactory.instance.objectNode().put("@id", part.getId()));
+			dataset.setAll("hasPart", hasPart);
+			added.add(part);
+		}
+		return added;
+	}
+
+	/**
+	 * Add a Dataset for each of these folders, e.g. <code>raw/</code>, as a
+	 * part of the dataset above it (see {@link #addParts}).
+	 *
+	 * @return The Datasets added, in the order of the folders
+	 */
+	public List<Entity> addFolders(List<String> folders) {
+		List<Entity> added = new ArrayList<>();
+		for (String folder : folders) {
+			String id = folder.endsWith("/") ? folder : folder + "/";
+			if (get(id).isPresent()) {
+				continue;
+			}
+			Entity dataset = new Entity(id, "Dataset");
+			entities.add(dataset);
+			added.add(dataset);
+		}
+		addParts(added);
+		return added;
 	}
 
 	/**

@@ -204,5 +204,10 @@ public class TestEntityTree {
 		assertFalse(EntityTree.isPath("#bob"));
 		assertFalse(EntityTree.isPath("_:b0"));
 		assertFalse(EntityTree.isPath("https://example.com/"));
+		assertEquals("my%20notes", EntityTree.encode("my notes"));
+		assertEquals("100%25%20%23", EntityTree.encode("100% #"));
+		assertEquals("ø", EntityTree.encode("ø"));
+		assertEquals(Optional.of("raw/my%20notes/"), EntityTree.folderId(new Node("path:raw/my notes/", "my notes",
+				Kind.FOLDER, Optional.empty(), false, List.of())));
 	}
 }

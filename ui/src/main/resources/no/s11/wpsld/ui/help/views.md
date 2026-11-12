@@ -28,6 +28,14 @@ file manager shows files:
   is in the folder of its type, and under the file, if the crate
   describes it.
 
+To bring a greyed out folder or file into the crate, select it (or
+several) and choose **Crate > Add Dataset for Folder** or **Add to Has
+Part**, also on the right-click menu. A folder gets a Dataset, and a file
+becomes a part, of the Dataset of the folder above it, or of the crate
+itself if that folder has none; select the outer folders too to add them
+all at once. Add to Has Part also makes a File or Dataset on the web a
+part of the crate, under **External resources**.
+
 Selecting an entity selects it in each place it is shown; **Copy** and
 **Remove** act on it once. Each entity has an icon for its type. **View > Entities by Type** shows the
 list again.

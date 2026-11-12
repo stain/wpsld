@@ -565,7 +565,12 @@ public class CrateEditor extends Application {
 		removeEntity.setId("removeEntityMenu");
 		removeEntity.disableProperty().bind(cannotRemove);
 		removeEntity.setOnAction(e -> removeEntities());
-		return new ContextMenu(copyEntity, pasteEntity, new SeparatorMenuItem(), removeEntity);
+		List<MenuItem> parts = partItems("context");
+		ContextMenu menu = new ContextMenu(copyEntity, pasteEntity, new SeparatorMenuItem());
+		menu.getItems().addAll(parts);
+		menu.getItems().addAll(new SeparatorMenuItem(), removeEntity);
+		menu.setOnShowing(e -> enableParts(parts));
+		return menu;
 	}
 
 	/** The list or the tree, whichever is shown */
@@ -731,10 +736,7 @@ public class CrateEditor extends Application {
 		// What they would undo and redo, e.g. Undo Add Person, as the menu opens
 		edit.setOnShowing(e -> nameUndo(stage, undo, redo));
 		edit.getItems().addAll(textEditing(stage));
-		MenuItem repair = new MenuItem("Repa_ir Crate");
-		repair.setId("menuRepair");
-		repair.setOnAction(e -> repair(stage));
-		edit.getItems().addAll(new SeparatorMenuItem(), repair, new SeparatorMenuItem(), preferences);
+		edit.getItems().addAll(new SeparatorMenuItem(), preferences);
 		edit.setId("menuEdit");
 		Menu view = new Menu("_View", null, sidebarItem(), new SeparatorMenuItem());
 		view.getItems().addAll(listings());
@@ -753,13 +755,89 @@ public class CrateEditor extends Application {
 		Menu help = new Menu("_Help", null, manual, new SeparatorMenuItem(), about);
 		help.setId("menuHelp");
 
-		MenuBar bar = new MenuBar(file, edit, view, insertMenu(), help);
+		MenuBar bar = new MenuBar(file, edit, view, insertMenu(), crateMenu(stage), help);
 		bar.setId("menuBar");
 		// In the macOS style, on macOS the menus are in the screen's menu bar
 		// (set, as JavaFX doesn't allow binding it)
 		bar.setUseSystemMenuBar(Theme.style().get() == Theme.Style.MACOS);
 		Theme.style().addListener((obs, old, style) -> bar.setUseSystemMenuBar(style == Theme.Style.MACOS));
 		return bar;
+	}
+
+	/**
+	 * Crate: what makes the crate's files its parts (its <code>hasPart</code>
+	 * hierarchy), for the entities or folders selected; and repairing it.
+	 */
+	private Menu crateMenu(Stage stage) {
+		List<MenuItem> parts = partItems("menu");
+		MenuItem repair = new MenuItem("Repa_ir Crate");
+		repair.setId("menuRepair");
+		repair.setOnAction(e -> repair(stage));
+		Menu menu = new Menu("_Crate", null, parts.toArray(MenuItem[]::new));
+		menu.getItems().addAll(new SeparatorMenuItem(), repair);
+		menu.setOnShowing(e -> enableParts(parts));
+		menu.setId("menuCrate");
+		return menu;
+	}
+
+	/**
+	 * Add Dataset for Folder and Add to Has Part, for the Crate menu and the
+	 * entities' right-click menu, with ids starting with this prefix
+	 */
+	private List<MenuItem> partItems(String prefix) {
+		MenuItem addDataset = new MenuItem("Add _Dataset for Folder");
+		addDataset.setId(prefix + "AddDataset");
+		addDataset.setOnAction(e -> addDatasets());
+		MenuItem addPart = new MenuItem("Add to Has _Part");
+		addPart.setId(prefix + "AddPart");
+		addPart.setOnAction(e -> addParts());
+		return List.of(addDataset, addPart);
+	}
+
+	/** As the menu opens, as what they act on changes with the crate */
+	private void enableParts(List<MenuItem> items) {
+		items.get(0).setDisable(selectedFolders().isEmpty());
+		items.get(1).setDisable(partable().isEmpty());
+	}
+
+	/** The folders without a Dataset selected in the tree, by their @ids */
+	private List<String> selectedFolders() {
+		return byFolder ? tree.selectedFolderIds() : List.of();
+	}
+
+	/**
+	 * The entities selected that could be parts but are not: files and
+	 * folders by their paths (not parts of files, e.g. page.html#table2),
+	 * and Files and Datasets on the web
+	 */
+	private List<Entity> partable() {
+		Set<Entity> data = Set.copyOf(crate.dataEntities());
+		return selection.stream().filter(e -> e != crate.getRoot() && !data.contains(e))
+				.filter(e -> EntityTree.isPath(e.getId()) && !e.getId().contains("#") || listing.isA(e, "File")
+						|| listing.isA(e, "Dataset"))
+				.toList();
+	}
+
+	/** A Dataset for each folder selected, as a part of the one above it */
+	private void addDatasets() {
+		List<Entity> added = crate.addFolders(selectedFolders());
+		if (added.isEmpty()) {
+			return;
+		}
+		crate.unmentionLinked();
+		changed();
+		showListed(added);
+	}
+
+	/** The entities selected as parts of the datasets of their folders */
+	private void addParts() {
+		List<Entity> selected = List.copyOf(selection);
+		if (crate.addParts(partable()).isEmpty()) {
+			return;
+		}
+		crate.unmentionLinked();
+		changed();
+		showListed(selected);
 	}
 
 	private void showHelp(HelpDialog.Topic topic) {
@@ -1021,7 +1099,7 @@ public class CrateEditor extends Application {
 		List<String> problems = new ArrayList<>();
 		if (!pasted.dangling().isEmpty()) {
 			problems.add("Not in this crate: " + String.join(", ", pasted.dangling())
-					+ ". Paste them too, or Edit > Repair Crate to add them as Things.");
+					+ ". Paste them too, or Crate > Repair Crate to add them as Things.");
 		}
 		if (!pasted.ambiguous().isEmpty()) {
 			problems.add("Another entity in this crate than the one copied may have the same @id: "
@@ -1802,7 +1880,7 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * Edit > Repair Crate: add a Thing for each reference to an entity not in
+	 * Crate > Repair Crate: add a Thing for each reference to an entity not in
 	 * the crate, to be named and typed (see {@link Crate#addReferenced()});
 	 * no longer mention the entities linked otherwise from the root data
 	 * entity (see {@link Crate#unmentionLinked()}), and mention those not
