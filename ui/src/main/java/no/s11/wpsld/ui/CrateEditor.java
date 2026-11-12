@@ -43,7 +43,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import org.kordamp.ikonli.javafx.FontIcon;
 
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -439,7 +438,7 @@ public class CrateEditor extends Application {
 			// Update the text in place on changes: refreshing the whole list
 			// on each key typed made it flicker
 			private final InvalidationListener relabel = obs -> label(getItem());
-			private final FontIcon icon = EntityIcons.forCell(this);
+			private final EntityIcons.Icon icon = EntityIcons.forCell(this);
 			{
 				labels.addListener(new WeakInvalidationListener(relabel));
 			}
@@ -451,7 +450,7 @@ public class CrateEditor extends Application {
 				if (empty || entity == null) {
 					setGraphic(null);
 				} else {
-					icon.setIconCode(EntityIcons.of(entity, listing));
+					icon.set(EntityIcons.of(entity, listing));
 					setGraphic(icon);
 				}
 			}

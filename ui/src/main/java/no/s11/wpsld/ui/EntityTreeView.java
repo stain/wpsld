@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-import org.kordamp.ikonli.javafx.FontIcon;
 
 import javafx.beans.InvalidationListener;
 import javafx.beans.WeakInvalidationListener;
@@ -63,7 +62,7 @@ class EntityTreeView extends TreeView<Node> {
 		setRoot(new TreeItem<>());
 		getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
 		setCellFactory(view -> new TreeCell<>() {
-			private final FontIcon icon = EntityIcons.forCell(this);
+			private final EntityIcons.Icon icon = EntityIcons.forCell(this);
 			private final Tooltip tooltip = new Tooltip();
 			private final InvalidationListener relabel = obs -> show(getItem(), isEmpty());
 			{
@@ -88,7 +87,7 @@ class EntityTreeView extends TreeView<Node> {
 				if (!Objects.equals(text, getText())) {
 					setText(text);
 				}
-				icon.setIconCode(EntityIcons.of(node, listing));
+				icon.set(EntityIcons.of(node, listing));
 				setGraphic(icon);
 				if ((node.kind() == Kind.FILE || node.kind() == Kind.FOLDER) && !node.data()) {
 					getStyleClass().add("not-data");

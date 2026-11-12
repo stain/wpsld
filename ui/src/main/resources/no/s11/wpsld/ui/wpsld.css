@@ -126,3 +126,61 @@
 .tree-cell.not-data {
     -fx-opacity: 0.55;
 }
+
+/*
+ * Entity icons (EntityIcons): an outline over its filled shape, coloured by
+ * kind. In the OS/2 Warp style both show, as a black outline over a bright
+ * fill, which stands out on light and dark and on the grey of a selected
+ * row; in the other styles only the outline shows, in the kind's colour,
+ * at least 3:1 against the list's background, and as the text of a
+ * selected row (-icon-text, set by EntityIcons.forCell).
+ */
+.entity-icon {
+    -icon-text: -fx-text-background-color;
+}
+
+.entity-icon-fill {
+    visibility: hidden;
+}
+
+.entity-icon-line {
+    -fx-icon-color: -icon-line;
+}
+
+.list-cell:filled:selected .entity-icon-line,
+.tree-cell:filled:selected .entity-icon-line {
+    -fx-icon-color: -icon-text;
+}
+
+.style-warp .entity-icon-fill {
+    visibility: visible;
+    -fx-icon-color: -icon-fill;
+}
+
+.style-warp .entity-icon-line,
+.style-warp .list-cell:filled:selected .entity-icon-line,
+.style-warp .tree-cell:filled:selected .entity-icon-line {
+    -fx-icon-color: #000000;
+}
+
+/* Light: the outline, and the fill in Warp */
+.entity-icon.icon-archive { -icon-line: #8b5a2b; -icon-fill: #d9a066; }
+.entity-icon.icon-folder { -icon-line: #a86b00; -icon-fill: #ffd34d; }
+.entity-icon.icon-person { -icon-line: #1f5fbf; -icon-fill: #86b3ff; }
+.entity-icon.icon-organization { -icon-line: #0b7470; -icon-fill: #5fcfc4; }
+.entity-icon.icon-place { -icon-line: #c0392b; -icon-fill: #ff7f6e; }
+.entity-icon.icon-document { -icon-line: #56606b; -icon-fill: #ffffff; }
+.entity-icon.icon-globe { -icon-line: #1d7a3a; -icon-fill: #6fcf86; }
+.entity-icon.icon-link { -icon-line: #2368a2; -icon-fill: #8ec5f2; }
+.entity-icon.icon-thing { -icon-line: #7446b0; -icon-fill: #c3a2ff; }
+
+/* Dark: the outline, and the fill in Warp */
+.colours-dark .entity-icon.icon-archive { -icon-line: #d9a66b; -icon-fill: #c98c4f; }
+.colours-dark .entity-icon.icon-folder { -icon-line: #f0c050; -icon-fill: #f2b92e; }
+.colours-dark .entity-icon.icon-person { -icon-line: #82b1ff; -icon-fill: #5e98f5; }
+.colours-dark .entity-icon.icon-organization { -icon-line: #4fd1c5; -icon-fill: #33b5aa; }
+.colours-dark .entity-icon.icon-place { -icon-line: #ff8a7a; -icon-fill: #ef6352; }
+.colours-dark .entity-icon.icon-document { -icon-line: #b9c1cb; -icon-fill: #e6e9ed; }
+.colours-dark .entity-icon.icon-globe { -icon-line: #74d68b; -icon-fill: #4cba66; }
+.colours-dark .entity-icon.icon-link { -icon-line: #7cc0f0; -icon-fill: #64aee6; }
+.colours-dark .entity-icon.icon-thing { -icon-line: #c4a5ff; -icon-fill: #a780f0; }
