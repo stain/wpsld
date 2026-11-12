@@ -129,11 +129,12 @@
 
 /*
  * Entity icons (EntityIcons): an outline over its filled shape, coloured by
- * kind. In the OS/2 Warp style both show, as a black outline over a bright
- * fill, which stands out on light and dark and on the grey of a selected
- * row; in the other styles only the outline shows, in the kind's colour,
- * at least 3:1 against the list's background, and as the text of a
- * selected row (-icon-text, set by EntityIcons.forCell).
+ * family. In the OS/2 Warp style both show: on light a black outline over a
+ * bright fill, on dark a bright outline over a deeper fill, both standing
+ * out also on the grey of a selected row. In the other styles only the
+ * outline shows, in the family's colour, at least 3.7:1 against the list's
+ * background, and as the text of a selected row (-icon-text, set by
+ * EntityIcons.forCell).
  */
 .entity-icon {
     -icon-text: -fx-text-background-color;
@@ -163,24 +164,38 @@
     -fx-icon-color: #000000;
 }
 
-/* Light: the outline, and the fill in Warp */
-.entity-icon.icon-archive { -icon-line: #8b5a2b; -icon-fill: #d9a066; }
-.entity-icon.icon-folder { -icon-line: #a86b00; -icon-fill: #ffd34d; }
-.entity-icon.icon-person { -icon-line: #1f5fbf; -icon-fill: #86b3ff; }
-.entity-icon.icon-organization { -icon-line: #0b7470; -icon-fill: #5fcfc4; }
-.entity-icon.icon-place { -icon-line: #c0392b; -icon-fill: #ff7f6e; }
-.entity-icon.icon-document { -icon-line: #56606b; -icon-fill: #ffffff; }
-.entity-icon.icon-globe { -icon-line: #1d7a3a; -icon-fill: #6fcf86; }
-.entity-icon.icon-link { -icon-line: #2368a2; -icon-fill: #8ec5f2; }
-.entity-icon.icon-thing { -icon-line: #7446b0; -icon-fill: #c3a2ff; }
+/* On dark, a black outline would vanish where it has no fill around it */
+.style-warp.colours-dark .entity-icon-line,
+.style-warp.colours-dark .list-cell:filled:selected .entity-icon-line,
+.style-warp.colours-dark .tree-cell:filled:selected .entity-icon-line {
+    -fx-icon-color: -icon-line;
+}
 
-/* Dark: the outline, and the fill in Warp */
-.colours-dark .entity-icon.icon-archive { -icon-line: #d9a66b; -icon-fill: #c98c4f; }
-.colours-dark .entity-icon.icon-folder { -icon-line: #f0c050; -icon-fill: #f2b92e; }
-.colours-dark .entity-icon.icon-person { -icon-line: #82b1ff; -icon-fill: #5e98f5; }
-.colours-dark .entity-icon.icon-organization { -icon-line: #4fd1c5; -icon-fill: #33b5aa; }
-.colours-dark .entity-icon.icon-place { -icon-line: #ff8a7a; -icon-fill: #ef6352; }
-.colours-dark .entity-icon.icon-document { -icon-line: #b9c1cb; -icon-fill: #e6e9ed; }
-.colours-dark .entity-icon.icon-globe { -icon-line: #74d68b; -icon-fill: #4cba66; }
-.colours-dark .entity-icon.icon-link { -icon-line: #7cc0f0; -icon-fill: #64aee6; }
-.colours-dark .entity-icon.icon-thing { -icon-line: #c4a5ff; -icon-fill: #a780f0; }
+/* By family: the outline in light and dark, and the fill in Warp */
+.entity-icon.icon-crate { -icon-line: #8b5a2b; -icon-fill: #d9a066; } /* the crate: brown */
+.entity-icon.icon-data { -icon-line: #a86b00; -icon-fill: #ffd34d; } /* datasets and folders: amber */
+.entity-icon.icon-work { -icon-line: #56606b; -icon-fill: #ffffff; } /* documents and media: slate, white paper in Warp */
+.entity-icon.icon-software { -icon-line: #4b45b8; -icon-fill: #b3b0ff; } /* software and workflows: indigo */
+.entity-icon.icon-web { -icon-line: #00788a; -icon-fill: #7fdcea; } /* web pages and resources: cyan */
+.entity-icon.icon-person { -icon-line: #1f5fbf; -icon-fill: #86b3ff; } /* people: blue */
+.entity-icon.icon-organization { -icon-line: #0b7470; -icon-fill: #5fcfc4; } /* organisations, projects, grants: teal */
+.entity-icon.icon-place { -icon-line: #c0392b; -icon-fill: #ff7f6e; } /* places: red */
+.entity-icon.icon-event { -icon-line: #b4510f; -icon-fill: #ffb070; } /* events and actions: orange */
+.entity-icon.icon-nature { -icon-line: #1d7a3a; -icon-fill: #6fcf86; } /* taxa, chemistry, medicine: green */
+.entity-icon.icon-product { -icon-line: #7a6a1f; -icon-fill: #e0d080; } /* products: olive */
+.entity-icon.icon-term { -icon-line: #a3337f; -icon-fill: #f5a3d8; } /* terms and values: magenta */
+.entity-icon.icon-thing { -icon-line: #6b6b6b; -icon-fill: #d0d0d0; } /* anything else: grey */
+
+.colours-dark .entity-icon.icon-crate { -icon-line: #d9a66b; -icon-fill: #7a4f22; }
+.colours-dark .entity-icon.icon-data { -icon-line: #f0c050; -icon-fill: #8a6000; }
+.colours-dark .entity-icon.icon-work { -icon-line: #b9c1cb; -icon-fill: #5f6873; }
+.colours-dark .entity-icon.icon-software { -icon-line: #a9a5ff; -icon-fill: #433ca6; }
+.colours-dark .entity-icon.icon-web { -icon-line: #5fd3e6; -icon-fill: #006a7a; }
+.colours-dark .entity-icon.icon-person { -icon-line: #82b1ff; -icon-fill: #1f4fa8; }
+.colours-dark .entity-icon.icon-organization { -icon-line: #4fd1c5; -icon-fill: #0a6460; }
+.colours-dark .entity-icon.icon-place { -icon-line: #ff8a7a; -icon-fill: #a8332a; }
+.colours-dark .entity-icon.icon-event { -icon-line: #ffa45c; -icon-fill: #9c460d; }
+.colours-dark .entity-icon.icon-nature { -icon-line: #74d68b; -icon-fill: #1a6b33; }
+.colours-dark .entity-icon.icon-product { -icon-line: #d8c76a; -icon-fill: #6b5d1a; }
+.colours-dark .entity-icon.icon-term { -icon-line: #f28fd0; -icon-fill: #8c2c6e; }
+.colours-dark .entity-icon.icon-thing { -icon-line: #b0b0b0; -icon-fill: #5a5a5a; }
