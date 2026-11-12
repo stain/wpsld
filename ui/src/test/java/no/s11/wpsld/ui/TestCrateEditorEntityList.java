@@ -210,6 +210,59 @@ public class TestCrateEditorEntityList extends ApplicationTest {
 	 * When the entity edited is not of the type chosen, none is selected,
 	 * though others selected are; it is selected again when listed again
 	 */
+	/** Of the type chosen, the first listed can be removed: it isn't the root */
+	@Test
+	public void removeFirstOfType() throws Exception {
+		addNamed("Person", "Alice");
+		addNamed("Person", "Bob");
+		showType("Person");
+		clickOn(lookup("#entities .list-cell").nth(0).queryAs(javafx.scene.Node.class));
+		assertEquals("Alice", entities().getSelectionModel().getSelectedItem().getLabel());
+		assertFalse(lookup("#removeEntity").query().isDisabled());
+		clickOn("#removeEntity");
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals(List.of("Bob"), labels());
+	}
+
+	@Test
+	public void removeFirstOfTypeSelectedBefore() throws Exception {
+		addNamed("Person", "Alice");
+		addNamed("Person", "Bob");
+		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().indexOf(
+				entities().getItems().stream().filter(e -> e.getLabel().equals("Alice")).findFirst().orElseThrow())));
+		showType("Person");
+		assertEquals("Alice", entities().getSelectionModel().getSelectedItem().getLabel());
+		assertFalse(lookup("#removeEntity").query().isDisabled());
+	}
+
+	/** Del in the list, or Edit > Remove, removes those selected, never the root */
+	@Test
+	public void removeByKey() throws Exception {
+		Entity root = entities().getItems().get(0);
+		addNamed("Person", "Alice");
+		addNamed("Person", "Bob");
+		clickOn("#entities");
+		interact(() -> entities().getSelectionModel().clearAndSelect(labels().indexOf("Alice")));
+		type(KeyCode.DELETE);
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals(List.of(root.getLabel(), "Bob"), labels());
+		// Not while typing in a field
+		interact(() -> entities().getSelectionModel().clearAndSelect(labels().indexOf("Bob")));
+		clickOn("#header-name");
+		assertTrue(menuItem("menuRemove").isDisable());
+		type(KeyCode.END, KeyCode.BACK_SPACE, KeyCode.LEFT, KeyCode.DELETE);
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals(2, labels().size());
+		assertEquals("B", lookup("#header-name").queryAs(TextField.class).getText());
+		// The root, with another, leaves the root
+		clickOn("#entities");
+		interact(() -> entities().getSelectionModel().selectAll());
+		assertFalse(menuItem("menuRemove").isDisable());
+		interact(() -> menuItem("menuRemove").fire());
+		assertEquals(List.of(root.getLabel()), labels());
+		assertTrue(menuItem("menuRemove").isDisable());
+	}
+
 	@Test
 	public void editedNotListed() throws Exception {
 		addNamed("Person", "Alice");

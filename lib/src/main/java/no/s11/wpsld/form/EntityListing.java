@@ -95,13 +95,22 @@ public class EntityListing {
 	}
 
 	/**
+	 * A type as the crate's context names it, e.g. <code>Person</code> for
+	 * <code>http://schema.org/Person</code>, as some crates write it; as it
+	 * is if not a known class.
+	 */
+	public String typeName(String type) {
+		return terms.classDef(type).map(terms::name).orElse(type);
+	}
+
+	/**
 	 * The types to list entities of: those the entities have, and the types
 	 * that two or more of those are kinds of, e.g. CreativeWork for Dataset
 	 * and File, though not Thing; by name, with how many entities are of
 	 * each.
 	 */
 	public List<TypeCount> types(Collection<Entity> entities) {
-		Set<String> had = entities.stream().flatMap(e -> e.getTypes().stream())
+		Set<String> had = entities.stream().flatMap(e -> e.getTypes().stream()).map(this::typeName)
 				.collect(Collectors.toCollection(LinkedHashSet::new));
 		Map<String, Integer> shared = new HashMap<>();
 		for (String type : had) {

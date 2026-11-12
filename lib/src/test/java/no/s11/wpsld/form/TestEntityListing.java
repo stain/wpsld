@@ -110,4 +110,16 @@ public class TestEntityListing {
 		assertEquals(List.of(new TypeCount("Dataset", 1), new TypeCount("GeoCoordinates", 1),
 				new TypeCount("Place", 1)), listing.types(crate.getEntities()));
 	}
+
+	/** Types written as IRIs are listed by their names */
+	@Test
+	public void typesByName() {
+		Crate crate = new Crate();
+		Entity alice = crate.add("Person");
+		alice.setTypes(List.of("http://xmlns.com/foaf/0.1/Agent", "http://schema.org/Person"));
+		crate.add("Person");
+		assertEquals(List.of("Dataset (1)", "http://xmlns.com/foaf/0.1/Agent (1)", "Person (2)"),
+				listing.types(crate.getEntities()).stream().map(TypeCount::toString).toList());
+		assertEquals(2, listing.list(crate, "Person").size());
+	}
 }

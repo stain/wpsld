@@ -20,8 +20,9 @@ entity without linking it from a property: it is mentioned by the root
 dataset, and shown, so that you can link it later, e.g. by typing its
 `@id` in a property. If the crate already has it, it is just shown.
 
-Select one or more entities and choose **Remove** to remove their
-descriptions. The root dataset cannot be removed. This does not delete
+Select one or more entities and choose **Remove**, below the list, in
+the **Edit** menu or by right-clicking, or press **Del**, to remove their
+descriptions from the crate. The root dataset cannot be removed. This does not delete
 files from your computer. References to removed entities may remain in
 other descriptions: check and remove or replace those references as needed.
 **Edit > Undo** can restore an accidental removal.

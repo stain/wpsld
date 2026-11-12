@@ -180,6 +180,9 @@ public class CrateEditor extends Application {
 	private boolean byFolder;
 	/** The entities selected in the list or tree shown, the one edited last */
 	private final ObservableList<Entity> selection = FXCollections.observableArrayList();
+	/** Whether none selected can be removed: none, or only the root data entity */
+	private final BooleanBinding cannotRemove = Bindings
+			.createBooleanBinding(() -> selection.stream().allMatch(e -> e == crate.getRoot()), selection);
 	private final TextArea preview = new TextArea();
 	private EntityPreview entityPreview;
 	private EntityEditor entityEditor;
@@ -492,17 +495,8 @@ public class CrateEditor extends Application {
 		add.setOnAction(e -> addEntity());
 		Button remove = new Button("Remove");
 		remove.setId("removeEntity");
-		// Not the root data entity, which may be among those selected
-		remove.disableProperty().bind(Bindings.createBooleanBinding(
-				() -> selection.stream().allMatch(e -> e == crate.getRoot()), selection));
-		remove.setOnAction(e -> {
-			List<Entity> removed = selection.stream().filter(entity -> entity != crate.getRoot()).toList();
-			removed.forEach(crate::remove);
-			// The entities only they linked to the root are now mentioned
-			crate.mentionUnlinked();
-			relist();
-			changed();
-		});
+		remove.disableProperty().bind(cannotRemove);
+		remove.setOnAction(e -> removeEntities());
 		HBox buttons = new HBox(6, add, remove);
 		buttons.setPadding(new Insets(6));
 		VBox.setVgrow(entities, Priority.ALWAYS);
@@ -536,6 +530,23 @@ public class CrateEditor extends Application {
 	}
 
 	/** Copy and Paste for the entities selected, as Edit > Copy and Paste */
+	/**
+	 * Remove the entities selected from the crate, not the root data entity,
+	 * which may be among them. Only from the crate's metadata: their files,
+	 * or the people they are, stay as they are, hence "Remove", not "Delete".
+	 */
+	private void removeEntities() {
+		List<Entity> removed = selection.stream().filter(entity -> entity != crate.getRoot()).toList();
+		if (removed.isEmpty()) {
+			return;
+		}
+		removed.forEach(crate::remove);
+		// The entities only they linked to the root are now mentioned
+		crate.mentionUnlinked();
+		relist();
+		changed();
+	}
+
 	private ContextMenu entityMenu(Stage stage) {
 		MenuItem copyEntity = new MenuItem("Copy");
 		copyEntity.setId("copyEntity");
@@ -544,7 +555,11 @@ public class CrateEditor extends Application {
 		MenuItem pasteEntity = new MenuItem("Paste");
 		pasteEntity.setId("pasteEntity");
 		pasteEntity.setOnAction(e -> pasteEntity(stage));
-		return new ContextMenu(copyEntity, pasteEntity);
+		MenuItem removeEntity = new MenuItem("Remove");
+		removeEntity.setId("removeEntityMenu");
+		removeEntity.disableProperty().bind(cannotRemove);
+		removeEntity.setOnAction(e -> removeEntities());
+		return new ContextMenu(copyEntity, pasteEntity, new SeparatorMenuItem(), removeEntity);
 	}
 
 	/** The list or the tree, whichever is shown */
@@ -791,7 +806,8 @@ public class CrateEditor extends Application {
 
 	/**
 	 * Edit > Cut, Copy, Paste and Select All, for the text field being edited;
-	 * in the entity list, Copy and Paste copy and paste entities; disabled
+	 * in the entity list, Copy and Paste copy and paste entities, and Remove
+	 * (Del) removes them; disabled
 	 * elsewhere. A text field handles their shortcuts itself first, so these
 	 * act when chosen from the menu.
 	 */
@@ -830,6 +846,15 @@ public class CrateEditor extends Application {
 			});
 			items.add(item);
 		}
+		// Del removes the entities selected, while the list or tree has focus:
+		// a text field takes the key itself first
+		MenuItem remove = new MenuItem("_Remove");
+		remove.setId("menuRemove");
+		remove.setAccelerator(new KeyCodeCombination(KeyCode.DELETE));
+		remove.disableProperty().bind(inEntities.not().or(cannotRemove));
+		remove.setOnAction(e -> removeEntities());
+		// After Cut, Copy and Paste
+		items.add(3, remove);
 		return items;
 	}
 
