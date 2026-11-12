@@ -774,9 +774,15 @@ Styles:
     about 39 MB compressed inside a jar: too big for the main zips, but
     fine as an optional data module. The registry changes daily; the dumps
     are released as versions on Zenodo (check how often).
-  - ORCID can't be offline: its yearly public data file is about 270 GB
-    (919 GB unpacked). ORCID and DOI lookups stay online-only, with typing
-    the identifier by hand as the fallback.
+  - ORCID can't be offline as a whole: its yearly public data file is
+    about 270 GB (919 GB unpacked), and even only the public names
+    (`scripts/orcid/names.sql` on ORCID's data in BigQuery, tried
+    2026-11) are over 1 GB of CSV, besides being personal data about
+    millions of people. ORCID and DOI lookups stay online, with typing the
+    identifier by hand as the fallback. An institution may make its own
+    offline subset: its researchers' names and affiliations, by its ROR ids
+    (`scripts/orcid/`), megabytes rather than gigabytes, as a data module
+    for its TRE, never shipped with wpsld.
   - **Data modules:** a third Gradle module beside `lib` and `ui` for the
     offline data, or one module (and jar) per dataset, as they update at
     different rates: SPDX a few times a year, PRONOM 2-4 times a year, ROR
