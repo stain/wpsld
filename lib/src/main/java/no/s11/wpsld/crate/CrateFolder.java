@@ -19,8 +19,11 @@ package no.s11.wpsld.crate;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -28,6 +31,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -95,6 +99,74 @@ public final class CrateFolder {
 		return ids;
 	}
 
+	/**
+	 * How a crate's files and a folder's match: the crate's parts with
+	 * relative paths (not parts of files, e.g. page.html#table2) that are in
+	 * the folder, those that are not, and the folder's files that no entity
+	 * describes.
+	 */
+	public record Match(List<String> present, List<String> absent, List<String> undescribed) {
+		/** Whether the crate's files seem to be elsewhere: it has some, and none is here */
+		public boolean elsewhere() {
+			return present.isEmpty() && !absent.isEmpty();
+		}
+	}
+
+	/**
+	 * How a crate's files match a folder's (see {@link Match}), listing at
+	 * most this many of the folder's files.
+	 */
+	public static Match match(Crate crate, Path folder, int limit) {
+		List<String> present = new ArrayList<>();
+		List<String> absent = new ArrayList<>();
+		for (Entity part : crate.dataEntities()) {
+			String id = part.getId();
+			if (!isRelativePath(id)) {
+				continue;
+			}
+			(exists(folder, id) ? present : absent).add(id);
+		}
+		Set<String> described = new HashSet<>();
+		crate.getEntities().stream().map(Entity::getId).filter(CrateFolder::isRelativePath)
+				.map(CrateFolder::normalise).forEach(described::add);
+		List<String> undescribed = Files.isDirectory(folder) ? list(folder, limit).stream()
+				.filter(id -> !id.endsWith("/") && !described.contains(normalise(id))).toList() : List.of();
+		return new Match(present, absent, undescribed);
+	}
+
+	/** A path relative to the crate: not absolute, #local, _:blank, ./ nor a part of a file */
+	private static boolean isRelativePath(String id) {
+		return !id.isEmpty() && !Crate.isAbsolute(id) && !Crate.isLocal(id) && !Crate.isBlankNode(id)
+				&& !id.equals("./") && !id.contains("#");
+	}
+
+	/** A path decoded, without ./ and a folder's last / */
+	private static String normalise(String id) {
+		String path = decode(id);
+		while (path.startsWith("./")) {
+			path = path.substring(2);
+		}
+		return path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+	}
+
+	/** Percent-decoded as UTF-8 (+ stays +), or as it is if it can't be */
+	public static String decode(String id) {
+		try {
+			return URLDecoder.decode(id.replace("+", "%2B"), StandardCharsets.UTF_8);
+		} catch (IllegalArgumentException e) {
+			return id;
+		}
+	}
+
+	/** Whether a relative <code>@id</code> is a file or folder in a folder */
+	public static boolean exists(Path folder, String id) {
+		try {
+			return Files.exists(folder.resolve(normalise(id)));
+		} catch (InvalidPathException e) {
+			return false;
+		}
+	}
+
 	/** A relative path as an <code>@id</code>, each name percent-encoded */
 	private static String id(Path relative) {
 		List<String> names = new ArrayList<>();
@@ -111,7 +183,7 @@ public final class CrateFolder {
 		StringBuilder encoded = new StringBuilder();
 		name.codePoints().forEach(c -> {
 			if (c < 0x21 || c == 0x7f || " %#?[]\"<>\\^`{|}".indexOf(c) >= 0) {
-				for (byte b : new String(Character.toChars(c)).getBytes(java.nio.charset.StandardCharsets.UTF_8)) {
+				for (byte b : new String(Character.toChars(c)).getBytes(StandardCharsets.UTF_8)) {
 					encoded.append(String.format("%%%02X", b & 0xff));
 				}
 			} else {

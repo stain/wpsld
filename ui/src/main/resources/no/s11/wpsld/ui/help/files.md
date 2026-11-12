@@ -24,11 +24,29 @@ date modified and, by its extension, its format from PRONOM.
 A crate whose metadata file is named `ro-crate-metadata.json` (or
 `ro-crate-metadata.jsonld`) is *attached* to its folder: identifiers such
 as `data/counts.csv` are its files there, which the preview and **↗**
-open. A metadata file of another name is *detached*: its relative
-identifiers name no files on this computer. A crate opened from a folder
-that has none of the files it lists, e.g. downloaded on its own, is
-treated as detached too, and wpsld says so. **Crate > Attached to Folder**
-changes this.
+open, and **Entities by Folder** also lists the folder's files that the
+crate doesn't describe yet, to add.
+
+A metadata file of another name, e.g. `bird-survey-ro-crate-metadata.json`,
+is *detached*, as RO-Crate calls a crate kept apart from its files:
+
+- Its relative identifiers name no files on this computer: the preview
+  shows `data/counts.csv` as text, not a link, and **↗** is not
+  available for it (web addresses still open).
+- **Entities by Folder** still shows the crate's folders and files by
+  their identifiers, but not the files of the folder it was opened from.
+- **Crate > Attached to Folder** is not available, as the file is not
+  named for a folder.
+- **File > Save** writes it back under the same name. Saving it with
+  **Save As...** as `ro-crate-metadata.json` attaches it to the folder
+  saved in; under any other name it stays detached.
+- **File > Open Folder...** only opens `ro-crate-metadata.json` (or
+  `.jsonld`), not other metadata files in the folder.
+
+A crate opened from a folder that has none of the files it lists, e.g.
+downloaded on its own, is treated as detached too, and wpsld says so;
+**Crate > Attached to Folder** attaches it after all, or detaches an
+attached crate.
 
 Before replacing a description with New or Open, or when using **File >
 Close Window** or **File > Exit**, wpsld asks what to do with unsaved
@@ -43,8 +61,14 @@ location or under another name. Other tools may expect the standard
 `ro-crate-metadata.json` name.
 
 File identifiers such as `data.csv` are paths relative to the metadata
-file's folder, for an attached crate. If you save in another folder, check that the described
-files exist at the corresponding paths there; wpsld does not copy them.
+file's folder, for an attached crate. wpsld does not copy files. If **Save
+As...** would attach the crate to a folder, as `ro-crate-metadata.json`,
+that lacks some of its files, wpsld first says how many of the crate's
+files are there and how many not, and how many of the folder's files the
+crate doesn't describe. Choose **Save Here** to attach it to that folder
+anyway, **Save Detached...** to save it under another name, such as
+`bird-survey-ro-crate-metadata.json`, apart from that folder's files, or
+**Cancel**.
 
 Before saving, wpsld reports missing requirements it detects. Choose
 **Cancel** to correct them, or **Save Anyway** to save an incomplete

@@ -469,6 +469,42 @@ public class TestCrateEditorEntityList extends ApplicationTest {
 		assertTrue(rows(tree).toString(), rows(tree).contains("  unrelated.pdf ~"));
 	}
 
+	/**
+	 * Save As ro-crate-metadata.json into a folder without the crate's files
+	 * asks first, telling which match
+	 */
+	@Test
+	public void saveAsIntoOtherFolder() throws Exception {
+		Path from = Files.createDirectories(temp.resolve("survey"));
+		Files.createDirectories(from.resolve("data"));
+		Files.writeString(from.resolve("data/counts.csv"), "");
+		Files.writeString(from.resolve("ro-crate-metadata.json"), CRATE);
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, from.resolve("ro-crate-metadata.json"))).get());
+		Path to = Files.createDirectories(temp.resolve("elsewhere"));
+		Files.writeString(to.resolve("other.txt"), "");
+		Path target = to.resolve("ro-crate-metadata.json");
+		no.s11.wpsld.crate.Crate named = new no.s11.wpsld.crate.Crate();
+		named.getRoot().set("name", Optional.of(com.fasterxml.jackson.databind.node.TextNode.valueOf("Bird survey, 2025!")));
+		assertEquals("bird-survey-2025-ro-crate-metadata.json", CrateEditor.detachedName(named));
+
+		var saving = WaitForAsyncUtils.asyncFx(() -> app.saveAsChecked(stage, target));
+		WaitForAsyncUtils.waitForFxEvents();
+		String text = lookup(".dialog-pane .content").queryAs(javafx.scene.control.Label.class).getText();
+		assertTrue(text, text.contains("0 of the crate's 3 files are in " + to + "; 3 are not, e.g. data/"));
+		assertTrue(text, text.contains("The folder has 1 file the crate doesn't describe, e.g. other.txt."));
+		assertTrue(text, text.contains("such as survey-ro-crate-metadata.json"));
+		clickOn("Cancel");
+		assertFalse(saving.get());
+		assertFalse(Files.exists(target));
+
+		saving = WaitForAsyncUtils.asyncFx(() -> app.saveAsChecked(stage, target));
+		WaitForAsyncUtils.waitForFxEvents();
+		clickOn("Save Here");
+		assertTrue(saving.get());
+		assertTrue(Files.exists(target));
+	}
+
 	@Test
 	public void editedNotListed() throws Exception {
 		addNamed("Person", "Alice");

@@ -61,4 +61,30 @@ public class TestCrateFolder {
 		assertEquals("4", entity.get("contentSize").orElseThrow().asText());
 		assertEquals("2025-06-02T10:15:30Z", entity.get("dateModified").orElseThrow().asText());
 	}
+
+	/** The crate's files in the folder and not, and the folder's not in the crate */
+	@Test
+	public void match() throws Exception {
+		Path folder = temp.getRoot().toPath();
+		Files.createDirectories(folder.resolve("data"));
+		Files.writeString(folder.resolve("data/my counts.csv"), "");
+		Files.writeString(folder.resolve("other.txt"), "");
+		Crate crate = new Crate();
+		for (String id : List.of("data/", "data/my%20counts.csv", "gone.csv", "https://example.com/x", "page.html#t")) {
+			Entity part = crate.add("File");
+			crate.rename(part, id);
+		}
+		crate.getRoot().setAll("hasPart", List.of(ref("data/"), ref("data/my%20counts.csv"), ref("gone.csv"),
+				ref("https://example.com/x"), ref("page.html#t")));
+		CrateFolder.Match match = CrateFolder.match(crate, folder, 100);
+		assertEquals(List.of("data/", "data/my%20counts.csv"), match.present());
+		assertEquals(List.of("gone.csv"), match.absent());
+		assertEquals(List.of("other.txt"), match.undescribed());
+		assertFalse(match.elsewhere());
+		assertTrue(CrateFolder.match(crate, folder.resolve("elsewhere"), 100).elsewhere());
+	}
+
+	private static com.fasterxml.jackson.databind.JsonNode ref(String id) {
+		return com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("@id", id);
+	}
 }

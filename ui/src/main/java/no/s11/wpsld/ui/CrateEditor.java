@@ -29,6 +29,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -1456,7 +1457,7 @@ public class CrateEditor extends Application {
 		lastFolder = file.toFile().getParentFile();
 		chooseProfile(document);
 		List<String> notes = new ArrayList<>(document.problems().stream().map(Problem::toString).toList());
-		if (crateFile.isAttached() && filesElsewhere(crate, crateFile.folder().get())) {
+		if (crateFile.isAttached() && CrateFolder.match(crate, crateFile.folder().get(), MAX_FILES).elsewhere()) {
 			// e.g. downloaded on its own
 			crateFile.setAttached(false);
 			relist();
@@ -1475,24 +1476,6 @@ public class CrateEditor extends Application {
 			warnings.show();
 		}
 		return true;
-	}
-
-	/**
-	 * Whether a crate's files seem to be elsewhere than this folder: it has
-	 * parts with relative paths, and none of them is in it.
-	 */
-	static boolean filesElsewhere(Crate crate, Path folder) {
-		List<String> paths = crate.dataEntities().stream().map(Entity::getId)
-				.filter(id -> EntityTree.isPath(id) && !id.contains("#")).toList();
-		return !paths.isEmpty() && paths.stream().noneMatch(id -> {
-			try {
-				String path = java.net.URLDecoder.decode(id.replace("+", "%2B"), java.nio.charset.StandardCharsets.UTF_8);
-				return Files.exists(folder.resolve(path));
-			} catch (IllegalArgumentException e) {
-				// Not decodable, or not a path here
-				return false;
-			}
-		});
 	}
 
 	/**
@@ -2032,7 +2015,77 @@ public class CrateEditor extends Application {
 			chooser.setInitialDirectory(lastFolder);
 		}
 		File file = chooser.showSaveDialog(stage);
-		return file != null && saveTo(stage, file.toPath());
+		return file != null && saveAsChecked(stage, file.toPath());
+	}
+
+	/**
+	 * Save As to a file, first asking if that attaches the crate to a folder
+	 * (named ro-crate-metadata.json, in a folder it is not attached to) that
+	 * lacks some of its files: telling how many of its files are there and
+	 * not, and how many of the folder's it doesn't describe; to save there
+	 * anyway, or under another name, detached.
+	 *
+	 * @return Whether it was saved
+	 */
+	boolean saveAsChecked(Stage stage, Path file) {
+		Path folder = file.toAbsolutePath().getParent();
+		if (!CrateFile.isMetadataFile(file) || crateFile.folder().equals(Optional.of(folder))) {
+			return saveTo(stage, file);
+		}
+		CrateFolder.Match match = CrateFolder.match(crate, folder, MAX_FILES);
+		if (match.absent().isEmpty()) {
+			return saveTo(stage, file);
+		}
+		int parts = match.present().size() + match.absent().size();
+		StringBuilder text = new StringBuilder();
+		text.append(match.present().size()).append(" of the crate's ").append(parts)
+				.append(parts == 1 ? " file is" : " files are").append(" in ").append(folder).append("; ")
+				.append(match.absent().size()).append(match.absent().size() == 1 ? " is" : " are").append(" not, e.g. ")
+				.append(String.join(", ", match.absent().stream().limit(3).toList())).append(".\n");
+		if (!match.undescribed().isEmpty()) {
+			text.append("The folder has ").append(match.undescribed().size())
+					.append(match.undescribed().size() == 1 ? " file" : " files")
+					.append(" the crate doesn't describe, e.g. ")
+					.append(String.join(", ", match.undescribed().stream().limit(3).toList())).append(".\n");
+		}
+		text.append("\nSaved here as ").append(file.getFileName())
+				.append(", the crate is attached to this folder: its paths are the files here. To keep it apart"
+						+ " from this folder's files, save it detached, under another name, such as ")
+				.append(detachedName(crate)).append(".");
+		ButtonType here = new ButtonType("Save Here", ButtonData.YES);
+		ButtonType detached = new ButtonType("Save Detached…", ButtonData.NO);
+		Alert alert = new Alert(AlertType.WARNING, text.toString(), here, detached, ButtonType.CANCEL);
+		alert.initOwner(stage);
+		alert.setHeaderText("Not all of the crate's files are in this folder");
+		alert.setResizable(true);
+		ButtonType chosen = alert.showAndWait().orElse(ButtonType.CANCEL);
+		if (chosen == here) {
+			return saveTo(stage, file);
+		}
+		if (chosen == detached) {
+			FileChooser chooser = new FileChooser();
+			chooser.setTitle("Save Detached RO-Crate Metadata File");
+			chooser.setInitialFileName(detachedName(crate));
+			chooser.setInitialDirectory(folder.toFile());
+			chooser.getExtensionFilters().setAll(new FileChooser.ExtensionFilter("JSON-LD", "*.json", "*.jsonld"));
+			File other = chooser.showSaveDialog(stage);
+			return other != null && saveTo(stage, other.toPath());
+		}
+		return false;
+	}
+
+	/**
+	 * A name for a detached crate's metadata file, as RO-Crate 1.2 suggests:
+	 * <code>bird-survey-ro-crate-metadata.json</code> for a crate named
+	 * "Bird survey".
+	 */
+	static String detachedName(Crate crate) {
+		String prefix = crate.getRoot().get("name").filter(JsonNode::isTextual).map(JsonNode::asText).orElse("")
+				.toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]+", "-").replaceAll("^-+|-+$", "");
+		if (prefix.length() > 40) {
+			prefix = prefix.substring(0, 40).replaceAll("-+$", "");
+		}
+		return (prefix.isEmpty() ? "detached" : prefix) + "-" + Crate.RO_CRATE_METADATA_JSON;
 	}
 
 	/**
