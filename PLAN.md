@@ -210,9 +210,15 @@ depositing data.
   none in the tests), and a click moves it (`Places.setPoint`, keeping
   GeoCoordinates or latitude/longitude where a crate has them). The preview
   links to it on OpenStreetMap. Next: tiles kept on disk between runs,
-  drawing lines and areas on the map, the map in the preview itself, and
-  `_:` blank node ids for new geometries, as the specification's example
-  has.
+  drawing lines and areas on the map, and `_:` blank node ids for new
+  geometries, as the specification's example has.
+  - *Map in the preview:* not shown there for now, as the form beside it
+    already has the map, and the two would duplicate each other. If the
+    preview is used on its own, e.g. a read-only viewer of crates, the
+    preview of several entities, or an exported `ro-crate-preview.html`,
+    show a read-only `MapView` (no `setOnPick`) of `Places.of(entity)` there,
+    for places, geometries, GeoCoordinates, and entities whose
+    `contentLocation` or `spatialCoverage` lead to a place.
 - **Required types** *(done)*: a notice beside "Add type…" when a profile
   requires a type the entity lacks (subtypes count), with a button to add it.
 - **Multi-line text.** Only the header's Description is a text area now;
