@@ -263,6 +263,26 @@ public class TestCrateEditorEntityList extends ApplicationTest {
 		assertTrue(menuItem("menuRemove").isDisable());
 	}
 
+	/** → beside a reference shows the entity it links to; ↗ opens a web @id */
+	@Test
+	public void openFromForm() throws Exception {
+		addNamed("Organization", "Example University");
+		String university = lookup("#entityId").queryAs(TextField.class).getText();
+		assertTrue(lookup("#openId").query().isDisabled());
+		addNamed("Person", "Alice");
+		assertTrue(lookup("#open-affiliation-0").query().isDisabled());
+		interact(() -> lookup("#value-affiliation-0").queryAs(ComboBox.class).getEditor().setText(university));
+		assertFalse(lookup("#open-affiliation-0").query().isDisabled());
+		clickOn("#open-affiliation-0");
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals("Example University", lookup("#header-name").queryAs(TextField.class).getText());
+		assertEquals("Example University", entities().getSelectionModel().getSelectedItem().getLabel());
+		// A web address as @id can be opened
+		TextField id = lookup("#entityId").queryAs(TextField.class);
+		interact(() -> id.setText("https://ror.org/01xtthb56"));
+		assertFalse(lookup("#openId").query().isDisabled());
+	}
+
 	@Test
 	public void editedNotListed() throws Exception {
 		addNamed("Person", "Alice");

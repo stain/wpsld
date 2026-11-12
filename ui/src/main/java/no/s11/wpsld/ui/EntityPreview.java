@@ -260,6 +260,15 @@ public class EntityPreview extends ScrollPane {
 	}
 
 	/**
+	 * Where an <code>@id</code> leads, as {@link #identifier} links it: a
+	 * web address, or the address of the file or folder beside the crate;
+	 * none for others.
+	 */
+	Optional<String> address(String id) {
+		return isWebAddress(id) ? Optional.of(id) : local(id).map(file -> file.toUri().toString());
+	}
+
+	/**
 	 * The existing file or folder a relative <code>@id</code> names beside the
 	 * crate, e.g. <code>data/table.csv</code> or <code>./</code>; none for
 	 * <code>#local</code> ids, blank nodes and absolute URIs, or if the crate

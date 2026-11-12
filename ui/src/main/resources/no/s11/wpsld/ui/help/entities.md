@@ -42,6 +42,10 @@ see [Properties and links](properties.md)) or another appropriate
 persistent identifier. A generated identifier beginning with `#` identifies
 an entity within this crate.
 
+**↗** beside `@id` opens a web address in the browser, or the file or
+folder beside the crate that a relative `@id` names; it is not available
+for identifiers beginning with `#` or `_:`.
+
 To change an identifier, select the entity, edit `@id` and press Enter or
 leave the field. Links to it are updated. If another entity already has
 that identifier, wpsld asks whether to merge them. Choose **Merge** only

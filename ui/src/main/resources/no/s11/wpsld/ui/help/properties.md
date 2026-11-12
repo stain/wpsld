@@ -17,7 +17,8 @@ Enter a value in the field. Use **+** to add another value and **×** or
 For a reference field such as Author, open its drop-down and choose a
 matching entity, or type its `@id`. The suggestions can be filtered by
 name or identifier. You can also copy one entity from the list and paste
-it into a reference field: its identifier is inserted as a link.
+it into a reference field: its identifier is inserted as a link. Choose
+**→** beside a link to show the entity it links to.
 
 To create and link a new description, choose **New** beside the property
 and select a type from its menu. Select the new entity in the list to fill

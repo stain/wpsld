@@ -515,6 +515,9 @@ public class CrateEditor extends Application {
 		entityPreview = new EntityPreview(() -> crate, this::show,
 				address -> getHostServices().showDocument(address), property -> entityEditor.label(property));
 		entityPreview.setFolder(() -> crateFile.path().map(file -> file.toAbsolutePath().getParent()));
+		// Beside the form's references and @id: show the entity, or open the address
+		entityEditor.setShow(this::show);
+		entityEditor.setAddress(entityPreview::address);
 		Tab previewTab = new Tab("Preview", entityPreview);
 		previewTab.setId("previewTab");
 		Tab jsonTab = new Tab("JSON-LD", preview);
