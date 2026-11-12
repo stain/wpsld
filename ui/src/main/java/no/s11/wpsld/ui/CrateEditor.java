@@ -106,6 +106,7 @@ import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.GeoNames;
+import no.s11.wpsld.crate.SpdxLicenses;
 import no.s11.wpsld.crate.UndoHistory;
 import no.s11.wpsld.crate.UndoHistory.Place;
 import no.s11.wpsld.crate.UndoHistory.Step;
@@ -368,6 +369,8 @@ public class CrateEditor extends Application {
 		entityEditor.setFindPlace(name -> new PlaceFinder(stage, name, () -> settings.geonamesUsername(), placeSearch,
 				owner -> showPreferences(stage), mapTiles, address -> getHostServices().showDocument(address))
 				.showAndWait());
+		entityEditor.setFindLicense(() -> new LicenseFinder(stage, "", SpdxLicenses.bundled(),
+				address -> getHostServices().showDocument(address)).showAndWait());
 		entityEditor.setTypeHelp(owner -> showHelp(HelpDialog.Topic.TYPES, owner));
 		// As the style lays it out, e.g. as a notebook in the OS/2 Warp style
 		entityEditor.setFormLayout(Theme.style().get().form());
@@ -1479,14 +1482,24 @@ public class CrateEditor extends Application {
 	 * the crate, to be named and typed (see {@link Crate#addReferenced()});
 	 * no longer mention the entities linked otherwise from the root data
 	 * entity (see {@link Crate#unmentionLinked()}), and mention those not
-	 * linked (see {@link Crate#mentionUnlinked()}). One undoable step, then
-	 * tells what was done.
+	 * linked (see {@link Crate#mentionUnlinked()}). First, SPDX licences
+	 * written otherwise (e.g. <code>https://spdx.org/licenses/MIT.html</code>,
+	 * or the text <code>CC-BY-4.0</code>) become the licence's SPDX IRI, and
+	 * are described from the SPDX License List (see
+	 * {@link SpdxLicenses#repair}). One undoable step, then tells what was
+	 * done.
 	 */
 	void repair(Stage stage) {
+		List<String> licences = SpdxLicenses.bundled().repair(crate);
 		List<Entity> added = crate.addReferenced();
 		List<Entity> unmentioned = crate.unmentionLinked();
 		List<Entity> mentioned = crate.mentionUnlinked();
 		List<String> done = new ArrayList<>();
+		if (!licences.isEmpty()) {
+			done.add("Licences of the SPDX License List:\n" + licences.stream().limit(LISTED).map(l -> "• " + l)
+					.collect(Collectors.joining("\n"))
+					+ (licences.size() > LISTED ? "\n• and " + (licences.size() - LISTED) + " more" : ""));
+		}
 		if (!added.isEmpty()) {
 			done.add("Added as Thing, referred to but not in the crate:\n" + list(added)
 					+ "\nGive them a name and type, or if an @id is mistyped, change it to the one meant"
@@ -1499,9 +1512,11 @@ public class CrateEditor extends Application {
 			done.add("Mentioned by the root, as not linked otherwise:\n" + list(mentioned));
 		}
 		if (!done.isEmpty()) {
-			entities.getItems().addAll(added);
-			if (entityEditor.getEntity() == crate.getRoot()) {
-				entityEditor.edit(crate.getRoot());
+			// Entities may have been added, renamed or merged
+			entities.getItems().setAll(crate.getEntities());
+			Entity edited = entityEditor.getEntity();
+			if (edited != null) {
+				entityEditor.edit(crate.getEntities().contains(edited) ? edited : crate.getRoot());
 			}
 			refresh();
 			checkpoint(placeOf(null), Optional.of("Repair"));

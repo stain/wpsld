@@ -86,13 +86,14 @@ contains `author`. Find **Date published** and enter `2025-01-31` or choose
 it from the calendar. For real research, use the actual publication date
 rather than guessing it.
 
-Find **License**. Choose **New > CreativeWork** to create and link a
-licence description. Select the new CreativeWork in the entity list and
-enter `Creative Commons Attribution 4.0 International` as its **Name**.
-Set its `@id` to `http://spdx.org/licenses/CC-BY-4.0` and press Enter.
-This SPDX identifier refers to the CC BY 4.0 licence.
+Find **License**. Choose **New > Licence from SPDX...**, type `cc-by-4.0`
+and choose **OK**. wpsld adds the licence Creative Commons Attribution 4.0
+International from the SPDX License List and links it: its `@id` is
+`http://spdx.org/licenses/CC-BY-4.0`, its SPDX address. Select it in the
+entity list to see it. See [Properties and links](properties.md) for more
+about licences.
 
-![The licence CreativeWork with its SPDX identifier and name](images/license-entity.png)
+![The licence CreativeWork with its SPDX address as @id and its name](images/license-entity.png)
 
 Select the dataset again: **License** should now link to that identifier,
 and **Date published** should contain the date.
