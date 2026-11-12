@@ -43,6 +43,8 @@ mountain...), and the one selected is shown on a map. Choose one and
 recommends, its name and web page, and where GeoNames has it. If the crate
 already has that place, it is linked instead of added again.
 
+![Find a place in GeoNames: Catalina Park in New South Wales, Australia, listed and marked on a map](images/place-finder.png)
+
 Looking places up needs a free GeoNames account: make one at
 [geonames.org](https://www.geonames.org/login), enable its free web
 services on your account page, and enter your username in **Edit >
@@ -54,6 +56,8 @@ place where you clicked, for example a more exact spot than GeoNames has,
 or a place GeoNames doesn't know. **Find place...** looks up a place you
 have already added, by its name. The map is from OpenStreetMap, so it
 needs an internet connection.
+
+![The place's form: its GeoNames @id and name, and under Location its coordinates, Find place... and the map with its marker](images/place-location.png)
 
 Behind the scenes, the location is a **Geometry** linked from the place's
 **Geo**, with the point as Well-Known Text in **As WKT**, for example

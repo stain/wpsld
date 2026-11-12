@@ -89,6 +89,9 @@ depositing data.
 
       HELP_SCREENSHOTS=$PWD/ui/src/main/resources/no/s11/wpsld/ui/help/images ./gradlew :ui:test --tests '*ReadmeScreenshots.helpScreenshots' --rerun
 
+  The places' screenshots (`placeScreenshots`, same folder) show
+  OpenStreetMap's tiles, so they need the internet; GeoNames is not asked.
+
 ### Editor (Crate-O style)
 
 - **JavaFX model-view binding.** Keep `lib`'s model free of JavaFX; in `ui`,

@@ -181,7 +181,8 @@ class PlaceFinder extends Dialog<Place> {
 		task.setOnSucceeded(e -> {
 			results.getItems().setAll(task.getValue());
 			status.setText(task.getValue().isEmpty() ? "No places named " + text + " found"
-					: task.getValue().size() + " places found; choose one and OK");
+					: task.getValue().size() == 1 ? "1 place found; choose it and OK"
+							: task.getValue().size() + " places found; choose one and OK");
 			if (!task.getValue().isEmpty()) {
 				results.getSelectionModel().selectFirst();
 			}

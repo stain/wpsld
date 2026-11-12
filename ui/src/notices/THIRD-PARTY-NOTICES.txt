@@ -321,3 +321,22 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+============================================================================
+OpenStreetMap map images in the help
+https://www.openstreetmap.org/copyright
+Open Database License (ODbL) 1.0
+============================================================================
+
+The help's screenshots of places (help/images/place-finder.png and
+help/images/place-location.png) show map tiles of OpenStreetMap:
+
+  Map data © OpenStreetMap contributors, available under the Open Database
+  License (ODbL): https://www.openstreetmap.org/copyright
+
+The place shown, Catalina Park, is from GeoNames (https://www.geonames.org/),
+under the Creative Commons Attribution 4.0 License.
+
+The maps wpsld shows while it runs are loaded from OpenStreetMap at that
+time and credited on the map; they are not part of the release builds.

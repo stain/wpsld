@@ -119,7 +119,7 @@ public class TestCrateEditorPlaces extends ApplicationTest {
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
 				() -> !lookup("#placeResults").queryListView().getItems().isEmpty());
 		assertEquals(List.of("Catalina as tester"), searches);
-		assertEquals("1 places found; choose one and OK", lookup("#placeStatus").queryAs(Label.class).getText());
+		assertEquals("1 place found; choose it and OK", lookup("#placeStatus").queryAs(Label.class).getText());
 		clickOn("#placeOk");
 
 		Entity place = entity("http://sws.geonames.org/8152662/").orElseThrow();
