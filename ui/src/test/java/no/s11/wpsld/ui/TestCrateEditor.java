@@ -148,6 +148,12 @@ public class TestCrateEditor extends ApplicationTest {
 		assertEquals("Profiles", lookup("#helpTopics").queryListView().getSelectionModel().getSelectedItem().toString());
 		clickOn("Close");
 
+		interact(() -> lookup("#save").query().requestFocus());
+		push(KeyCode.F1);
+		assertEquals("Opening and saving crates", lookup("#helpTopics").queryListView()
+				.getSelectionModel().getSelectedItem().toString());
+		clickOn("Close");
+
 		interact(() -> lookup("#views").query().requestFocus());
 		push(KeyCode.F1);
 		assertEquals("Views and styles", lookup("#helpTopics").queryListView()

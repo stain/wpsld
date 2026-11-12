@@ -17,6 +17,12 @@ files from your computer. References to removed entities may remain in
 other descriptions: check and remove or replace those references as needed.
 **Edit > Undo** can restore an accidental removal.
 
+**Edit > Repair Crate** can add placeholder Things for references to
+entities not described in the crate, and update the root's mentions for
+otherwise unlinked entities. It reports what it changed. Give any
+placeholders appropriate types and names, or correct mistaken identifiers.
+Use **Edit > Undo** if needed.
+
 ## Identifiers and merging
 
 Each entity has an `@id`. For a file, use its path relative to the crate

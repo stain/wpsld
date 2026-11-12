@@ -67,12 +67,13 @@ depositing data.
   linking a file and an author, and exploring types and properties with a
   photograph and a Wikidata person. It includes screenshots and further
   reading; the README links to the Markdown topics for reading outside the app.
-- Short topics cover types, entities and identifiers, properties and links,
-  copy and paste, and views. Paste Special is not implemented yet; document
-  its actual options when it is added.
-- **Next:** expand the profile guidance and add topics on required fields,
-  people and organisations, files, saving and troubleshooting; add a
-  glossary. Check every instruction against the app's actual behaviour and
+- Short topics cover opening and saving, profile loading and preferences,
+  types, entities and identifiers, properties and links, copy and paste,
+  and views. Paste Special is not implemented yet; document its actual
+  options when it is added.
+- **Next:** add topics on required fields, people and organisations,
+  files and troubleshooting; add a glossary. Check every instruction against
+  the app's actual behaviour and
   the applicable RO-Crate specification.
 - Extend contextual entry points as more topics and controls are added.
   Keep the help navigable by keyboard and screen reader,

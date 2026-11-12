@@ -5,6 +5,7 @@ the editor for help about the focused control (on macOS, Command-? also
 works). Help stays open while you work.
 
 - [Getting started](getting-started.md): create and save a first crate.
+- [Opening and saving crates](files.md): use the File menu and handle warnings.
 - [Profiles](profiles.md): choose guidance for a particular kind of crate.
 - [Types](types.md): choose, add and remove types.
 - [Entities and identifiers](entities.md): add, remove and merge descriptions.

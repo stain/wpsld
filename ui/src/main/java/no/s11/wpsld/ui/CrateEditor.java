@@ -568,6 +568,9 @@ public class CrateEditor extends Application {
 					|| id.equals("profileStatus"))) {
 				return HelpDialog.Topic.PROFILES;
 			}
+			if ("save".equals(id)) {
+				return HelpDialog.Topic.FILES;
+			}
 			if (id != null && (id.equals("addType") || id.startsWith("removeType-")
 					|| id.startsWith("type-"))) {
 				return HelpDialog.Topic.TYPES;
@@ -1030,7 +1033,8 @@ public class CrateEditor extends Application {
 	 * Show the preferences, and keep them on OK.
 	 */
 	void showPreferences(Stage stage) {
-		new PreferencesDialog(stage, settings, profileCache, this::forgotten).showAndWait().ifPresent(changed -> {
+		new PreferencesDialog(stage, settings, profileCache, this::forgotten,
+				owner -> showHelp(HelpDialog.Topic.PROFILES, owner)).showAndWait().ifPresent(changed -> {
 			settings = changed;
 			profileCache.setDisabledRegistries(changed.disabledRegistries());
 			saveSettings(stage);
@@ -1096,6 +1100,12 @@ public class CrateEditor extends Application {
 		VBox content = new VBox(8, new HBox(8, location, file), help, listed, registryProblems);
 		content.setPadding(new Insets(4));
 		dialog.getDialogPane().setContent(content);
+		dialog.getDialogPane().addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+			if (HelpDialog.isHelpShortcut(event)) {
+				event.consume();
+				showHelp(HelpDialog.Topic.PROFILES, dialog.getDialogPane().getScene().getWindow());
+			}
+		});
 		ButtonType load = new ButtonType("Load", ButtonData.OK_DONE);
 		dialog.getDialogPane().getButtonTypes().setAll(load, ButtonType.CANCEL);
 		dialog.getDialogPane().lookupButton(load).disableProperty().bind(location.textProperty().isEmpty());

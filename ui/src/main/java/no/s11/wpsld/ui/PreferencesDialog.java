@@ -34,12 +34,14 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Dialog;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
@@ -61,7 +63,8 @@ class PreferencesDialog extends Dialog<Settings> {
 	 * @param forgotten Told about each kept profile removed, if it was read,
 	 *                  to stop offering it
 	 */
-	PreferencesDialog(Window owner, Settings settings, ProfileCache profiles, Consumer<Profile> forgotten) {
+	PreferencesDialog(Window owner, Settings settings, ProfileCache profiles, Consumer<Profile> forgotten,
+			Consumer<Window> profileHelp) {
 		initOwner(owner);
 		setTitle("Preferences");
 		setResizable(true);
@@ -130,7 +133,17 @@ class PreferencesDialog extends Dialog<Settings> {
 		TabPane tabs = new TabPane(registryTab, keptTab);
 		tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 		tabs.setPrefSize(640, 400);
-		getDialogPane().setContent(tabs);
+		Hyperlink help = new Hyperlink("Help with profiles");
+		help.setId("preferencesProfileHelp");
+		help.setOnAction(e -> profileHelp.accept(getDialogPane().getScene().getWindow()));
+		VBox.setVgrow(tabs, javafx.scene.layout.Priority.ALWAYS);
+		getDialogPane().setContent(new VBox(tabs, help));
+		getDialogPane().addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+			if (HelpDialog.isHelpShortcut(event)) {
+				event.consume();
+				profileHelp.accept(getDialogPane().getScene().getWindow());
+			}
+		});
 		getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
 		setResultConverter(button -> {
 			if (button != ButtonType.OK) {

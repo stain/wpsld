@@ -54,6 +54,7 @@ class HelpDialog extends Dialog<Void> {
 	enum Topic {
 		CONTENTS("Contents", "index.md"),
 		GETTING_STARTED("Getting started", "getting-started.md"),
+		FILES("Opening and saving crates", "files.md"),
 		PROFILES("Profiles", "profiles.md"),
 		TYPES("Types", "types.md"),
 		ENTITIES("Entities and identifiers", "entities.md"),

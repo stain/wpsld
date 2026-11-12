@@ -21,4 +21,6 @@ description into another crate. Other wpsld text fields do not paste a
 copied entity as text.
 
 **Paste Special** is planned but is not yet available. For now use Paste,
-and use **Edit > Undo** if the result is not what you intended.
+and use **Edit > Undo** if the result is not what you intended. **Edit >
+Redo** reapplies an undone change. **Select All** selects text in the
+focused text field.

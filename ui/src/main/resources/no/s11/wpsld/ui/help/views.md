@@ -13,3 +13,6 @@ Choose **View > Style** to change the appearance and form layout, and
 the form as a notebook with type tabs and pages; other styles use
 expandable groups and property search. Changing the view does not change
 the metadata.
+
+**Help > About wpsld...** shows the application and runtime versions,
+licences and third-party notices.
