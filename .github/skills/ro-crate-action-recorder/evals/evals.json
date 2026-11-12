@@ -1,0 +1,16 @@
+{
+  "skill_name": "ro-crate-action-recorder",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I maintain a Python argparse CLI. How do I get every run recorded as RO-Crate provenance?",
+      "expected_output": "Shows recorded_argparse with input_files/output_files and warns the output needs checking.",
+      "files": [],
+      "expectations": [
+        "Uses rocrate-action-recorder's recorded_argparse",
+        "Installs in its own environment (it pins rocrate)",
+        "Says to check/fix the generated crate (version, software url, agent)"
+      ]
+    }
+  ]
+}

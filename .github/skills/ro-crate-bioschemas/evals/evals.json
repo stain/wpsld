@@ -1,0 +1,31 @@
+{
+  "skill_name": "ro-crate-bioschemas",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add a Taxon entity for Arabidopsis thaliana (scientific name, vernacular name 'thale cress', rank species) to my RO-Crate 1.3 and make it follow the Bioschemas Taxon profile.",
+      "expected_output": "Taxon entity with conformsTo Taxon/1.0-RELEASE on the entity, a Profile entity, and @context extended for scientificName and vernacularName; no biothings IRIs.",
+      "files": [],
+      "expectations": [
+        "Declares https://bioschemas.org/profiles/Taxon/1.0-RELEASE with conformsTo on the Taxon entity, not on the root",
+        "Adds scientificName to the @context array mapped to https://bioschemas.org/terms/scientificName",
+        "Maps vernacularName to http://rs.tdwg.org/dwc/terms/vernacularName or explains that it is not in the RO-Crate context",
+        "Does not use any discovery.biothings.io IRI",
+        "Does not invent an identifier for the taxon (asks or uses a real one such as an NCBI Taxonomy URL only if known)"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Our event pages have Bioschemas markup with \"@context\": \"https://schema.org\" and a dct:conformsTo pointing at the draft Bioschemas Event profile (the 2019 draft). Turn one into an RO-Crate entity.",
+      "expected_output": "Event entity (contextual, not in hasPart); explains there is no released Event profile and that a draft may be declared though it is not recommended, suggesting the latest draft or none and asking which; rewrites https schema.org IRIs to the RO-Crate terms.",
+      "files": [],
+      "expectations": [
+        "Says there is no released Event profile, and either declares the latest draft profile while saying it is not recommended, or leaves it out and offers the draft as an option",
+        "Uses plain conformsTo rather than dct:conformsTo if any profile is declared",
+        "Warns that https://schema.org IRIs do not compact to RO-Crate terms and converts them",
+        "The Event is a contextual entity (not in hasPart)",
+        "Does not replace the Event profile with an unrelated released profile"
+      ]
+    }
+  ]
+}

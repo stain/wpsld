@@ -664,3 +664,41 @@
 .dialog-pane > .button-bar > .container {
     -fx-padding: 4 20 16 20;
 }
+
+/* Help viewer: a quiet toolbar, Finder-like sidebar and reading page. */
+.help-dialog .help-toolbar {
+    -fx-background-color: -mac-window;
+    -fx-border-color: transparent transparent -mac-separator transparent;
+    -fx-padding: 10 16;
+}
+
+.help-dialog .help-title {
+    -fx-font-size: 15px;
+    -fx-text-fill: -mac-text;
+}
+
+.help-dialog .help-sidebar, .help-dialog #helpTopics {
+    -fx-background-color: -mac-sidebar;
+}
+
+.help-dialog .help-sidebar {
+    -fx-padding: 12 8;
+}
+
+.help-dialog .help-sidebar-title {
+    -fx-text-fill: -mac-text-secondary;
+    -fx-padding: 0 8 4 8;
+}
+
+.help-dialog .help-content, .help-dialog #helpPage > .viewport {
+    -fx-background-color: -mac-list;
+}
+
+.help-dialog .help-content {
+    -fx-padding: 24 30;
+    -fx-line-spacing: 3;
+}
+
+.help-dialog .help-content > .help-text {
+    -fx-fill: -mac-text;
+}

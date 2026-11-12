@@ -1,0 +1,16 @@
+{
+  "skill_name": "ro-crate-excel",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I have a folder of files and my collaborators only know Excel. How do I get an RO-Crate?",
+      "expected_output": "Explains rocxl/xlro, Siegfried requirement, review and validate.",
+      "files": [],
+      "expectations": [
+        "Mentions rocxl or xlro",
+        "Mentions Siegfried is required",
+        "Says to run on a copy and validate afterwards"
+      ]
+    }
+  ]
+}

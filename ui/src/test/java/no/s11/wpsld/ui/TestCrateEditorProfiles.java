@@ -170,11 +170,29 @@ public class TestCrateEditorProfiles extends ApplicationTest {
 		ComboBox<FormFields> profiles = profiles();
 		Path file = testProfile("Dialog Profile");
 		clickOn("#loadProfile");
+		push(KeyCode.F1);
+		assertEquals("Profiles", lookup("#helpTopics").queryListView().getSelectionModel().getSelectedItem().toString());
+		clickOn("Close");
 		clickOn("#profileLocation").write(file.toString());
 		clickOn("Load");
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> profiles.getItems().size() == 3);
 		WaitForAsyncUtils.waitForFxEvents();
 		assertEquals("Dialog Profile 0.1.0", profiles.getValue().getName());
+	}
+
+	@Test
+	public void preferencesLinkAndF1OpenProfileHelp() {
+		profiles();
+		push(KeyCode.SHORTCUT, KeyCode.COMMA);
+		clickOn("#preferencesProfileHelp");
+		assertEquals("Profiles", lookup("#helpTopics").queryListView().getSelectionModel().getSelectedItem().toString());
+		clickOn("Close");
+		clickOn("Kept profiles");
+		push(KeyCode.F1);
+		assertEquals("Profiles", lookup("#helpTopics").queryListView().getSelectionModel().getSelectedItem().toString());
+		clickOn("Close");
+		assertTrue(lookup("#keptProfiles").tryQuery().isPresent());
+		clickOn("Cancel");
 	}
 
 	/**

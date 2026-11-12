@@ -1,0 +1,16 @@
+{
+  "skill_name": "ro-crate-py",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Use Python to make a crate from the folder ./experiment and zip it.",
+      "expected_output": "Uses rocrate init / write-zip, then completes root name, description, licence.",
+      "files": [],
+      "expectations": [
+        "Uses the rocrate CLI or library rather than hand-written JSON serialisation",
+        "Adds name, description and license to the root after init",
+        "Validates the result"
+      ]
+    }
+  ]
+}

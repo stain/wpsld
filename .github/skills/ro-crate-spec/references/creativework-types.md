@@ -1,0 +1,191 @@
+# CreativeWork and its schema.org subtypes
+
+A data entity is a "directory, file, or other Web resource" (RO-Crate 1.3 terminology). Files MUST include `File` (= `http://schema.org/MediaObject`) and directories `Dataset`; any other web resource the crate contains is typically a `CreativeWork` or one of its subtypes below, and the most specific fitting type is the most useful (`["File", "SoftwareSourceCode"]` for a script file, `WebPage` or `LearningResource` for an online tutorial page). Contextual entities can use these types too (a licence is a `CreativeWork`, a cited article a `ScholarlyArticle`); the type alone does not make something a data entity: being contained in the crate and linked by `hasPart` does.
+
+**Check terms against the crate's context, not the live schema.org site.** Each RO-Crate context is fixed to the schema.org release in its `schemaVersion`: 1.0 → 5.0, 1.1 → 10.0, 1.2 → 22.0, 1.3 → 30.0. A type or property added to schema.org after that release (for example `DigitalProductPassport`, `DeclarationOfConformity` and `EnvironmentalProductDeclaration`, subtypes of `Certification` added after 30.0) is not in the context and must be added to the crate's `@context` array, e.g. `{"DigitalProductPassport": "http://schema.org/DigitalProductPassport"}` (`ro-crate-create`, references/jsonld.md). The context uses the `http://schema.org/` namespace, so use the `http` vocabulary definitions (https://schema.org/docs/developers.html#defs) of that release. Look up a type's properties on its schema.org page, and check the properties against the context in the same way.
+
+- **pending**: in schema.org's pending area in that release, not yet core. The context still defines it, so it is usable, but it may change (`LearningResource`, used by Bioschemas TrainingMaterial, is one; several others such as `ArchiveComponent` became core in 30.1).
+- **superseded by** / **attic**: deprecated by schema.org (attic: retired, kept for old data). The RO-Crate context still defines them, so they are not forbidden, but ideally avoid them in new metadata and use the replacement (`SoftwareSourceCode` rather than `Code`). Keep them when editing a crate that already uses them unless asked to modernise.
+- **not in RO-Crate context**: the context does not define the term; add it to the `@context` array before use.
+- Types with several parents are listed once, under the parent met first (alphabetical, depth first); check the type's page for its other parents.
+
+Generated with `scripts/creativework_types.py` from schema.org 30.0 (`data/releases/30.0/schemaorg-all-http.jsonld` in the schemaorg GitHub repository, including attic terms) and the RO-Crate 1.3 context (2026-10-23). All 176 are in the 1.3 context. Regenerate for another RO-Crate version from the release its context names.
+
+**176 subtypes of CreativeWork**
+
+- `AmpStory` (pending)
+- `ArchiveComponent` (pending)
+- `Article`
+  - `AdvertiserContentArticle` (pending)
+  - `NewsArticle`
+    - `AnalysisNewsArticle` (pending)
+    - `AskPublicNewsArticle` (pending)
+    - `BackgroundNewsArticle` (pending)
+    - `OpinionNewsArticle` (pending)
+    - `ReportageNewsArticle` (pending)
+    - `ReviewNewsArticle` (pending)
+  - `Report`
+  - `SatiricalArticle` (pending)
+  - `ScholarlyArticle`
+    - `MedicalScholarlyArticle`
+  - `SocialMediaPosting`
+    - `BlogPosting`
+      - `LiveBlogPosting`
+    - `DiscussionForumPosting`
+  - `TechArticle`
+    - `APIReference`
+- `Atlas`
+- `Blog`
+- `Book`
+  - `Audiobook`
+  - `SequentialArt`
+- `Certification` (pending)
+- `Chapter`
+- `Claim` (pending)
+- `Clip`
+  - `MovieClip`
+  - `RadioClip`
+  - `TVClip`
+  - `VideoGameClip`
+- `Code` (superseded by `SoftwareSourceCode`)
+- `Collection`
+  - `ProductCollection` (pending)
+- `ComicStory`
+  - `ComicCoverArt`
+- `Comment`
+  - `Answer`
+  - `CorrectionComment` (pending)
+  - `Question`
+- `Conversation`
+- `Course`
+- `CreativeWorkSeason`
+  - `PodcastSeason` (pending)
+  - `RadioSeason`
+  - `TVSeason`
+- `CreativeWorkSeries`
+  - `BookSeries`
+  - `MovieSeries`
+  - `Periodical`
+    - `ComicSeries`
+    - `Newspaper`
+  - `PodcastSeries` (pending)
+  - `RadioSeries`
+  - `TVSeries`
+  - `VideoGameSeries`
+- `Credential` (pending)
+  - `EducationalOccupationalCredential` (pending)
+- `DataCatalog`
+- `Dataset`
+  - `DataFeed`
+    - `CompleteDataFeed` (pending)
+- `DefinedTermSet` (pending)
+  - `CategoryCodeSet` (pending)
+- `Diet`
+- `DigitalDocument`
+  - `NoteDigitalDocument`
+  - `PresentationDigitalDocument`
+  - `SpreadsheetDigitalDocument`
+  - `TextDigitalDocument`
+- `Drawing` (pending)
+- `Episode`
+  - `PodcastEpisode` (pending)
+  - `RadioEpisode`
+  - `TVEpisode`
+- `ExercisePlan`
+- `Game`
+  - `VideoGame`
+- `Guide` (pending)
+- `HowTo`
+  - `Recipe`
+- `HowToDirection`
+- `HowToSection`
+- `HowToStep`
+- `HowToTip`
+- `HyperToc` (pending)
+- `HyperTocEntry` (pending)
+- `LearningResource` (pending)
+  - `Quiz` (pending)
+  - `Syllabus` (pending)
+- `Legislation` (pending)
+  - `LegislationObject` (pending)
+- `Manuscript` (pending)
+- `Map`
+- `MathSolver` (pending)
+- `MediaObject`
+  - `3DModel` (pending)
+  - `AudioObject`
+    - `AudioObjectSnapshot` (pending)
+  - `DataDownload`
+  - `ImageObject`
+    - `Barcode`
+    - `ImageObjectSnapshot` (pending)
+  - `MusicVideoObject`
+  - `TextObject`
+  - `VideoObject`
+    - `VideoObjectSnapshot` (pending)
+- `MediaReviewItem` (pending)
+- `Menu`
+- `MenuSection`
+- `Message`
+  - `EmailMessage`
+- `Movie`
+- `MusicComposition`
+- `MusicPlaylist`
+  - `MusicAlbum`
+  - `MusicRelease`
+- `MusicRecording`
+- `Painting`
+- `Photograph`
+- `Play` (pending)
+- `Poster` (pending)
+- `PublicationIssue`
+  - `ComicIssue`
+- `PublicationVolume`
+- `Quotation` (pending)
+- `Review`
+  - `ClaimReview`
+  - `CriticReview` (pending)
+  - `EmployerReview` (pending)
+  - `MediaReview` (pending)
+  - `Recommendation` (pending)
+  - `UserReview` (pending)
+- `Sculpture`
+- `Season` (superseded by `CreativeWorkSeason`)
+- `SheetMusic` (pending)
+- `ShortStory` (pending)
+- `SoftwareApplication`
+  - `MobileApplication`
+  - `OperatingSystem` (pending)
+  - `RuntimePlatform` (pending)
+  - `WebApplication`
+- `SoftwareSourceCode`
+- `SpecialAnnouncement` (pending)
+- `Statement` (pending)
+- `Thesis`
+- `VisualArtwork`
+  - `CoverArt`
+- `WebContent` (pending)
+  - `HealthTopicContent` (pending)
+- `WebPage`
+  - `AboutPage`
+  - `CheckoutPage`
+  - `CollectionPage`
+    - `MediaGallery`
+      - `ImageGallery`
+      - `VideoGallery`
+  - `ContactPage`
+  - `FAQPage`
+  - `ItemPage`
+  - `MedicalWebPage`
+  - `ProfilePage`
+  - `QAPage`
+  - `RealEstateListing` (pending)
+  - `SearchResultsPage`
+- `WebPageElement`
+  - `SiteNavigationElement`
+  - `Table`
+  - `WPAdBlock`
+  - `WPFooter`
+  - `WPHeader`
+  - `WPSideBar`
+- `WebSite`

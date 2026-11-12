@@ -40,6 +40,48 @@
     -fx-font-size: 0.85em;
 }
 
+.dialog-pane.help-dialog > .content {
+    -fx-padding: 0;
+}
+
+.help-dialog .help-toolbar {
+    -fx-padding: 8 10;
+    -fx-alignment: center-left;
+    -fx-background-color: -fx-background;
+}
+
+.help-dialog .help-title {
+    -fx-font-size: 1.15em;
+    -fx-font-weight: bold;
+}
+
+.help-dialog .help-sidebar {
+    -fx-padding: 8;
+    -fx-background-color: -fx-background;
+}
+
+.help-dialog .help-sidebar-title {
+    -fx-font-weight: bold;
+}
+
+.help-dialog .help-content {
+    -fx-padding: 18 22;
+    -fx-background-color: -fx-control-inner-background;
+    -fx-line-spacing: 2;
+}
+
+.help-dialog .help-content > .help-text {
+    -fx-fill: -fx-text-inner-color;
+}
+
+.help-dialog .help-content .hyperlink {
+    -fx-padding: 0;
+}
+
+.help-dialog #helpPage > .viewport {
+    -fx-background-color: -fx-control-inner-background;
+}
+
 .chip-remove {
     -fx-padding: 0 4 0 4;
 }

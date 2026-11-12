@@ -1,0 +1,16 @@
+{
+  "skill_name": "ro-crate-tools",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I want a nice HTML page for my crate and a GUI to edit the metadata. What should I use?",
+      "expected_output": "Recommends rochtml/ro-crate-html and Describo/Crate-O/NovaCrate with status caveats.",
+      "files": [],
+      "expectations": [
+        "Mentions a preview generator (rochtml or rocrate init --gen-preview)",
+        "Mentions at least two GUI editors",
+        "Notes tools are alpha/beta and points to the tools list"
+      ]
+    }
+  ]
+}

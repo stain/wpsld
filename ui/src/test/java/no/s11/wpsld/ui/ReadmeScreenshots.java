@@ -36,13 +36,20 @@ import org.junit.Test;
 import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
+import javafx.scene.Node;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.DatePicker;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.RadioMenuItem;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.PixelReader;
+import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
 import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
@@ -109,6 +116,111 @@ public class ReadmeScreenshots extends ApplicationTest {
 		png(out.resolve("warp-event.png"));
 	}
 
+	/** Screenshots for the help walkthrough, with the same example values. */
+	@Test
+	public void helpScreenshots() throws Exception {
+		String folder = System.getenv("HELP_SCREENSHOTS");
+		Assume.assumeTrue("Set HELP_SCREENSHOTS to the folder for them", folder != null && !folder.isBlank());
+		Path out = Files.createDirectories(Path.of(folder));
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		interact(() -> {
+			stage.setWidth(1400);
+			stage.setHeight(900);
+		});
+		look("classic", "light");
+		interact(() -> {
+			lookup("#header-name").queryAs(TextField.class).setText("Example dataset");
+			lookup("#header-description").queryAs(TextArea.class).setText("A sample file described with wpsld.");
+		});
+		png(out.resolve("editor-overview.png"));
+
+		interact(() -> {
+			MenuButton parts = lookup("#headerNew-hasPart").queryAs(MenuButton.class);
+			parts.getItems().stream().filter(i -> i.getText().equals("File")).findFirst().orElseThrow().fire();
+		});
+		select("#file-1");
+		interact(() -> {
+			TextField id = lookup("#entityId").queryAs(TextField.class);
+			id.setText("data.csv");
+			id.getOnAction().handle(new javafx.event.ActionEvent());
+			lookup("#header-name").queryAs(TextField.class).setText("Sample data");
+		});
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("encoding format"));
+		interact(() -> lookup("#value-encodingFormat-0").queryAs(TextField.class).setText("text/csv"));
+		png(out.resolve("file-form.png"), lookup(n -> n instanceof EntityEditor).query());
+
+		select("./");
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("author"));
+		interact(() -> {
+			MenuButton author = lookup("#new-author").queryAs(MenuButton.class);
+			author.getItems().stream().filter(i -> i.getText().equals("Person")).findFirst().orElseThrow().fire();
+		});
+		select("#person-1");
+		interact(() -> lookup("#header-name").queryAs(TextField.class).setText("Example author"));
+		select("./");
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("author"));
+		org.junit.Assert.assertEquals("./", lookup("#entityId").queryAs(TextField.class).getText());
+		org.junit.Assert.assertTrue(lookup("#value-author-0").queryAs(ComboBox.class).getEditor().getText()
+				.startsWith("#person-"));
+		png(out.resolve("author-link.png"), lookup(n -> n instanceof EntityEditor).query());
+
+		clickOn("#save");
+		png(out.resolve("save-warning.png"), lookup(".dialog-pane").query());
+		clickOn("Cancel");
+		interact(() -> {
+			lookup("#propertySearch").queryAs(TextField.class).clear();
+			lookup("#value-datePublished-0").queryAs(DatePicker.class).getEditor().setText("2025-01-31");
+			MenuButton license = lookup("#new-license").queryAs(MenuButton.class);
+			license.getItems().stream().filter(i -> i.getText().equals("CreativeWork")).findFirst()
+					.orElseThrow().fire();
+		});
+		select("#creativework-1");
+		interact(() -> {
+			lookup("#header-name").queryAs(TextField.class)
+					.setText("Creative Commons Attribution 4.0 International");
+			TextField id = lookup("#entityId").queryAs(TextField.class);
+			id.setText("http://spdx.org/licenses/CC-BY-4.0");
+			id.getOnAction().handle(new javafx.event.ActionEvent());
+		});
+		png(out.resolve("license-entity.png"), lookup(n -> n instanceof EntityEditor).query());
+		select("./");
+		png(out.resolve("dataset-form.png"), lookup(n -> n instanceof EntityEditor).query());
+
+		interact(() -> {
+			MenuButton parts = lookup("#headerNew-hasPart").queryAs(MenuButton.class);
+			parts.getItems().stream().filter(i -> i.getText().equals("File")).findFirst().orElseThrow().fire();
+		});
+		select("#file-1");
+		interact(() -> {
+			TextField id = lookup("#entityId").queryAs(TextField.class);
+			id.setText("photo.jpg");
+			id.getOnAction().handle(new javafx.event.ActionEvent());
+			lookup("#header-name").queryAs(TextField.class).setText("Photograph of Margaret Hamilton");
+		});
+		clickOn("#addType");
+		clickOn("#typeSearch").write("Photograph").type(KeyCode.ENTER);
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("about"));
+		interact(() -> {
+			MenuButton about = lookup("#new-about").queryAs(MenuButton.class);
+			about.getItems().stream().filter(i -> i.getText().equals("Thing")).findFirst().orElseThrow().fire();
+		});
+		select("#thing-1");
+		clickOn("#addType");
+		clickOn("#typeSearch").write("Person").type(KeyCode.ENTER);
+		interact(() -> {
+			lookup("#header-name").queryAs(TextField.class).setText("Margaret Hamilton");
+			TextField id = lookup("#entityId").queryAs(TextField.class);
+			id.setText("https://www.wikidata.org/entity/Q11628");
+			id.getOnAction().handle(new javafx.event.ActionEvent());
+		});
+		png(out.resolve("wikidata-person.png"), lookup(n -> n instanceof EntityEditor).query());
+		select("photo.jpg");
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("about"));
+		org.junit.Assert.assertEquals("https://www.wikidata.org/entity/Q11628",
+				lookup("#value-about-0").queryAs(ComboBox.class).getEditor().getText());
+		png(out.resolve("photograph-about.png"), lookup(n -> n instanceof EntityEditor).query());
+	}
+
 	/** The example crate, copied to a new folder with its files */
 	private Path copyExample() throws Exception {
 		Path source = Path.of(getClass().getResource("/example-crate/ro-crate-metadata.json").toURI()).getParent();
@@ -147,8 +259,10 @@ public class ReadmeScreenshots extends ApplicationTest {
 
 	private void select(String id) {
 		ListView<Entity> entities = lookup("#entities").queryListView();
-		interact(() -> entities.getItems().stream().filter(e -> e.getId().equals(id)).findFirst()
-				.ifPresent(entities.getSelectionModel()::select));
+		interact(() -> {
+			Entity entity = entities.getItems().stream().filter(e -> e.getId().equals(id)).findFirst().orElseThrow();
+			entities.getSelectionModel().clearAndSelect(entities.getItems().indexOf(entity));
+		});
 		WaitForAsyncUtils.waitForFxEvents();
 	}
 
@@ -157,9 +271,20 @@ public class ReadmeScreenshots extends ApplicationTest {
 		WaitForAsyncUtils.waitForFxEvents();
 		Image[] image = new Image[1];
 		interact(() -> image[0] = stage.getScene().snapshot(null));
-		int width = (int) image[0].getWidth();
-		int height = (int) image[0].getHeight();
-		PixelReader pixels = image[0].getPixelReader();
+		png(file, image[0]);
+	}
+
+	private void png(Path file, Node node) throws IOException {
+		WaitForAsyncUtils.waitForFxEvents();
+		Image[] image = new Image[1];
+		interact(() -> image[0] = node.snapshot(null, null));
+		png(file, image[0]);
+	}
+
+	private void png(Path file, Image image) throws IOException {
+		int width = (int) image.getWidth();
+		int height = (int) image.getHeight();
+		PixelReader pixels = image.getPixelReader();
 		ByteArrayOutputStream raw = new ByteArrayOutputStream();
 		for (int y = 0; y < height; y++) {
 			// Each row with the Sub filter, which compresses screenshots well

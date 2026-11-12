@@ -81,6 +81,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Popup;
+import javafx.stage.Window;
 import javafx.util.StringConverter;
 
 import org.kordamp.ikonli.Ikon;
@@ -134,6 +135,7 @@ public class EntityEditor extends ScrollPane {
 	/** Opens a web address, e.g. in the browser */
 	private Consumer<String> browse = address -> {
 	};
+	private Consumer<Window> typeHelp;
 	/** Creates a new entity of the given type in the crate */
 	private final Function<String, Entity> newEntity;
 	/** Changes an entity's @id in the crate, updating references (or merging) */
@@ -217,7 +219,18 @@ public class EntityEditor extends ScrollPane {
 	 * Let the user choose a type to add to the entity, e.g. for a new entity.
 	 */
 	public void chooseType() {
-		new TypeSelector(schema, otherTypes(), getScene().getWindow()).showAndWait().ifPresent(this::addType);
+		TypeSelector selector = new TypeSelector(schema, otherTypes(), getScene().getWindow());
+		selector.getDialogPane().addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+			if (typeHelp != null && HelpDialog.isHelpShortcut(event)) {
+				event.consume();
+				typeHelp.accept(selector.getDialogPane().getScene().getWindow());
+			}
+		});
+		selector.showAndWait().ifPresent(this::addType);
+	}
+
+	void setTypeHelp(Consumer<Window> typeHelp) {
+		this.typeHelp = Objects.requireNonNull(typeHelp);
 	}
 
 	/**

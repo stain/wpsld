@@ -1,0 +1,30 @@
+{
+  "skill_name": "ro-crate-publish",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Package my finished crate as a BagIt zip I can hand to the archive.",
+      "expected_output": "bagit.txt, manifest listing every payload file including the metadata, crate under data/.",
+      "files": [],
+      "expectations": [
+        "Crate files are placed under data/",
+        "manifest-sha512.txt includes data/ro-crate-metadata.json",
+        "Asks before uploading anywhere"
+      ]
+    },
+    {
+      "prompt": "Our Rails catalogue has a page per training material and already embeds Bioschemas JSON-LD. Add FAIR Signposting so machines can find an RO-Crate for each record.",
+      "expected_output": "Link header and HTML <link> with describedby (RO-Crate profile), cite-as, author, license, type; crate URL plus content negotiation; signposts first and framework preload links quoted; tested with the signposting library and rocrate-validator.",
+      "files": [],
+      "expectations": [
+        "Advertises the crate with rel=\"describedby\", type=\"application/ld+json\" and profile=\"https://w3id.org/ro/crate\"",
+        "Sends the same links in the HTTP Link header and as HTML <link> elements",
+        "Warns that the framework's own Link entries (Rails preload with unquoted integrity values or nopush) can make strict parsers reject the whole header, and puts the signposting links first",
+        "Keeps plain application/ld+json returning the existing JSON-LD and serves the crate for the RO-Crate profile",
+        "Uses rel=\"item\" only for downloadable content, not for HTML pages",
+        "Suggests testing with an independent client (Python signposting) and validating the returned crate"
+      ],
+      "id": 2
+    }
+  ]
+}

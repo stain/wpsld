@@ -50,6 +50,45 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
 
 ## Next steps
 
+### User help
+
+The audience includes researchers and research data managers who may not
+know RO-Crate, JSON-LD or schema.org. Write for tasks first, introduce terms
+only when needed, and distinguish describing metadata from packaging or
+depositing data.
+
+- **Help > wpsld Help** *(started)*: an offline, searchable, non-modal
+  JavaFX help window with linked Markdown topics, contents and screenshots.
+  F1 opens the topic for the focused editor control (Command-? also works
+  on macOS); the profile chooser's help button opens its topic directly.
+  Existing field definitions remain available separately. The help viewer
+  follows the chosen style and colours, including dark mode.
+- The getting-started walkthrough covers creating and saving a description,
+  linking a file and an author, and exploring types and properties with a
+  photograph and a Wikidata person. It includes screenshots and further
+  reading; the README links to the Markdown topics for reading outside the app.
+- Short topics cover opening and saving, profile loading and preferences,
+  types, entities and identifiers, properties and links, copy and paste,
+  and views. Paste Special is not implemented yet; document its actual
+  options when it is added.
+- **Next:** add topics on required fields, people and organisations,
+  files and troubleshooting; add a glossary. Check every instruction against
+  the app's actual behaviour and
+  the applicable RO-Crate specification.
+- Extend contextual entry points as more topics and controls are added.
+  Keep the help navigable by keyboard and screen reader,
+  usable in all styles and offline, and test that packaged releases contain
+  every topic.
+- Author topics in `ui/src/main/resources/no/s11/wpsld/ui/help/` as
+  CommonMark. The native renderer supports headings, paragraphs, lists,
+  emphasis, code, HTTP(S) links and bundled images under `help/images/`;
+  use relative image paths with ASCII names and descriptive alt text. Add a
+  topic to `HelpDialog.Topic` and link it from `index.md` to make it
+  searchable and available to contextual help. Regenerate walkthrough
+  screenshots with:
+
+      HELP_SCREENSHOTS=$PWD/ui/src/main/resources/no/s11/wpsld/ui/help/images ./gradlew :ui:test --tests '*ReadmeScreenshots.helpScreenshots' --rerun
+
 ### Editor (Crate-O style)
 
 - **JavaFX model-view binding.** Keep `lib`'s model free of JavaFX; in `ui`,
@@ -409,7 +448,6 @@ For macOS (when running on it, whatever the style):
   even with one window.
 - A **Settings window** with toolbar panes, titled after the pane shown,
   applying changes as they are made, instead of the modal Preferences.
-- **Help > wpsld Help**, for ? (Command-?) to open.
 - The **close button's dot** and real **sheets** are out of JavaFX's reach.
 
 For every platform:

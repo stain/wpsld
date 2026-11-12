@@ -29,7 +29,10 @@ def crossTargets = project.hasProperty('windowsJdkHome') ? [
 ] : [:]
 
 jlink {
-    options = ['--strip-debug', '--no-header-files', '--no-man-pages']
+    // Ikonli jars contain OSGi component descriptors in the same OSGI-INF
+    // package. They are unused outside OSGi and newer jlink rejects the split.
+    options = ['--strip-debug', '--no-header-files', '--no-man-pages',
+               '--exclude-resources', 'glob:/org.kordamp.ikonli.*/OSGI-INF/**']
     launcher {
         name = 'wpsld'
         // Windows .bat launcher starts javaw, without a console window
@@ -131,6 +134,7 @@ dependencies {
 
     implementation project(':lib')
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.4'
+    implementation 'org.commonmark:commonmark:0.24.0'
     // Icons as font glyphs: Microsoft's Fluent System Icons, for the
     // Windows 11 style (see Theme)
     implementation 'org.kordamp.ikonli:ikonli-javafx:12.4.0'
