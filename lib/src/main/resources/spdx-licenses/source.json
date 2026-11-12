@@ -1,0 +1,7 @@
+{
+  "version": "3.29.0",
+  "tag": "v3.29.0",
+  "source": "https://raw.githubusercontent.com/spdx/license-list-data/v3.29.0/jsonld/licenses.jsonld",
+  "sha256": "680e8f12e1ca5dd1dccfce8717582c8ce653670f17ec59966d075635fac4f9a8",
+  "licences": 740
+}

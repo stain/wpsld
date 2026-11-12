@@ -340,3 +340,24 @@ under the Creative Commons Attribution 4.0 License.
 
 The maps wpsld shows while it runs are loaded from OpenStreetMap at that
 time and credited on the map; they are not part of the release builds.
+
+
+============================================================================
+SPDX License List 3.29.0
+https://spdx.org/licenses/
+Creative Commons Attribution 3.0 Unported (CC-BY-3.0)
+============================================================================
+
+wpsld includes the SPDX License List 3.29.0, from release v3.29.0 of
+https://github.com/spdx/license-list-data (jsonld/licenses.jsonld), to
+choose licences from. It is licensed under the Creative Commons Attribution
+3.0 Unported licence, https://creativecommons.org/licenses/by/3.0/, as
+https://github.com/spdx/license-list-data/blob/main/accessingLicenses.md
+gives it.
+
+Changed: only the listed licences are kept, each with its identifier, name,
+OSI approval, FSF libre and deprecation flags and links; the licence texts
+and templates, the licence exceptions and the link checks are left out.
+
+SPDX is a registered trademark of The Linux Foundation. wpsld is not
+affiliated with or endorsed by SPDX or The Linux Foundation.

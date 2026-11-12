@@ -60,7 +60,7 @@ public class TestAboutDialog extends ApplicationTest {
 		// Not about the source, and covers what the zips include
 		assertTrue(notices.contains("It does NOT describe the wpsld source code or git repository"));
 		for (String component : List.of("Jackson", "commonmark-java", "FastDoubleParser", "Schubfach", "Ikonli",
-				"Fluent UI System Icons", "Copyright (c) 2020 Microsoft Corporation")) {
+				"Fluent UI System Icons", "Copyright (c) 2020 Microsoft Corporation", "SPDX License List 3.29.0")) {
 			assertTrue(component, notices.contains(component));
 		}
 

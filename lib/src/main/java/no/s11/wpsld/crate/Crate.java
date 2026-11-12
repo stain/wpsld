@@ -493,7 +493,11 @@ public class Crate {
 				.map(v -> v.get("@id").asText());
 	}
 
-	private void replaceReferences(String oldId, String newId) {
+	/**
+	 * Point the references to one <code>@id</code> to another, e.g. to an
+	 * entity known by another address.
+	 */
+	void replaceReferences(String oldId, String newId) {
 		replaceReferences(entities, Map.of(oldId, newId));
 	}
 

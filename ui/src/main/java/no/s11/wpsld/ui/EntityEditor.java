@@ -95,6 +95,7 @@ import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.GeoNames;
 import no.s11.wpsld.crate.Places;
+import no.s11.wpsld.crate.SpdxLicenses;
 import no.s11.wpsld.form.EntityTypes;
 import no.s11.wpsld.form.FieldTier;
 import no.s11.wpsld.form.FormField;
@@ -181,6 +182,8 @@ public class EntityEditor extends ScrollPane {
 	private MapTiles mapTiles = MapTiles.NONE;
 	/** Asks the user for a place in GeoNames, starting from a name */
 	private Function<String, Optional<GeoNames.Place>> findPlace = name -> Optional.empty();
+	/** Asks the user for a licence of the SPDX License List */
+	private Supplier<Optional<SpdxLicenses.License>> findLicense = Optional::empty;
 	/** Where the map of an entity was left, kept while the form is rebuilt */
 	private record MapState(Entity entity, int zoom, double latitude, double longitude) {
 	}
@@ -946,6 +949,14 @@ public class EntityEditor extends ScrollPane {
 	}
 
 	/**
+	 * Set how to ask the user for a licence of the SPDX License List; empty if
+	 * they cancel.
+	 */
+	public void setFindLicense(Supplier<Optional<SpdxLicenses.License>> findLicense) {
+		this.findLicense = Objects.requireNonNull(findLicense);
+	}
+
+	/**
 	 * Set how to open web addresses, such as the definitions of properties.
 	 */
 	public void setBrowse(Consumer<String> browse) {
@@ -1166,6 +1177,12 @@ public class EntityEditor extends ScrollPane {
 					item.setOnAction(e -> link(newEntity.apply(terms.name(type)).getId()));
 					create.getItems().add(item);
 				}
+				if (field.name().equals("license")) {
+					MenuItem fromSpdx = new MenuItem("Licence from SPDX…");
+					fromSpdx.setId(id(prefix("newSpdx"), field.name()));
+					fromSpdx.setOnAction(e -> findLicense.get().ifPresent(this::linkLicense));
+					create.getItems().add(0, fromSpdx);
+				}
 				if (entityTypes.stream().anyMatch(c -> c.getID().equals(PLACE))) {
 					MenuItem fromGeoNames = new MenuItem("Place from GeoNames…");
 					fromGeoNames.setId(id(prefix("newGeoNames"), field.name()));
@@ -1217,6 +1234,24 @@ public class EntityEditor extends ScrollPane {
 				Places.describe(place, found, EntityEditor.this::crateEntity, () -> newEntity.apply("Geometry"));
 			}
 			link(found.iri());
+		}
+
+		/**
+		 * Link the licence chosen from the SPDX License List: the crate's
+		 * entity for it, or a new one with its SPDX IRI and identifier.
+		 */
+		private void linkLicense(SpdxLicenses.License license) {
+			if (crateEntity(license.iri()).isEmpty()) {
+				Entity licence = newEntity.apply("CreativeWork");
+				// Not linked from anywhere yet, so its identifier can just change
+				licence.setId(license.iri());
+				SpdxLicenses.describe(licence, license, EntityEditor.this::crateEntity, id -> {
+					Entity identifier = newEntity.apply("PropertyValue");
+					identifier.setId(id);
+					return identifier;
+				});
+			}
+			link(license.iri());
 		}
 
 		private void link(String id) {

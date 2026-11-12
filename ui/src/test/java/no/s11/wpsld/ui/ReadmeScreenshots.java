@@ -184,18 +184,15 @@ public class ReadmeScreenshots extends ApplicationTest {
 		interact(() -> {
 			lookup("#propertySearch").queryAs(TextField.class).clear();
 			lookup("#value-datePublished-0").queryAs(DatePicker.class).getEditor().setText("2025-01-31");
-			MenuButton license = lookup("#new-license").queryAs(MenuButton.class);
-			license.getItems().stream().filter(i -> i.getText().equals("CreativeWork")).findFirst()
-					.orElseThrow().fire();
 		});
-		select("#creativework-1");
-		interact(() -> {
-			lookup("#header-name").queryAs(TextField.class)
-					.setText("Creative Commons Attribution 4.0 International");
-			TextField id = lookup("#entityId").queryAs(TextField.class);
-			id.setText("http://spdx.org/licenses/CC-BY-4.0");
-			id.getOnAction().handle(new javafx.event.ActionEvent());
-		});
+		// New > Licence from SPDX..., which waits for an answer, so not inside interact()
+		MenuButton license = lookup("#new-license").queryAs(MenuButton.class);
+		Platform.runLater(() -> license.getItems().stream().filter(i -> "newSpdx-license".equals(i.getId()))
+				.findFirst().orElseThrow().fire());
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#licenseQuery").tryQuery().isPresent());
+		interact(() -> lookup("#licenseQuery").queryAs(TextField.class).setText("cc-by-4.0"));
+		interact(() -> lookup("#licenseOk").queryButton().fire());
+		select("http://spdx.org/licenses/CC-BY-4.0");
 		png(out.resolve("license-entity.png"), lookup(n -> n instanceof EntityEditor).query());
 		select("./");
 		png(out.resolve("dataset-form.png"), lookup(n -> n instanceof EntityEditor).query());
@@ -284,6 +281,29 @@ public class ReadmeScreenshots extends ApplicationTest {
 		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText(""));
 		waitForTiles();
 		png(out.resolve("place-location.png"), lookup(n -> n instanceof EntityEditor).query());
+	}
+
+	/**
+	 * A screenshot of choosing a licence from the SPDX License List, for the
+	 * help.
+	 */
+	@Test
+	public void licenceScreenshots() throws Exception {
+		String folder = System.getenv("HELP_SCREENSHOTS");
+		Assume.assumeTrue("Set HELP_SCREENSHOTS to the folder for them", folder != null && !folder.isBlank());
+		Path out = Files.createDirectories(Path.of(folder));
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		look("classic", "light");
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("license"));
+		MenuButton create = lookup("#new-license").queryAs(MenuButton.class);
+		// The dialog waits for an answer, so not inside interact()
+		Platform.runLater(() -> create.getItems().stream().filter(i -> "newSpdx-license".equals(i.getId()))
+				.findFirst().orElseThrow().fire());
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#licenseQuery").tryQuery().isPresent());
+		interact(() -> lookup("#licenseQuery").queryAs(TextField.class).setText("creative commons attribution 4.0"));
+		png(out.resolve("licence-finder.png"),
+				lookup(".dialog-pane").match(n -> n.lookup("#licenseQuery") != null).query());
+		interact(() -> lookup("#licenseOk").queryButton().fire());
 	}
 
 	/** Time for the map's tiles to come from OpenStreetMap */

@@ -32,38 +32,42 @@ entities.
 ## Licences
 
 RO-Crate asks for a **License** on the crate itself (the root dataset), and
-on any file whose licence differs from the crate's. The licence should be
-a description of its own, a CreativeWork, whose `@id` is the licence's web
-address. For the common licences, use their address in the
-[SPDX License List](https://spdx.org/licenses/), which gives each licence
-a short identifier, for example:
+on any file whose licence differs from the crate's. wpsld includes the
+[SPDX License List](https://spdx.org/licenses/), which names the common
+licences and gives each a short identifier, such as `CC-BY-4.0` or
+`Apache-2.0`.
 
-- `http://spdx.org/licenses/CC-BY-4.0` for Creative Commons Attribution 4.0
-- `http://spdx.org/licenses/CC0-1.0` for the CC0 public domain dedication
-- `http://spdx.org/licenses/Apache-2.0` for the Apache License 2.0
-- `http://spdx.org/licenses/MIT` for the MIT License
+To add one, choose **New** beside **License**, then **Licence from
+SPDX...**. Type part of the licence's identifier or name, for example
+`cc-by-4.0`, `apache` or `creative commons attribution 4.0`: the list
+narrows while you type, with whether a licence is OSI approved or FSF free.
+The licence selected is described beside the list, with links to its
+page on the SPDX License List and to the licence itself. Choose one and
+**OK**.
 
-Look up other identifiers on the SPDX License List's page, and put the
-identifier after `http://spdx.org/licenses/`.
+![Choosing a licence from the SPDX License List: the Creative Commons Attribution 4.0 licences, with CC-BY-4.0 selected](images/licence-finder.png)
 
-wpsld does not look licences up for you yet, so add one like this:
+wpsld then adds the licence as RO-Crate recommends: a CreativeWork whose
+`@id` is its SPDX address, such as `http://spdx.org/licenses/CC-BY-4.0`,
+named as SPDX names it, with its SPDX identifier (`CC-BY-4.0`) as a
+PropertyValue in its **Identifier**. If the crate already has that licence,
+for example to give a file the same licence as the crate, it is linked
+rather than added again.
 
-1. On the crate (or file), find **License** and choose **New >
-   CreativeWork**.
-2. Select the new CreativeWork in the entity list, and enter the licence's
-   full name as its **Name**, for example `Creative Commons Attribution
-   4.0 International`.
-3. Set its `@id` to the SPDX address, for example
-   `http://spdx.org/licenses/CC-BY-4.0`, and press Enter. The crate's
-   link to it follows the new `@id`.
+SPDX has replaced some identifiers, for example `GPL-2.0` by `GPL-2.0-only`
+and `GPL-2.0-or-later`. Those are hidden unless you tick **Show deprecated
+identifiers**, e.g. to match what a crate already says.
 
-To give another file the same licence, don't make a second description:
-open the file's **License** drop-down and choose the licence the crate
-already has. For a licence that isn't on the SPDX list, use its own web
-address as the `@id`, and add a **Description** summarising it.
+Crates made elsewhere may give a licence in other ways, for example as
+the text `CC-BY-4.0`, or with an address copied from the browser such as
+`https://spdx.org/licenses/Apache-2.0.html`. **Edit > Repair Crate** turns
+these into links to the SPDX licence, merges licences that turn out to be
+the same, and adds the SPDX name and identifier where they are missing,
+keeping any name the licence already has.
 
-[Getting started](getting-started.md) walks through adding a licence, with
-screenshots.
+For a licence that isn't on the SPDX list, choose **New > CreativeWork**
+instead, set its `@id` to the licence's own web address, and give it a
+**Name** and a **Description** summarising it.
 
 ## Places
 
