@@ -361,3 +361,23 @@ and templates, the licence exceptions and the link checks are left out.
 
 SPDX is a registered trademark of The Linux Foundation. wpsld is not
 affiliated with or endorsed by SPDX or The Linux Foundation.
+
+
+============================================================================
+PRONOM file formats, DROID signature file V125
+https://pronom.nationalarchives.gov.uk/
+Open Government Licence v3.0
+============================================================================
+
+wpsld includes the file formats of PRONOM, The National Archives' registry
+of file formats, from its DROID signature file V125
+(https://pronom.nationalarchives.gov.uk/signatures/DROID_SignatureFile_V125.xml),
+to choose file formats from.
+
+Contains public sector information licensed under the Open Government
+Licence v3.0, https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/
+© Crown copyright, The National Archives.
+
+Changed: only each format's PUID, name, version, media types and file
+extensions are kept; the byte signatures for identifying files are left
+out.

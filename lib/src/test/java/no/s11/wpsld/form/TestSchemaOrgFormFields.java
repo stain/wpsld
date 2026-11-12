@@ -203,4 +203,17 @@ public class TestSchemaOrgFormFields {
 		// And Thing's, like name
 		assertTrue(geometry.stream().anyMatch(f -> f.name().equals("name")));
 	}
+
+	/**
+	 * RO-Crate links a file's encodingFormat to a description of the format
+	 * (e.g. in PRONOM) beside its media type, so it takes text or links.
+	 */
+	@Test
+	public void encodingFormatLinks() {
+		SchemaOrgFormFields formFields = new SchemaOrgFormFields(new SchemaFromJsonLd());
+		FormField format = formFields.fieldsFor(Set.of(URI.create(S + "MediaObject"))).stream()
+				.filter(f -> f.name().equals("encodingFormat")).findFirst().orElseThrow();
+		assertEquals(ValueKind.TEXT_OR_REFERENCE, format.kind());
+		assertTrue(format.range().stream().anyMatch(c -> c.getID().equals(URI.create(S + "WebPage"))));
+	}
 }

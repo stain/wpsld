@@ -73,6 +73,35 @@ For a licence that isn't on the SPDX list, choose **New > CreativeWork**
 instead, set its `@id` to the licence's own web address, and give it a
 **Name** and a **Description** summarising it.
 
+## File formats
+
+RO-Crate asks files for their **Encoding format**: the media type, such
+as `text/csv` or `application/pdf`, and, where it can, a link to the
+format's description in [PRONOM](https://pronom.nationalarchives.gov.uk/),
+the UK National Archives' registry of file formats. wpsld includes PRONOM's
+list of formats, so this works offline.
+
+On a file, choose **New** beside **Encoding format**, then **Format from
+PRONOM...**. The search starts with the file's media type, or the
+extension of its name (for example `.csv`); you can also type a name, a
+version or a PRONOM identifier (PUID) such as `fmt/19`. Choose the format
+and **OK**: wpsld links the format, described as a WebPage and Standard
+with its PRONOM address as `@id`, and adds its media type if the file has
+none.
+
+![Choosing a file format from PRONOM: the versions of PDF, with PDF 1.0 selected](images/format-finder.png)
+
+Many formats have several versions, and PRONOM lists each: PDF 1.4, 1.5,
+1.7 and PDF/A all have the media type `application/pdf` and the extension
+`.pdf`. Choose the version the file has, if you know it, or leave just the
+media type.
+
+**Edit > Repair Crate** links the PRONOM format where a file's media type
+belongs to only one format, such as `text/csv` or `text/markdown`, but not
+`application/pdf`. It also turns PRONOM addresses copied from its web site,
+such as `https://pronom.nationalarchives.gov.uk/fmt/19`, into the form
+RO-Crate uses, `https://www.nationalarchives.gov.uk/PRONOM/fmt/19`.
+
 ## Places
 
 To say where something is, or which area it covers, link it to a

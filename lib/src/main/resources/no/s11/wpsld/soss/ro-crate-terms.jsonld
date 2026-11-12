@@ -28,6 +28,13 @@
       }
     },
     {
+      "@id": "schema:encodingFormat",
+      "@type": "rdf:Property",
+      "schema:rangeIncludes": {
+        "@id": "schema:WebPage"
+      }
+    },
+    {
       "@id": "schema:geo",
       "@type": "rdf:Property",
       "schema:rangeIncludes": {

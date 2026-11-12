@@ -95,6 +95,7 @@ import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.GeoNames;
 import no.s11.wpsld.crate.Places;
+import no.s11.wpsld.crate.PronomFormats;
 import no.s11.wpsld.crate.SpdxLicenses;
 import no.s11.wpsld.form.EntityTypes;
 import no.s11.wpsld.form.FieldTier;
@@ -182,6 +183,8 @@ public class EntityEditor extends ScrollPane {
 	private MapTiles mapTiles = MapTiles.NONE;
 	/** Asks the user for a place in GeoNames, starting from a name */
 	private Function<String, Optional<GeoNames.Place>> findPlace = name -> Optional.empty();
+	/** Asks the user for a file format of PRONOM, starting from a search */
+	private Function<String, Optional<PronomFormats.Format>> findFormat = query -> Optional.empty();
 	/** Asks the user for a licence of the SPDX License List */
 	private Supplier<Optional<SpdxLicenses.License>> findLicense = Optional::empty;
 	/** Where the map of an entity was left, kept while the form is rebuilt */
@@ -949,6 +952,14 @@ public class EntityEditor extends ScrollPane {
 	}
 
 	/**
+	 * Set how to ask the user for a file format of PRONOM, given what to
+	 * search for first; empty if they cancel.
+	 */
+	public void setFindFormat(Function<String, Optional<PronomFormats.Format>> findFormat) {
+		this.findFormat = Objects.requireNonNull(findFormat);
+	}
+
+	/**
 	 * Set how to ask the user for a licence of the SPDX License List; empty if
 	 * they cancel.
 	 */
@@ -1177,6 +1188,12 @@ public class EntityEditor extends ScrollPane {
 					item.setOnAction(e -> link(newEntity.apply(terms.name(type)).getId()));
 					create.getItems().add(item);
 				}
+				if (field.name().equals("encodingFormat")) {
+					MenuItem fromPronom = new MenuItem("Format from PRONOM…");
+					fromPronom.setId(id(prefix("newPronom"), field.name()));
+					fromPronom.setOnAction(e -> findFormat.apply(formatQuery()).ifPresent(this::linkFormat));
+					create.getItems().add(0, fromPronom);
+				}
 				if (field.name().equals("license")) {
 					MenuItem fromSpdx = new MenuItem("Licence from SPDX…");
 					fromSpdx.setId(id(prefix("newSpdx"), field.name()));
@@ -1234,6 +1251,38 @@ public class EntityEditor extends ScrollPane {
 				Places.describe(place, found, EntityEditor.this::crateEntity, () -> newEntity.apply("Geometry"));
 			}
 			link(found.iri());
+		}
+
+		/**
+		 * What to look a file's format up by: its media type, if it has one,
+		 * else the extension of its <code>@id</code>, e.g. <code>.csv</code>.
+		 */
+		private String formatQuery() {
+			Optional<String> mediaType = entity.getAll("encodingFormat").stream().filter(JsonNode::isTextual)
+					.map(JsonNode::asText).findFirst();
+			if (mediaType.isPresent()) {
+				return mediaType.get();
+			}
+			String id = entity.getId().replaceAll("[?#].*", "");
+			int dot = id.lastIndexOf('.');
+			return dot > id.lastIndexOf('/') && dot < id.length() - 1 ? id.substring(dot) : "";
+		}
+
+		/**
+		 * Add the format chosen from PRONOM: a link to the crate's entity for
+		 * it, or a new one with its PRONOM address, and its media type if the
+		 * file has none.
+		 */
+		private void linkFormat(PronomFormats.Format format) {
+			if (crateEntity(format.iri()).isEmpty()) {
+				Entity described = newEntity.apply("WebPage");
+				// Not linked from anywhere yet, so its identifier can just change
+				described.setId(format.iri());
+				PronomFormats.describe(described, format);
+			}
+			PronomFormats.addTo(entity, format);
+			onChange.run();
+			showForm();
 		}
 
 		/**

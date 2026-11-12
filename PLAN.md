@@ -685,12 +685,25 @@ Styles:
   names the latest) can be bundled and searched offline, as the SPDX list
   is. Credit "Contains public sector information licensed under the Open
   Government Licence v3.0" and the signature version.
-  - A "Format from PRONOM…" chooser by name, extension or media type,
-    showing versions: many formats share a media type or extension
-    (`application/pdf` and `.pdf` match many versioned PUIDs, e.g. PDF 1.4
-    to 1.7 and PDF/A), and only 781 of 2,571 have a MIME type.
-  - Repair Crate may add the PRONOM entity where the media type has a
-    single match, and otherwise leave it to the user.
+  - *Done:* "New ▾ Format from PRONOM…" on `encodingFormat`
+    (`FormatFinder`, `PronomFormats`) searches the bundled formats by name,
+    version, PUID, extension or media type while typing, starting from the
+    file's media type or extension, and links the format (a `WebPage`,
+    `Standard` with its PRONOM address and name) beside the media type,
+    adding that if the file has none. `encodingFormat` takes links as well
+    as text (`WebPage` added to its range in `ro-crate-terms.jsonld`), so
+    such links are no longer turned into text when edited. Many formats
+    share a media type or extension (`application/pdf` and `.pdf` match 35
+    PUIDs: PDF 1.0 to 1.7, PDF/A 1a to 4f…), so each version is listed.
+    Bundled by `scripts/update-pronom-formats.sh <version>|latest` from
+    signature file V125, trimmed to PUID, name, version, media types and
+    extensions (271 kB), credited under the Open Government Licence v3.0.
+  - *Done:* Repair Crate links the format where a file's media type
+    belongs to one format only (209 of PRONOM's 310 media types, e.g.
+    `text/csv`, `text/markdown`, `application/zip`), and turns other forms
+    of PRONOM addresses (`http:`, the new site's, `.json`) into
+    `https://www.nationalarchives.gov.uk/PRONOM/<PUID>`. No identifiers.org
+    prefix exists for PRONOM, so no PropertyValue as for SPDX.
   - With proper file support (a crate with its root folder, see Opening a
     folder below), identify a file's format from its content with the same
     signature file (and `container-signature.xml` for ZIP and OLE2
@@ -754,9 +767,24 @@ Styles:
     https://osmdata.openstreetmap.de/data/ has land and water polygons and
     coastlines (ODbL), enough for an offline outline map to place a point
     on; or a tile server inside the TRE, set as the map's tile address.
-  - Licences (SPDX) are bundled already; PRONOM's signature file can be
-    bundled too (see above). ROR publishes a full data dump on Zenodo,
-    which a TRE could load; ORCID and DOI lookups stay online-only.
+  - Licences (SPDX) and file formats (PRONOM) are bundled already, small
+    enough (415 and 271 kB) not to bloat the zips. ROR publishes a full
+    data dump on Zenodo, which a TRE could load; ORCID and DOI lookups stay
+    online-only.
+  - **Data bundles added by the user** (not yet): data too big to bundle,
+    or under a licence that doesn't fit with Apache-2.0, dropped into a
+    folder that wpsld reads at start (e.g. `data/` beside its settings, or
+    beside the application for a whole TRE), each with its source, version
+    and licence shown in Help > About. For example GeoNames'
+    `allCountries.zip` (403 MB), a ROR dump, or map data from
+    https://download.geofabrik.de/ (OpenStreetMap extracts per continent,
+    country and region, ODbL, up to tens of GB): too large to bundle, but
+    a region's extract could give offline street-level maps and place
+    search. A "pre-populated wpsld" could be prepared outside a TRE with the
+    data its users need, then moved inside the firewall as one folder or
+    zip. Needs: the folder's layout and a manifest per bundle, checking
+    what is there at start, and preferring the bundles over online services
+    when offline.
 - **An explorer for entities**, like Explorer, the Finder or a Workplace
   Shell folder: a window (or view) of the crate with virtual folders for
   each kind of contextual entity on top, e.g. "Persons", "Organizations"

@@ -306,6 +306,37 @@ public class ReadmeScreenshots extends ApplicationTest {
 		interact(() -> lookup("#licenseOk").queryButton().fire());
 	}
 
+	/**
+	 * A screenshot of choosing a file format from PRONOM, for the help: a
+	 * PDF, whose versions are listed.
+	 */
+	@Test
+	public void formatScreenshots() throws Exception {
+		String folder = System.getenv("HELP_SCREENSHOTS");
+		Assume.assumeTrue("Set HELP_SCREENSHOTS to the folder for them", folder != null && !folder.isBlank());
+		Path out = Files.createDirectories(Path.of(folder));
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		look("classic", "light");
+		interact(() -> lookup("#headerNew-hasPart").queryAs(MenuButton.class).getItems().stream()
+				.filter(i -> i.getText().equals("File")).findFirst().orElseThrow().fire());
+		select("#file-1");
+		interact(() -> {
+			TextField id = lookup("#entityId").queryAs(TextField.class);
+			id.setText("paper.pdf");
+			id.getOnAction().handle(new javafx.event.ActionEvent());
+		});
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("encodingFormat"));
+		MenuButton create = lookup("#new-encodingFormat").queryAs(MenuButton.class);
+		// The dialog waits for an answer, so not inside interact()
+		Platform.runLater(() -> create.getItems().stream()
+				.filter(i -> "newPronom-encodingFormat".equals(i.getId())).findFirst().orElseThrow().fire());
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#formatQuery").tryQuery().isPresent());
+		interact(() -> lookup("#formatQuery").queryAs(TextField.class).setText("pdf 1."));
+		png(out.resolve("format-finder.png"),
+				lookup(".dialog-pane").match(n -> n.lookup("#formatQuery") != null).query());
+		interact(() -> lookup("#formatOk").queryButton().fire());
+	}
+
 	/** Time for the map's tiles to come from OpenStreetMap */
 	private void waitForTiles() throws InterruptedException {
 		Thread.sleep(6000);
