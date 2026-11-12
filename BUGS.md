@@ -76,3 +76,11 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   adds them as a Dataset (a folder) or a File, also several selected at
   once. For a file, detect its format from its contents (file magic and
   PRONOM), and fill in its size, media type and other details.
+- **Formats from file contents**: files added from a folder get their
+  format by extension only, as the bundled PRONOM data has extensions and
+  media types but not DROID's byte signatures. Matching contents ("file
+  magic") needs the signature file's internal signatures and a matcher
+  for them, or a library such as Apache Tika.
+- **Refresh the folder's files**: they are listed again at most every 5
+  seconds as the crate changes; a View > Refresh (F5) would list them at
+  once, e.g. after copying files in.

@@ -198,6 +198,66 @@ public final class PRONOMFormats {
 	}
 
 	/**
+	 * The formats a file of this name may be, by its extension, e.g.
+	 * <code>.csv</code>, ignoring case; none without one.
+	 */
+	public List<Format> withExtension(String fileName) {
+		String name = fileName.replaceAll("[?#].*", "");
+		name = name.substring(name.lastIndexOf('/') + 1);
+		int dot = name.lastIndexOf('.');
+		if (dot <= 0 || dot == name.length() - 1) {
+			return List.of();
+		}
+		String extension = name.substring(dot + 1);
+		return formats.stream().filter(f -> f.extensions().stream().anyMatch(extension::equalsIgnoreCase)).toList();
+	}
+
+	/**
+	 * Describe a file's format by its name, where it has none yet: its
+	 * media type in <code>encodingFormat</code> if the formats with its
+	 * extension agree on one; and a link to the format, described in the
+	 * crate, if only one has it (e.g. <code>.csv</code>, but not
+	 * <code>.pdf</code>, which has many versions).
+	 *
+	 * @return The format linked, if any
+	 */
+	public Optional<Format> addByName(Crate crate, Entity file) {
+		if (!file.getAll("encodingFormat").isEmpty()) {
+			return Optional.empty();
+		}
+		List<Format> found = withExtension(file.getId());
+		if (found.size() == 1) {
+			addTo(file, found.get(0));
+			describeIn(crate, found.get(0));
+			return Optional.of(found.get(0));
+		}
+		List<String> mediaTypes = found.stream().flatMap(f -> f.mediaTypes().stream()).distinct().toList();
+		if (mediaTypes.size() == 1) {
+			file.setAll("encodingFormat", List.of(TextNode.valueOf(mediaTypes.get(0))));
+		}
+		return Optional.empty();
+	}
+
+	/**
+	 * A format's entity in the crate, added if not there, and described
+	 * (see {@link #describe}) if not yet
+	 *
+	 * @return Whether it was added or described
+	 */
+	private static boolean describeIn(Crate crate, Format format) {
+		Entity described = crate.get(format.iri()).orElseGet(() -> {
+			Entity added = crate.add("WebPage");
+			crate.rename(added, format.iri());
+			return added;
+		});
+		boolean complete = described.getTypes().containsAll(TYPES) && described.get("name").isPresent();
+		if (!complete) {
+			describe(described, format);
+		}
+		return !complete;
+	}
+
+	/**
 	 * Describe a format's entity as RO-Crate's examples do: of the types
 	 * <code>WebPage</code> and <code>Standard</code> (keeping others it has,
 	 * but not Thing), named as PRONOM names it, unless it has a name. Its
@@ -301,14 +361,7 @@ public final class PRONOMFormats {
 				if (format.isEmpty()) {
 					continue;
 				}
-				Entity described = crate.get(id).orElseGet(() -> {
-					Entity added = crate.add("WebPage");
-					crate.rename(added, id);
-					return added;
-				});
-				boolean complete = described.getTypes().containsAll(TYPES) && described.get("name").isPresent();
-				if (!complete) {
-					describe(described, format.get());
+				if (describeIn(crate, format.get())) {
 					done.add(format.get().name() + " (" + id + ") completed from PRONOM");
 				}
 			}

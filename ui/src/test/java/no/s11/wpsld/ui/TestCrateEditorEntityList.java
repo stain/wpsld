@@ -395,6 +395,80 @@ public class TestCrateEditorEntityList extends ApplicationTest {
 		assertEquals("raw/2025/a.txt", entities().getSelectionModel().getSelectedItem().getId());
 	}
 
+	/**
+	 * File > Open Folder without a metadata file: a new crate of the folder,
+	 * its files greyed out to add; saved in it without asking
+	 */
+	@Test
+	public void openFolder() throws Exception {
+		Path folder = Files.createDirectories(temp.resolve("Bird survey"));
+		Files.createDirectories(folder.resolve("data"));
+		Files.writeString(folder.resolve("data/counts.csv"), "species,count\n");
+		Files.writeString(folder.resolve("my notes.txt"), "notes");
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.openFolder(stage, folder)).get());
+		choose("menuListByFolder");
+		EntityTreeView tree = lookup("#entityTree").queryAs(EntityTreeView.class);
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals(List.of("Bird survey", "  data ~", "  my notes.txt ~"), rows(tree));
+		assertTrue(stage.getTitle(),
+				stage.getTitle().contains("Bird survey" + java.io.File.separator + "ro-crate-metadata.json"));
+
+		// The file and the folder, the folder first
+		interact(() -> tree.getTreeItem(1).setExpanded(true));
+		interact(() -> {
+			tree.getSelectionModel().clearSelection();
+			tree.getSelectionModel().selectIndices(1, 2);
+		});
+		interact(() -> menuItem("menuAddDataset").fire());
+		interact(() -> tree.getSelectionModel().clearAndSelect(rows(tree).indexOf("    counts.csv ~")));
+		interact(() -> menuItem("menuAddPart").fire());
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals(List.of("Bird survey", "  data", "    counts.csv", "  my notes.txt ~"), rows(tree).subList(0, 4));
+		assertEquals("data/counts.csv", lookup("#entityId").queryAs(TextField.class).getText());
+		interact(() -> tree.getSelectionModel().clearAndSelect(3));
+		interact(() -> menuItem("menuAddPart").fire());
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals("my%20notes.txt", lookup("#entityId").queryAs(TextField.class).getText());
+
+		push(KeyCode.SHORTCUT, KeyCode.S);
+		WaitForAsyncUtils.waitForFxEvents();
+		// No licence nor description yet
+		if (lookup("Save Anyway").tryQuery().isPresent()) {
+			clickOn("Save Anyway");
+		}
+		String saved = Files.readString(folder.resolve("ro-crate-metadata.json"));
+		assertTrue(saved, saved.contains("\"contentSize\" : \"14\""));
+		assertTrue(saved, saved.contains("\"text/csv\""));
+		assertTrue(saved, saved.contains("\"@id\" : \"my%20notes.txt\""));
+	}
+
+	/**
+	 * A metadata file whose files are not beside it (e.g. downloaded) is
+	 * detached, as is one of another name: its folder's files are not listed
+	 */
+	@Test
+	public void detached() throws Exception {
+		Path folder = Files.createDirectories(temp.resolve("Downloads"));
+		Files.writeString(folder.resolve("unrelated.pdf"), "");
+		Path metadata = folder.resolve("ro-crate-metadata.json");
+		Files.writeString(metadata, CRATE);
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, metadata)).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		// The warning saying so, beside the window
+		interact(() -> List.copyOf(javafx.stage.Window.getWindows()).stream().filter(w -> w != stage)
+				.forEach(w -> ((Stage) w).close()));
+		choose("menuListByFolder");
+		EntityTreeView tree = lookup("#entityTree").queryAs(EntityTreeView.class);
+		assertFalse(rows(tree).toString(), rows(tree).contains("  unrelated.pdf ~"));
+		// Attached after all, its folder's files are listed
+		interact(() -> ((javafx.scene.control.CheckMenuItem) menuItem("menuAttached")).setSelected(true));
+		interact(() -> menuItem("menuAttached").fire());
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(rows(tree).toString(), rows(tree).contains("  unrelated.pdf ~"));
+	}
+
 	@Test
 	public void editedNotListed() throws Exception {
 		addNamed("Person", "Alice");

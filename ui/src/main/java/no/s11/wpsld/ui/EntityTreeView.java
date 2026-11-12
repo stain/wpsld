@@ -183,7 +183,9 @@ class EntityTreeView extends TreeView<Node> {
 	/** The entity's types and @id; or what a greyed out node is */
 	private static Optional<String> tip(Node node) {
 		String state = switch (node.kind()) {
-		case FOLDER, FILE -> node.entity().isEmpty() ? "A folder with no Dataset entity"
+		case FOLDER, FILE -> node.entity().isEmpty()
+				? node.kind() == Kind.FILE ? "In the crate's folder, but not in the crate: Add to Has Part to add it"
+						: "A folder with no Dataset entity"
 				: node.data() ? "" : "Not a data entity: not a part (hasPart) of the crate or its datasets";
 		default -> "";
 		};
@@ -298,6 +300,12 @@ class EntityTreeView extends TreeView<Node> {
 			scrollTo(Math.max(0, last - 3));
 		}
 		return all;
+	}
+
+	/** The files selected that have no entity, by their @ids */
+	List<String> selectedFileIds() {
+		return getSelectionModel().getSelectedItems().stream().filter(Objects::nonNull).map(TreeItem::getValue)
+				.map(EntityTree::fileId).flatMap(Optional::stream).distinct().toList();
 	}
 
 	/** The folders selected that have no Dataset, by their @ids, e.g. raw/ */

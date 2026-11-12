@@ -19,8 +19,11 @@ package no.s11.wpsld.ui;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -42,6 +45,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 
 
 import javafx.application.Application;
@@ -98,6 +102,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.util.StringConverter;
 import javafx.stage.Stage;
@@ -107,6 +112,7 @@ import no.s11.wpsld.Settings;
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.CrateChecks;
 import no.s11.wpsld.crate.CrateDocument;
+import no.s11.wpsld.crate.CrateFolder;
 import no.s11.wpsld.crate.CrateDocument.Problem;
 import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
@@ -517,7 +523,8 @@ public class CrateEditor extends Application {
 		// refers to, which open them) and the crate's JSON-LD
 		entityPreview = new EntityPreview(() -> crate, this::show,
 				address -> getHostServices().showDocument(address), property -> entityEditor.label(property));
-		entityPreview.setFolder(() -> crateFile.path().map(file -> file.toAbsolutePath().getParent()));
+		// Only an attached crate's relative @ids are files
+		entityPreview.setFolder(crateFile::folder);
 		// Beside the form's references and @id: show the entity, or open the address
 		entityEditor.setShow(this::show);
 		entityEditor.setAddress(entityPreview::address);
@@ -693,6 +700,11 @@ public class CrateEditor extends Application {
 		open.setId("menuOpen");
 		open.setAccelerator(new KeyCodeCombination(KeyCode.O, KeyCombination.SHORTCUT_DOWN));
 		open.setOnAction(e -> askToOpen(stage));
+		MenuItem openFolder = new MenuItem("Open _Folder…");
+		openFolder.setId("menuOpenFolder");
+		openFolder.setAccelerator(new KeyCodeCombination(KeyCode.O, KeyCombination.SHORTCUT_DOWN,
+				KeyCombination.SHIFT_DOWN));
+		openFolder.setOnAction(e -> askToOpenFolder(stage));
 		MenuItem close = new MenuItem("_Close Window");
 		close.setId("menuClose");
 		close.setAccelerator(new KeyCodeCombination(KeyCode.W, KeyCombination.SHORTCUT_DOWN));
@@ -716,7 +728,7 @@ public class CrateEditor extends Application {
 		exit.setAccelerator(new KeyCodeCombination(KeyCode.Q, KeyCombination.SHORTCUT_DOWN));
 		// As closing the window, rather than stage.close(), which doesn't ask
 		exit.setOnAction(e -> stage.fireEvent(new WindowEvent(stage, WindowEvent.WINDOW_CLOSE_REQUEST)));
-		Menu file = new Menu("_File", null, newCrate, open, close, new SeparatorMenuItem(), save, saveAs,
+		Menu file = new Menu("_File", null, newCrate, open, openFolder, close, new SeparatorMenuItem(), save, saveAs,
 				new SeparatorMenuItem(), load, new SeparatorMenuItem(), exit);
 		file.setId("menuFile");
 
@@ -775,9 +787,20 @@ public class CrateEditor extends Application {
 		MenuItem repair = new MenuItem("Repa_ir Crate");
 		repair.setId("menuRepair");
 		repair.setOnAction(e -> repair(stage));
+		CheckMenuItem attached = new CheckMenuItem("A_ttached to Folder");
+		attached.setId("menuAttached");
+		attached.setOnAction(e -> {
+			crateFile.setAttached(attached.isSelected());
+			relist();
+			refresh();
+		});
 		Menu menu = new Menu("_Crate", null, parts.toArray(MenuItem[]::new));
-		menu.getItems().addAll(new SeparatorMenuItem(), repair);
-		menu.setOnShowing(e -> enableParts(parts));
+		menu.getItems().addAll(new SeparatorMenuItem(), attached, new SeparatorMenuItem(), repair);
+		menu.setOnShowing(e -> {
+			enableParts(parts);
+			attached.setSelected(crateFile.isAttached());
+			attached.setDisable(!crateFile.canAttach());
+		});
 		menu.setId("menuCrate");
 		return menu;
 	}
@@ -799,7 +822,7 @@ public class CrateEditor extends Application {
 	/** As the menu opens, as what they act on changes with the crate */
 	private void enableParts(List<MenuItem> items) {
 		items.get(0).setDisable(selectedFolders().isEmpty());
-		items.get(1).setDisable(partable().isEmpty());
+		items.get(1).setDisable(partable().isEmpty() && (!byFolder || byPart || tree.selectedFileIds().isEmpty()));
 	}
 
 	/** The folders without a Dataset selected in the tree, by their @ids */
@@ -820,6 +843,59 @@ public class CrateEditor extends Application {
 				.toList();
 	}
 
+	/**
+	 * The files and folders of an attached crate's folder, as relative
+	 * <code>@id</code>s (see {@link CrateFolder#list}): listed again after a
+	 * few seconds, not on each change, as a folder may have many.
+	 */
+	private List<String> filesOnDisk() {
+		Optional<Path> folder = crateFile.folder();
+		if (folder.isEmpty()) {
+			return List.of();
+		}
+		long now = System.nanoTime();
+		if (!folder.equals(listedFolder) || now - listedAt > 5_000_000_000L) {
+			try {
+				listed = CrateFolder.list(folder.get(), MAX_FILES);
+			} catch (UncheckedIOException e) {
+				listed = List.of();
+			}
+			listedFolder = folder;
+			listedAt = now;
+		}
+		return listed;
+	}
+
+	/** The most files of a folder to list */
+	private static final int MAX_FILES = 10_000;
+	private List<String> listed = List.of();
+	private Optional<Path> listedFolder = Optional.empty();
+	private long listedAt;
+
+	/**
+	 * The files selected that the crate doesn't describe yet, in its folder:
+	 * as Files, described by the file on disk (size, date modified) and its
+	 * name (format, see {@link PRONOMFormats#addByName})
+	 */
+	private List<Entity> addSelectedFiles() {
+		if (!byFolder || byPart) {
+			return List.of();
+		}
+		List<Entity> added = new ArrayList<>();
+		for (String id : tree.selectedFileIds()) {
+			if (crate.get(id).isPresent()) {
+				continue;
+			}
+			Entity file = crate.add("File");
+			crate.rename(file, id);
+			crateFile.folder().ifPresent(folder -> CrateFolder.describe(file,
+					folder.resolve(java.net.URLDecoder.decode(id.replace("+", "%2B"), StandardCharsets.UTF_8))));
+			PRONOMFormats.bundled().addByName(crate, file);
+			added.add(file);
+		}
+		return added;
+	}
+
 	/** A Dataset for each folder selected, as a part of the one above it */
 	private void addDatasets() {
 		List<Entity> added = crate.addFolders(selectedFolders());
@@ -833,8 +909,12 @@ public class CrateEditor extends Application {
 
 	/** The entities selected as parts of the datasets of their folders */
 	private void addParts() {
-		List<Entity> selected = List.copyOf(selection);
-		if (crate.addParts(partable()).isEmpty()) {
+		List<Entity> files = addSelectedFiles();
+		List<Entity> selected = new ArrayList<>(selection);
+		selected.addAll(files);
+		List<Entity> parts = new ArrayList<>(partable());
+		parts.addAll(files);
+		if (crate.addParts(parts).isEmpty()) {
 			return;
 		}
 		crate.unmentionLinked();
@@ -1039,7 +1119,8 @@ public class CrateEditor extends Application {
 				}
 			}
 			if (byFolder) {
-				tree.setNodes(byPart ? EntityTree.logical(crate, listing) : EntityTree.physical(crate, listing), edited);
+				tree.setNodes(byPart ? EntityTree.logical(crate, listing)
+						: EntityTree.physical(crate, listing, filesOnDisk()), edited);
 			}
 		} finally {
 			relisting = false;
@@ -1307,6 +1388,53 @@ public class CrateEditor extends Application {
 	}
 
 	/**
+	 * File > Open Folder: choose a folder, and open its crate, after asking
+	 * whether to discard the changes to this crate (see {@link #openFolder}).
+	 */
+	private void askToOpenFolder(Stage stage) {
+		if (!mayClose(stage)) {
+			return;
+		}
+		DirectoryChooser chooser = new DirectoryChooser();
+		chooser.setTitle("Open Folder as RO-Crate");
+		if (lastFolder != null) {
+			chooser.setInitialDirectory(lastFolder);
+		}
+		File folder = chooser.showDialog(stage);
+		if (folder != null) {
+			openFolder(stage, folder.toPath());
+		}
+	}
+
+	/**
+	 * Open a folder's crate: its <code>ro-crate-metadata.json</code> (or
+	 * RO-Crate 1.0's <code>.jsonld</code>), else a new crate attached to it,
+	 * saved there when first saved. Its files are not added, but listed in
+	 * Entities by Folder to add.
+	 *
+	 * @return Whether it was opened
+	 */
+	boolean openFolder(Stage stage, Path folder) {
+		for (String name : List.of(Crate.RO_CRATE_METADATA_JSON, CrateFile.RO_CRATE_METADATA_JSONLD)) {
+			if (Files.isRegularFile(folder.resolve(name))) {
+				return open(stage, folder.resolve(name));
+			}
+		}
+		Crate created = new Crate();
+		String name = Optional.ofNullable(folder.toAbsolutePath().getFileName()).map(Path::toString).orElse("");
+		if (!name.isEmpty()) {
+			created.getRoot().set("name", Optional.of(TextNode.valueOf(name)));
+		}
+		edit(created, Optional.empty());
+		crateFile.openIn(folder, crate.toJson());
+		listedFolder = Optional.empty();
+		lastFolder = folder.toFile();
+		relist();
+		refresh();
+		return true;
+	}
+
+	/**
 	 * Open an RO-Crate Metadata File, or the one in a folder, without asking.
 	 * Its problems are shown: errors instead of opening it, warnings beside
 	 * it. The profile it conforms to is chosen, or loaded if not offered yet.
@@ -1327,18 +1455,44 @@ public class CrateEditor extends Application {
 		edit(document.crate().get(), Optional.of(file));
 		lastFolder = file.toFile().getParentFile();
 		chooseProfile(document);
-		if (!document.problems().isEmpty()) {
-			Alert warnings = new Alert(AlertType.WARNING, document.problems().stream().map(Problem::toString)
-					.collect(Collectors.joining("\n")), ButtonType.OK);
+		List<String> notes = new ArrayList<>(document.problems().stream().map(Problem::toString).toList());
+		if (crateFile.isAttached() && filesElsewhere(crate, crateFile.folder().get())) {
+			// e.g. downloaded on its own
+			crateFile.setAttached(false);
+			relist();
+			refresh();
+			notes.add("None of the crate's files are in " + crateFile.folder().orElse(file.getParent())
+					+ ", so it is opened as a detached crate, whose files are elsewhere."
+					+ " Choose Crate > Attached to Folder if they are in its folder.");
+		}
+		if (!notes.isEmpty()) {
+			Alert warnings = new Alert(AlertType.WARNING, String.join("\n", notes), ButtonType.OK);
 			warnings.initOwner(stage);
-			warnings.setHeaderText(document.problems().size() + (document.problems().size() == 1 ? " warning" : " warnings")
-					+ " reading " + file);
+			warnings.setHeaderText(notes.size() + (notes.size() == 1 ? " warning" : " warnings") + " reading " + file);
 			warnings.setResizable(true);
 			// Beside the crate, not in the way of editing it
 			warnings.initModality(javafx.stage.Modality.NONE);
 			warnings.show();
 		}
 		return true;
+	}
+
+	/**
+	 * Whether a crate's files seem to be elsewhere than this folder: it has
+	 * parts with relative paths, and none of them is in it.
+	 */
+	static boolean filesElsewhere(Crate crate, Path folder) {
+		List<String> paths = crate.dataEntities().stream().map(Entity::getId)
+				.filter(id -> EntityTree.isPath(id) && !id.contains("#")).toList();
+		return !paths.isEmpty() && paths.stream().noneMatch(id -> {
+			try {
+				String path = java.net.URLDecoder.decode(id.replace("+", "%2B"), java.nio.charset.StandardCharsets.UTF_8);
+				return Files.exists(folder.resolve(path));
+			} catch (IllegalArgumentException e) {
+				// Not decodable, or not a path here
+				return false;
+			}
+		});
 	}
 
 	/**
@@ -1732,6 +1886,11 @@ public class CrateEditor extends Application {
 	boolean save(Stage stage) {
 		Optional<Path> path = crateFile.path();
 		if (path.isEmpty()) {
+			// A new crate of a folder: in it, unless another was saved there since
+			Optional<Path> target = crateFile.saveTarget().filter(file -> !Files.exists(file));
+			if (target.isPresent()) {
+				return meetsRequirements(stage) && saveTo(stage, target.get());
+			}
 			return saveAs(stage);
 		}
 		CrateFile.Disk disk = crateFile.disk();
@@ -1864,10 +2023,12 @@ public class CrateEditor extends Application {
 		}
 		FileChooser chooser = new FileChooser();
 		chooser.setTitle("Save RO-Crate Metadata File");
-		chooser.setInitialFileName(crateFile.path().map(p -> p.getFileName().toString())
+		chooser.setInitialFileName(crateFile.saveTarget().map(p -> p.getFileName().toString())
 				.orElse(Crate.RO_CRATE_METADATA_JSON));
+		crateFile.saveTarget().map(p -> p.toAbsolutePath().getParent().toFile()).filter(File::isDirectory)
+				.ifPresent(chooser::setInitialDirectory);
 		chooser.getExtensionFilters().setAll(new FileChooser.ExtensionFilter("JSON-LD", "*.json", "*.jsonld"));
-		if (lastFolder != null) {
+		if (lastFolder != null && chooser.getInitialDirectory() == null) {
 			chooser.setInitialDirectory(lastFolder);
 		}
 		File file = chooser.showSaveDialog(stage);

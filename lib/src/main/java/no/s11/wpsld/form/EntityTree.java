@@ -21,6 +21,7 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.text.Collator;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -33,6 +34,7 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import no.s11.wpsld.crate.Crate;
+import no.s11.wpsld.crate.CrateFolder;
 import no.s11.wpsld.crate.Entity;
 
 /**
@@ -96,6 +98,16 @@ public class EntityTree {
 	 * The physical tree: its top nodes, the root data entity first.
 	 */
 	public static List<Node> physical(Crate crate, EntityListing listing) {
+		return physical(crate, listing, List.of());
+	}
+
+	/**
+	 * The physical tree, with the files and folders of the crate's folder
+	 * that it doesn't describe, by their relative <code>@id</code>s (see
+	 * {@link CrateFolder#list}): files without an entity, greyed out as the
+	 * folders without one are.
+	 */
+	public static List<Node> physical(Crate crate, EntityListing listing, Collection<String> onDisk) {
 		Collator collator = Collator.getInstance();
 		collator.setStrength(Collator.SECONDARY);
 		Entity root = crate.getRoot();
@@ -119,6 +131,24 @@ public class EntityTree {
 				external.add(entity);
 			} else {
 				listing.typeNames(entity).forEach(t -> contextual.computeIfAbsent(t, k -> new ArrayList<>()).add(entity));
+			}
+		}
+		// Files and folders on disk without an entity
+		Set<List<String>> described = new HashSet<>();
+		crate.getEntities().stream().map(Entity::getId).filter(EntityTree::isPath).map(EntityTree::path)
+				.forEach(described::add);
+		for (String id : onDisk) {
+			List<String> path = path(id);
+			if (described.contains(path)) {
+				continue;
+			}
+			if (id.endsWith("/")) {
+				Folder folder = top;
+				for (String name : path) {
+					folder = folder.folder(name);
+				}
+			} else {
+				top.addMissing(path);
 			}
 		}
 		// Parts of files: under the file's entity if it has one, and by type
@@ -264,31 +294,31 @@ public class EntityTree {
 		if (node.kind() != Kind.FOLDER || !node.key().startsWith("path:")) {
 			return Optional.empty();
 		}
-		String path = node.key().substring("path:".length());
-		StringBuilder id = new StringBuilder();
-		for (String name : path.split("/")) {
-			id.append(encode(name)).append('/');
-		}
-		return Optional.of(id.toString());
+		return Optional.of(pathId(node.key().substring("path:".length())));
 	}
 
 	/**
-	 * A name in a path, percent-encoded where a relative URI must be: spaces,
-	 * <code>%</code>, <code>#</code>, <code>?</code> and other characters not
-	 * allowed in a URI; letters of other scripts stay, as IRIs allow them.
+	 * The <code>@id</code> for a file in the crate's folder that has no
+	 * entity, e.g. <code>my%20notes.txt</code>; none for other nodes.
 	 */
+	public static Optional<String> fileId(Node node) {
+		if (node.kind() != Kind.FILE || node.entity().isPresent() || !node.key().startsWith("path:")) {
+			return Optional.empty();
+		}
+		return Optional.of(pathId(node.key().substring("path:".length())));
+	}
+
+	/** A decoded path, e.g. a/my notes/, as an @id: a/my%20notes/ */
+	private static String pathId(String path) {
+		List<String> names = new ArrayList<>();
+		for (String name : path.split("/")) {
+			names.add(encode(name));
+		}
+		return String.join("/", names) + (path.endsWith("/") ? "/" : "");
+	}
+
 	static String encode(String name) {
-		StringBuilder encoded = new StringBuilder();
-		name.codePoints().forEach(c -> {
-			if (c < 0x21 || c == 0x7f || " %#?[]\"<>\\^`{|}".indexOf(c) >= 0) {
-				for (byte b : new String(Character.toChars(c)).getBytes(StandardCharsets.UTF_8)) {
-					encoded.append(String.format("%%%02X", b & 0xff));
-				}
-			} else {
-				encoded.appendCodePoint(c);
-			}
-		});
-		return encoded.toString();
+		return CrateFolder.encode(name);
 	}
 
 	/** Percent-decoded as UTF-8, or as it is if it can't be */
@@ -327,6 +357,8 @@ public class EntityTree {
 		Entity entity;
 		final Map<String, Folder> folders = new LinkedHashMap<>();
 		final List<Entity> files = new ArrayList<>();
+		/** Files on disk in it without an entity, by name */
+		final List<String> missing = new ArrayList<>();
 		/** The data entities of the crate */
 		final Set<Entity> data;
 		/** The entities of parts of files, e.g. page.html#table2, by file */
@@ -354,6 +386,18 @@ public class EntityTree {
 			}
 		}
 
+		void addMissing(List<String> path) {
+			Folder folder = this;
+			for (String name : path.subList(0, path.size() - 1)) {
+				folder = folder.folder(name);
+			}
+			String name = path.get(path.size() - 1);
+			// Not as a file if an entity has its path as a folder
+			if (!folder.folders.containsKey(name)) {
+				folder.missing.add(name);
+			}
+		}
+
 		Folder folder(String name) {
 			return folders.computeIfAbsent(name, n -> new Folder(key + n + "/", n, data, parts));
 		}
@@ -362,10 +406,15 @@ public class EntityTree {
 			List<Node> children = new ArrayList<>();
 			folders.values().stream().sorted(Comparator.comparing((Folder f) -> f.name, collator)
 					.thenComparing(f -> f.key)).map(f -> f.node(Kind.FOLDER, collator)).forEach(children::add);
-			files.stream().sorted(Comparator.comparing((Entity e) -> name(e), collator).thenComparing(Entity::getId))
+			// Files described and not, by name
+			List<Node> fileNodes = new ArrayList<>();
+			files.stream().sorted(Comparator.comparing(Entity::getId))
 					.map(e -> new Node("id:" + e.getId(), name(e), Kind.FILE, Optional.of(e), data.contains(e),
 							parts(e, collator)))
-					.forEach(children::add);
+					.forEach(fileNodes::add);
+			missing.stream().map(n -> new Node("path:" + key + n, n, Kind.FILE, Optional.empty(), false, List.of()))
+					.forEach(fileNodes::add);
+			fileNodes.stream().sorted(Comparator.comparing(Node::name, collator)).forEach(children::add);
 			if (entity != null) {
 				children.addAll(parts(entity, collator));
 			}

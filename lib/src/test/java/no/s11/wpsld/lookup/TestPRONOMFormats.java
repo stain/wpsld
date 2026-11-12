@@ -129,4 +129,25 @@ public class TestPRONOMFormats {
 	private static JsonNode reference(String id) {
 		return JsonNodeFactory.instance.objectNode().put("@id", id);
 	}
+
+	/** A file's format by its extension: linked if only one has it, else its media type if they agree */
+	@Test
+	public void addByName() {
+		PRONOMFormats pronom = PRONOMFormats.bundled();
+		Crate crate = new Crate();
+		Entity csv = crate.add("File");
+		crate.rename(csv, "data/counts.CSV");
+		Entity pdf = crate.add("File");
+		crate.rename(pdf, "paper.pdf");
+		Entity none = crate.add("File");
+		crate.rename(none, "README");
+		assertTrue(pronom.addByName(crate, csv).isPresent());
+		assertEquals("text/csv", csv.getAll("encodingFormat").get(0).asText());
+		String iri = csv.getAll("encodingFormat").get(1).get("@id").asText();
+		assertTrue(crate.get(iri).orElseThrow().getTypes().containsAll(PRONOMFormats.TYPES));
+		assertTrue(pronom.addByName(crate, pdf).isEmpty());
+		assertEquals(List.of(), none.getAll("encodingFormat"));
+		assertTrue(pronom.addByName(crate, none).isEmpty());
+		assertEquals(List.of(), pronom.withExtension("README"));
+	}
 }

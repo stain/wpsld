@@ -204,6 +204,29 @@ public class TestEntityTree {
 		assertEquals(keys.size(), keys.stream().distinct().count());
 	}
 
+	/** Files and folders on disk without an entity, greyed out among the rest */
+	@Test
+	public void onDisk() {
+		Crate crate = new Crate();
+		add(crate, "data/", "Data", "Dataset");
+		add(crate, "data/b.csv", null, "File");
+		hasPart(crate.getRoot(), "data/");
+		hasPart(crate.get("data/").orElseThrow(), "data/b.csv");
+		List<Node> nodes = EntityTree.physical(crate, listing,
+				List.of("data/", "data/a.csv", "data/b.csv", "raw/", "raw/my%20notes.txt", "empty/"));
+		assertEquals(List.of(
+				"ROOT ./",
+				"  FOLDER data",
+				"    FILE a.csv *",
+				"    FILE b.csv",
+				"  FOLDER empty *",
+				"  FOLDER raw *",
+				"    FILE my notes.txt *"), lines(nodes));
+		Node notes = nodes.get(0).children().get(2).children().get(0);
+		assertEquals(Optional.of("raw/my%20notes.txt"), EntityTree.fileId(notes));
+		assertEquals(Optional.of("raw/"), EntityTree.folderId(nodes.get(0).children().get(2)));
+	}
+
 	/** Each entity at least once, with keys unique in the tree */
 	@Test
 	public void keys() {

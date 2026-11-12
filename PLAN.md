@@ -1030,6 +1030,50 @@ run) loads, but shows what to work on:
   the Run of "COMPSs runtime version 3.4": find out where the time goes
   (preview, form building, or reference lookups across many entities).
 
+### Performance on larger crates
+
+Measure before optimising, on crates of growing size: e.g. the COMPSs run
+crate above, a ROHub crate, and generated ones with 1 000, 10 000 and
+100 000 entities and as many files in an attached crate's folder.
+- What to time: opening (reading, the profile, the first form), selecting
+  an entity (form, preview, references across the crate), typing in a
+  field (each change checks the crate for undo and relists), saving and
+  Repair Crate; switching to Entities by Folder and by Part; listing the
+  folder's files (now at most 10 000, again after 5 seconds).
+- How: a benchmark test (not run by default, as `onlineTest` isn't) that
+  builds such crates and reports times, and the JDK's Flight Recorder on
+  the running editor for where the time goes.
+- Likely costs to look at: `crate.toJson()` compared on every change
+  (undo, the title's "modified"), `dataEntities()` and `byId()` built
+  again in loops, the tree made again from scratch, and the preview's
+  "Referenced by" scanning all entities.
+
+### Internationalisation (i18n)
+
+wpsld is in English only. Translating it means more than the UI's labels:
+- **The UI**: menus, buttons, dialogs, messages and help pages in resource
+  bundles, chosen by the system's language with a preference to change
+  it; dates and numbers formatted for the language.
+- **The vocabulary**: property and type labels and their descriptions come
+  from schema.org's definitions (`rdfs:label`, `rdfs:comment`), which are
+  in English; translations would need another source, e.g. community
+  translations of schema.org, or labels in a profile. Labels made from
+  terms (`datePublished` → "Date published", see `Labels`) are English
+  word rules too.
+- **Profiles**: some MASP profiles may already give labels and
+  descriptions with `@language`: check which do, and show those in the
+  user's language, falling back to English.
+- **The crate's own values**: `name` and `description` may be given in
+  several languages (`{"@value": …, "@language": "nb"}`), which the form
+  shows read-only now; editing values per language would follow.
+- **Right-to-left languages** (Arabic, Hebrew): the UI mirrored (JavaFX's
+  node orientation), and text fields that take mixed directions; the
+  Warp notebook's tabs and the tree's lines mirrored too.
+- **Keyboard layouts**: shortcuts and mnemonics that work on layouts
+  without the letters (e.g. Cyrillic, Greek) or where the keys move
+  (AZERTY, QWERTZ; `Ctrl+/` for help on macOS), and input methods for
+  Chinese, Japanese and Korean in the text fields.
+
 ### Start-up
 
 - Try AppCDS (`-XX:+AutoCreateSharedArchive`) or the Java 25 AOT cache in the
