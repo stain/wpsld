@@ -43,6 +43,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import org.kordamp.ikonli.javafx.FontIcon;
+
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
@@ -56,6 +58,9 @@ import javafx.beans.property.SimpleLongProperty;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
+import javafx.collections.ObservableList;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
@@ -69,6 +74,7 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
 import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Control;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Separator;
@@ -84,6 +90,7 @@ import javafx.scene.control.TextInputControl;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.ToolBar;
 import javafx.scene.control.Tooltip;
+import javafx.scene.control.TreeItem;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
@@ -115,6 +122,7 @@ import no.s11.wpsld.crate.UndoHistory;
 import no.s11.wpsld.crate.UndoHistory.Place;
 import no.s11.wpsld.crate.UndoHistory.Step;
 import no.s11.wpsld.form.EntityListing;
+import no.s11.wpsld.form.EntityTree;
 import no.s11.wpsld.form.EntityListing.TypeCount;
 import no.s11.wpsld.form.EntityTypes;
 import no.s11.wpsld.form.FormFields;
@@ -168,6 +176,11 @@ public class CrateEditor extends Application {
 	private EntityListing listing;
 	/** True while the list is redone, keeping the selection, so as not to edit it again */
 	private boolean relisting;
+	/** The entities by their folders, shown instead of the list if chosen */
+	private EntityTreeView tree;
+	private boolean byFolder;
+	/** The entities selected in the list or tree shown, the one edited last */
+	private final ObservableList<Entity> selection = FXCollections.observableArrayList();
 	private final TextArea preview = new TextArea();
 	private EntityPreview entityPreview;
 	private EntityEditor entityEditor;
@@ -360,6 +373,8 @@ public class CrateEditor extends Application {
 		entityTypes = new EntityTypes(schema);
 		terms = new CrateTerms(schema);
 		listing = new EntityListing(terms);
+		tree = new EntityTreeView(listing, labels);
+		tree.setId("entityTree");
 		schemaOrg = new SchemaOrgFormFields(terms);
 		// The core RO-Crate profile by default: the same schema.org fields,
 		// with those RO-Crate requires first; then the profiles the user loaded
@@ -424,6 +439,7 @@ public class CrateEditor extends Application {
 			// Update the text in place on changes: refreshing the whole list
 			// on each key typed made it flicker
 			private final InvalidationListener relabel = obs -> label(getItem());
+			private final FontIcon icon = EntityIcons.forCell(this);
 			{
 				labels.addListener(new WeakInvalidationListener(relabel));
 			}
@@ -432,6 +448,12 @@ public class CrateEditor extends Application {
 			protected void updateItem(Entity entity, boolean empty) {
 				super.updateItem(entity, empty);
 				label(empty ? null : entity);
+				if (empty || entity == null) {
+					setGraphic(null);
+				} else {
+					icon.setIconCode(EntityIcons.of(entity, listing));
+					setGraphic(icon);
+				}
 			}
 
 			private void label(Entity entity) {
@@ -448,17 +470,23 @@ public class CrateEditor extends Application {
 				entityPreview.show(entity);
 			}
 		});
+		// A folder without an entity is selected, but the form stays
+		tree.getSelectionModel().selectedItemProperty().addListener((obs, old, item) -> {
+			if (item != null && !relisting) {
+				item.getValue().entity().ifPresent(entity -> {
+					entityEditor.edit(entity);
+					entityPreview.show(entity);
+				});
+			}
+		});
 		// Several to copy or remove; the last selected is edited
 		entities.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+		entities.getSelectionModel().getSelectedItems().addListener((ListChangeListener<Entity>) c -> select());
+		tree.getSelectionModel().getSelectedItems()
+				.addListener((ListChangeListener<TreeItem<EntityTree.Node>>) c -> select());
 		// Copy and paste entities, as Edit > Copy and Paste do in the list
-		MenuItem copyEntity = new MenuItem("Copy");
-		copyEntity.setId("copyEntity");
-		copyEntity.disableProperty().bind(entities.getSelectionModel().selectedItemProperty().isNull());
-		copyEntity.setOnAction(e -> copyEntity());
-		MenuItem pasteEntity = new MenuItem("Paste");
-		pasteEntity.setId("pasteEntity");
-		pasteEntity.setOnAction(e -> pasteEntity(stage));
-		entities.setContextMenu(new ContextMenu(copyEntity, pasteEntity));
+		entities.setContextMenu(entityMenu(stage));
+		tree.setContextMenu(entityMenu(stage));
 
 		Button add = new Button("Add entity");
 		add.setId("addEntity");
@@ -467,11 +495,9 @@ public class CrateEditor extends Application {
 		remove.setId("removeEntity");
 		// Not the root data entity, which may be among those selected
 		remove.disableProperty().bind(Bindings.createBooleanBinding(
-				() -> entities.getSelectionModel().getSelectedItems().stream().allMatch(e -> e == crate.getRoot()),
-				entities.getSelectionModel().getSelectedItems()));
+				() -> selection.stream().allMatch(e -> e == crate.getRoot()), selection));
 		remove.setOnAction(e -> {
-			List<Entity> removed = entities.getSelectionModel().getSelectedItems().stream()
-					.filter(entity -> entity != crate.getRoot()).toList();
+			List<Entity> removed = selection.stream().filter(entity -> entity != crate.getRoot()).toList();
 			removed.forEach(crate::remove);
 			// The entities only they linked to the root are now mentioned
 			crate.mentionUnlinked();
@@ -482,6 +508,7 @@ public class CrateEditor extends Application {
 		buttons.setPadding(new Insets(6));
 		VBox.setVgrow(entities, Priority.ALWAYS);
 		VBox.setMargin(entityType, new Insets(0, 0, 4, 0));
+		VBox.setVgrow(tree, Priority.ALWAYS);
 		sidebar = new VBox(new Label(" Entities"), entityType, entities, buttons);
 
 		preview.setId("preview");
@@ -505,8 +532,67 @@ public class CrateEditor extends Application {
 		show(crate.getRoot());
 		changed();
 		// The list first, as before the type selector above it
-		Platform.runLater(entities::requestFocus);
+		Platform.runLater(() -> listView().requestFocus());
 		return split;
+	}
+
+	/** Copy and Paste for the entities selected, as Edit > Copy and Paste */
+	private ContextMenu entityMenu(Stage stage) {
+		MenuItem copyEntity = new MenuItem("Copy");
+		copyEntity.setId("copyEntity");
+		copyEntity.disableProperty().bind(Bindings.isEmpty(selection));
+		copyEntity.setOnAction(e -> copyEntity());
+		MenuItem pasteEntity = new MenuItem("Paste");
+		pasteEntity.setId("pasteEntity");
+		pasteEntity.setOnAction(e -> pasteEntity(stage));
+		return new ContextMenu(copyEntity, pasteEntity);
+	}
+
+	/** The list or the tree, whichever is shown */
+	private Control listView() {
+		return byFolder ? tree : entities;
+	}
+
+	/** Keep up with the entities selected in the list or tree shown */
+	private void select() {
+		List<Entity> selected = byFolder ? tree.selectedEntities()
+				: new ArrayList<>(entities.getSelectionModel().getSelectedItems().stream()
+						.filter(Objects::nonNull).toList());
+		if (!byFolder) {
+			Entity last = entities.getSelectionModel().getSelectedItem();
+			if (last != null && selected.remove(last)) {
+				selected.add(last);
+			}
+		}
+		if (!selected.equals(selection)) {
+			selection.setAll(selected);
+		}
+	}
+
+	/**
+	 * View > Entities by Type or by Folder: the list, sorted and by type,
+	 * or the tree of folders; the same entities selected.
+	 */
+	private void listByFolder(boolean folders) {
+		if (folders == byFolder) {
+			return;
+		}
+		List<Entity> shown = List.copyOf(selection);
+		boolean focused = listView().isFocused();
+		byFolder = folders;
+		int at = sidebar.getChildren().indexOf(folders ? entityType : tree);
+		sidebar.getChildren().removeAll(entityType, entities, tree);
+		if (folders) {
+			sidebar.getChildren().add(at, tree);
+		} else {
+			sidebar.getChildren().addAll(at, List.of(entityType, entities));
+		}
+		relist();
+		Entity edited = entityEditor.getEntity();
+		showListed(!shown.isEmpty() || edited == null ? shown : List.of(edited));
+		if (focused) {
+			listView().requestFocus();
+		}
 	}
 
 	/**
@@ -630,7 +716,9 @@ public class CrateEditor extends Application {
 		repair.setOnAction(e -> repair(stage));
 		edit.getItems().addAll(new SeparatorMenuItem(), repair, new SeparatorMenuItem(), preferences);
 		edit.setId("menuEdit");
-		Menu view = new Menu("_View", null, sidebarItem(), new SeparatorMenuItem(), styles(stage), colours(stage));
+		Menu view = new Menu("_View", null, sidebarItem(), new SeparatorMenuItem());
+		view.getItems().addAll(listings());
+		view.getItems().addAll(new SeparatorMenuItem(), styles(stage), colours(stage));
 		view.setId("menuView");
 
 		MenuItem manual = new MenuItem("_wpsld Help");
@@ -713,7 +801,8 @@ public class CrateEditor extends Application {
 		BooleanBinding noField = Bindings.createBooleanBinding(
 				() -> !(stage.getScene().getFocusOwner() instanceof TextInputControl),
 				stage.getScene().focusOwnerProperty());
-		BooleanBinding inEntities = Bindings.createBooleanBinding(() -> stage.getScene().getFocusOwner() == entities,
+		BooleanBinding inEntities = Bindings.createBooleanBinding(
+				() -> stage.getScene().getFocusOwner() == entities || stage.getScene().getFocusOwner() == tree,
 				stage.getScene().focusOwnerProperty());
 		BooleanBinding never = Bindings.createBooleanBinding(() -> false);
 		record Command(String label, String id, KeyCode key, Consumer<TextInputControl> action,
@@ -723,7 +812,7 @@ public class CrateEditor extends Application {
 				new Command("Cu_t", "menuCut", KeyCode.X, TextInputControl::cut, never, () -> {
 				}),
 				new Command("_Copy", "menuCopy", KeyCode.C, TextInputControl::copy,
-						inEntities.and(entities.getSelectionModel().selectedItemProperty().isNotNull()),
+						inEntities.and(Bindings.isNotEmpty(selection)),
 						this::copyEntity),
 				new Command("_Paste", "menuPaste", KeyCode.V, TextInputControl::paste, inEntities,
 						() -> pasteEntity(stage)),
@@ -754,8 +843,7 @@ public class CrateEditor extends Application {
 	 * references to those are right.
 	 */
 	void copyEntity() {
-		List<Entity> selected = crate.getEntities().stream()
-				.filter(entities.getSelectionModel().getSelectedItems()::contains).toList();
+		List<Entity> selected = crate.getEntities().stream().filter(selection::contains).toList();
 		if (selected.isEmpty()) {
 			return;
 		}
@@ -777,10 +865,15 @@ public class CrateEditor extends Application {
 
 	/**
 	 * Select these entities in the list, the last one edited, listing all
-	 * types if any of them are not listed.
+	 * types if any of them are not listed; or in the tree, opening their
+	 * folders.
 	 */
 	private void showListed(List<Entity> shown) {
 		relist();
+		if (byFolder) {
+			tree.select(shown);
+			return;
+		}
 		if (!entities.getItems().containsAll(shown)) {
 			entityType.setValue(null);
 		}
@@ -795,7 +888,7 @@ public class CrateEditor extends Application {
 	 * edited and listed no longer is, e.g. its type changed. Those selected
 	 * stay selected, without editing them again; none if the entity edited
 	 * is no longer listed, as the form still shows it, and it is selected
-	 * again when listed again.
+	 * again when listed again. The tree too, when it is shown.
 	 */
 	private void relist() {
 		relist(true);
@@ -835,9 +928,13 @@ public class CrateEditor extends Application {
 					entities.getSelectionModel().select(edited);
 				}
 			}
+			if (byFolder) {
+				tree.setNodes(EntityTree.physical(crate), edited);
+			}
 		} finally {
 			relisting = false;
 		}
+		select();
 	}
 
 	/**
@@ -911,6 +1008,26 @@ public class CrateEditor extends Application {
 		alert.setResizable(true);
 		alert.initModality(javafx.stage.Modality.NONE);
 		alert.show();
+	}
+
+	/**
+	 * View > Entities by Type (the list) or by Folder (the tree).
+	 */
+	private List<MenuItem> listings() {
+		ToggleGroup group = new ToggleGroup();
+		RadioMenuItem byType = new RadioMenuItem("Entities by _Type");
+		byType.setId("menuListByType");
+		byType.setToggleGroup(group);
+		byType.setSelected(true);
+		RadioMenuItem folders = new RadioMenuItem("Entities by _Folder");
+		folders.setId("menuListByFolder");
+		folders.setToggleGroup(group);
+		group.selectedToggleProperty().addListener((obs, old, item) -> {
+			if (item != null) {
+				listByFolder(item == folders);
+			}
+		});
+		return List.of(byType, folders);
 	}
 
 	/**
@@ -1603,8 +1720,7 @@ public class CrateEditor extends Application {
 			error.show();
 			return;
 		}
-		Optional<String> selected = Optional.ofNullable(entities.getSelectionModel().getSelectedItem())
-				.map(Entity::getId);
+		Optional<String> selected = Optional.ofNullable(entityEditor.getEntity()).map(Entity::getId);
 		crate = document.crate().get();
 		crateFile.reset(Optional.of(path), crate.toJson());
 		show(selected.flatMap(crate::get).orElse(crate.getRoot()));
@@ -1856,7 +1972,7 @@ public class CrateEditor extends Application {
 	 * the form shows it. The profile follows the crate's conformsTo.
 	 */
 	private void restore(ObjectNode before, Step step) {
-		Optional<String> shown = Optional.ofNullable(entities.getSelectionModel().getSelectedItem()).map(Entity::getId);
+		Optional<String> shown = Optional.ofNullable(entityEditor.getEntity()).map(Entity::getId);
 		crate = new CrateReader().read(step.crate(), crateFile.path().map(Path::toString).orElse("undo")).crate()
 				.orElseThrow();
 		history.settle(crate.toJson());

@@ -22,6 +22,7 @@ import static org.junit.Assert.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -30,15 +31,22 @@ import org.junit.Test;
 import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
+
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.ListView;
+import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TreeItem;
 import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
 import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.form.EntityListing.TypeCount;
+import no.s11.wpsld.form.EntityTree;
 import no.s11.wpsld.masp.ProfileCache;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
@@ -47,10 +55,30 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
  * those of a type chosen.
  */
 public class TestCrateEditorEntityList extends ApplicationTest {
+	private CrateEditor app;
+	private Path temp;
+
+	/** A crate with files in folders, one not a part, a web resource, and a person */
+	private static final String CRATE = """
+			{"@context": "https://w3id.org/ro/crate/1.3/context", "@graph": [
+			 {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+			  "conformsTo": {"@id": "https://w3id.org/ro/crate/1.3"}},
+			 {"@id": "./", "@type": "Dataset", "name": "Survey",
+			  "hasPart": [{"@id": "data/"}, {"@id": "raw/2025/a.txt"}, {"@id": "https://example.com/z.csv"}],
+			  "mentions": [{"@id": "docs/cited.pdf"}], "author": {"@id": "#alice"}},
+			 {"@id": "data/", "@type": "Dataset", "name": "Data", "hasPart": {"@id": "data/counts.csv"}},
+			 {"@id": "data/counts.csv", "@type": "File", "name": "Bird counts"},
+			 {"@id": "raw/2025/a.txt", "@type": "File"},
+			 {"@id": "docs/cited.pdf", "@type": "File"},
+			 {"@id": "https://example.com/z.csv", "@type": "File"},
+			 {"@id": "#alice", "@type": "Person", "name": "Alice"}
+			]}
+			""";
+
 	@Override
 	public void start(Stage stage) throws Exception {
-		Path temp = Files.createTempDirectory("wpsld-entity-list");
-		CrateEditor app = new CrateEditor(SchemaFromJsonLd::new, CrateTerms::prewarm,
+		temp = Files.createTempDirectory("wpsld-entity-list");
+		app = new CrateEditor(SchemaFromJsonLd::new, CrateTerms::prewarm,
 				new ProfileCache(getClass().getClassLoader(), new CrateReader(), Duration.ofSeconds(5),
 						Optional.of(temp.resolve("profiles")), List.of()),
 				Optional.of(temp.resolve("settings.json")));
@@ -77,6 +105,39 @@ public class TestCrateEditorEntityList extends ApplicationTest {
 		clickOn("#addEntity");
 		clickOn("#typeSearch").write(type).type(KeyCode.ENTER);
 		clickOn("#header-name").write(name);
+	}
+
+	/** Open the crate above, listed by folder */
+	private EntityTreeView openByFolder() throws Exception {
+		Path metadata = temp.resolve("ro-crate-metadata.json");
+		Files.writeString(metadata, CRATE);
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, metadata)).get());
+		choose("menuListByFolder");
+		return lookup("#entityTree").queryAs(EntityTreeView.class);
+	}
+
+	/** As choosing the radio item in its menu */
+	private void choose(String id) {
+		interact(() -> ((RadioMenuItem) menuItem(id)).setSelected(true));
+	}
+
+	private MenuItem menuItem(String id) {
+		return lookup("#menuBar").queryAs(MenuBar.class).getMenus().stream().flatMap(m -> m.getItems().stream())
+				.filter(i -> id.equals(i.getId())).findFirst().orElseThrow();
+	}
+
+	/** The tree's rows as shown, indented, "~" if greyed out */
+	private static List<String> rows(EntityTreeView tree) {
+		List<String> rows = new ArrayList<>();
+		for (int i = 0; i < tree.getExpandedItemCount(); i++) {
+			TreeItem<EntityTree.Node> item = tree.getTreeItem(i);
+			EntityTree.Node node = item.getValue();
+			boolean grey = (node.kind() == EntityTree.Kind.FILE || node.kind() == EntityTree.Kind.FOLDER)
+					&& !node.data();
+			rows.add("  ".repeat(tree.getTreeItemLevel(item) - 1) + node.name() + (grey ? " ~" : ""));
+		}
+		return rows;
 	}
 
 	private List<String> labels() {
@@ -186,5 +247,63 @@ public class TestCrateEditorEntityList extends ApplicationTest {
 		showType("CreativeWork");
 		assertEquals(List.of(root, data), entities().getSelectionModel().getSelectedItems());
 		assertEquals(data, entities().getSelectionModel().getSelectedItem());
+	}
+
+	/**
+	 * View > Entities by Folder: the tree, top folders open; the entity
+	 * edited selected; folders opened to show one selected
+	 */
+	@Test
+	public void byFolder() throws Exception {
+		EntityTreeView tree = openByFolder();
+		assertFalse(lookup("#entities").tryQuery().isPresent());
+		assertEquals(List.of("Survey", "  data", "  docs ~", "  raw ~", "External resources", "  https://example.com/z.csv", "Person", "  Alice"),
+				rows(tree));
+		// The root, still edited, selected
+		assertEquals("Survey", tree.getSelectionModel().getSelectedItem().getValue().name());
+
+		interact(() -> tree.getTreeItem(1).setExpanded(true));
+		interact(() -> tree.getSelectionModel().clearAndSelect(2));
+		assertEquals("data/counts.csv", lookup("#entityId").queryAs(TextField.class).getText());
+		assertEquals(List.of("Survey", "  data", "    counts.csv", "  docs ~", "  raw ~", "External resources", "  https://example.com/z.csv", "Person", "  Alice"), rows(tree));
+
+		// Folders without an entity: selected, but the form stays
+		interact(() -> tree.getSelectionModel().clearAndSelect(4));
+		assertEquals("data/counts.csv", lookup("#entityId").queryAs(TextField.class).getText());
+		assertTrue(lookup("#removeEntity").queryButton().isDisabled());
+
+		// Back to the list: the file still selected
+		choose("menuListByType");
+		assertEquals("Bird counts", entities().getSelectionModel().getSelectedItem().getLabel());
+		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().indexOf(
+				entities().getItems().stream().filter(e -> e.getId().equals("raw/2025/a.txt")).findFirst()
+						.orElseThrow())));
+		choose("menuListByFolder");
+		assertEquals("raw/2025/a.txt", tree.selectedEntities().get(0).getId());
+		assertEquals(List.of("Survey", "  data", "    counts.csv", "  docs ~", "  raw ~", "    2025 ~",
+				"      a.txt", "External resources", "  https://example.com/z.csv", "Person", "  Alice"), rows(tree));
+	}
+
+	/**
+	 * A file named in the form keeps its place, shown with its name; the
+	 * contextual file not in hasPart greyed out until it is a part
+	 */
+	@Test
+	public void byFolderChanges() throws Exception {
+		EntityTreeView tree = openByFolder();
+		interact(() -> tree.getTreeItem(2).setExpanded(true));
+		assertEquals("    cited.pdf ~", rows(tree).get(3));
+		interact(() -> tree.getSelectionModel().clearAndSelect(3));
+		clickOn("#header-name").write("Cited paper");
+		// Shown with its name as typed
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup("cited.pdf — Cited paper").tryQuery().isPresent());
+		// Made a part of the crate: no longer greyed out, and still selected
+		Entity root = tree.getTreeItem(0).getValue().entity().orElseThrow();
+		interact(() -> ((ArrayNode) root.get("hasPart").orElseThrow()).addObject().put("@id", "docs/cited.pdf"));
+		// Leaving the field sorts and lists again
+		interact(tree::requestFocus);
+		assertEquals("    cited.pdf", rows(tree).get(3));
+		assertEquals("docs/cited.pdf", tree.selectedEntities().get(0).getId());
 	}
 }

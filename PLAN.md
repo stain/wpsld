@@ -966,7 +966,15 @@ Styles:
   so the entity edited doesn't move under the cursor; the selection is
   kept.
 - **Logical and physical listings** (a tree, next to the flat list by
-  type), proposed after sorting the list:
+  type), proposed after sorting the list. The physical one is *done*, as
+  View > Entities by Folder (`EntityTree` in lib, `EntityTreeView`), with
+  icons by type (`EntityIcons`, Fluent UI: folder, document, person,
+  building, location, else a cube) also in the list; entities with a path
+  that are not data entities are greyed out at their path. Next: icons for
+  more of schema.org's major types; the Workplace Shell's look in the Warp
+  style (lines joining the tree, hatched icon when selected); a header with
+  the selected folder's path and counts; Add Dataset on a folder without
+  one; the logical tree.
   - *Logical*: the root's `hasPart` hierarchy of Datasets and their parts,
     which may include entities with absolute URIs or in other folders; an
     entity can appear under more than one Dataset. Contextual entities
