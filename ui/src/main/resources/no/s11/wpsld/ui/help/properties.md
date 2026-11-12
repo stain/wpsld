@@ -28,3 +28,25 @@ If you remove a link, the linked description is not itself deleted.
 Some properties also accept plain text, such as licence terms. Check that
 the value is appropriate and that references point to the intended
 entities.
+
+## Places
+
+To say where something is, or which area it covers, link it to a
+**Place** with **Content location** (where it was made or what it shows)
+or **Spatial coverage** (the area it is about). Give the place a name. If
+it has a [GeoNames](https://www.geonames.org/) page, use its identifier as
+the place's `@id`, for example `http://sws.geonames.org/8152662/`.
+
+For the exact point or shape, choose **New** beside the place's **Geo**
+and select **Geometry**, as RO-Crate recommends. In the geometry's
+**As WKT**, write the point, line or shape as Well-Known Text, longitude
+before latitude, for example:
+
+    <http://www.opengis.net/def/crs/OGC/1.3/CRS84> POINT (150.301195 -33.7152)
+
+`LINESTRING (...)` and `POLYGON ((...))` describe lines and areas. Older
+crates may instead use GeoCoordinates with Latitude and Longitude; wpsld
+reads those too.
+
+The preview of a place, geometry or coordinates has a link to show it on
+OpenStreetMap, which opens in your browser.
