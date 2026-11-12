@@ -57,6 +57,7 @@ import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.GeoNames;
+import no.s11.wpsld.crate.Orcid;
 import no.s11.wpsld.masp.ProfileCache;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
@@ -95,6 +96,11 @@ public class ReadmeScreenshots extends ApplicationTest {
 		// without asking GeoNames
 		app.setPlaceSearch((query, username) -> List.of(new GeoNames.Place(8152662, "Catalina Park",
 				Optional.of("New South Wales"), Optional.of("Australia"), Optional.of("park"), -33.7152, 150.301195)));
+		// ORCID's fictional researcher, as ORCID has him, without asking ORCID
+		app.setPersonSearch(query -> List.of(new Orcid.Person("0000-0002-1825-0097", Optional.of("Josiah"),
+				Optional.of("Carberry"), Optional.empty(),
+				List.of("Josiah Stinkney Carberry", "J. Carberry", "J. S. Carberry"),
+				List.of("Brown University", "Wesleyan University"))));
 		app.init();
 		app.start(stage);
 	}
@@ -160,7 +166,8 @@ public class ReadmeScreenshots extends ApplicationTest {
 			lookup("#header-name").queryAs(TextField.class).setText("Sample data");
 		});
 		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("encoding format"));
-		interact(() -> lookup("#value-encodingFormat-0").queryAs(TextField.class).setText("text/csv"));
+		// Text or a link to a format's description, so a drop-down
+		interact(() -> lookup("#value-encodingFormat-0").queryAs(ComboBox.class).getEditor().setText("text/csv"));
 		png(out.resolve("file-form.png"), lookup(n -> n instanceof EntityEditor).query());
 
 		select("./");
@@ -304,6 +311,64 @@ public class ReadmeScreenshots extends ApplicationTest {
 		png(out.resolve("licence-finder.png"),
 				lookup(".dialog-pane").match(n -> n.lookup("#licenseQuery") != null).query());
 		interact(() -> lookup("#licenseOk").queryButton().fire());
+	}
+
+	/**
+	 * A screenshot of choosing a file format from PRONOM, for the help: a
+	 * PDF, whose versions are listed.
+	 */
+	@Test
+	public void formatScreenshots() throws Exception {
+		String folder = System.getenv("HELP_SCREENSHOTS");
+		Assume.assumeTrue("Set HELP_SCREENSHOTS to the folder for them", folder != null && !folder.isBlank());
+		Path out = Files.createDirectories(Path.of(folder));
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		look("classic", "light");
+		interact(() -> lookup("#headerNew-hasPart").queryAs(MenuButton.class).getItems().stream()
+				.filter(i -> i.getText().equals("File")).findFirst().orElseThrow().fire());
+		select("#file-1");
+		interact(() -> {
+			TextField id = lookup("#entityId").queryAs(TextField.class);
+			id.setText("paper.pdf");
+			id.getOnAction().handle(new javafx.event.ActionEvent());
+		});
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("encodingFormat"));
+		MenuButton create = lookup("#new-encodingFormat").queryAs(MenuButton.class);
+		// The dialog waits for an answer, so not inside interact()
+		Platform.runLater(() -> create.getItems().stream()
+				.filter(i -> "newPronom-encodingFormat".equals(i.getId())).findFirst().orElseThrow().fire());
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#formatQuery").tryQuery().isPresent());
+		interact(() -> lookup("#formatQuery").queryAs(TextField.class).setText("pdf 1."));
+		png(out.resolve("format-finder.png"),
+				lookup(".dialog-pane").match(n -> n.lookup("#formatQuery") != null).query());
+		interact(() -> lookup("#formatOk").queryButton().fire());
+	}
+
+	/**
+	 * A screenshot of finding a person in ORCID, for the help.
+	 */
+	@Test
+	public void personScreenshots() throws Exception {
+		String folder = System.getenv("HELP_SCREENSHOTS");
+		Assume.assumeTrue("Set HELP_SCREENSHOTS to the folder for them", folder != null && !folder.isBlank());
+		Path out = Files.createDirectories(Path.of(folder));
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		look("classic", "light");
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("author"));
+		MenuButton create = lookup("#new-author").queryAs(MenuButton.class);
+		// The dialog waits for an answer, so not inside interact()
+		Platform.runLater(() -> create.getItems().stream().filter(i -> "newOrcid-author".equals(i.getId()))
+				.findFirst().orElseThrow().fire());
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#personQuery").tryQuery().isPresent());
+		interact(() -> lookup("#personQuery").queryAs(TextField.class).setText("Josiah Carberry"));
+		interact(() -> lookup("#personSearch").queryButton().fire());
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
+				() -> !lookup("#personResults").queryListView().getItems().isEmpty());
+		png(out.resolve("person-finder.png"),
+				lookup(".dialog-pane").match(n -> n.lookup("#personQuery") != null).query());
+		interact(() -> lookup("#personOk").queryButton().fire());
+		select("https://orcid.org/0000-0002-1825-0097");
+		png(out.resolve("person-orcid.png"), lookup(n -> n instanceof EntityEditor).query());
 	}
 
 	/** Time for the map's tiles to come from OpenStreetMap */

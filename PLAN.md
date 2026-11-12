@@ -685,12 +685,25 @@ Styles:
   names the latest) can be bundled and searched offline, as the SPDX list
   is. Credit "Contains public sector information licensed under the Open
   Government Licence v3.0" and the signature version.
-  - A "Format from PRONOM…" chooser by name, extension or media type,
-    showing versions: many formats share a media type or extension
-    (`application/pdf` and `.pdf` match many versioned PUIDs, e.g. PDF 1.4
-    to 1.7 and PDF/A), and only 781 of 2,571 have a MIME type.
-  - Repair Crate may add the PRONOM entity where the media type has a
-    single match, and otherwise leave it to the user.
+  - *Done:* "New ▾ Format from PRONOM…" on `encodingFormat`
+    (`FormatFinder`, `PronomFormats`) searches the bundled formats by name,
+    version, PUID, extension or media type while typing, starting from the
+    file's media type or extension, and links the format (a `WebPage`,
+    `Standard` with its PRONOM address and name) beside the media type,
+    adding that if the file has none. `encodingFormat` takes links as well
+    as text (`WebPage` added to its range in `ro-crate-terms.jsonld`), so
+    such links are no longer turned into text when edited. Many formats
+    share a media type or extension (`application/pdf` and `.pdf` match 35
+    PUIDs: PDF 1.0 to 1.7, PDF/A 1a to 4f…), so each version is listed.
+    Bundled by `scripts/update-pronom-formats.sh <version>|latest` from
+    signature file V125, trimmed to PUID, name, version, media types and
+    extensions (271 kB), credited under the Open Government Licence v3.0.
+  - *Done:* Repair Crate links the format where a file's media type
+    belongs to one format only (209 of PRONOM's 310 media types, e.g.
+    `text/csv`, `text/markdown`, `application/zip`), and turns other forms
+    of PRONOM addresses (`http:`, the new site's, `.json`) into
+    `https://www.nationalarchives.gov.uk/PRONOM/<PUID>`. No identifiers.org
+    prefix exists for PRONOM, so no PropertyValue as for SPDX.
   - With proper file support (a crate with its root folder, see Opening a
     folder below), identify a file's format from its content with the same
     signature file (and `container-signature.xml` for ZIP and OLE2
@@ -730,9 +743,25 @@ Styles:
     `http://dx.doi.org/10…`, `https://dx.doi.org/…`, `http://doi.org/…` and
     `doi:10…` into that form, in `@id`s, references and `identifier` text,
     as for SPDX addresses.
+- **People from ORCID** *(done)*: "New ▾ Person from ORCID…" on fields
+  that take a Person, and "Find in ORCID…" in an ORCID row on a Person's
+  form (`PersonFinder`, `Orcid`), search ORCID's public API
+  (`pub.orcid.org/v3.0/expanded-search`, no credentials needed, tried
+  2026-11-12) by name or iD, on Enter, listing ORCID iD, other names and
+  institutions (as text: no ROR ids), and add the Person with
+  `https://orcid.org/<iD>` as `@id`, `name`, `givenName` and
+  `familyName`; e-mail addresses ORCID may give are ignored. Offline, the
+  search fails saying the iD can still be typed. Repair Crate writes ORCID
+  addresses given otherwise (`http:`, no scheme, trailing slash, small
+  `x`) as `https://orcid.org/<iD>`, if the ISO 7064 check digit is right,
+  merging duplicates; sandbox iDs are left. Next: affiliations as ROR
+  Organizations, from ORCID's employment records (`/v3.0/<iD>/employments`),
+  once ROR lookups exist: their organisations are disambiguated by ROR,
+  Ringgold or GRID (Josiah Carberry's by Ringgold only), so those without
+  a ROR id need a ROR search by name and country; tests and help use
+  ORCID's fictional Josiah Carberry, 0000-0002-1825-0097.
 - **More lookups for RO-Crate's recommended identifiers** (Recommended
-  Identifiers in RO-Crate 1.3's metadata page): people from ORCID (with
-  affiliations from ROR). Smaller helpers: `keywords` edited as tags but
+  Identifiers in RO-Crate 1.3's metadata page). Smaller helpers: `keywords` edited as tags but
   written as one comma-separated string, and `temporalCoverage` as a
   from/to date range (`1950/1975`).
 - **Offline use, e.g. inside a Trusted Research Environment (TRE)** whose
@@ -754,9 +783,45 @@ Styles:
     https://osmdata.openstreetmap.de/data/ has land and water polygons and
     coastlines (ODbL), enough for an offline outline map to place a point
     on; or a tile server inside the TRE, set as the map's tile address.
-  - Licences (SPDX) are bundled already; PRONOM's signature file can be
-    bundled too (see above). ROR publishes a full data dump on Zenodo,
-    which a TRE could load; ORCID and DOI lookups stay online-only.
+  - Licences (SPDX) and file formats (PRONOM) are bundled already, small
+    enough (415 and 271 kB) not to bloat the zips.
+  - ROR's full data dump (https://doi.org/10.5281/zenodo.6347574, CC0;
+    v2.15 of 2026-10-20 is a 39.3 MB zip, 330 MB of JSON unpacked) stays
+    about 39 MB compressed inside a jar: too big for the main zips, but
+    fine as an optional data module. The registry changes daily; the dumps
+    are released as versions on Zenodo (check how often).
+  - ORCID can't be offline as a whole: its yearly public data file is
+    about 270 GB (919 GB unpacked), and even only the public names
+    (`scripts/orcid/names.sql` on ORCID's data in BigQuery, tried
+    2026-11) are over 1 GB of CSV, besides being personal data about
+    millions of people. ORCID and DOI lookups stay online, with typing the
+    identifier by hand as the fallback. An institution may make its own
+    offline subset: its researchers' names and affiliations, by its ROR ids
+    (`scripts/orcid/`), megabytes rather than gigabytes, as a data module
+    for its TRE, never shipped with wpsld.
+  - **Data modules:** a third Gradle module beside `lib` and `ui` for the
+    offline data, or one module (and jar) per dataset, as they update at
+    different rates: SPDX a few times a year, PRONOM 2-4 times a year, ROR
+    with each Zenodo release, GeoNames daily. Each jar carries its data,
+    source, version and licence (shown in Help > About), so the application
+    and the data can be released separately, e.g. by GitHub Actions
+    packaging each data release, and a TRE can take the jars it needs.
+    Small ones (SPDX, PRONOM) stay in the main zips; large ones (ROR,
+    GeoNames' bigger dumps) are added as below.
+  - **Data bundles added by the user** (not yet): data too big to bundle,
+    or under a licence that doesn't fit with Apache-2.0, dropped into a
+    folder that wpsld reads at start (e.g. `data/` beside its settings, or
+    beside the application for a whole TRE), each with its source, version
+    and licence shown in Help > About. For example GeoNames'
+    `allCountries.zip` (403 MB), a ROR dump, or map data from
+    https://download.geofabrik.de/ (OpenStreetMap extracts per continent,
+    country and region, ODbL, up to tens of GB): too large to bundle, but
+    a region's extract could give offline street-level maps and place
+    search. A "pre-populated wpsld" could be prepared outside a TRE with the
+    data its users need, then moved inside the firewall as one folder or
+    zip. Needs: the folder's layout and a manifest per bundle, checking
+    what is there at start, and preferring the bundles over online services
+    when offline.
 - **An explorer for entities**, like Explorer, the Finder or a Workplace
   Shell folder: a window (or view) of the crate with virtual folders for
   each kind of contextual entity on top, e.g. "Persons", "Organizations"

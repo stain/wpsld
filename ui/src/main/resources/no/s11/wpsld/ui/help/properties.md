@@ -29,6 +29,35 @@ Some properties also accept plain text, such as licence terms. Check that
 the value is appropriate and that references point to the intended
 entities.
 
+## People
+
+RO-Crate recommends identifying people by their
+[ORCID iD](https://orcid.org/), such as
+`https://orcid.org/0000-0002-1825-0097`. To add an author (or another
+person) from ORCID, choose **New** beside **Author**, then **Person from
+ORCID...**. Type their name, or their ORCID iD, and choose **Search**: the
+people found are listed with their ORCID iD and institutions, and the one
+selected with their other names and a link to their ORCID record. Several
+people may have the same name, so check before choosing. Choose one and
+**OK**: wpsld adds them as a Person with their ORCID iD as `@id`, their
+name, and their given and family names. If the crate already has them,
+they are linked instead.
+
+![Finding a person in ORCID: Josiah Carberry, with his ORCID iD and institutions](images/person-finder.png)
+
+A Person's form shows their ORCID iD, if their `@id` is one, beside **Find
+in ORCID...**, which looks up a person you have already added, by their
+name, and gives them their ORCID iD as `@id`.
+
+![A Person's form with the ORCID iD as @id, and ORCID with Find in ORCID... and a link to the record](images/person-orcid.png)
+
+Looking people up needs an internet connection, but no account. Without
+one, or if ORCID can't be reached, you can still type the ORCID iD as the
+person's `@id`. **Edit > Repair Crate** writes ORCID iDs given in other
+forms, such as `http://orcid.org/0000-0002-1825-0097/`, as
+`https://orcid.org/0000-0002-1825-0097`, and merges people who turn out to
+be the same; iDs whose check digit is wrong are left for you to correct.
+
 ## Licences
 
 RO-Crate asks for a **License** on the crate itself (the root dataset), and
@@ -72,6 +101,35 @@ is meant, such as GNU's GPL page, which serves both "GPL-3.0-only" and
 For a licence that isn't on the SPDX list, choose **New > CreativeWork**
 instead, set its `@id` to the licence's own web address, and give it a
 **Name** and a **Description** summarising it.
+
+## File formats
+
+RO-Crate asks files for their **Encoding format**: the media type, such
+as `text/csv` or `application/pdf`, and, where it can, a link to the
+format's description in [PRONOM](https://pronom.nationalarchives.gov.uk/),
+the UK National Archives' registry of file formats. wpsld includes PRONOM's
+list of formats, so this works offline.
+
+On a file, choose **New** beside **Encoding format**, then **Format from
+PRONOM...**. The search starts with the file's media type, or the
+extension of its name (for example `.csv`); you can also type a name, a
+version or a PRONOM identifier (PUID) such as `fmt/19`. Choose the format
+and **OK**: wpsld links the format, described as a WebPage and Standard
+with its PRONOM address as `@id`, and adds its media type if the file has
+none.
+
+![Choosing a file format from PRONOM: the versions of PDF, with PDF 1.0 selected](images/format-finder.png)
+
+Many formats have several versions, and PRONOM lists each: PDF 1.4, 1.5,
+1.7 and PDF/A all have the media type `application/pdf` and the extension
+`.pdf`. Choose the version the file has, if you know it, or leave just the
+media type.
+
+**Edit > Repair Crate** links the PRONOM format where a file's media type
+belongs to only one format, such as `text/csv` or `text/markdown`, but not
+`application/pdf`. It also turns PRONOM addresses copied from its web site,
+such as `https://pronom.nationalarchives.gov.uk/fmt/19`, into the form
+RO-Crate uses, `https://www.nationalarchives.gov.uk/PRONOM/fmt/19`.
 
 ## Places
 

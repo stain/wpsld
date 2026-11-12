@@ -41,7 +41,9 @@ public class SchemaFromJsonLd {
 	 * Terms RO-Crate recommends from outside schema.org, in schema.org's own
 	 * JSON-LD form, so that forms offer them like schema.org's: GeoSPARQL's
 	 * <code>Geometry</code> and <code>asWKT</code> for places, also added to
-	 * the range of <code>schema:geo</code>.
+	 * the range of <code>schema:geo</code>; and <code>WebPage</code> in the
+	 * range of <code>encodingFormat</code>, for links to a file format's
+	 * description (e.g. in PRONOM) beside the media type.
 	 */
 	public static final String RO_CRATE_TERMS_JSONLD = "ro-crate-terms.jsonld";
 
