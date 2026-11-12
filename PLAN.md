@@ -57,23 +57,31 @@ know RO-Crate, JSON-LD or schema.org. Write for tasks first, introduce terms
 only when needed, and distinguish describing metadata from packaging or
 depositing data.
 
-- **Help > wpsld Help** *(started)*: an offline, searchable JavaFX help
-  window with bundled Markdown topics. F1 opens it (Command-? on macOS).
-  The profile chooser's help button opens its topic directly; other controls
-  can open their own topics without replacing the existing field definitions.
-- **Next:** expand the getting-started walkthrough and add guidance on
-  profiles and required fields, people and organisations, files, saving and
-  troubleshooting; add a glossary and links to further reading. Check every
-  instruction against the app's actual behaviour and the applicable RO-Crate
-  specification.
+- **Help > wpsld Help** *(started)*: an offline, searchable, non-modal
+  JavaFX help window with bundled Markdown topics and screenshots. F1 opens
+  it (Command-? on macOS). The profile chooser's help button opens its topic
+  directly; other controls can open their own topics without replacing the
+  existing field definitions.
+- The getting-started walkthrough covers creating and saving a description,
+  linking a file and an author, and exploring types and properties with a
+  photograph and a Wikidata person. It includes screenshots and further
+  reading; the README links to the Markdown topics for reading outside the app.
+- **Next:** expand the profile guidance and add topics on required fields,
+  people and organisations, files, saving and troubleshooting; add a
+  glossary. Check every instruction against the app's actual behaviour and
+  the applicable RO-Crate specification.
 - Add contextual links from relevant controls and field descriptions as
   topics are written. Keep the help navigable by keyboard and screen reader,
   usable in all styles and offline, and test that packaged releases contain
   every topic.
 - Author topics in `ui/src/main/resources/no/s11/wpsld/ui/help/` as
   CommonMark. The native renderer supports headings, paragraphs, lists,
-  emphasis, code and HTTP(S) links; add a topic to `HelpDialog.Topic` to
-  make it searchable and available to contextual help.
+  emphasis, code, HTTP(S) links and bundled images under `help/images/`;
+  use relative image paths with ASCII names and descriptive alt text. Add a
+  topic to `HelpDialog.Topic` to make it searchable and available to
+  contextual help. Regenerate walkthrough screenshots with:
+
+      HELP_SCREENSHOTS=$PWD/ui/src/main/resources/no/s11/wpsld/ui/help/images ./gradlew :ui:test --tests '*ReadmeScreenshots.helpScreenshots' --rerun
 
 ### Editor (Crate-O style)
 

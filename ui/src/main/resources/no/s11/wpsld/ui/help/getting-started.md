@@ -28,6 +28,8 @@ The list on the left contains the things being described, called entities.
 The middle shows the selected item's form; the right shows a preview. The
 default profile places required fields first and marks them with `*`.
 
+![The editor with entities on the left, the dataset form in the middle and a preview on the right](images/editor-overview.png)
+
 ## 3. Describe the dataset
 
 In the middle form, enter a **Name** and **Description** for the whole
@@ -43,6 +45,8 @@ the text "For tutorial practice only; not for reuse". For real data, use a
 licence or terms that actually apply to the whole dataset; ask your data
 manager if you are unsure. Do not assume a licence applies to third-party
 material. You can also describe a licence as a separate linked entity.
+
+![The dataset form filled in with a name, description, publication date and tutorial-only licence](images/dataset-form.png)
 
 ## 4. Describe and link a file
 
@@ -61,6 +65,8 @@ Give the file a **Name**, such as "Sample data". Optionally, find
 **Encoding format** and enter `text/csv` if it is a CSV file. Select the
 dataset again: **Has part** should now reference `data.csv`.
 
+![The file form with identifier data.csv, name Sample data and encoding format text/csv](images/file-form.png)
+
 ## 5. Add an author
 
 With the dataset selected, find **Author**. Use **Search properties** if
@@ -73,11 +79,15 @@ their real ORCID, you may replace it with their ORCID URL and press Enter;
 do not invent identifiers. Return to the dataset to see the Author link.
 Use `+` to add another value where the field permits it.
 
+![The dataset form with its Author field linked to the person identified as #person-1](images/author-link.png)
+
 ## 6. Save and review
 
 Choose **File > Save**. If wpsld reports missing requirements, read the
 list and choose **Cancel** to return to the form and correct them. **Save
 Anyway** saves an incomplete description; it does not make it valid.
+
+![The save warning lists missing required fields, with Cancel and Save Anyway buttons](images/save-warning.png)
 
 In the save dialog, select your prepared folder and use the proposed name
 `ro-crate-metadata.json`. The metadata file should now sit beside
@@ -88,6 +98,42 @@ metadata with **File > Open**.
 The save-time checks are helpful but are not a complete validation or a
 guarantee that the data can be shared. Before publishing, check the crate
 with an RO-Crate validator and follow your repository's requirements.
+
+## 7. Explore types and properties: a photograph
+
+The forms use schema.org, a shared vocabulary of types and properties.
+To explore it, try describing a photograph as well as the CSV. This
+exercise only creates metadata; it does not download a photograph.
+
+1. Select the dataset. Under **Has part**, choose **New > File**.
+   Select the new File in the entity list. Change its `@id` to `photo.jpg`
+   and press Enter; enter "Photograph of Margaret Hamilton" as its Name.
+2. Select **Add type...**, search for `Photograph`, select it and choose
+   **OK**. The photograph has both **File** and **Photograph** types:
+   File says it is a file in the crate; Photograph describes its content.
+   Keep both types. Different types offer different properties.
+3. Use **Search properties** to find **About**. Choose **New > Thing**
+   in that field to create and link an entity. Select the new Thing in the
+   entity list, choose **Add type...**, search for `Person`, and choose
+   **OK**. Person replaces the more general Thing type.
+4. Enter `Margaret Hamilton` as the person's **Name**, and set their `@id`
+   to `https://www.wikidata.org/entity/Q11628`; press Enter. This identifies
+   the software engineer Margaret Hamilton in Wikidata. wpsld does not
+   retrieve her name automatically; you enter it in the form.
+5. Select the photograph again and find **About**. It should now reference
+   the Wikidata identifier. The question-mark or info button beside a
+   property shows its definition; explore other properties using search.
+
+![The Person form with the name Margaret Hamilton and her Wikidata identifier](images/wikidata-person.png)
+
+![The photograph has File and Photograph types and its About field links to the Wikidata person](images/photograph-about.png)
+
+For a real crate, only describe a photograph you actually have and verify
+that it depicts the person identified. Put the real `photo.jpg` in the
+crate folder, or use its correct relative path as the File's `@id`, and
+check rights before sharing it. Do not claim a CSV is a photograph or invent
+a person or their identifier. If you have no such photograph, remove this
+practice File and Person before sharing, then save again.
 
 ## Further reading
 

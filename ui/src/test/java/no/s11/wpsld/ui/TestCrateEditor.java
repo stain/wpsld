@@ -162,6 +162,36 @@ public class TestCrateEditor extends ApplicationTest {
 	}
 
 	@Test
+	public void gettingStartedAddsPhotographAndWikidataPerson() {
+		ListView<Entity> list = entities();
+		interact(() -> {
+			MenuButton parts = lookup("#headerNew-hasPart").queryAs(MenuButton.class);
+			parts.getItems().stream().filter(item -> item.getText().equals("File")).findFirst().orElseThrow().fire();
+		});
+		Entity file = list.getItems().stream().filter(e -> e.getTypes().contains("File")).findFirst().orElseThrow();
+		interact(() -> list.getSelectionModel().clearAndSelect(list.getItems().indexOf(file)));
+		renameTo("photo.jpg");
+		clickOn("#addType");
+		clickOn("#typeSearch").write("Photograph").type(KeyCode.ENTER);
+		assertEquals(List.of("File", "Photograph"), file.getTypes());
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("about"));
+		interact(() -> {
+			MenuButton about = lookup("#new-about").queryAs(MenuButton.class);
+			about.getItems().stream().filter(item -> item.getText().equals("Thing")).findFirst().orElseThrow().fire();
+		});
+		Entity person = list.getItems().stream().filter(e -> e.getTypes().contains("Thing")).findFirst().orElseThrow();
+		interact(() -> list.getSelectionModel().clearAndSelect(list.getItems().indexOf(person)));
+		clickOn("#addType");
+		clickOn("#typeSearch").write("Person").type(KeyCode.ENTER);
+		assertEquals(List.of("Person"), person.getTypes());
+		interact(() -> lookup("#header-name").queryAs(TextField.class).setText("Margaret Hamilton"));
+		renameTo("https://www.wikidata.org/entity/Q11628");
+		assertEquals("https://www.wikidata.org/entity/Q11628", file.getAll("about").get(0).path("@id").asText());
+		assertEquals("Margaret Hamilton", person.get("name").orElseThrow().asText());
+		assertEquals("photo.jpg", list.getItems().get(0).getAll("hasPart").get(0).path("@id").asText());
+	}
+
+	@Test
 	public void addEntityChoosesType() {
 		assertEquals(1, entities().getItems().size());
 		addEntity("person");

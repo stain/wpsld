@@ -29,7 +29,10 @@ def crossTargets = project.hasProperty('windowsJdkHome') ? [
 ] : [:]
 
 jlink {
-    options = ['--strip-debug', '--no-header-files', '--no-man-pages']
+    // Ikonli jars contain OSGi component descriptors in the same OSGI-INF
+    // package. They are unused outside OSGi and newer jlink rejects the split.
+    options = ['--strip-debug', '--no-header-files', '--no-man-pages',
+               '--exclude-resources', 'glob:/org.kordamp.ikonli.*/OSGI-INF/**']
     launcher {
         name = 'wpsld'
         // Windows .bat launcher starts javaw, without a console window

@@ -28,6 +28,8 @@ import java.util.function.Consumer;
 
 import javafx.collections.FXCollections;
 import javafx.collections.transformation.FilteredList;
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.DoubleBinding;
 import javafx.geometry.Insets;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
@@ -86,10 +88,18 @@ class HelpDialog extends Dialog<Void> {
 		TextFlow content = new TextFlow();
 		content.setId("helpContent");
 		content.setFocusTraversable(true);
+		content.setMinWidth(0);
 		content.getStyleClass().add("help-content");
 		content.setPadding(new Insets(8));
+		ScrollPane page = new ScrollPane(content);
+		page.setId("helpPage");
+		page.setFitToWidth(true);
+		DoubleBinding imageWidth = Bindings.createDoubleBinding(
+				() -> Math.max(1, page.getViewportBounds().getWidth()
+						- content.getPadding().getLeft() - content.getPadding().getRight()),
+				page.viewportBoundsProperty(), content.paddingProperty());
 		topics.getSelectionModel().selectedItemProperty().addListener((obs, old, selected) ->
-				HelpMarkdown.show(content, selected == null ? "" : selected.content, browse));
+				HelpMarkdown.show(content, selected == null ? "" : selected.content, browse, imageWidth));
 		search.textProperty().addListener((obs, old, query) -> {
 			String term = query.strip().toLowerCase(Locale.ROOT);
 			Topic selected = topics.getSelectionModel().getSelectedItem();
@@ -102,8 +112,6 @@ class HelpDialog extends Dialog<Void> {
 		});
 		topics.getSelectionModel().select(Objects.requireNonNull(initialTopic));
 
-		ScrollPane page = new ScrollPane(content);
-		page.setFitToWidth(true);
 		SplitPane pages = new SplitPane(topics, page);
 		pages.setDividerPositions(0.3);
 		VBox.setVgrow(pages, Priority.ALWAYS);
