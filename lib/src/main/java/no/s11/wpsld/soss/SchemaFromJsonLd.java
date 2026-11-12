@@ -37,6 +37,14 @@ public class SchemaFromJsonLd {
 	public static final String SCHEMAORG_JSONLD = "schemaorg-30.0-all-http.jsonld";
 	public static final String SCHEMAORG_JSONLD_SHA256 = "6ec3618c91764067d309d112ab4d0b39681361c5bee3c337c926c94f0bd632bc";
 
+	/**
+	 * Terms RO-Crate recommends from outside schema.org, in schema.org's own
+	 * JSON-LD form, so that forms offer them like schema.org's: GeoSPARQL's
+	 * <code>Geometry</code> and <code>asWKT</code> for places, also added to
+	 * the range of <code>schema:geo</code>.
+	 */
+	public static final String RO_CRATE_TERMS_JSONLD = "ro-crate-terms.jsonld";
+
 	private static final URI RDF = URI.create("http://www.w3.org/1999/02/22-rdf-syntax-ns#");
 	private static final URI RDF_PROPERTY = URI.create(RDF + "Property");
 	private static final URI RDF_TYPE = URI.create(RDF + "type");
@@ -77,16 +85,7 @@ public class SchemaFromJsonLd {
 	private final Set<URI> dataTypes;
 
 	public SchemaFromJsonLd() {
-		JsonNode tree;
-		try (InputStream in = getClass().getResourceAsStream(SCHEMAORG_JSONLD)) {
-			if (in == null) {
-				throw new IllegalStateException("Can't find resource " + SCHEMAORG_JSONLD);
-			}
-			tree = new ObjectMapper().readTree(in);
-		} catch (IOException e) {
-			throw new UncheckedIOException("Can't read " + SCHEMAORG_JSONLD, e);
-		}
-		jsonld = new JsonLdGraph(tree);
+		jsonld = new JsonLdGraph(List.of(read(SCHEMAORG_JSONLD), read(RO_CRATE_TERMS_JSONLD)));
 		// Create all classes and properties first; their references to each
 		// other are resolved lazily, so the order in the JSON-LD and any
 		// circular references don't matter
@@ -107,6 +106,17 @@ public class SchemaFromJsonLd {
 		qualityCheck();
 		// Everything is resolved, the JSON is no longer needed
 		jsonld = null;
+	}
+
+	private JsonNode read(String resource) {
+		try (InputStream in = getClass().getResourceAsStream(resource)) {
+			if (in == null) {
+				throw new IllegalStateException("Can't find resource " + resource);
+			}
+			return new ObjectMapper().readTree(in);
+		} catch (IOException e) {
+			throw new UncheckedIOException("Can't read " + resource, e);
+		}
 	}
 
 	/**
@@ -374,8 +384,10 @@ public class SchemaFromJsonLd {
 	}
 
 	/**
-	 * The flat <code>@graph</code> of schema.org's JSON-LD, indexed for
-	 * lookups while the model is built.
+	 * The flat <code>@graph</code> of schema.org's JSON-LD, and of other
+	 * vocabularies in the same form, indexed for lookups while the model is
+	 * built. A node described in several documents (e.g. a property whose
+	 * range another vocabulary extends) has all their values.
 	 */
 	private static class JsonLdGraph {
 		/** Prefixes from the @context of the schema.org JSON-LD */
@@ -390,13 +402,16 @@ public class SchemaFromJsonLd {
 		 */
 		private final Map<String, URI> expanded = new ConcurrentHashMap<>();
 
-		JsonLdGraph(JsonNode jsonld) {
-			// schema.org's own @context is a plain prefix map
-			jsonld.get("@context").properties().forEach(e -> prefixes.put(e.getKey(), e.getValue().asText()));
+		JsonLdGraph(List<JsonNode> documents) {
 			List<JsonNode> nodes = new ArrayList<>();
-			jsonld.get("@graph").forEach(nodes::add);
+			for (JsonNode jsonld : documents) {
+				// schema.org's own @context is a plain prefix map
+				jsonld.get("@context").properties().forEach(e -> prefixes.put(e.getKey(), e.getValue().asText()));
+				jsonld.get("@graph").forEach(nodes::add);
+			}
 			this.graph = nodes.parallelStream()
-					.collect(Collectors.toUnmodifiableMap(node -> expand(node.get("@id").asText()), this::propertyValues));
+					.collect(Collectors.toUnmodifiableMap(node -> expand(node.get("@id").asText()), this::propertyValues,
+							JsonLdGraph::merge));
 			record Link(URI property, URI object, URI subject) {
 			}
 			this.inverse = graph.entrySet().parallelStream()
@@ -420,6 +435,13 @@ public class SchemaFromJsonLd {
 				return URI.create(prefixes.get(compact.substring(0, colon)) + compact.substring(colon + 1));
 			}
 			return URI.create(compact);
+		}
+
+		private static Map<URI, List<JsonNode>> merge(Map<URI, List<JsonNode>> a, Map<URI, List<JsonNode>> b) {
+			Map<URI, List<JsonNode>> merged = new LinkedHashMap<>(a);
+			b.forEach((property, values) -> merged.merge(property, values,
+					(x, y) -> Stream.concat(x.stream(), y.stream()).distinct().toList()));
+			return merged;
 		}
 
 		private Map<URI, List<JsonNode>> propertyValues(JsonNode node) {

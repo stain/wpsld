@@ -179,4 +179,28 @@ public class TestSchemaOrgFormFields {
 		assertEquals(List.of(S + "CreativeWork"),
 				byName.get("hasPart").range().stream().map(c -> c.getID().toString()).toList());
 	}
+
+	/**
+	 * RO-Crate 1.2 and later describe places with GeoSPARQL: a Place's geo
+	 * is a Geometry, whose asWKT is Well-Known Text.
+	 */
+	@Test
+	public void places() {
+		SchemaOrgFormFields formFields = new SchemaOrgFormFields(new SchemaFromJsonLd());
+		FormField geo = formFields.fieldsFor(Set.of(URI.create(S + "Place"))).stream()
+				.filter(f -> f.name().equals("geo")).findFirst().orElseThrow();
+		assertEquals(ValueKind.REFERENCE, geo.kind());
+		assertEquals(List.of("GeoCoordinates", "GeoShape", "Geometry"),
+				geo.range().stream().map(formFields.getTerms()::name).sorted().toList());
+
+		List<FormField> geometry = formFields
+				.fieldsFor(Set.of(URI.create("http://www.opengis.net/ont/geosparql#Geometry")));
+		FormField asWKT = geometry.get(0);
+		assertEquals("asWKT", asWKT.name());
+		assertEquals("Geometry", asWKT.group());
+		assertEquals(ValueKind.TEXT, asWKT.kind());
+		assertTrue(asWKT.comment().orElseThrow().contains("POINT"));
+		// And Thing's, like name
+		assertTrue(geometry.stream().anyMatch(f -> f.name().equals("name")));
+	}
 }

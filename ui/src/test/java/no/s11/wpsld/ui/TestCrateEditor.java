@@ -1055,6 +1055,51 @@ public class TestCrateEditor extends ApplicationTest {
 				"#local", false, "_:b0", false, "urn:uuid:3f2504e0-4f89-11d3-9a0c-0305e82c3301", false), clickable);
 	}
 
+	/**
+	 * A place, as RO-Crate 1.3 describes it: its geo a Geometry with
+	 * Well-Known Text, shown on a map from the preview, and new geometries
+	 * made from its geo field.
+	 */
+	@Test
+	public void places() throws Exception {
+		entities();
+		Path dir = Files.createTempDirectory("crate");
+		Files.writeString(dir.resolve("ro-crate-metadata.json"), """
+				{"@context": "https://w3id.org/ro/crate/1.3/context",
+				 "@graph": [
+				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.3"}},
+				  {"@id": "./", "@type": "Dataset", "name": "A crate", "contentLocation": {"@id": "#catalina"}},
+				  {"@id": "#catalina", "@type": "Place", "name": "Catalina Park", "geo": {"@id": "_:g1"}},
+				  {"@id": "_:g1", "@type": "Geometry",
+				   "asWKT": "<http://www.opengis.net/def/crs/OGC/1.3/CRS84> POINT (150.301195 -33.7152)"}
+				 ]}""");
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir)).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup("#previewMap").tryQuery().isEmpty());
+		Entity place = entities().getItems().stream().filter(e -> e.getId().equals("#catalina")).findFirst()
+				.orElseThrow();
+		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().indexOf(place)));
+		Hyperlink map = lookup("#previewMap").queryAs(Hyperlink.class);
+		assertEquals("Show on OpenStreetMap", map.getText());
+		assertEquals("Latitude -33.715200, longitude 150.301195", map.getTooltip().getText());
+		// asWKT is a field of the Geometry, as schema.org's properties are
+		Entity geometry = entities().getItems().stream().filter(e -> e.getId().equals("_:g1")).findFirst()
+				.orElseThrow();
+		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().indexOf(geometry)));
+		assertTrue(visibleProperties().contains("asWKT"));
+		// A place's geo may be a new Geometry
+		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().indexOf(place)));
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("geo"));
+		interact(() -> {
+			MenuButton geo = lookup("#new-geo").queryAs(MenuButton.class);
+			geo.getItems().stream().filter(item -> item.getText().equals("Geometry")).findFirst().orElseThrow().fire();
+		});
+		assertTrue(entities().getItems().stream().anyMatch(e -> e.getId().equals("#geometry-1")
+				&& e.getTypes().equals(List.of("Geometry"))));
+	}
+
 	private MenuItem menuItem(String id) {
 		MenuBar bar = lookup("#menuBar").queryAs(MenuBar.class);
 		return bar.getMenus().stream().flatMap(m -> m.getItems().stream()).filter(i -> id.equals(i.getId()))

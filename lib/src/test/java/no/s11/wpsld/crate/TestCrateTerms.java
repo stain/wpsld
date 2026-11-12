@@ -104,6 +104,10 @@ public class TestCrateTerms {
 		// Not schema.org's, nor datatypes
 		assertFalse(names.contains("File"));
 		assertFalse(names.contains("HTML"));
+		// Nor those the schema model defines, with their properties
+		assertFalse(names.contains("Geometry"));
+		assertEquals("Geometry", terms.name(terms.classDef("Geometry").orElseThrow()));
+		assertEquals("asWKT", terms.name(terms.propertyDef("asWKT").orElseThrow()));
 
 		ClassDef collection = terms.otherClass(URI.create("http://pcdm.org/models#Collection"), Optional.empty());
 		assertEquals("RepositoryCollection", terms.name(collection));

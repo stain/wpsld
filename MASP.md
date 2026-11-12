@@ -162,7 +162,11 @@ then ranges over the root data entity's class rule.
   Core, dx-prof, PAV, PCDM, CodeMeta, Bioschemas, GeoSPARQL, PROV, IANA link
   relations, RO terms); the schema model has no definitions for them, so the
   editor keeps their values but offers no fields. The core MASP RO-Crate
-  profile should cover them.
+  profile should cover them. The exception is places: GeoSPARQL's
+  `Geometry` and `asWKT`, which RO-Crate 1.2 and later recommend for a
+  `Place`'s `geo`, are defined in `ro-crate-terms.jsonld` (schema.org's own
+  JSON-LD form, loaded with schema.org), with `Geometry` added to `geo`'s
+  range.
 - **JSON-LD 1.0.** RO-Crate 1.2/1.3: the metadata document "MUST be a
   document which is valid JSON-LD 1.0 in flattened and compacted form", so
   JSON-LD 1.1 context features (scoped contexts, `@import`, `@protected`,

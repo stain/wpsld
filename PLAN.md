@@ -195,6 +195,16 @@ depositing data.
   it in the profile's group. Next: offer to move the value to the
   replacement (e.g. `fileFormat` → `encodingFormat`); search reveal in the
   notebook view (which has no search box).
+- **Places** *(done)*: as RO-Crate 1.2 and later describe them, a `Place`
+  (from `contentLocation` or `spatialCoverage`) whose `geo` is a GeoSPARQL
+  `Geometry` with Well-Known Text in `asWKT`, e.g.
+  `<http://www.opengis.net/def/crs/OGC/1.3/CRS84> POINT (150.301195 -33.7152)`.
+  Both terms are fields like schema.org's (`ro-crate-terms.jsonld`), and
+  "New ▾" on `geo` offers `Geometry`. The preview of a place, geometry or
+  `GeoCoordinates` links to it on OpenStreetMap (`Places`: points, lines and
+  shapes in CRS84 or EPSG:4326, and `latitude`/`longitude`). Next: a map in
+  the preview itself, picking a point on a map, looking up GeoNames ids, and
+  `_:` blank node ids for new geometries, as the specification's example has.
 - **Required types** *(done)*: a notice beside "Add type…" when a profile
   requires a type the entity lacks (subtypes count), with a button to add it.
 - **Multi-line text.** Only the header's Description is a text area now;
