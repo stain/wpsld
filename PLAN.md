@@ -995,14 +995,18 @@ Styles:
   only for an attached crate (opened from or saved to a folder), whose
   relative `@id`s are files beside it.
 
-### To debug: labels of properties outside the profile
+### Done: labels of properties outside the profile
 
 Loading the crate of
 https://www.rohub.org/3b9d1622-2ff1-4a08-8e4a-9fe002f47180?activetab=overview,
 a property outside the profile, `https://w3id.org/ro-id/rohub/model#has_version`,
-gets a strange label in the editor and the preview, "Https://w 3d.org…":
-the whole IRI is split into words, rather than its local name after `#`
-or `/` (here "Has version").
+got the label "Https://w 3d.org…"; an IRI is now named by its local name
+after `#` or `/`, with `_` between words ("Has version"). The same crate
+nests entities in `hasPart` (`{"@id": …, "@type": "Dataset"}`), which are
+now flattened as it is read, writes types as IRIs (`http://schema.org/Person`),
+now named as the context names them in the entity list, and has
+properties outside the types with several values, now one row each.
+Still to do: Repair Crate could write such types by their names.
 
 ### To debug: a large workflow run crate
 

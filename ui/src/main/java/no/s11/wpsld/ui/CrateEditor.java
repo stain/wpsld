@@ -460,7 +460,9 @@ public class CrateEditor extends Application {
 
 			private void label(Entity entity) {
 				String text = entity == null ? null
-						: entity.getLabel() + "\n" + String.join(", ", entity.getTypes()) + "  " + entity.getId();
+						: entity.getLabel() + "\n"
+								+ String.join(", ", entity.getTypes().stream().map(listing::typeName).toList()) + "  "
+								+ entity.getId();
 				if (!Objects.equals(text, getText())) {
 					setText(text);
 				}
@@ -848,7 +850,7 @@ public class CrateEditor extends Application {
 		}
 		// Del removes the entities selected, while the list or tree has focus:
 		// a text field takes the key itself first
-		MenuItem remove = new MenuItem("_Remove");
+		MenuItem remove = new MenuItem("Re_move");
 		remove.setId("menuRemove");
 		remove.setAccelerator(new KeyCodeCombination(KeyCode.DELETE));
 		remove.disableProperty().bind(inEntities.not().or(cannotRemove));

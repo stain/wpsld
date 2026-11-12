@@ -533,8 +533,13 @@ public class EntityEditor extends ScrollPane {
 		if (!others.isEmpty()) {
 			int row = 0;
 			for (String name : others) {
-				TextField value = new TextField(text(entity.get(name).orElseThrow()));
-				value.setEditable(false);
+				// One row per value, as other properties with several have
+				VBox value = new VBox(4);
+				for (JsonNode each : entity.getAll(name)) {
+					TextField field = new TextField(text(each));
+					field.setEditable(false);
+					value.getChildren().add(field);
+				}
 				Button remove = new Button("Remove");
 				remove.setOnAction(e -> {
 					entity.set(name, Optional.empty());
@@ -544,6 +549,10 @@ public class EntityEditor extends ScrollPane {
 				Label label = new Label(label(name));
 				label.setId(id("label", name));
 				label.setTooltip(new Tooltip(name));
+				// Beside its first value
+				GridPane.setValignment(label, VPos.TOP);
+				label.setPadding(new Insets(4, 0, 0, 0));
+				GridPane.setValignment(remove, VPos.TOP);
 				grid.addRow(row++, label, value, remove);
 				Optional<Label> retired = retiredNote(name);
 				if (retired.isPresent()) {

@@ -217,6 +217,30 @@ public class TestCrateReader {
 		assertFalse(document.problems().toString(), reports(document, Severity.WARNING, "#x name"));
 	}
 
+	/** Entities nested with their @id are flattened, as ROHub's hasPart */
+	@Test
+	public void nestedEntitiesFlattened() {
+		CrateDocument document = graph(
+				"{\"@id\": \"#x\", \"@type\": \"Thing\", \"hasPart\": [{\"@id\": \"data/\", \"@type\": \"Dataset\"},"
+						+ " {\"@id\": \"new.csv\", \"@type\": \"File\", \"name\": \"New\"}],"
+						+ " \"author\": {\"@id\": \"#alice\", \"name\": \"Alice\"}}",
+				"{\"@id\": \"data/\", \"@type\": [\"Dataset\", \"Collection\"], \"name\": \"Data\"}",
+				"{\"@id\": \"#alice\", \"@type\": \"Person\"}");
+		Entity x = document.entity("#x").orElseThrow();
+		assertEquals(List.of("{\"@id\":\"data/\"}", "{\"@id\":\"new.csv\"}"),
+				x.getAll("hasPart").stream().map(Object::toString).toList());
+		assertEquals("{\"@id\":\"#alice\"}", x.get("author").orElseThrow().toString());
+		Entity data = document.entity("data/").orElseThrow();
+		assertEquals(List.of("Dataset", "Collection"), data.getTypes());
+		assertEquals("Data", data.get("name").orElseThrow().asText());
+		assertEquals("New", document.entity("new.csv").orElseThrow().get("name").orElseThrow().asText());
+		Entity alice = document.entity("#alice").orElseThrow();
+		assertEquals(List.of("Person"), alice.getTypes());
+		assertEquals("Alice", alice.get("name").orElseThrow().asText());
+		assertTrue(reports(document, Severity.WARNING, "3 entities were nested in values"));
+		assertFalse(document.problems().toString(), reports(document, Severity.WARNING, "no @type"));
+	}
+
 	@Test
 	public void unknownTermsReported() {
 		CrateDocument document = json("{\"@context\": {\"name\": \"http://schema.org/name\"}, \"@graph\": ["
