@@ -166,4 +166,29 @@ public class TestCrateEditorWorks extends ApplicationTest {
 		assertEquals(List.of("CreativeWork", "ScholarlyArticle"), work.getTypes());
 		assertEquals("2019-11-15", work.get("datePublished").orElseThrow().asText());
 	}
+
+	/**
+	 * A DOI typed or pasted into Citation, as RO-Crate's example has it: the
+	 * link is the DOI's address, and the work is looked up and described.
+	 */
+	@Test
+	public void doiTypedIntoCitation() throws Exception {
+		Entity root = entities().getItems().get(0);
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("citation"));
+		TextField editor = lookup("#value-citation-0").queryAs(javafx.scene.control.ComboBox.class).getEditor();
+		interact(() -> editor.setText("doi:10.5281/zenodo.3541888"));
+		// Enter; the finder it opens waits for an answer, so not inside interact()
+		Platform.runLater(() -> editor.fireEvent(new ActionEvent()));
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#workResults").tryQuery().isPresent()
+				&& !lookup("#workResults").queryListView().getItems().isEmpty());
+		assertEquals(List.of("10.5281/zenodo.3541888"), searches);
+		assertEquals("https://doi.org/10.5281/zenodo.3541888", root.get("citation").orElseThrow().path("@id").asText());
+		interact(() -> lookup("#workOk").queryButton().fire());
+		Entity spec = entity("https://doi.org/10.5281/zenodo.3541888").orElseThrow();
+		assertEquals("RO-Crate Metadata Specification 1.0", spec.getLabel());
+		// Confirmed again: no second look-up
+		Platform.runLater(() -> editor.fireEvent(new ActionEvent()));
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals(1, searches.size());
+	}
 }

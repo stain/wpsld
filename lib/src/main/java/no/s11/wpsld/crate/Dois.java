@@ -102,38 +102,18 @@ public class Dois {
 		}
 
 		/**
-		 * A citation of it as text, e.g. "Sefton, P., … (2019). RO-Crate
-		 * Metadata Specification 1.0. Zenodo. https://doi.org/…"
+		 * A short citation of it as text, as its <code>creditText</code>,
+		 * with the journal it is in, if any, e.g. "Xuan et al. (2015): Topic
+		 * Model for Graph Mining. IEEE Transactions on Cybernetics", "Sefton
+		 * &amp; Soiland-Reyes (2019): …", or "Title (2019)" without authors.
 		 */
 		public String creditText() {
-			List<String> names = authors.stream()
-					.map(a -> a.familyName().map(f -> f + a.givenName().map(g -> ", " + initials(g)).orElse(""))
-							.orElse(a.name()))
-					.toList();
-			String who = names.size() > 20 ? String.join(", ", names.subList(0, 19)) + ", … " + names.getLast()
-					: names.size() > 1 ? String.join(", ", names.subList(0, names.size() - 1)) + ", & " + names.getLast()
-							: String.join("", names);
-			StringBuilder text = new StringBuilder();
-			if (!who.isEmpty()) {
-				text.append(who).append(' ');
-			}
-			year().ifPresent(y -> text.append('(').append(y).append("). "));
-			text.append(title.endsWith(".") ? title : title + ".");
-			String in = Stream.of(container, volume.map(v -> v + issue.map(i -> "(" + i + ")").orElse("")), pages)
-					.flatMap(Optional::stream).collect(Collectors.joining(", "));
-			if (!in.isEmpty()) {
-				text.append(' ').append(in).append('.');
-			} else {
-				publisher.ifPresent(p -> text.append(' ').append(p).append('.'));
-			}
-			return text.append(' ').append(iri()).toString();
-		}
-
-		private static String initials(String given) {
-			return Stream.of(given.split("[\\s.]+")).filter(p -> !p.isEmpty())
-					.map(p -> p.codePoints().limit(1).collect(StringBuilder::new, StringBuilder::appendCodePoint,
-							StringBuilder::append) + ".")
-					.collect(Collectors.joining(" "));
+			List<String> names = authors.stream().map(a -> a.familyName().orElse(a.name())).toList();
+			String who = names.size() > 2 ? names.get(0) + " et al."
+					: String.join(" & ", names);
+			String cited = who.isEmpty() ? title + year().map(y -> " (" + y + ")").orElse("")
+					: who + year().map(y -> " (" + y + ")").orElse("") + ": " + title;
+			return container.map(c -> cited + (cited.endsWith(".") ? " " : ". ") + c).orElse(cited);
 		}
 	}
 
@@ -453,8 +433,8 @@ public class Dois {
 	 * Describe a work as RO-Crate's example of a citation has it: its type
 	 * (keeping other types it has, but not Thing), its DOI as
 	 * <code>identifier</code>, <code>name</code>,
-	 * <code>datePublished</code>, <code>creditText</code> (a citation as
-	 * text), its <code>abstract</code> as plain text if the agency has one, its first {@value #MAX_AUTHORS} authors as Persons (by ORCID iD,
+	 * <code>datePublished</code>, <code>creditText</code> (a short citation,
+	 * see {@link Work#creditText()}), its <code>abstract</code> as plain text if the agency has one, its first {@value #MAX_AUTHORS} authors as Persons (by ORCID iD,
 	 * or a Person of the crate with the same name, or a new one), and the
 	 * journal it is in as a Periodical, by its ISSN. Values it has are kept.
 	 * Its <code>@id</code> is left to the caller, normally {@link Work#iri()}.

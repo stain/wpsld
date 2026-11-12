@@ -74,13 +74,21 @@ example those in Zenodo).
 
 Choose one and **OK**: wpsld adds it with its DOI as `@id` and
 **Identifier**, its type (such as ScholarlyArticle or Dataset), title as
-**Name**, **Date published**, **Abstract** where the agency has one, a
-citation as text in **Credit text**, its first authors as Persons (by
+**Name**, **Date published**, **Abstract** where the agency has one, a short
+citation such as "Xuan et al. (2015): Topic Model for Graph Mining. IEEE
+Transactions on Cybernetics" in
+**Credit text**, its first authors as Persons (by
 their ORCID iD where the agency knows it, or a person the crate already
 has by the same name), and the journal it is in, by its ISSN. If the crate
 already has the work, it is linked instead.
 
 ![The work's form: its DOI as @id, its name, Fill in from DOI, and its authors linked by ORCID iD](images/work-form.png)
+
+You can also type or paste a DOI straight into **Citation** (in any of
+those forms) and press Enter or leave the field: it becomes a link to
+`https://doi.org/...`, as RO-Crate asks of citations, and if the crate
+doesn't describe the work yet, wpsld looks it up for you to add with
+**OK**; **Cancel** keeps just the link.
 
 A work whose `@id` is a DOI has a **DOI** row with **Fill in from DOI**,
 which adds what is missing, keeping what it has; an article, book, chapter,

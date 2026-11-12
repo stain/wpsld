@@ -87,8 +87,8 @@ public class TestDois {
 		assertEquals("https://doi.org/10.1109/tcyb.2014.2386282", work.iri());
 		assertEquals(Optional.of("2015-12"), work.issued());
 		assertEquals(List.of("2168-2267", "2168-2275"), work.issn());
-		assertEquals("Xuan, J., Lu, J., Zhang, G., & Luo, X. (2015). Topic Model for Graph Mining. "
-				+ "IEEE Transactions on Cybernetics, 45(12), 2792-2803. https://doi.org/10.1109/tcyb.2014.2386282",
+		// With the journal it is in
+		assertEquals("Xuan et al. (2015): Topic Model for Graph Mining. IEEE Transactions on Cybernetics",
 				work.creditText());
 	}
 
@@ -102,8 +102,16 @@ public class TestDois {
 		// The abstract as plain text, not the other descriptions
 		assertEquals(Optional.of("Web-version: https://w3id.org/ro/crate/1.0\n\n"
 				+ "This document specifies a method, known as RO-Crate."), work.summary());
-		assertEquals("Sefton, P., & Soiland-Reyes, S. (2019). RO-Crate Metadata Specification 1.0. Zenodo. "
-				+ "https://doi.org/10.5281/zenodo.3541888", work.creditText());
+		assertEquals("Sefton & Soiland-Reyes (2019): RO-Crate Metadata Specification 1.0", work.creditText());
+		// One author; none
+		assertEquals("Sefton (2019): RO-Crate Metadata Specification 1.0",
+				new Work(work.doi(), work.type(), work.title(), work.authors().subList(0, 1), work.issued(),
+						Optional.empty(), List.of(), Optional.empty(), Optional.empty(), Optional.empty(),
+						Optional.empty(), Optional.empty(), "DataCite").creditText());
+		assertEquals("RO-Crate Metadata Specification 1.0 (2019)",
+				new Work(work.doi(), work.type(), work.title(), List.of(), work.issued(), Optional.empty(),
+						List.of(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+						Optional.empty(), "DataCite").creditText());
 	}
 
 	@Test
@@ -138,7 +146,8 @@ public class TestDois {
 		assertEquals("Topic Model for Graph Mining", article.getLabel());
 		assertEquals(work.iri(), article.get("identifier").orElseThrow().asText());
 		assertEquals("2015-12", article.get("datePublished").orElseThrow().asText());
-		assertTrue(article.get("creditText").orElseThrow().asText().startsWith("Xuan, J., Lu, J."));
+		assertEquals("Xuan et al. (2015): Topic Model for Graph Mining. IEEE Transactions on Cybernetics",
+				article.get("creditText").orElseThrow().asText());
 		List<JsonNode> authors = article.getAll("author");
 		assertEquals(4, authors.size());
 		assertEquals(lu.getId(), authors.get(1).path("@id").asText());

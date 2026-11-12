@@ -24,6 +24,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -47,6 +48,7 @@ import javafx.collections.FXCollections;
 import javafx.css.PseudoClass;
 import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Bounds;
+import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.VPos;
@@ -1658,7 +1660,54 @@ public class EntityEditor extends ScrollPane {
 					}
 				});
 			});
+			if (WORK_FIELDS.contains(field.name())) {
+				lookUpTypedDoi(combo, candidates.keySet());
+			}
 			return combo;
+		}
+
+		/**
+		 * A DOI typed or pasted into a citation, in any of its forms, once
+		 * confirmed (Enter, or leaving the field): written as its
+		 * <code>https://doi.org/</code> link, to the crate's entity for it if
+		 * it has one, else looked up, to describe the work if the user
+		 * chooses it. Each DOI is asked about once.
+		 */
+		private void lookUpTypedDoi(ComboBox<String> combo, Set<String> entityIds) {
+			Set<String> asked = new HashSet<>();
+			Runnable lookUp = () -> {
+				String typed = combo.getEditor().getText().strip();
+				Optional<String> doi = Dois.doiOf(typed);
+				if (doi.isEmpty() || entityIds.contains(typed)) {
+					return;
+				}
+				String iri = Dois.iri(doi.get());
+				Optional<Entity> existing = crateEntities.get().stream()
+						.filter(e -> e.getId().equalsIgnoreCase(iri)).findFirst();
+				if (existing.isPresent()) {
+					combo.getEditor().setText(existing.get().getId());
+					return;
+				}
+				if (!typed.equals(iri)) {
+					combo.getEditor().setText(iri);
+				}
+				if (asked.add(iri.toLowerCase(Locale.ROOT))) {
+					// After the field is left: the dialog takes the focus
+					Platform.runLater(() -> findWork.apply(doi.get()).ifPresent(found -> {
+						if (crateEntities.get().stream().noneMatch(e -> e.getId().equalsIgnoreCase(iri))) {
+							Entity work = newEntityWithId(found.type(), iri);
+							Dois.describe(work, found, crateEntities.get(), EntityEditor.this::newEntityWithId);
+							onChange.run();
+						}
+					}));
+				}
+			};
+			combo.getEditor().addEventHandler(ActionEvent.ACTION, e -> lookUp.run());
+			combo.getEditor().focusedProperty().addListener((obs, was, focused) -> {
+				if (!focused) {
+					lookUp.run();
+				}
+			});
 		}
 
 		/**

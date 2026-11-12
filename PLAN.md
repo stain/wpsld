@@ -724,7 +724,9 @@ Styles:
   `citation`, `isBasedOn` and `subjectOf`, and a DOI row on a work whose
   `@id` is a DOI ("Fill in from DOI", keeping its values) or on an article,
   book, chapter, report or thesis without one ("Find DOI…") (`WorkFinder`,
-  `Dois`). A DOI in any form (bare `10.…`, `doi:`, `https://doi.org/`,
+  `Dois`). A DOI typed or pasted into those fields becomes its
+  `https://doi.org/` link when confirmed, and is looked up once to describe
+  the work, as RO-Crate asks citations to be URLs. A DOI in any form (bare `10.…`, `doi:`, `https://doi.org/`,
   `dx.doi.org`, percent-encoded) is looked up at its agency
   (`https://doi.org/ra/<doi>`): Crossref's REST API (`api.crossref.org/works/`)
   or DataCite's (`api.datacite.org/dois/`), whose records have more than
@@ -734,24 +736,29 @@ Styles:
   DataCite's with all words required (`a AND b`), as its ranking of loose
   words is poor. The work is described as RO-Crate's citation example has
   it: DOI as `@id` and `identifier`, `name`, `datePublished`, `creditText`
-  (APA-like), `abstract` as plain text (Crossref's JATS or DataCite's HTML;
+  (a short citation, see below), `abstract` as plain text (Crossref's JATS or DataCite's HTML;
   Crossref has abstracts only where the publisher deposited one), the first
   10 authors as Persons (by ORCID iD, or a Person of the crate with the same
   name), and the journal by `isPartOf` a Periodical with `issn`, `@id`
   `https://portal.issn.org/resource/ISSN/<ISSN>`. RO-Crate's example has
   `"journal": "…"`, but the RO-Crate context defines no `journal` property
-  (only `Journal` for `Periodical`), so wpsld uses `isPartOf`. Repair Crate
+  (only `Journal` for `Periodical`), so wpsld uses `isPartOf`.
+  **TODO:** raise an issue at https://github.com/ResearchObject/ro-crate
+  that the citation example of 1.3's Contextual Entities (Publications via
+  citation property) uses `journal`, which the RO-Crate context doesn't
+  define: suggest `isPartOf` a Periodical (`Journal`) as schema.org has it,
+  or adding the term. Repair Crate
   writes DOIs as `https://doi.org/…`, merges works whose DOIs differ only in
   case, and turns `identifier` and `citation` text that is a DOI into that
   (a link for `citation`); a DOI alone as `@id` is left, being a path.
   Crossref's public pool allowed 1 request per second (2026-11-12).
   - *Short forms* such as "Xuan et al. (2015): Topic Model for Graph
-    Mining": RO-Crate suggests none, only `creditText` for a full citation
-    (whose examples use "et al.") and `name` for the title. A short form is
-    derived, so rather than storing it (e.g. as schema.org's
-    `alternateName`, an alias of anything), show it as the work's label in
-    the entity list, references and preview, computed from its authors'
-    family names, `datePublished` and `name`.
+    Mining" are the `creditText`, which RO-Crate gives any CreativeWork as
+    "a textual citation for the entity" (Root Data Entity: Resolvable
+    persistent identifiers and citation text): the first author's family
+    name ("et al." for three or more, "A & B" for two), the year, the
+    title, and the journal if any. Next: show it as the work's label in references and the entity
+    list, where the title alone can be ambiguous.
   - *Next:* explore the kinds of objects DataCite registers besides
     articles (its `resourceTypeGeneral`: Dataset, Software,
     ComputationalNotebook, Workflow, Image, Audiovisual, PhysicalObject,
