@@ -103,6 +103,8 @@ public class TestCrateEditorEntityList extends ApplicationTest {
 	}
 
 	private void addNamed(String type, String name) {
+		// Once the editor is there
+		entities();
 		clickOn("#addEntity");
 		clickOn("#typeSearch").write(type).type(KeyCode.ENTER);
 		clickOn("#header-name").write(name);
@@ -368,6 +370,29 @@ public class TestCrateEditorEntityList extends ApplicationTest {
 		// No longer mentioned by the root, as it is linked as a part
 		interact(() -> tree.getSelectionModel().clearAndSelect(0));
 		assertFalse(lookup("#preview").queryAs(TextArea.class).getText().contains("\"mentions\""));
+	}
+
+	/** View > Entities by Part: the hasPart hierarchy; the selection kept between the trees */
+	@Test
+	public void byPart() throws Exception {
+		EntityTreeView tree = openByFolder();
+		choose("menuListByPart");
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals(List.of("Survey", "  data", "  https://example.com/z.csv", "  raw/2025/a.txt", "File",
+				"  docs/cited.pdf", "Person", "  Alice"), rows(tree));
+		interact(() -> tree.getTreeItem(1).setExpanded(true));
+		assertEquals("    counts.csv", rows(tree).get(2));
+		interact(() -> tree.getSelectionModel().clearAndSelect(4));
+		assertEquals("raw/2025/a.txt", lookup("#entityId").queryAs(TextField.class).getText());
+		choose("menuListByFolder");
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals("raw/2025/a.txt", tree.selectedEntities().get(0).getId());
+		assertEquals("      a.txt", rows(tree).get(tree.getSelectionModel().getSelectedIndex()));
+		choose("menuListByPart");
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals("  raw/2025/a.txt", rows(tree).get(tree.getSelectionModel().getSelectedIndex()));
+		choose("menuListByType");
+		assertEquals("raw/2025/a.txt", entities().getSelectionModel().getSelectedItem().getId());
 	}
 
 	@Test

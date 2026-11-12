@@ -974,7 +974,8 @@ Styles:
   is in the folder of each; parts of files (`page.html#table2`) are under
   their file. *Done*: Crate > Add Dataset for Folder and Add to Has Part
   (also on the right-click menu) bring greyed out folders and files into
-  `hasPart`. Next: the logical tree; then Open Folder (see BUGS.md); the
+  `hasPart`. The logical one is *done* too, as View > Entities by Part
+  (`EntityTree.logical`). Next: Open Folder (see BUGS.md); the
   Workplace Shell's look in the Warp style (lines joining the tree,
   hatched icon when selected); a header with the selected folder's path
   and counts.

@@ -28,6 +28,12 @@ file manager shows files:
   is in the folder of its type, and under the file, if the crate
   describes it.
 
+**View > Entities by Part** shows another tree: what the crate is made
+of, by **Has part**. The dataset as a whole holds its parts, and each
+Dataset its own parts, wherever their files are: a part of two datasets
+is under both. Parts are named by their path from their dataset's
+folder. The other entities follow in a folder for each type, as by folder.
+
 To bring a greyed out folder or file into the crate, select it (or
 several) and choose **Crate > Add Dataset for Folder** or **Add to Has
 Part**, also on the right-click menu. A folder gets a Dataset, and a file

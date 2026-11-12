@@ -23,9 +23,11 @@ import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
@@ -134,11 +136,97 @@ public class EntityTree {
 							e -> new Node("id:" + e.getId(), e.getId(), Kind.RESOURCE, Optional.of(e), true, List.of()))
 							.toList()));
 		}
-		Comparator<Entity> order = listing.order(root);
-		contextual.forEach((type, entities) -> nodes.add(new Node("type:" + type, type, Kind.TYPE, Optional.empty(),
+		nodes.addAll(typeFolders(contextual, listing.order(root)));
+		return nodes;
+	}
+
+	/** A folder for each type, of its entities */
+	private static List<Node> typeFolders(Map<String, List<Entity>> byType, Comparator<Entity> order) {
+		List<Node> nodes = new ArrayList<>();
+		byType.forEach((type, entities) -> nodes.add(new Node("type:" + type, type, Kind.TYPE, Optional.empty(),
 				false, entities.stream().sorted(order).map(e -> new Node("type:" + type + " id:" + e.getId(),
 						e.getLabel(), Kind.CONTEXTUAL, Optional.of(e), false, List.of())).toList())));
 		return nodes;
+	}
+
+	/**
+	 * The logical tree: the root data entity's parts (<code>hasPart</code>),
+	 * each Dataset, or other entity with parts, a folder of its own parts,
+	 * wherever their files are; an entity that is a part of several is in
+	 * each. Parts are named by their path from the dataset's, where it has
+	 * one (<code>counts.csv</code> in <code>data/</code>), else by their
+	 * <code>@id</code>. Then the other entities, in a folder for each of
+	 * their types, as in {@link #physical}.
+	 */
+	public static List<Node> logical(Crate crate, EntityListing listing) {
+		Collator collator = Collator.getInstance();
+		collator.setStrength(Collator.SECONDARY);
+		Entity root = crate.getRoot();
+		Map<String, Entity> byId = new HashMap<>();
+		crate.getEntities().forEach(e -> byId.putIfAbsent(e.getId(), e));
+		Set<Entity> data = Set.copyOf(crate.dataEntities());
+		List<Node> nodes = new ArrayList<>();
+		nodes.add(new Node("part:", root.getLabel(), Kind.ROOT, Optional.of(root), true,
+				parts(root, "part:", Set.of(root), byId, listing, collator)));
+		Map<String, List<Entity>> contextual = new TreeMap<>(collator);
+		for (Entity entity : crate.getEntities()) {
+			if (entity != root && !data.contains(entity)) {
+				listing.typeNames(entity).forEach(t -> contextual.computeIfAbsent(t, k -> new ArrayList<>()).add(entity));
+			}
+		}
+		nodes.addAll(typeFolders(contextual, listing.order(root)));
+		return nodes;
+	}
+
+	/**
+	 * The parts of an entity: those with parts, or Datasets, first, as
+	 * folders; not again within themselves, if parts are in a cycle
+	 */
+	private static List<Node> parts(Entity whole, String key, Set<Entity> within, Map<String, Entity> byId,
+			EntityListing listing, Collator collator) {
+		List<Entity> parts = whole.getAll("hasPart").stream().filter(v -> v.isObject() && v.path("@id").isTextual())
+				.map(v -> byId.get(v.get("@id").asText())).filter(Objects::nonNull).distinct().toList();
+		Comparator<Entity> folders = Comparator.comparing(part -> !isWhole(part, listing));
+		return parts.stream()
+				.sorted(folders.thenComparing(part -> partName(whole, part), collator).thenComparing(Entity::getId))
+				.map(part -> {
+					String partKey = key + "/" + part.getId();
+					boolean folder = isWhole(part, listing);
+					Kind kind = folder ? Kind.FOLDER : Crate.isAbsolute(part.getId()) ? Kind.RESOURCE : Kind.FILE;
+					List<Node> children = folder && !within.contains(part)
+							? parts(part, partKey, plus(within, part), byId, listing, collator)
+							: List.of();
+					return new Node(partKey, partName(whole, part), kind, Optional.of(part), true, children);
+				}).toList();
+	}
+
+	private static boolean isWhole(Entity entity, EntityListing listing) {
+		return !entity.getAll("hasPart").isEmpty() || listing.isA(entity, "Dataset");
+	}
+
+	private static Set<Entity> plus(Set<Entity> set, Entity entity) {
+		Set<Entity> more = new HashSet<>(set);
+		more.add(entity);
+		return more;
+	}
+
+	/**
+	 * A part's name: its path from the folder of the dataset it is a part
+	 * of, decoded, if it is in it (<code>raw/a.csv</code> in
+	 * <code>data/</code> for <code>data/raw/a.csv</code>); else its path
+	 * from the crate, or its <code>@id</code>.
+	 */
+	static String partName(Entity whole, Entity part) {
+		String id = part.getId();
+		if (!isPath(id) || id.contains("#")) {
+			return id;
+		}
+		String path = String.join("/", path(id));
+		String folder = whole.getId().equals("./") ? "" : String.join("/", isPath(whole.getId()) ? path(whole.getId()) : List.of());
+		if (!folder.isEmpty() && path.startsWith(folder + "/")) {
+			return path.substring(folder.length() + 1);
+		}
+		return path;
 	}
 
 	/**

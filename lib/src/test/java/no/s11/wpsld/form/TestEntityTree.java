@@ -168,6 +168,42 @@ public class TestEntityTree {
 				"  CONTEXTUAL report.html#fig1"), lines(EntityTree.physical(crate, listing)));
 	}
 
+	/**
+	 * The logical tree: hasPart from the root, wherever the files are, a
+	 * part of two datasets in each, named from their folder; the rest by type
+	 */
+	@Test
+	public void logical() {
+		Crate crate = new Crate();
+		crate.getRoot().set("name", Optional.of(TextNode.valueOf("Survey")));
+		add(crate, "data/", "Data", "Dataset");
+		add(crate, "data/raw/counts.csv", "Counts", "File");
+		add(crate, "shared.txt", null, "File");
+		add(crate, "https://example.com/z.csv", null, "File");
+		add(crate, "#loop", "Loop", "Dataset");
+		add(crate, "notes.txt", null, "File");
+		add(crate, "#alice", "Alice", "Person");
+		hasPart(crate.getRoot(), "data/", "https://example.com/z.csv", "shared.txt", "#loop");
+		hasPart(crate.get("data/").orElseThrow(), "data/raw/counts.csv", "shared.txt");
+		hasPart(crate.get("#loop").orElseThrow(), "#loop");
+		assertEquals(List.of(
+				"ROOT Survey",
+				"  FOLDER #loop",
+				"    FOLDER #loop",
+				"  FOLDER data",
+				"    FILE raw/counts.csv",
+				"    FILE shared.txt",
+				"  RESOURCE https://example.com/z.csv",
+				"  FILE shared.txt",
+				"TYPE File *",
+				"  CONTEXTUAL notes.txt",
+				"TYPE Person *",
+				"  CONTEXTUAL Alice"), lines(EntityTree.logical(crate, listing)));
+		List<String> keys = new ArrayList<>();
+		collect(EntityTree.logical(crate, listing), keys, new ArrayList<>());
+		assertEquals(keys.size(), keys.stream().distinct().count());
+	}
+
 	/** Each entity at least once, with keys unique in the tree */
 	@Test
 	public void keys() {

@@ -178,6 +178,8 @@ public class CrateEditor extends Application {
 	/** The entities by their folders, shown instead of the list if chosen */
 	private EntityTreeView tree;
 	private boolean byFolder;
+	/** Whether the tree shows the crate's parts (hasPart), not its folders */
+	private boolean byPart;
 	/** The entities selected in the list or tree shown, the one edited last */
 	private final ObservableList<Entity> selection = FXCollections.observableArrayList();
 	/** Whether none selected can be removed: none, or only the root data entity */
@@ -802,7 +804,7 @@ public class CrateEditor extends Application {
 
 	/** The folders without a Dataset selected in the tree, by their @ids */
 	private List<String> selectedFolders() {
-		return byFolder ? tree.selectedFolderIds() : List.of();
+		return byFolder && !byPart ? tree.selectedFolderIds() : List.of();
 	}
 
 	/**
@@ -1037,7 +1039,7 @@ public class CrateEditor extends Application {
 				}
 			}
 			if (byFolder) {
-				tree.setNodes(EntityTree.physical(crate, listing), edited);
+				tree.setNodes(byPart ? EntityTree.logical(crate, listing) : EntityTree.physical(crate, listing), edited);
 			}
 		} finally {
 			relisting = false;
@@ -1130,12 +1132,26 @@ public class CrateEditor extends Application {
 		RadioMenuItem folders = new RadioMenuItem("Entities by _Folder");
 		folders.setId("menuListByFolder");
 		folders.setToggleGroup(group);
+		RadioMenuItem parts = new RadioMenuItem("Entities by _Part");
+		parts.setId("menuListByPart");
+		parts.setToggleGroup(group);
 		group.selectedToggleProperty().addListener((obs, old, item) -> {
-			if (item != null) {
-				listByFolder(item == folders);
+			if (item == null) {
+				return;
+			}
+			boolean logical = item == parts;
+			if (byFolder && item != byType && logical != byPart) {
+				// From one tree to the other
+				List<Entity> shown = List.copyOf(selection);
+				byPart = logical;
+				Entity edited = entityEditor.getEntity();
+				showListed(!shown.isEmpty() || edited == null ? shown : List.of(edited));
+			} else {
+				byPart = logical;
+				listByFolder(item != byType);
 			}
 		});
-		return List.of(byType, folders);
+		return List.of(byType, folders, parts);
 	}
 
 	/**
