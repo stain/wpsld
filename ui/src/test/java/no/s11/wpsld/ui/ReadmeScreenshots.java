@@ -128,19 +128,11 @@ public class ReadmeScreenshots extends ApplicationTest {
 			stage.setHeight(900);
 		});
 		look("classic", "light");
-		clickOn("#save");
-		png(out.resolve("save-warning.png"), lookup(".dialog-pane").query());
-		clickOn("Cancel");
-
 		interact(() -> {
 			lookup("#header-name").queryAs(TextField.class).setText("Example dataset");
 			lookup("#header-description").queryAs(TextArea.class).setText("A sample file described with wpsld.");
-			lookup("#value-datePublished-0").queryAs(DatePicker.class).getEditor().setText("2025-01-31");
-			lookup("#value-license-0").queryAs(ComboBox.class).getEditor()
-					.setText("For tutorial practice only; not for reuse");
 		});
 		png(out.resolve("editor-overview.png"));
-		png(out.resolve("dataset-form.png"), lookup(n -> n instanceof EntityEditor).query());
 
 		interact(() -> {
 			MenuButton parts = lookup("#headerNew-hasPart").queryAs(MenuButton.class);
@@ -171,6 +163,28 @@ public class ReadmeScreenshots extends ApplicationTest {
 		org.junit.Assert.assertTrue(lookup("#value-author-0").queryAs(ComboBox.class).getEditor().getText()
 				.startsWith("#person-"));
 		png(out.resolve("author-link.png"), lookup(n -> n instanceof EntityEditor).query());
+
+		clickOn("#save");
+		png(out.resolve("save-warning.png"), lookup(".dialog-pane").query());
+		clickOn("Cancel");
+		interact(() -> {
+			lookup("#propertySearch").queryAs(TextField.class).clear();
+			lookup("#value-datePublished-0").queryAs(DatePicker.class).getEditor().setText("2025-01-31");
+			MenuButton license = lookup("#new-license").queryAs(MenuButton.class);
+			license.getItems().stream().filter(i -> i.getText().equals("CreativeWork")).findFirst()
+					.orElseThrow().fire();
+		});
+		select("#creativework-1");
+		interact(() -> {
+			lookup("#header-name").queryAs(TextField.class)
+					.setText("Creative Commons Attribution 4.0 International");
+			TextField id = lookup("#entityId").queryAs(TextField.class);
+			id.setText("http://spdx.org/licenses/CC-BY-4.0");
+			id.getOnAction().handle(new javafx.event.ActionEvent());
+		});
+		png(out.resolve("license-entity.png"), lookup(n -> n instanceof EntityEditor).query());
+		select("./");
+		png(out.resolve("dataset-form.png"), lookup(n -> n instanceof EntityEditor).query());
 
 		interact(() -> {
 			MenuButton parts = lookup("#headerNew-hasPart").queryAs(MenuButton.class);

@@ -96,7 +96,8 @@ final class HelpMarkdown {
 				inline(flow, node, browse, imageWidth, style + "-fx-font-style: italic;");
 			} else if (node instanceof org.commonmark.node.Image image) {
 				image(flow, image, imageWidth);
-			} else if (node instanceof Link link && isWebLink(link.getDestination())) {
+			} else if (node instanceof Link link && (isWebLink(link.getDestination())
+					|| HelpDialog.Topic.fromResource(link.getDestination()).isPresent())) {
 				Hyperlink hyperlink = new Hyperlink(plainChildren(link));
 				hyperlink.setOnAction(e -> browse.accept(link.getDestination()));
 				flow.getChildren().add(hyperlink);
@@ -169,6 +170,7 @@ final class HelpMarkdown {
 
 	private static void text(TextFlow flow, String value, String style) {
 		javafx.scene.text.Text text = new javafx.scene.text.Text(value);
+		text.getStyleClass().add("help-text");
 		text.setStyle(style);
 		flow.getChildren().add(text);
 	}

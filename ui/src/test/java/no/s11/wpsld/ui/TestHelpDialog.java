@@ -33,11 +33,14 @@ import org.commonmark.parser.Parser;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.scene.Scene;
 import javafx.scene.control.Hyperlink;
+import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.Region;
+import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
 import javafx.stage.Modality;
@@ -48,9 +51,77 @@ public class TestHelpDialog extends ApplicationTest {
 
 	@Override
 	public void start(Stage stage) {
+		Theme.choose(Theme.Style.CLASSIC, Theme.Colours.LIGHT);
 		this.stage = stage;
 		stage.setScene(new Scene(new StackPane(), 200, 100));
 		stage.show();
+	}
+
+	@Test
+	public void helpFollowsStylesAndColoursWhileOpen() {
+		HelpDialog[] dialog = new HelpDialog[1];
+		interact(() -> {
+			dialog[0] = new HelpDialog(stage, HelpDialog.Topic.CONTENTS, address -> {});
+			dialog[0].show();
+		});
+		Label title = lookup(".help-title").queryAs(Label.class);
+		Region sidebar = lookup(".help-sidebar").queryAs(Region.class);
+		TextFlow content = lookup("#helpContent").queryAs(TextFlow.class);
+		Text text = content.getChildren().stream().filter(Text.class::isInstance)
+				.map(Text.class::cast).findFirst().orElseThrow();
+		Hyperlink link = content.getChildren().stream().filter(Hyperlink.class::isInstance)
+				.map(Hyperlink.class::cast).findFirst().orElseThrow();
+		ListView<?> topics = lookup("#helpTopics").queryListView();
+
+		interact(() -> {
+			Theme.choose(Theme.Style.MACOS, Theme.Colours.LIGHT);
+			dialog[0].getDialogPane().applyCss();
+		});
+		assertEquals(Color.web("#e3e3e3"), sidebar.getBackground().getFills().get(0).getFill());
+		assertEquals(Color.web("#262626"), text.getFill());
+		assertEquals(Color.web("#0068da"), link.getTextFill());
+		assertEquals(15, title.getFont().getSize(), 0.1);
+
+		interact(() -> {
+			Theme.choose(Theme.Style.MACOS, Theme.Colours.DARK);
+			dialog[0].getDialogPane().applyCss();
+		});
+		assertEquals(Color.web("#1e1e1e"), content.getBackground().getFills().get(0).getFill());
+		assertEquals(Color.web("#dfdfdf"), text.getFill());
+		assertEquals(Color.web("#419cff"), link.getTextFill());
+
+		interact(() -> {
+			Theme.choose(Theme.Style.WARP, Theme.Colours.DARK);
+			dialog[0].getDialogPane().applyCss();
+		});
+		assertEquals(Color.web("#3d2bd0"), title.getBackground().getFills().get(0).getFill());
+		assertEquals(Color.WHITE, title.getTextFill());
+		assertEquals(Color.web("#262626"), content.getBackground().getFills().get(0).getFill());
+		assertEquals(Color.web("#e4e4e4"), text.getFill());
+		assertEquals(Color.web("#9d93ff"), link.getTextFill());
+		assertEquals("Contents", topics.getSelectionModel().getSelectedItem().toString());
+
+		interact(() -> {
+			Theme.choose(Theme.Style.WIN11, Theme.Colours.LIGHT);
+			dialog[0].getDialogPane().applyCss();
+		});
+		assertEquals(Color.web("#fbfbfb"), content.getBackground().getFills().get(0).getFill());
+		assertEquals(Color.web("#1b1b1b"), text.getFill());
+
+		interact(() -> {
+			Theme.choose(Theme.Style.WIN11, Theme.Colours.DARK);
+			dialog[0].getDialogPane().applyCss();
+		});
+		assertEquals(Color.web("#2b2b2b"), content.getBackground().getFills().get(0).getFill());
+		assertEquals(Color.WHITE, text.getFill());
+
+		interact(() -> {
+			Theme.choose(Theme.Style.CLASSIC, Theme.Colours.DARK);
+			dialog[0].getDialogPane().applyCss();
+		});
+		assertEquals(Color.web("#1f1f1f"), content.getBackground().getFills().get(0).getFill());
+		assertEquals(Color.web("#cccccc"), text.getFill());
+		clickOn("Close");
 	}
 
 	@Test
@@ -77,9 +148,57 @@ public class TestHelpDialog extends ApplicationTest {
 		assertTrue(topics.getItems().isEmpty());
 		assertEquals("", text(content));
 		interact(search::clear);
-		assertEquals(2, topics.getItems().size());
+		assertEquals(HelpDialog.Topic.values().length, topics.getItems().size());
 		assertNotNull(topics.getSelectionModel().getSelectedItem());
 		clickOn("Close");
+	}
+
+	@Test
+	public void contentsLinksOpenBundledTopics() {
+		HelpDialog[] dialog = new HelpDialog[1];
+		interact(() -> {
+			dialog[0] = new HelpDialog(stage, HelpDialog.Topic.CONTENTS, address -> fail("Must stay offline"));
+			dialog[0].show();
+		});
+		ListView<?> topics = lookup("#helpTopics").queryListView();
+		TextFlow content = lookup("#helpContent").queryAs(TextFlow.class);
+		List<String> links = new ArrayList<>();
+		Parser.builder().build().parse(HelpDialog.Topic.CONTENTS.content).accept(new AbstractVisitor() {
+			@Override
+			public void visit(org.commonmark.node.Link link) {
+				assertTrue("Unknown topic: " + link.getDestination(),
+						HelpDialog.Topic.fromResource(link.getDestination()).isPresent());
+				links.add(link.getDestination());
+			}
+		});
+		assertEquals(HelpDialog.Topic.values().length - 1, links.size());
+		assertEquals(links.size(), links.stream().distinct().count());
+		TextField search = lookup("#helpSearch").queryAs(TextField.class);
+		interact(() -> search.setText("Choose a topic in the list"));
+		assertEquals(1, topics.getItems().size());
+		Hyperlink types = content.getChildren().stream().filter(Hyperlink.class::isInstance)
+				.map(Hyperlink.class::cast).filter(link -> link.getText().equals("Types")).findFirst().orElseThrow();
+		interact(types::fire);
+		assertEquals("Types", topics.getSelectionModel().getSelectedItem().toString());
+		assertEquals("", search.getText());
+		assertTrue(text(content).startsWith("Types"));
+		clickOn("Close");
+	}
+
+	@Test
+	public void localTopicLinksAreRegistered() {
+		for (HelpDialog.Topic topic : HelpDialog.Topic.values()) {
+			Parser.builder().build().parse(topic.content).accept(new AbstractVisitor() {
+				@Override
+				public void visit(org.commonmark.node.Link link) {
+					String destination = link.getDestination();
+					if (destination.endsWith(".md")) {
+						assertTrue("Unknown topic in " + topic + ": " + destination,
+								HelpDialog.Topic.fromResource(destination).isPresent());
+					}
+				}
+			});
+		}
 	}
 
 	@Test

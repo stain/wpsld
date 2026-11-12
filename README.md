@@ -18,13 +18,14 @@ It is a work in progress. See [PLAN.md](PLAN.md) for the plan and
 
 ## Help in the app
 
-Choose **Help > wpsld Help** (F1, or Command-? on macOS) for offline help.
-The question-mark button beside the profile chooser opens help about
-profiles. The manual is being developed; the existing field help buttons
-also show definitions of individual properties.
+Choose **Help > wpsld Help** for offline help. F1 opens help for the
+focused editor control (Command-? also works on macOS). The question-mark
+button beside the profile chooser opens help about profiles; field help
+buttons show definitions of individual properties. The help window follows
+the selected style and colours.
 
-The help topics can also be read here: [Getting started](ui/src/main/resources/no/s11/wpsld/ui/help/getting-started.md)
-and [Profiles](ui/src/main/resources/no/s11/wpsld/ui/help/profiles.md).
+The [help contents](ui/src/main/resources/no/s11/wpsld/ui/help/index.md)
+and its linked Markdown topics can also be read on GitHub.
 
 ## Screenshots
 

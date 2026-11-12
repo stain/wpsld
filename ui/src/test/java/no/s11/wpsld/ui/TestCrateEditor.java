@@ -44,6 +44,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.Label;
 import javafx.scene.control.DatePicker;
+import javafx.scene.control.DialogPane;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.MenuItem;
@@ -56,6 +57,8 @@ import javafx.scene.control.skin.VirtualFlow;
 import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.crate.CrateChecks;
+import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.form.FormFields;
 
 /**
@@ -101,7 +104,7 @@ public class TestCrateEditor extends ApplicationTest {
 		entities();
 		interact(menuItem("menuManual")::fire);
 		assertTrue(TestHelpDialog.text(lookup("#helpContent").queryAs(javafx.scene.text.TextFlow.class))
-				.startsWith("Getting started"));
+				.startsWith("Help contents"));
 		clickOn("Close");
 		if (!CrateFile.onMac()) {
 			push(KeyCode.F1);
@@ -115,6 +118,50 @@ public class TestCrateEditor extends ApplicationTest {
 	}
 
 	@Test
+	public void f1OpensHelpForTheFocusedControl() {
+		entities();
+		interact(() -> lookup("#entities").query().requestFocus());
+		push(KeyCode.F1);
+		assertEquals("Entities and identifiers", lookup("#helpTopics").queryListView()
+				.getSelectionModel().getSelectedItem().toString());
+		clickOn("Close");
+
+		interact(() -> lookup("#entityId").query().requestFocus());
+		push(KeyCode.F1);
+		assertEquals("Entities and identifiers", lookup("#helpTopics").queryListView()
+				.getSelectionModel().getSelectedItem().toString());
+		clickOn("Close");
+
+		interact(() -> lookup("#propertySearch").query().requestFocus());
+		push(KeyCode.F1);
+		assertEquals("Properties and links", lookup("#helpTopics").queryListView()
+				.getSelectionModel().getSelectedItem().toString());
+		clickOn("Close");
+
+		interact(() -> lookup("#addType").query().requestFocus());
+		push(KeyCode.F1);
+		assertEquals("Types", lookup("#helpTopics").queryListView().getSelectionModel().getSelectedItem().toString());
+		clickOn("Close");
+
+		interact(() -> lookup("#profile").query().requestFocus());
+		push(KeyCode.F1);
+		assertEquals("Profiles", lookup("#helpTopics").queryListView().getSelectionModel().getSelectedItem().toString());
+		clickOn("Close");
+
+		interact(() -> lookup("#views").query().requestFocus());
+		push(KeyCode.F1);
+		assertEquals("Views and styles", lookup("#helpTopics").queryListView()
+				.getSelectionModel().getSelectedItem().toString());
+		clickOn("Close");
+
+		clickOn("#addType");
+		push(KeyCode.F1);
+		assertEquals("Types", lookup("#helpTopics").queryListView().getSelectionModel().getSelectedItem().toString());
+		clickOn("Close");
+		clickOn("Cancel");
+	}
+
+	@Test
 	public void gettingStartedCreatesLinkedDescriptions() throws Exception {
 		ListView<Entity> list = entities();
 		Entity root = list.getItems().get(0);
@@ -122,9 +169,6 @@ public class TestCrateEditor extends ApplicationTest {
 			lookup("#header-name").queryAs(TextField.class).setText("Example dataset");
 			lookup("#header-description").queryAs(javafx.scene.control.TextArea.class)
 					.setText("A sample file described with wpsld.");
-			lookup("#value-datePublished-0").queryAs(DatePicker.class).getEditor().setText("2025-01-31");
-			lookup("#value-license-0").queryAs(ComboBox.class).getEditor()
-					.setText("For tutorial practice only; not for reuse");
 			MenuButton parts = lookup("#headerNew-hasPart").queryAs(MenuButton.class);
 			parts.getItems().stream().filter(item -> item.getText().equals("File")).findFirst().orElseThrow().fire();
 		});
@@ -145,19 +189,51 @@ public class TestCrateEditor extends ApplicationTest {
 		interact(() -> lookup("#header-name").queryAs(TextField.class).setText("Example author"));
 
 		assertEquals(person.getId(), root.getAll("author").get(0).path("@id").asText());
-		assertEquals("2025-01-31", root.get("datePublished").orElseThrow().asText());
-		assertEquals("For tutorial practice only; not for reuse", root.get("license").orElseThrow().asText());
+		interact(() -> list.getSelectionModel().clearAndSelect(0));
+		clickOn("#save");
+		String warning = lookup(".dialog-pane").queryAs(DialogPane.class).getContentText();
+		assertTrue(warning.contains("datePublished"));
+		assertTrue(warning.contains("license"));
+		clickOn("Cancel");
 
-		Path metadata = Files.createTempFile("wpsld-help-", ".json");
+		interact(() -> {
+			lookup("#propertySearch").queryAs(TextField.class).clear();
+			lookup("#value-datePublished-0").queryAs(DatePicker.class).getEditor().setText("2025-01-31");
+			MenuButton license = lookup("#new-license").queryAs(MenuButton.class);
+			license.getItems().stream().filter(item -> item.getText().equals("CreativeWork"))
+					.findFirst().orElseThrow().fire();
+		});
+		Entity license = list.getItems().stream().filter(e -> e.getTypes().contains("CreativeWork"))
+				.findFirst().orElseThrow();
+		interact(() -> list.getSelectionModel().clearAndSelect(list.getItems().indexOf(license)));
+		interact(() -> lookup("#header-name").queryAs(TextField.class)
+				.setText("Creative Commons Attribution 4.0 International"));
+		renameTo("http://spdx.org/licenses/CC-BY-4.0");
+		assertEquals("2025-01-31", root.get("datePublished").orElseThrow().asText());
+		assertEquals("http://spdx.org/licenses/CC-BY-4.0", root.getAll("license").get(0).path("@id").asText());
+
+		Path folder = Files.createTempDirectory("wpsld-help-");
+		Path data = Files.writeString(folder.resolve("data.csv"), "value\n1\n");
+		Path metadata = folder.resolve("ro-crate-metadata.json");
 		try {
 			Stage stage = (Stage) list.getScene().getWindow();
 			assertTrue(WaitForAsyncUtils.asyncFx(() -> app.saveTo(stage, metadata)).get());
 			JsonNode graph = new ObjectMapper().readTree(metadata.toFile()).path("@graph");
 			assertTrue(graph.toString().contains("\"data.csv\""));
+			var saved = new CrateReader().read(metadata).crate().orElseThrow();
+			assertTrue(CrateChecks.check(saved).isEmpty());
+			assertEquals("http://spdx.org/licenses/CC-BY-4.0",
+					saved.getRoot().getAll("license").get(0).path("@id").asText());
+			Entity savedLicense = saved.get("http://spdx.org/licenses/CC-BY-4.0").orElseThrow();
+			assertEquals(List.of("CreativeWork"), savedLicense.getTypes());
+			assertEquals("Creative Commons Attribution 4.0 International",
+					savedLicense.get("name").orElseThrow().asText());
 			assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, metadata)).get());
 			assertTrue(list.getItems().stream().anyMatch(e -> e.getId().equals("data.csv")));
 		} finally {
 			Files.deleteIfExists(metadata);
+			Files.deleteIfExists(data);
+			Files.deleteIfExists(folder);
 		}
 	}
 

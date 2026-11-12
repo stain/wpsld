@@ -433,3 +433,44 @@
     -fx-font-weight: bold;
     -fx-text-fill: -warp-text;
 }
+
+/* Help viewer: a square title strip, framed index and sunken reading pane. */
+.help-dialog .help-toolbar {
+    -fx-background-color: -warp-face;
+    -fx-padding: 5;
+}
+
+.help-dialog .help-title {
+    -fx-background-color: -warp-menu-select;
+    -fx-text-fill: -warp-menu-select-text;
+    -fx-padding: 5 8;
+    -fx-font-size: 12px;
+}
+
+.help-dialog .help-sidebar {
+    -fx-background-color: -warp-face;
+    -fx-padding: 6;
+}
+
+.help-dialog .help-sidebar-title {
+    -fx-text-fill: -warp-text;
+}
+
+.help-dialog #helpPage {
+    -fx-background-color: -warp-light, -warp-dark, -warp-face, -warp-ink, -warp-base;
+    -fx-background-insets: 0, 0 1 1 0, 1, 1 2 2 1, 2;
+    -fx-padding: 2;
+}
+
+.help-dialog #helpPage > .viewport, .help-dialog .help-content {
+    -fx-background-color: -warp-base;
+}
+
+.help-dialog .help-content {
+    -fx-padding: 14 16;
+    -fx-line-spacing: 1;
+}
+
+.help-dialog .help-content > .help-text {
+    -fx-fill: -warp-text;
+}

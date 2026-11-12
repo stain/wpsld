@@ -36,17 +36,8 @@ In the middle form, enter a **Name** and **Description** for the whole
 dataset. For practice these could be "Example dataset" and "A sample file
 described with wpsld."
 
-Find **Date published** and enter a date as `YYYY-MM-DD` or choose it from
-the calendar. For the exercise you can use `2025-01-31`. For real research,
-use the actual publication date rather than guessing it.
-
-Enter the terms for reuse in **License**. For this exercise, you can enter
-the text "For tutorial practice only; not for reuse". For real data, use a
-licence or terms that actually apply to the whole dataset; ask your data
-manager if you are unsure. Do not assume a licence applies to third-party
-material. You can also describe a licence as a separate linked entity.
-
-![The dataset form filled in with a name, description, publication date and tutorial-only licence](images/dataset-form.png)
+For this exercise, leave **Date published** and **License** empty for now:
+you will complete them after seeing the save warning.
 
 ## 4. Describe and link a file
 
@@ -83,17 +74,42 @@ Use `+` to add another value where the field permits it.
 
 ## 6. Save and review
 
-Choose **File > Save**. If wpsld reports missing requirements, read the
-list and choose **Cancel** to return to the form and correct them. **Save
-Anyway** saves an incomplete description; it does not make it valid.
+Choose **File > Save**. The warning lists the missing `datePublished` and
+`license` properties. Choose **Cancel** to return to the form and correct
+them. **Save Anyway** saves an incomplete description; it does not make
+it valid.
 
 ![The save warning lists missing required fields, with Cancel and Save Anyway buttons](images/save-warning.png)
 
-In the save dialog, select your prepared folder and use the proposed name
-`ro-crate-metadata.json`. The metadata file should now sit beside
-`data.csv`. Check that the file you described really exists there and that
-the names, links, date and licence are accurate. You can reopen the
-metadata with **File > Open**.
+Select the dataset (`./`) and clear **Search properties** if it still
+contains `author`. Find **Date published** and enter `2025-01-31` or choose
+it from the calendar. For real research, use the actual publication date
+rather than guessing it.
+
+Find **License**. Choose **New > CreativeWork** to create and link a
+licence description. Select the new CreativeWork in the entity list and
+enter `Creative Commons Attribution 4.0 International` as its **Name**.
+Set its `@id` to `http://spdx.org/licenses/CC-BY-4.0` and press Enter.
+This SPDX identifier refers to the CC BY 4.0 licence.
+
+![The licence CreativeWork with its SPDX identifier and name](images/license-entity.png)
+
+Select the dataset again: **License** should now link to that identifier,
+and **Date published** should contain the date.
+
+![The dataset form with a publication date and link to the SPDX licence](images/dataset-form.png)
+
+This licence is an example for data you are entitled to license under CC BY
+4.0. For real data, choose the actual applicable licence or terms; ask your
+data manager if unsure, and do not assume a licence applies to third-party
+material.
+
+Choose **File > Save** again. If another requirement is reported, cancel and
+correct it too. In the save dialog, select your prepared folder and use the
+proposed name `ro-crate-metadata.json`. The metadata file should now sit
+beside `data.csv`. Check that the file you described really exists there
+and that the names, links, date and licence are accurate. You can reopen
+the metadata with **File > Open**.
 
 The save-time checks are helpful but are not a complete validation or a
 guarantee that the data can be shared. Before publishing, check the crate

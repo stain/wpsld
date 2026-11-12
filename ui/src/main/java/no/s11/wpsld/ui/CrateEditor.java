@@ -94,6 +94,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.util.StringConverter;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 import javafx.stage.WindowEvent;
 import no.s11.wpsld.Settings;
 import no.s11.wpsld.crate.Crate;
@@ -250,6 +251,11 @@ public class CrateEditor extends Application {
 		// In a text field, Ctrl+Z is first its own undo of typing; once it
 		// has none, the crate's, e.g. in the field focused by an undo
 		stage.getScene().addEventFilter(KeyEvent.KEY_PRESSED, e -> {
+			if (HelpDialog.isHelpShortcut(e)) {
+				e.consume();
+				showHelp(helpFor(stage.getScene().getFocusOwner()));
+				return;
+			}
 			if (!(stage.getScene().getFocusOwner() instanceof TextInputControl field)) {
 				return;
 			}
@@ -350,6 +356,7 @@ public class CrateEditor extends Application {
 					return entity;
 				}, this::rename);
 		entityEditor.setBrowse(address -> getHostServices().showDocument(address));
+		entityEditor.setTypeHelp(owner -> showHelp(HelpDialog.Topic.TYPES, owner));
 		// As the style lays it out, e.g. as a notebook in the OS/2 Warp style
 		entityEditor.setFormLayout(Theme.style().get().form());
 		Theme.style().addListener((obs, old, style) -> entityEditor.setFormLayout(style.form()));
@@ -451,6 +458,7 @@ public class CrateEditor extends Application {
 		Tab jsonTab = new Tab("JSON-LD", preview);
 		jsonTab.setId("jsonTab");
 		TabPane views = new TabPane(previewTab, jsonTab);
+		views.setId("views");
 		views.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 		split = new SplitPane(sidebar, entityEditor, views);
 		split.setDividerPositions(0.2, 0.66);
@@ -529,7 +537,7 @@ public class CrateEditor extends Application {
 		manual.setAccelerator(CrateFile.onMac()
 				? new KeyCodeCombination(KeyCode.SLASH, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN)
 				: new KeyCodeCombination(KeyCode.F1));
-		manual.setOnAction(e -> showHelp(HelpDialog.Topic.GETTING_STARTED));
+		manual.setOnAction(e -> showHelp(HelpDialog.Topic.CONTENTS));
 		MenuItem about = new MenuItem("_About wpsld…");
 		about.setId("menuAbout");
 		about.setOnAction(e -> new AboutDialog(stage, address -> getHostServices().showDocument(address)).show());
@@ -546,7 +554,35 @@ public class CrateEditor extends Application {
 	}
 
 	private void showHelp(HelpDialog.Topic topic) {
-		new HelpDialog(stage, topic, address -> getHostServices().showDocument(address)).show();
+		showHelp(topic, stage);
+	}
+
+	private void showHelp(HelpDialog.Topic topic, Window owner) {
+		new HelpDialog(owner, topic, address -> getHostServices().showDocument(address)).show();
+	}
+
+	private HelpDialog.Topic helpFor(Node focused) {
+		for (Node node = focused; node != null; node = node.getParent()) {
+			String id = node.getId();
+			if (id != null && (id.equals("profile") || id.equals("loadProfile") || id.equals("profileHelp")
+					|| id.equals("profileStatus"))) {
+				return HelpDialog.Topic.PROFILES;
+			}
+			if (id != null && (id.equals("addType") || id.startsWith("removeType-")
+					|| id.startsWith("type-"))) {
+				return HelpDialog.Topic.TYPES;
+			}
+			if ((id != null && id.equals("entityId")) || node == sidebar) {
+				return HelpDialog.Topic.ENTITIES;
+			}
+			if (id != null && id.equals("views")) {
+				return HelpDialog.Topic.VIEWS;
+			}
+			if (node == entityEditor) {
+				return HelpDialog.Topic.PROPERTIES;
+			}
+		}
+		return HelpDialog.Topic.CONTENTS;
 	}
 
 	/**
