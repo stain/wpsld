@@ -40,12 +40,14 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import no.s11.wpsld.Settings;
+import no.s11.wpsld.crate.GeoNames;
 import no.s11.wpsld.masp.Profile;
 import no.s11.wpsld.masp.ProfileCache;
 import no.s11.wpsld.masp.ProfileRegistry;
@@ -64,7 +66,7 @@ class PreferencesDialog extends Dialog<Settings> {
 	 *                  to stop offering it
 	 */
 	PreferencesDialog(Window owner, Settings settings, ProfileCache profiles, Consumer<Profile> forgotten,
-			Consumer<Window> profileHelp) {
+			Consumer<Window> profileHelp, Consumer<String> browse) {
 		initOwner(owner);
 		setTitle("Preferences");
 		setResizable(true);
@@ -130,7 +132,23 @@ class PreferencesDialog extends Dialog<Settings> {
 		keptBox.setPadding(new Insets(12));
 		Tab keptTab = new Tab("Kept profiles", keptBox);
 
-		TabPane tabs = new TabPane(registryTab, keptTab);
+		TextField geonames = new TextField(settings.geonamesUsername());
+		geonames.setId("geonamesUsername");
+		geonames.setPromptText("Your GeoNames username");
+		Hyperlink signUp = new Hyperlink("Make a free GeoNames account");
+		signUp.setOnAction(e -> browse.accept(GeoNames.SIGN_UP));
+		Hyperlink account = new Hyperlink("Enable the free web services of your account");
+		account.setOnAction(e -> browse.accept(GeoNames.ACCOUNT));
+		Label geonamesAbout = new Label("Find place… looks places up by name in GeoNames, whose identifiers RO-Crate "
+				+ "recommends for places. GeoNames needs a username of your own: make an account, enable its "
+				+ "free web services on your account page, and enter the username here.");
+		geonamesAbout.setWrapText(true);
+		VBox placesBox = new VBox(8, geonamesAbout, new Label("GeoNames username"), geonames, signUp, account);
+		placesBox.setPadding(new Insets(12));
+		Tab placesTab = new Tab("Places", placesBox);
+		placesTab.setId("placesTab");
+
+		TabPane tabs = new TabPane(registryTab, keptTab, placesTab);
 		tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 		tabs.setPrefSize(640, 400);
 		Hyperlink help = new Hyperlink("Help with profiles");
@@ -151,7 +169,7 @@ class PreferencesDialog extends Dialog<Settings> {
 			}
 			Set<String> disabled = enabled.entrySet().stream().filter(e -> !e.getValue().isSelected())
 					.map(e -> e.getKey().name()).collect(Collectors.toSet());
-			return settings.withDisabledRegistries(disabled);
+			return settings.withDisabledRegistries(disabled).withGeonamesUsername(geonames.getText());
 		});
 	}
 }

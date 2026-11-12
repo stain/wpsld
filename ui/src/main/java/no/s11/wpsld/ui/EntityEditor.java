@@ -93,6 +93,8 @@ import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.CrateDocument;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.crate.GeoNames;
+import no.s11.wpsld.crate.Places;
 import no.s11.wpsld.form.EntityTypes;
 import no.s11.wpsld.form.FieldTier;
 import no.s11.wpsld.form.FormField;
@@ -175,6 +177,14 @@ public class EntityEditor extends ScrollPane {
 	/** Text of the property search, kept while the same entity is shown */
 	private String propertyQuery = "";
 	private final Label noMatches = new Label("No matching properties");
+	/** The map's tiles for places */
+	private MapTiles mapTiles = MapTiles.NONE;
+	/** Asks the user for a place in GeoNames, starting from a name */
+	private Function<String, Optional<GeoNames.Place>> findPlace = name -> Optional.empty();
+	/** Where the map of an entity was left, kept while the form is rebuilt */
+	private record MapState(Entity entity, int zoom, double latitude, double longitude) {
+	}
+	private MapState mapState;
 
 	public EntityEditor(SchemaFromJsonLd schema, FormFields formFields, Supplier<List<Entity>> crateEntities,
 			Supplier<Entity> root, Runnable onChange, Function<String, Entity> newEntity,
@@ -432,6 +442,13 @@ public class EntityEditor extends ScrollPane {
 				header.addRow(headerRow++, fieldLabel(field.get()), new FieldEditor(field.get(), true).node());
 			}
 		}
+		// Where a place is, on a map, rather than as coordinates to type
+		if (isA(PLACE) || entity.getTypes().contains("Geometry") || isA(GEO_COORDINATES)) {
+			Label location = new Label("Location");
+			location.setId("label-location");
+			GridPane.setValignment(location, VPos.TOP);
+			header.addRow(headerRow++, location, locationEditor());
+		}
 		if (!layout.notebook()) {
 			// A search, not a field to fill in: small, on the right
 			TextField search = new TextField(propertyQuery);
@@ -555,6 +572,88 @@ public class EntityEditor extends ScrollPane {
 			// Still searching, e.g. after adding a type
 			applySearch(true);
 		}
+	}
+
+	private static final URI PLACE = URI.create("http://schema.org/Place");
+	private static final URI GEO_COORDINATES = URI.create("http://schema.org/GeoCoordinates");
+
+	/** Whether the entity is of the class or one of its subclasses */
+	private boolean isA(URI type) {
+		return typeIris().stream().map(schema.getClasses()::get).filter(Objects::nonNull)
+				.anyMatch(c -> c.getSelfAndSuperClasses().stream().anyMatch(s -> s.getID().equals(type)));
+	}
+
+	private Optional<Entity> crateEntity(String id) {
+		return crateEntities.get().stream().filter(e -> e.getId().equals(id)).findFirst();
+	}
+
+	/**
+	 * A map of where the entity is, a click on it moving it there, and for a
+	 * place a search of GeoNames.
+	 */
+	private Node locationEditor() {
+		Entity edited = entity;
+		MapView map = new MapView(mapTiles);
+		map.setBrowse(address -> browse.accept(address));
+		Optional<Places.Area> where = Places.of(edited, this::crateEntity);
+		Label coordinates = new Label();
+		coordinates.setId("locationCoordinates");
+		coordinates.setWrapText(true);
+		coordinates.getStyleClass().add("dim-text");
+		Runnable describe = () -> coordinates.setText(map.getShown()
+				.map(a -> a.isPoint()
+						? String.format(Locale.ROOT, "Latitude %.6f, longitude %.6f — click the map to move it",
+								a.latitude(), a.longitude())
+						: String.format(Locale.ROOT, "An area around latitude %.4f, longitude %.4f", a.latitude(),
+								a.longitude()))
+				.orElse("Not set: " + (isA(PLACE) ? "find the place, or " : "") + "click the map where it is"));
+		if (mapState != null && mapState.entity() == edited) {
+			map.mark(where);
+			map.setView(mapState.zoom(), mapState.latitude(), mapState.longitude());
+		} else {
+			map.show(where);
+		}
+		describe.run();
+		map.setOnPick((latitude, longitude) -> {
+			Places.setPoint(edited, latitude, longitude, this::crateEntity, () -> newEntity.apply("Geometry"));
+			mapState = new MapState(edited, map.getZoom(), map.getLatitude(), map.getLongitude());
+			map.mark(Places.of(edited, this::crateEntity));
+			describe.run();
+			onChange.run();
+			// New or changed values, e.g. geo linking a new Geometry
+			showForm();
+		});
+		VBox box = new VBox(6);
+		if (isA(PLACE)) {
+			Button find = new Button("Find place…");
+			find.setId("findPlace");
+			find.setTooltip(new Tooltip("Look the place up in GeoNames by its name"));
+			find.setOnAction(e -> findPlace.apply(edited.get("name").map(JsonNode::asText).orElse(""))
+					.ifPresent(found -> {
+						Places.describe(edited, found, this::crateEntity, () -> newEntity.apply("Geometry"));
+						mapState = null;
+						onChange.run();
+						// Its GeoNames identifier, unless it has an identifier of
+						// its own (merging if the crate has the place already)
+						String id = edited.getId();
+						if (!id.equals(found.iri()) && (id.startsWith("#") || id.startsWith("_:")
+								|| GeoNames.idOf(id).isPresent())) {
+							renameEntity.accept(edited, found.iri());
+						} else {
+							showForm();
+						}
+					}));
+			// The button keeps its text; the coordinates wrap instead
+			find.setMinWidth(Region.USE_PREF_SIZE);
+			HBox.setHgrow(coordinates, Priority.ALWAYS);
+			HBox findBar = new HBox(8, find, coordinates);
+			findBar.setAlignment(Pos.CENTER_LEFT);
+			box.getChildren().add(findBar);
+		} else {
+			box.getChildren().add(coordinates);
+		}
+		box.getChildren().add(map);
+		return box;
 	}
 
 	/**
@@ -832,6 +931,21 @@ public class EntityEditor extends ScrollPane {
 	 * the property itself.
 	 */
 	/**
+	 * Set the tiles of the map shown for places.
+	 */
+	public void setMapTiles(MapTiles mapTiles) {
+		this.mapTiles = Objects.requireNonNull(mapTiles);
+	}
+
+	/**
+	 * Set how to ask the user for a place in GeoNames, given a name to start
+	 * from; empty if they cancel.
+	 */
+	public void setFindPlace(Function<String, Optional<GeoNames.Place>> findPlace) {
+		this.findPlace = Objects.requireNonNull(findPlace);
+	}
+
+	/**
 	 * Set how to open web addresses, such as the definitions of properties.
 	 */
 	public void setBrowse(Consumer<String> browse) {
@@ -1052,6 +1166,12 @@ public class EntityEditor extends ScrollPane {
 					item.setOnAction(e -> link(newEntity.apply(terms.name(type)).getId()));
 					create.getItems().add(item);
 				}
+				if (entityTypes.stream().anyMatch(c -> c.getID().equals(PLACE))) {
+					MenuItem fromGeoNames = new MenuItem("Place from GeoNames…");
+					fromGeoNames.setId(id(prefix("newGeoNames"), field.name()));
+					fromGeoNames.setOnAction(e -> findPlace.apply("").ifPresent(this::linkPlace));
+					create.getItems().add(fromGeoNames);
+				}
 				actions.getChildren().add(create);
 			}
 			node = new VBox(4, rowsBox, actions);
@@ -1085,6 +1205,20 @@ public class EntityEditor extends ScrollPane {
 		/**
 		 * Link an entity: in the first empty row, or a new row.
 		 */
+		/**
+		 * Link the place found in GeoNames: the crate's entity for it, or a
+		 * new one with its GeoNames identifier.
+		 */
+		private void linkPlace(GeoNames.Place found) {
+			if (crateEntity(found.iri()).isEmpty()) {
+				Entity place = newEntity.apply("Place");
+				// Not linked from anywhere yet, so its identifier can just change
+				place.setId(found.iri());
+				Places.describe(place, found, EntityEditor.this::crateEntity, () -> newEntity.apply("Geometry"));
+			}
+			link(found.iri());
+		}
+
 		private void link(String id) {
 			Optional<Row> empty = rows.stream().filter(r -> r.text().get().isBlank()).findFirst();
 			if (empty.isPresent()) {

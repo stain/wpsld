@@ -146,6 +146,8 @@ test {
     systemProperty 'glass.platform', 'headless'
     systemProperty 'testfx.robot', 'glass'
     systemProperty 'prism.order', 'sw'
+    // No map tiles from the web: maps are blank, but work
+    systemProperty 'wpsld.mapTiles', 'none'
     // The tests run JavaFX on the class path, in the unnamed module
     jvmArgs '--enable-native-access=ALL-UNNAMED'
     // TestFX registers each test's application in a static JavaFX map

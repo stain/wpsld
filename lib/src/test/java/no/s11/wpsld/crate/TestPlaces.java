@@ -19,6 +19,7 @@ package no.s11.wpsld.crate;
 
 import static org.junit.Assert.*;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.Test;
@@ -99,5 +100,63 @@ public class TestPlaces {
 		// A place referring to itself doesn't loop
 		place.set("geo", Optional.of(JsonNodeFactory.instance.objectNode().put("@id", place.getId())));
 		assertEquals(Optional.empty(), Places.of(place, crate));
+	}
+
+	@Test
+	public void wkt() {
+		assertEquals("<http://www.opengis.net/def/crs/OGC/1.3/CRS84> POINT (150.301195 -33.7152)",
+				Places.wkt(-33.7152, 150.301195));
+		// Rounded to about 10 cm, no exponents
+		assertEquals("<http://www.opengis.net/def/crs/OGC/1.3/CRS84> POINT (0 0.000001)",
+				Places.wkt(0.0000012345, -0.0000000001));
+		assertEquals(Places.fromWkt("POINT (2.5 1)"), Places.fromWkt(Places.wkt(1, 2.5)));
+	}
+
+	@Test
+	public void setPointAddsGeometry() {
+		Crate crate = new Crate();
+		Entity place = crate.add("Place");
+		Entity changed = Places.setPoint(place, -33.7152, 150.301195, crate::get, () -> crate.add("Geometry"));
+		assertEquals(List.of("Geometry"), changed.getTypes());
+		assertEquals(changed.getId(), place.get("geo").orElseThrow().path("@id").asText());
+		assertEquals(Places.wkt(-33.7152, 150.301195), changed.get("asWKT").orElseThrow().asText());
+		// Moved again: the same geometry
+		assertSame(changed, Places.setPoint(place, 1, 2, crate::get, () -> crate.add("Geometry")));
+		assertEquals(Optional.of(Area.point(1, 2)), Places.of(place, crate));
+		assertEquals(3, crate.getEntities().size());
+	}
+
+	@Test
+	public void setPointKeepsCoordinates() {
+		Crate crate = new Crate();
+		Entity place = crate.add("Place");
+		Entity coordinates = crate.add("GeoCoordinates");
+		place.set("geo", Optional.of(JsonNodeFactory.instance.objectNode().put("@id", coordinates.getId())));
+		assertSame(coordinates, Places.setPoint(place, 53.4668, -2.2339, crate::get, () -> {
+			throw new AssertionError("No new geometry");
+		}));
+		assertEquals(53.4668, coordinates.get("latitude").orElseThrow().asDouble(), DELTA);
+		assertEquals(-2.2339, coordinates.get("longitude").orElseThrow().asDouble(), DELTA);
+		// A place with its own coordinates keeps them
+		Entity other = crate.add("Place");
+		other.set("latitude", Optional.of(DoubleNode.valueOf(0)));
+		other.set("longitude", Optional.of(DoubleNode.valueOf(0)));
+		assertSame(other, Places.setPoint(other, 10, 20, crate::get, () -> {
+			throw new AssertionError("No new geometry");
+		}));
+		assertEquals(Optional.of(Area.point(10, 20)), Places.of(other, crate));
+	}
+
+	@Test
+	public void describedFromGeoNames() {
+		Crate crate = new Crate();
+		Entity place = crate.add("Place");
+		GeoNames.Place found = new GeoNames.Place(8152662, "Catalina Park", Optional.of("New South Wales"),
+				Optional.of("Australia"), Optional.of("park"), -33.7152, 150.30119);
+		Places.describe(place, found, crate::get, () -> crate.add("Geometry"));
+		assertEquals("Catalina Park", place.getLabel());
+		assertEquals("http://sws.geonames.org/8152662/", place.get("identifier").orElseThrow().asText());
+		assertEquals("https://www.geonames.org/8152662/", place.get("url").orElseThrow().asText());
+		assertEquals(Optional.of(Area.point(-33.7152, 150.30119)), Places.of(place, crate));
 	}
 }
