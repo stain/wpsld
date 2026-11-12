@@ -709,7 +709,19 @@ Styles:
     signature file (and `container-signature.xml` for ZIP and OLE2
     formats), as DROID and Siegfried do, as the extension doesn't tell the
     version; and fill in `contentSize`.
-- **Organisations from ROR** for `affiliation`, `publisher` and `funder`, as
+- **Organisations from ROR** *(done)*: "New ▾ Organization from ROR…" on
+  fields that take an Organization, and "Find in ROR…" in a ROR row on an
+  Organization's form (`OrganizationFinder`, `Ror`), searching
+  `api.ror.org/v2/organizations?query=` on Enter, or the record of a ROR
+  identifier (checked by its ISO 7064 97-10 check digits). The name to
+  write is chosen from all its names (display name first, then labels,
+  aliases, acronyms, with language); it gets `url` (web site) and
+  `location`, the GeoNames Place of its city, from the record. Repair Crate
+  writes ROR addresses given otherwise as `https://ror.org/<id>`, merging
+  duplicates. Next: a `Client-Id` setting if the limit bites; ROR's
+  parent/child `relationships` as `parentOrganization`; the ROR dump (CC0)
+  as an offline data module. Notes from the plan:
+  for `affiliation`, `publisher` and `funder`, as
   RO-Crate recommends ROR identifiers: search its REST API v2
   (https://ror.readme.io/docs/rest-api), on Enter rather than on each key.
   Without a client ID (https://ror.readme.io/docs/client-id, checked
@@ -769,7 +781,7 @@ Styles:
     `SoftwareApplication`, a workflow as `ComputationalWorkflow` (Workflow
     RO-Crate), an instrument as in Provenance's equipment; and their
     licences (DataCite's `rightsList`, often SPDX ids) and keywords.
-    Also the publisher as an Organization (from ROR, once it is there).
+    Also the publisher as an Organization (from ROR, now that it is there).
 - **People from ORCID** *(done)*: "New ▾ Person from ORCID…" on fields
   that take a Person, and "Find in ORCID…" in an ORCID row on a Person's
   form (`PersonFinder`, `Orcid`), search ORCID's public API
@@ -785,8 +797,13 @@ Styles:
   Organizations, from ORCID's employment records (`/v3.0/<iD>/employments`),
   once ROR lookups exist: their organisations are disambiguated by ROR,
   Ringgold or GRID (Josiah Carberry's by Ringgold only), so those without
-  a ROR id need a ROR search by name and country; tests and help use
+  a ROR id need a ROR search by name and country (`Ror.search`); tests and help use
   ORCID's fictional Josiah Carberry, 0000-0002-1825-0097.
+- **Insert menu** *(next, after ROR)*: Insert > Place…, Person…,
+  Organization…, Licence…, Publication by DOI… (and File format…), opening
+  the same finders as the New ▾ items, adding the entity to the crate (and
+  showing it) without first having to find the field that links it; later
+  datasets and other kinds of entities.
 - **More lookups for RO-Crate's recommended identifiers** (Recommended
   Identifiers in RO-Crate 1.3's metadata page). Smaller helpers: `keywords` edited as tags but
   written as one comma-separated string, and `temporalCoverage` as a

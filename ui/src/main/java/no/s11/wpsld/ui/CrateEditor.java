@@ -108,6 +108,7 @@ import no.s11.wpsld.crate.Dois;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.GeoNames;
 import no.s11.wpsld.crate.Orcid;
+import no.s11.wpsld.crate.Ror;
 import no.s11.wpsld.crate.PronomFormats;
 import no.s11.wpsld.crate.SpdxLicenses;
 import no.s11.wpsld.crate.UndoHistory;
@@ -375,6 +376,8 @@ public class CrateEditor extends Application {
 		entityEditor.setFindWork(query -> new WorkFinder(stage, query, workSearch,
 				address -> getHostServices().showDocument(address)).showAndWait());
 		entityEditor.setFindPerson(name -> new PersonFinder(stage, name, personSearch,
+				address -> getHostServices().showDocument(address)).showAndWait());
+		entityEditor.setFindOrganization(name -> new OrganizationFinder(stage, name, organizationSearch,
 				address -> getHostServices().showDocument(address)).showAndWait());
 		entityEditor.setFindFormat(query -> new FormatFinder(stage, query, PronomFormats.bundled(),
 				address -> getHostServices().showDocument(address)).showAndWait());
@@ -1066,6 +1069,16 @@ public class CrateEditor extends Application {
 		this.workSearch = Objects.requireNonNull(workSearch);
 	}
 
+	private OrganizationFinder.Search organizationSearch = new Ror(ProfileCache.httpClient(Duration.ofSeconds(15)),
+			Duration.ofSeconds(20), USER_AGENT)::search;
+
+	/**
+	 * Look organisations up with this instead of ROR, e.g. in tests.
+	 */
+	void setOrganizationSearch(OrganizationFinder.Search organizationSearch) {
+		this.organizationSearch = Objects.requireNonNull(organizationSearch);
+	}
+
 	/**
 	 * Look people up with this instead of ORCID, e.g. in tests.
 	 */
@@ -1517,14 +1530,16 @@ public class CrateEditor extends Application {
 	 * are described from the SPDX License List (see
 	 * {@link SpdxLicenses#repair}), and PRONOM file formats likewise, also
 	 * for a media type that only one format has (see
-	 * {@link PronomFormats#repair}), and ORCID iDs and DOIs written otherwise
-	 * (see {@link Orcid#repair} and {@link Dois#repair}). One undoable step, then tells what was
+	 * {@link PronomFormats#repair}), and ORCID iDs, ROR identifiers and DOIs
+	 * written otherwise (see {@link Orcid#repair}, {@link Ror#repair} and
+	 * {@link Dois#repair}). One undoable step, then tells what was
 	 * done.
 	 */
 	void repair(Stage stage) {
 		List<String> licences = SpdxLicenses.bundled().repair(crate);
 		List<String> formats = PronomFormats.bundled().repair(crate);
 		List<String> people = Orcid.repair(crate);
+		List<String> organizations = Ror.repair(crate);
 		List<String> dois = Dois.repair(crate);
 		List<Entity> added = crate.addReferenced();
 		List<Entity> unmentioned = crate.unmentionLinked();
@@ -1544,6 +1559,11 @@ public class CrateEditor extends Application {
 			done.add("ORCID iDs:\n" + people.stream().limit(LISTED).map(f -> "• " + f)
 					.collect(Collectors.joining("\n"))
 					+ (people.size() > LISTED ? "\n• and " + (people.size() - LISTED) + " more" : ""));
+		}
+		if (!organizations.isEmpty()) {
+			done.add("ROR identifiers:\n" + organizations.stream().limit(LISTED).map(f -> "• " + f)
+					.collect(Collectors.joining("\n"))
+					+ (organizations.size() > LISTED ? "\n• and " + (organizations.size() - LISTED) + " more" : ""));
 		}
 		if (!formats.isEmpty()) {
 			done.add("File formats of PRONOM:\n" + formats.stream().limit(LISTED).map(f -> "• " + f)

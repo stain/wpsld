@@ -99,6 +99,7 @@ import no.s11.wpsld.crate.Dois;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.GeoNames;
 import no.s11.wpsld.crate.Orcid;
+import no.s11.wpsld.crate.Ror;
 import no.s11.wpsld.crate.Places;
 import no.s11.wpsld.crate.PronomFormats;
 import no.s11.wpsld.crate.SpdxLicenses;
@@ -198,6 +199,8 @@ public class EntityEditor extends ScrollPane {
 			.map(t -> URI.create("http://schema.org/" + t)).toList();
 	/** Asks the user for a person in ORCID, starting from a name */
 	private Function<String, Optional<Orcid.Person>> findPerson = name -> Optional.empty();
+	/** Asks the user for an organisation in ROR, and its name, starting from a name */
+	private Function<String, Optional<OrganizationFinder.Chosen>> findOrganization = name -> Optional.empty();
 	/** Asks the user for a file format of PRONOM, starting from a search */
 	private Function<String, Optional<PronomFormats.Format>> findFormat = query -> Optional.empty();
 	/** Asks the user for a licence of the SPDX License List */
@@ -476,6 +479,12 @@ public class EntityEditor extends ScrollPane {
 			orcid.setId("label-orcid");
 			header.addRow(headerRow++, orcid, orcidEditor());
 		}
+		// An organisation's ROR identifier, looked up rather than typed
+		if (isA(ORGANIZATION)) {
+			Label ror = new Label("ROR");
+			ror.setId("label-ror");
+			header.addRow(headerRow++, ror, rorEditor());
+		}
 		// Where a place is, on a map, rather than as coordinates to type
 		if (isA(PLACE) || entity.getTypes().contains("Geometry") || isA(GEO_COORDINATES)) {
 			Label location = new Label("Location");
@@ -610,6 +619,7 @@ public class EntityEditor extends ScrollPane {
 
 	private static final URI PLACE = URI.create("http://schema.org/Place");
 	private static final URI PERSON = URI.create("http://schema.org/Person");
+	private static final URI ORGANIZATION = URI.create("http://schema.org/Organization");
 	private static final URI GEO_COORDINATES = URI.create("http://schema.org/GeoCoordinates");
 
 	/** Whether the entity is of the class or one of its subclasses */
@@ -707,6 +717,51 @@ public class EntityEditor extends ScrollPane {
 		} else {
 			Label none = new Label("No ORCID iD as @id yet");
 			none.setId("orcidNone");
+			none.getStyleClass().add("dim-text");
+			shown = none;
+		}
+		HBox box = new HBox(8, find, shown);
+		box.setAlignment(Pos.CENTER_LEFT);
+		return box;
+	}
+
+	/**
+	 * The organisation's ROR identifier, if its <code>@id</code> is one, and
+	 * finding it in ROR by name, which gives it its ROR identifier as
+	 * <code>@id</code> (merging if the crate has it already) and the name
+	 * chosen.
+	 */
+	private Node rorEditor() {
+		Entity edited = entity;
+		Button find = new Button("Find in ROR…");
+		find.setId("findOrganization");
+		find.setMinWidth(Region.USE_PREF_SIZE);
+		find.setTooltip(new Tooltip("Look the organisation up in ROR by its name"));
+		find.setOnAction(e -> findOrganization.apply(edited.get("name").map(JsonNode::asText).orElse(""))
+				.ifPresent(found -> {
+					Ror.describe(edited, found.organization(), found.name(), this::crateEntity,
+							this::newEntityWithId);
+					onChange.run();
+					String id = edited.getId();
+					String iri = found.organization().iri();
+					// Its ROR identifier, unless it has an identifier of its own
+					if (!id.equals(iri) && (id.startsWith("#") || id.startsWith("_:") || Ror.idOf(id).isPresent())) {
+						renameEntity.accept(edited, iri);
+					} else {
+						showForm();
+					}
+				}));
+		Node shown;
+		Optional<String> id = edited.getId().startsWith(Ror.NAMESPACE) ? Ror.idOf(edited.getId()) : Optional.empty();
+		if (id.isPresent()) {
+			Hyperlink link = new Hyperlink(id.get());
+			link.setId("rorLink");
+			link.setTooltip(new Tooltip("Open its ROR record"));
+			link.setOnAction(e -> browse.accept(edited.getId()));
+			shown = link;
+		} else {
+			Label none = new Label("No ROR identifier as @id yet");
+			none.setId("rorNone");
 			none.getStyleClass().add("dim-text");
 			shown = none;
 		}
@@ -1090,6 +1145,14 @@ public class EntityEditor extends ScrollPane {
 	}
 
 	/**
+	 * Set how to ask the user for an organisation in ROR, and which of its
+	 * names to write, given a name to start from; empty if they cancel.
+	 */
+	void setFindOrganization(Function<String, Optional<OrganizationFinder.Chosen>> findOrganization) {
+		this.findOrganization = Objects.requireNonNull(findOrganization);
+	}
+
+	/**
 	 * Set how to ask the user for a file format of PRONOM, given what to
 	 * search for first; empty if they cancel.
 	 */
@@ -1338,6 +1401,12 @@ public class EntityEditor extends ScrollPane {
 					fromOrcid.setOnAction(e -> findPerson.apply("").ifPresent(this::linkPerson));
 					create.getItems().add(fromOrcid);
 				}
+				if (entityTypes.stream().anyMatch(c -> c.getID().equals(ORGANIZATION))) {
+					MenuItem fromRor = new MenuItem("Organization from ROR…");
+					fromRor.setId(id(prefix("newRor"), field.name()));
+					fromRor.setOnAction(e -> findOrganization.apply("").ifPresent(this::linkOrganization));
+					create.getItems().add(fromRor);
+				}
 				if (field.name().equals("encodingFormat")) {
 					MenuItem fromPronom = new MenuItem("Format from PRONOM…");
 					fromPronom.setId(id(prefix("newPronom"), field.name()));
@@ -1431,6 +1500,20 @@ public class EntityEditor extends ScrollPane {
 				Orcid.describe(person, found);
 			}
 			link(found.iri());
+		}
+
+		/**
+		 * Link the organisation found in ROR: the crate's entity for it, or a
+		 * new one with its ROR identifier as <code>@id</code>.
+		 */
+		private void linkOrganization(OrganizationFinder.Chosen found) {
+			String iri = found.organization().iri();
+			if (crateEntity(iri).isEmpty()) {
+				Entity organization = newEntityWithId("Organization", iri);
+				Ror.describe(organization, found.organization(), found.name(), EntityEditor.this::crateEntity,
+						EntityEditor.this::newEntityWithId);
+			}
+			link(iri);
 		}
 
 		/**

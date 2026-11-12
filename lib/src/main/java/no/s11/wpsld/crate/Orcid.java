@@ -221,35 +221,7 @@ public class Orcid {
 	 * @return What was changed, one line each
 	 */
 	public static List<String> repair(Crate crate) {
-		List<String> done = new ArrayList<>();
-		for (Entity entity : List.copyOf(crate.getEntities())) {
-			Optional<String> iri = canonical(entity.getId());
-			if (iri.isEmpty() || entity.getId().equals(iri.get())) {
-				continue;
-			}
-			String old = entity.getId();
-			Optional<Entity> existing = crate.get(iri.get());
-			if (existing.isPresent()) {
-				crate.merge(existing.get(), entity);
-				done.add(old + " merged into " + iri.get());
-			} else {
-				crate.rename(entity, iri.get());
-				done.add(old + " is now " + iri.get());
-			}
-		}
-		for (Entity entity : List.copyOf(crate.getEntities())) {
-			for (String property : List.copyOf(entity.getValues().keySet())) {
-				for (JsonNode value : entity.getAll(property)) {
-					String id = value.path("@id").asText(null);
-					Optional<String> iri = id == null ? Optional.empty() : canonical(id);
-					if (iri.isPresent() && !id.equals(iri.get())) {
-						crate.replaceReferences(id, iri.get());
-						done.add("Links to " + id + " now go to " + iri.get());
-					}
-				}
-			}
-		}
-		return done;
+		return crate.normaliseIds(Orcid::canonical);
 	}
 
 	/**
