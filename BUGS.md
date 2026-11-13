@@ -5,17 +5,6 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
 
 ## Bugs
 
-- **Compact IRIs as `@id` are not expanded to open them.** The ↗ beside
-  `@id` and the preview's links use the `@id` as written. An `@id` such as
-  `s:ActiveActionStatus` should be expanded with the crate's `@context` to
-  `http://schema.org/ActiveActionStatus` before opening, in the form and in
-  the preview. (`#local` and `_:blank` ids still can't be opened.)
-- **Text values of URL properties should be links in the preview.**
-  Properties whose range is [URL](https://schema.org/URL), e.g. `url`,
-  `contentUrl`, `sameAs`, `isBasedOn`, should show a text value
-  (`"url": "http://example.com/"`) as a link. It mostly works already, maybe
-  only because the text starts with `http`/`https`: check, and decide by
-  the property's range, from schema.org or the profile.
 - **Remove disabled for the first entity of a type**: reported with a type
   chosen in the type selector. Not reproduced: clicking the first entity
   of a type and choosing Remove works in tests, also on the ROHub crate

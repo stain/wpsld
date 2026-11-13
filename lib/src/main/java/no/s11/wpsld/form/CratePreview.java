@@ -127,10 +127,10 @@ public final class CratePreview {
 
 		// The crate itself, then each group
 		html.append("<h2>The crate</h2>\n");
-		entity(html, root, anchors, byId, data, label);
+		entity(html, crate, root, anchors, byId, data, label);
 		groups.forEach((group, entities) -> {
 			html.append("<h2>").append(escape(group)).append("</h2>\n");
-			entities.forEach(e -> entity(html, e, anchors, byId, data, label));
+			entities.forEach(e -> entity(html, crate, e, anchors, byId, data, label));
 		});
 		html.append("</main>\n<footer>Made by ").append(escape(generator))
 				.append(" from the crate's metadata.</footer>\n</body>\n</html>\n");
@@ -142,14 +142,15 @@ public final class CratePreview {
 		return html.contains("<meta name=\"generator\" content=\"" + GENERATOR);
 	}
 
-	private static void entity(StringBuilder html, Entity entity, Map<Entity, String> anchors,
+	private static void entity(StringBuilder html, Crate crate, Entity entity, Map<Entity, String> anchors,
 			Map<String, Entity> byId, List<Entity> data, java.util.function.Function<String, String> label) {
 		html.append("<section class=\"entity\" id=\"").append(anchors.get(entity)).append("\">\n<h3>")
 				.append(escape(entity.getLabel())).append("</h3>\n<p class=\"types\">")
 				.append(escape(String.join(", ", entity.getTypes()))).append("</p>\n<p class=\"id\">");
 		String id = entity.getId();
-		if (isWeb(id) || data.contains(entity) && isRelative(id)) {
-			html.append("<a href=\"").append(escape(id)).append("\">").append(escape(id)).append("</a>");
+		if (isWeb(crate.expandId(id)) || data.contains(entity) && isRelative(id)) {
+			html.append("<a href=\"").append(escape(isRelative(id) ? id : crate.expandId(id))).append("\">")
+					.append(escape(id)).append("</a>");
 		} else {
 			html.append(escape(id));
 		}
@@ -162,12 +163,12 @@ public final class CratePreview {
 			values.forEach((property, list) -> {
 				html.append("<tr><th>").append(escape(label.apply(property))).append("</th><td>");
 				if (list.size() == 1) {
-					value(html, list.get(0), anchors, byId);
+					value(html, crate, list.get(0), anchors, byId);
 				} else {
 					html.append("<ul class=\"values\">");
 					list.forEach(v -> {
 						html.append("<li>");
-						value(html, v, anchors, byId);
+						value(html, crate, v, anchors, byId);
 						html.append("</li>");
 					});
 					html.append("</ul>");
@@ -179,7 +180,7 @@ public final class CratePreview {
 		html.append("</section>\n");
 	}
 
-	private static void value(StringBuilder html, JsonNode value, Map<Entity, String> anchors,
+	private static void value(StringBuilder html, Crate crate, JsonNode value, Map<Entity, String> anchors,
 			Map<String, Entity> byId) {
 		if (value.isObject() && value.path("@id").isTextual()) {
 			String id = value.get("@id").asText();
@@ -187,8 +188,9 @@ public final class CratePreview {
 			if (linked != null) {
 				html.append("<a href=\"#").append(anchors.get(linked)).append("\">").append(escape(linked.getLabel()))
 						.append("</a>");
-			} else if (isWeb(id)) {
-				html.append("<a href=\"").append(escape(id)).append("\">").append(escape(id)).append("</a>");
+			} else if (isWeb(crate.expandId(id))) {
+				html.append("<a href=\"").append(escape(crate.expandId(id))).append("\">").append(escape(id))
+						.append("</a>");
 			} else {
 				html.append("<span class=\"id\">").append(escape(id)).append("</span>");
 			}

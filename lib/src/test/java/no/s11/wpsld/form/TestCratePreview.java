@@ -67,4 +67,24 @@ public class TestCratePreview {
 		assertTrue(html.contains("<h2>Person</h2>"));
 		assertFalse(CratePreview.isOurs("<html><meta name=\"generator\" content=\"rochtml\"></html>"));
 	}
+
+	/** Compact IRIs link to their expanded address, shown as written */
+	@Test
+	public void compactIris() throws Exception {
+		Crate crate = new no.s11.wpsld.crate.CrateReader().read(new com.fasterxml.jackson.databind.ObjectMapper()
+				.readTree("""
+						{"@context": ["https://w3id.org/ro/crate/1.3/context", {"s": "http://schema.org/"}],
+						 "@graph": [
+						  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"}},
+						  {"@id": "./", "@type": "Dataset", "mentions": {"@id": "s:CompletedActionStatus"}},
+						  {"@id": "s:ActiveActionStatus", "@type": "Thing"}]}"""), "test").crate().orElseThrow();
+		assertEquals("http://schema.org/ActiveActionStatus", crate.expandId("s:ActiveActionStatus"));
+		assertEquals("data/a.csv", crate.expandId("data/a.csv"));
+		assertEquals("https://example.com/x", crate.expandId("https://example.com/x"));
+		String html = CratePreview.html(crate, Labels::fromTerm, "wpsld 1.0");
+		assertTrue(html, html.contains(
+				"<a href=\"http://schema.org/ActiveActionStatus\">s:ActiveActionStatus</a>"));
+		assertTrue(html, html.contains(
+				"<a href=\"http://schema.org/CompletedActionStatus\">s:CompletedActionStatus</a>"));
+	}
 }

@@ -1061,6 +1061,54 @@ public class TestCrateEditor extends ApplicationTest {
 	}
 
 	/**
+	 * Compact IRIs open as expanded with the crate's @context, in the preview
+	 * and beside the @id; text values are links when the property takes URLs
+	 * (to the web or a file beside the crate), not when it takes only text,
+	 * and for unknown properties when they are web addresses.
+	 */
+	@Test
+	public void previewWebLinks() throws Exception {
+		entities();
+		Path dir = Files.createTempDirectory("crate");
+		Files.writeString(dir.resolve("data.csv"), "a,b\n");
+		Files.writeString(dir.resolve("ro-crate-metadata.json"), """
+				{"@context": ["https://w3id.org/ro/crate/1.3/context", {"s": "http://schema.org/"}],
+				 "@graph": [
+				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.3"}},
+				  {"@id": "./", "@type": "Dataset", "name": "A crate", "url": "data.csv",
+				   "alternateName": "https://example.com/name", "sameAs": "https://example.com/same",
+				   "s:unknownTerm": "https://example.com/unknown",
+				   "mentions": [{"@id": "s:ActiveActionStatus"}, {"@id": "s:CompletedActionStatus"}]},
+				  {"@id": "s:ActiveActionStatus", "@type": "Thing"}]}""");
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir)).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		List<String> opened = new java.util.ArrayList<>();
+		interact(() -> app.browse = opened::add);
+		Entity root = entities().getItems().stream().filter(e -> e.getId().equals("./")).findFirst().orElseThrow();
+		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().indexOf(root)));
+		java.util.Set<String> links = from(lookup("#previewProperties").queryAs(Node.class)).lookup(".hyperlink")
+				.queryAllAs(Hyperlink.class).stream().map(Hyperlink::getText)
+				.collect(java.util.stream.Collectors.toSet());
+		assertTrue(links.toString(), links.containsAll(java.util.Set.of("data.csv", "https://example.com/same",
+				"https://example.com/unknown", "s:CompletedActionStatus")));
+		assertFalse(links.toString(), links.contains("https://example.com/name"));
+		Hyperlink completed = previewLink("#previewProperties", "s:CompletedActionStatus");
+		interact(completed::fire);
+		assertEquals(List.of("http://schema.org/CompletedActionStatus"), opened);
+
+		Entity status = entities().getItems().stream().filter(e -> e.getId().equals("s:ActiveActionStatus"))
+				.findFirst().orElseThrow();
+		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().indexOf(status)));
+		Hyperlink id = lookup("#previewId").queryAs(Hyperlink.class);
+		assertEquals("s:ActiveActionStatus", id.getText());
+		assertFalse(lookup("#openId").query().isDisabled());
+		clickOn("#openId");
+		assertEquals("http://schema.org/ActiveActionStatus", opened.get(1));
+	}
+
+	/**
 	 * A place, as RO-Crate 1.3 describes it: its geo a Geometry with
 	 * Well-Known Text, shown on a map from the preview, and new geometries
 	 * made from its geo field.

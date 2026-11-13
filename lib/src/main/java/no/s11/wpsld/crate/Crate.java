@@ -45,6 +45,9 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 
+import no.s11.wpsld.jsonld.ContextCache;
+import no.s11.wpsld.jsonld.JsonLdContext;
+
 /**
  * The entities of an RO-Crate, starting with its root data entity
  * <code>./</code>. The metadata descriptor is not an entity here, it is
@@ -88,6 +91,8 @@ public class Crate {
 	private final JsonNode context;
 	/** The metadata descriptor as read, to write again; else a new one for 1.3 */
 	private final Optional<Entity> descriptor;
+	/** The context processed, when first needed */
+	private JsonLdContext processed;
 
 	public Crate() {
 		entities.add(new Entity(ROOT_ID, "Dataset"));
@@ -135,6 +140,19 @@ public class Crate {
 	 */
 	public JsonNode getContext() {
 		return context.deepCopy();
+	}
+
+	/**
+	 * An <code>@id</code> as an IRI: a compact IRI such as
+	 * <code>s:ActiveActionStatus</code> expanded with the crate's
+	 * <code>@context</code> (from the bundled contexts, without network
+	 * access); others, e.g. absolute IRIs and relative paths, as they are.
+	 */
+	public String expandId(String id) {
+		if (processed == null) {
+			processed = JsonLdContext.of(context, ContextCache.bundled());
+		}
+		return processed.expandId(id);
 	}
 
 	public Entity getRoot() {

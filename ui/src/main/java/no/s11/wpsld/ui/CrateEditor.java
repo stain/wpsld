@@ -225,6 +225,8 @@ public class CrateEditor extends Application {
 	private double[] dividers;
 	/** True while checking whether the file changed on disk, as its dialog moves the focus */
 	private boolean checkingDisk;
+	/** Opens addresses from the form and the preview, in the browser; replaced in tests */
+	Consumer<String> browse = address -> getHostServices().showDocument(address);
 
 	/** What to do when saving over a file that changed on disk */
 	private enum Overwrite {
@@ -409,7 +411,7 @@ public class CrateEditor extends Application {
 					relist();
 					return entity;
 				}, this::rename);
-		entityEditor.setBrowse(address -> getHostServices().showDocument(address));
+		entityEditor.setBrowse(address -> browse.accept(address));
 		// Places: a map, and looking them up in GeoNames
 		entityEditor.setMapTiles(mapTiles);
 		entityEditor.setFindPlace(name -> new PlaceFinder(stage, name, () -> settings.geonamesUsername(), placeSearch,
@@ -546,9 +548,11 @@ public class CrateEditor extends Application {
 		// On the right, a preview of the entity (with links to the entities it
 		// refers to, which open them) and the crate's JSON-LD
 		entityPreview = new EntityPreview(() -> crate, this::show,
-				address -> getHostServices().showDocument(address), property -> entityEditor.label(property));
+				address -> browse.accept(address), property -> entityEditor.label(property));
 		// Only an attached crate's relative @ids are files
 		entityPreview.setFolder(crateFile::folder);
+		// Text of properties that take URLs as links, by the form's fields
+		entityPreview.setTakesUrl(property -> entityEditor.takesUrl(property));
 		// Beside the form's references and @id: show the entity, or open the address
 		entityEditor.setShow(this::show);
 		entityEditor.setAddress(entityPreview::address);
