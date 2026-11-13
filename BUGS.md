@@ -16,24 +16,6 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   `.label`'s `-warp-text` (#e4e4e4), also after switching style and
   colours while open. Maybe Windows only (as the cut-off dialog text was);
   needs a screenshot, and whether the colours were Dark or Same as System.
-- **The HTML preview (`ro-crate-preview.html`)**, seen on
-  `debug/workshop8`:
-  - **Files only mentioned get no link to the file**, e.g.
-    `data/exports/csv/dim_date.csv` and the ImageObject `Picture1.png`,
-    in the root's `mentions` rather than reached by `hasPart`:
-    `CratePreview` links only data entities' paths. Link every entity
-    whose `@id` is a relative path (not `#local` or `_:blank`).
-  - **Descriptions lose their line breaks**: written as one `<p>`, so
-    they look different than in the app. Each blank-line-separated part
-    a `<p>`, a lone newline a `<br>`; or render as Markdown when it looks
-    like Markdown (see "Markdown descriptions in the preview" below:
-    tells are `` `code` ``, `_italics_`, `**bold**`, `[link](http…)`,
-    lines starting `- ` or `#`).
-  - **A link back to the top** (the crate) from each entity's section.
-  - **The JSON-LD in a `<script type="application/ld+json">`** in the
-    `<head>`, as the RO-Crate specification asks of previews (with `</`
-    escaped so that it can't end the script).
-
 ## Repair Crate
 
 - **Types written as IRIs**, e.g. ROHub's `http://schema.org/Person` and
@@ -103,11 +85,27 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   offers ActiveActionStatus, CompletedActionStatus, FailedActionStatus and
   PotentialActionStatus. Other values must still be allowed, as users may
   extend an enumeration.
-- **Markdown descriptions in the preview**: render `description` as
-  Markdown when it is likely to be Markdown, by heuristics (headings,
-  lists, emphasis, links such as `[text](url)`), or when the crate says so
-  (`encodingFormat` `text/markdown`). ROHub's and COMPSs' crates write
-  Markdown descriptions; see also PLAN.md.
+- **Markdown descriptions in the Preview tab**: the saved HTML preview
+  now renders `description` as Markdown when `Markdown.looksLike` it
+  (headings, fenced code, links, bold, inline code, tables, lists); do
+  the same in the Preview tab if the heuristics work well there (see
+  PLAN.md, HTML preview). ROHub's and COMPSs' crates write Markdown
+  descriptions.
+- **Find entities (Edit > Find…, Ctrl+F)**: a dialog to search the
+  crate's entities by their values and `@id`s, with tick-boxes for what
+  to search (names, other values, `@id`s, nested objects; match case,
+  whole words), listing the matches to go to. Perhaps Replace too, for
+  values other than `@id`s: not `@id`s by default, neither of entities
+  nor of nested objects, as renaming can merge entities and change
+  references; if offered, check first and say what would happen (e.g.
+  "15 entities would be merged"), and rewrite `#local` identifiers but
+  never URLs. Matches hidden by the type chosen above the entity list
+  are said to be, as for the filter below.
+- **Filter the entity list**: a search field in the toolbar after Load
+  Profile… and ?, filtering the entities shown (list or tree) by name,
+  `@id` and maybe values as you type; with a type chosen, say at the end
+  of the list what else matches, e.g. "Hidden: 15 entities of other
+  types", to show them all.
 
 ## To check on Windows and macOS
 

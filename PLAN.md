@@ -1211,7 +1211,11 @@ RO-Crates" in the spec's data entities). Recognise them:
 ### HTML preview (ro-crate-preview.html)
 
 *Done, basic*: saving an attached crate writes `ro-crate-preview.html`
-(`CratePreview`): plain HTML and CSS, light and dark, no scripts; the
+(`CratePreview`): plain HTML and CSS, light and dark, a few colours, no
+scripts but the metadata's JSON-LD in `<script type="application/ld+json">`;
+descriptions as Markdown when they look like it (`Markdown.looksLike`),
+else paragraphs with their line breaks; files linked by their paths
+wherever they are linked from; a Top link in each section; the
 crate's name and description, a contents list, a section per entity with
 its properties, `#entity-n` anchors between them, links to files and the
 web; marked with `<meta name="generator" content="wpsld …">` so that
@@ -1222,8 +1226,11 @@ not in hasPart). Next: a preference to not write it; the generator as a
 SoftwareApplication with a CreateAction (object the metadata, result the
 preview), as the spec's example; images and maps for files and places;
 "Referenced by" as in the editor's preview; anchors that stay the same
-across saves (by @id rather than position); Markdown descriptions
-rendered. For a richer preview, investigate which existing previewer
+across saves (by @id rather than position). Markdown in the Preview
+tab too, with the same heuristics (`Markdown.looksLike`), if they work
+well in the HTML preview: JavaFX has no HTML view without WebView, so
+render commonmark's tree to JavaFX nodes (TextFlow, as the help viewer
+does for its Markdown). For a richer preview, investigate which existing previewer
 is easiest to reuse without running JavaScript or Python inside the Java
 application (no GraalJS, Jython or a bundled Node):
 - Previewers whose template could run in Java as it is: e.g. ro-crate-py's

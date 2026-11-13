@@ -87,4 +87,53 @@ public class TestCratePreview {
 		assertTrue(html, html.contains(
 				"<a href=\"http://schema.org/CompletedActionStatus\">s:CompletedActionStatus</a>"));
 	}
+
+	/**
+	 * Files mentioned rather than parts link to their paths too; each
+	 * entity links to the top; the metadata is in a script, which a
+	 * description can't end.
+	 */
+	@Test
+	public void linksTopAndScript() throws Exception {
+		Crate crate = new Crate();
+		Entity picture = crate.add("ImageObject");
+		crate.rename(picture, "Picture1.png");
+		crate.getRoot().setAll("mentions", List.of(ref("Picture1.png")));
+		crate.getRoot().set("description", Optional.of(TextNode.valueOf("Not </script> here")));
+		String html = CratePreview.html(crate, Labels::fromTerm, "wpsld 1.0");
+		assertTrue(html, html.contains("<a href=\"Picture1.png\">Picture1.png</a>"));
+		assertTrue(html.contains("<header id=\"top\">"));
+		assertTrue(html.contains("<p class=\"top\"><a href=\"#top\">Top</a></p>"));
+		int start = html.indexOf("<script type=\"application/ld+json\">");
+		int end = html.indexOf("</script>", start);
+		assertTrue(start > 0 && start < html.indexOf("</head>"));
+		String json = html.substring(html.indexOf('\n', start) + 1, end);
+		assertEquals(crate.toJson(), new com.fasterxml.jackson.databind.ObjectMapper().readTree(json));
+		assertFalse(json.contains("</"));
+		// The description in the header, not again in the crate's table
+		assertTrue(html.contains("<p>Not &lt;/script&gt; here</p>"));
+		assertFalse(html.contains("<th>Description</th>"));
+	}
+
+	/** Descriptions keep their paragraphs and line breaks, or are Markdown */
+	@Test
+	public void descriptions() {
+		assertEquals("<p>One<br>\ntwo</p>\n<p>Three &amp; four</p>\n",
+				Markdown.toHtml("One\ntwo\n\n  \nThree & four\n"));
+		assertFalse(Markdown.looksLike("Counts in dim_date and air_quality_hourly, 2 * 3 = 6"));
+		assertFalse(Markdown.looksLike("- one item only"));
+		assertTrue(Markdown.looksLike("Some **bold** text"));
+		assertTrue(Markdown.looksLike("# Title\n\nText"));
+		assertTrue(Markdown.looksLike("Run `make`"));
+		assertTrue(Markdown.looksLike("See [the site](https://example.com)"));
+		assertTrue(Markdown.looksLike("- one\n- two"));
+		assertTrue(Markdown.looksLike("| a | b |\n|---|---|\n| 1 | 2 |"));
+		String html = Markdown.toHtml("# Title\n\n**DuckDB** <b>raw</b> [x](javascript:alert(1))\n\n| a | b |\n|---|---|\n| 1 | 2 |");
+		assertTrue(html, html.contains("<h1>Title</h1>"));
+		assertTrue(html.contains("<strong>DuckDB</strong>"));
+		// HTML in the text stays text; scripts aren't links
+		assertTrue(html.contains("&lt;b&gt;raw&lt;/b&gt;"));
+		assertFalse(html.contains("javascript:"));
+		assertTrue(html.contains("<table>"));
+	}
 }

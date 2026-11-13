@@ -21,6 +21,8 @@ module no.s11.wpsld {
     // Loading MASP profiles by URL
     requires java.net.http;
     requires org.apache.tika.core;
+    requires org.commonmark;
+    requires org.commonmark.ext.gfm.tables;
     exports no.s11.wpsld;
     exports no.s11.wpsld.arcp;
     exports no.s11.wpsld.soss;

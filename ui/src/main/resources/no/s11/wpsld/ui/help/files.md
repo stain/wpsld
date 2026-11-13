@@ -63,7 +63,10 @@ metadata file: the crate described as a web page, to read in a browser.
 It has the crate's name and description, a list of its entities (files
 and folders first, then the others by type) and a section for each, with
 its properties; links go to the entities it refers to, to its files, and
-to the web. The crate describes the page, as RO-Crate shows it: an entity
+to the web. Descriptions keep their paragraphs and line breaks, or are
+shown formatted when they are written in Markdown (headings, lists,
+**bold**, links, tables). The page also holds a copy of the metadata, for
+programs that read it. The crate describes the page, as RO-Crate shows it: an entity
 `ro-crate-preview.html`, a CreativeWork about the crate, not one of its
 parts.
 
