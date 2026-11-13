@@ -1030,6 +1030,27 @@ run) loads, but shows what to work on:
   the Run of "COMPSs runtime version 3.4": find out where the time goes
   (preview, form building, or reference lookups across many entities).
 
+### HTML preview (ro-crate-preview.html)
+
+An attached crate may have an `ro-crate-preview.html`, which goes out of
+date as the crate is edited. For now, saving asks once to move it aside
+(into `ro-crate-preview_files/old-ro-crate-preview-DATE.html`), delete
+it, or keep it. To write a new one, investigate which existing previewer
+is easiest to reuse without running JavaScript or Python inside the Java
+application (no GraalJS, Jython or a bundled Node):
+- Previewers whose template could run in Java as it is: e.g. ro-crate-py's
+  preview is a Jinja template, which Jinjava (a Java implementation of
+  Jinja) might render; check the template's filters and its licence.
+- Previewers that render in the browser: a static HTML page with its
+  script, and the crate's JSON-LD embedded or beside it, which wpsld would
+  only copy and fill in (e.g. what ro-crate-html-js / rochtml can make;
+  check whether a page works offline, from `file:`).
+- Others to compare: ro-crate-html-lite, and Crate-O's and Describo's
+  previews; what each shows (files, people, licences, provenance), its
+  size, how it is maintained, and its licence.
+- Or wpsld's own: the preview pane already renders entities; writing that
+  as HTML is the fallback, with the most control and the most to maintain.
+
 ### Performance on larger crates
 
 Measure before optimising, on crates of growing size: e.g. the COMPSs run

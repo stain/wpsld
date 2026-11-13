@@ -103,6 +103,25 @@ public class Crate {
 	}
 
 	/**
+	 * The RO-Crate version the crate conforms to, e.g. <code>1.3</code>, by
+	 * its metadata descriptor's <code>conformsTo</code>; 1.3 for a new crate,
+	 * 1.0 for a descriptor of RO-Crate 1.0 (<code>ro-crate-metadata.jsonld</code>,
+	 * which had no <code>conformsTo</code>); none if it can't tell.
+	 */
+	public Optional<String> specVersion() {
+		if (descriptor.isEmpty()) {
+			return Optional.of("1.3");
+		}
+		Optional<String> version = descriptor.get().getAll("conformsTo").stream().map(v -> v.path("@id").asText(""))
+				.filter(id -> id.startsWith(RO_CRATE_SPEC)).map(id -> id.substring(RO_CRATE_SPEC.length()))
+				.map(v -> v.replaceAll("[/#].*", "")).filter(v -> !v.isEmpty()).findFirst();
+		if (version.isEmpty() && descriptor.get().getId().endsWith(".jsonld")) {
+			return Optional.of("1.0");
+		}
+		return version;
+	}
+
+	/**
 	 * A crate of entities read from a file, with its root data entity first,
 	 * written again with its own <code>@context</code> and metadata
 	 * descriptor, so with the same RO-Crate version and extra terms.

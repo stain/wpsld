@@ -70,6 +70,21 @@ anyway, **Save Detached...** to save it under another name, such as
 `bird-survey-ro-crate-metadata.json`, apart from that folder's files, or
 **Cancel**.
 
+wpsld saves by writing the whole file beside the old one first and then
+putting it in its place, so that a crash or a full disk never leaves a
+half-written metadata file. A symbolic link to the metadata file stays a
+link: the file it links to is saved.
+
+For an attached crate, the checks before saving also report files and
+folders it describes that are not in its folder, or are there with other
+upper and lower case (which Windows and macOS find, but other computers
+don't), paths out of its folder (`../`), which an attached crate can't
+have, and Datasets whose `@id` doesn't end with `/`. Saving a crate of
+RO-Crate 1.1 or later beside RO-Crate 1.0's `ro-crate-metadata.jsonld`
+offers to remove that old file (a symbolic link of that name can stay),
+and saving an attached crate with an `ro-crate-preview.html` offers to
+move it aside or delete it, as it no longer shows the crate as saved.
+
 Before saving, wpsld reports missing requirements it detects. Choose
 **Cancel** to correct them, or **Save Anyway** to save an incomplete
 description. These checks are not a complete validator; validate the

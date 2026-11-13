@@ -84,6 +84,51 @@ public class TestCrateFolder {
 		assertTrue(CrateFolder.match(crate, folder.resolve("elsewhere"), 100).elsewhere());
 	}
 
+	/** What is wrong with a crate attached to a folder, to tell before saving */
+	@Test
+	public void problems() throws Exception {
+		Path folder = temp.getRoot().toPath();
+		Files.createDirectories(folder.resolve("data"));
+		Files.writeString(folder.resolve("page.html"), "");
+		Crate crate = new Crate();
+		for (String[] e : new String[][] { { "data", "Dataset" }, { "../other/x.csv", "File" },
+				{ "gone.csv", "File" }, { "page.html#t2", "Table" }, { "lost.html#t1", "Table" },
+				{ "https://example.com/y.csv", "File" }, { "#alice", "Person" } }) {
+			Entity entity = crate.add(e[1]);
+			crate.rename(entity, e[0]);
+		}
+		assertEquals(List.of(
+				"1 entity is outside the crate's folder, which an attached crate can't have: ../other/x.csv",
+				"1 Dataset's @id should end with / as a folder's: data",
+				"2 files or folders are not in the crate's folder: gone.csv, lost.html#t1"),
+				CrateFolder.problems(crate, folder));
+		crate.rename(crate.getRoot(), "root/");
+		assertEquals("The root data entity's @id must be ./ or an absolute URI, not root/",
+				CrateFolder.problems(crate, folder).get(0));
+		crate.rename(crate.getRoot(), "https://doi.org/10.5281/zenodo.1");
+		assertEquals(3, CrateFolder.problems(crate, folder).size());
+		assertFalse(CrateFolder.exists(folder, "../" + folder.getFileName() + "/page.html"));
+	}
+
+	/**
+	 * Where names are found ignoring upper and lower case (Windows, macOS),
+	 * an @id with other case than the file's is a problem; elsewhere it is
+	 * not found at all
+	 */
+	@Test
+	public void otherCase() throws Exception {
+		Path folder = temp.getRoot().toPath();
+		Files.createDirectories(folder.resolve("Data"));
+		Files.writeString(folder.resolve("Data/Counts.csv"), "");
+		assertEquals(java.util.Optional.empty(), CrateFolder.problem(folder, "Data/Counts.csv"));
+		String problem = CrateFolder.problem(folder, "data/counts.csv").orElseThrow();
+		if (Files.exists(folder.resolve("data/counts.csv"))) {
+			assertTrue(problem, problem.startsWith("Named Data/Counts.csv in the crate's folder"));
+		} else {
+			assertEquals("Not found in the crate's folder: data/counts.csv", problem);
+		}
+	}
+
 	private static com.fasterxml.jackson.databind.JsonNode ref(String id) {
 		return com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("@id", id);
 	}

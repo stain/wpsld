@@ -560,4 +560,21 @@ public class TestCrate {
 		assertEquals(List.of("raw/2025/"), parts(added.get(1)));
 		assertSame(added.get(0), crate.partOf("raw/2025/counts.csv"));
 	}
+
+	@Test
+	public void specVersion() {
+		assertEquals(Optional.of("1.3"), new Crate().specVersion());
+		CrateReader reader = new CrateReader();
+		String v12 = "{\"@context\": \"https://w3id.org/ro/crate/1.2/context\", \"@graph\": ["
+				+ "{\"@id\": \"ro-crate-metadata.json\", \"@type\": \"CreativeWork\", \"about\": {\"@id\": \"./\"},"
+				+ " \"conformsTo\": {\"@id\": \"https://w3id.org/ro/crate/1.2\"}},"
+				+ "{\"@id\": \"./\", \"@type\": \"Dataset\"}]}";
+		assertEquals(Optional.of("1.2"), reader.read(new java.io.ByteArrayInputStream(v12.getBytes(StandardCharsets.UTF_8)),
+				"test").crate().orElseThrow().specVersion());
+		String v10 = "{\"@context\": \"https://w3id.org/ro/crate/1.0/context\", \"@graph\": ["
+				+ "{\"@id\": \"ro-crate-metadata.jsonld\", \"@type\": \"CreativeWork\", \"about\": {\"@id\": \"./\"}},"
+				+ "{\"@id\": \"./\", \"@type\": \"Dataset\"}]}";
+		assertEquals(Optional.of("1.0"), reader.read(new java.io.ByteArrayInputStream(v10.getBytes(StandardCharsets.UTF_8)),
+				"test").crate().orElseThrow().specVersion());
+	}
 }

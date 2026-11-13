@@ -134,6 +134,75 @@ public final class CrateFolder {
 		return new Match(present, absent, undescribed);
 	}
 
+	/**
+	 * What is wrong with a crate attached to this folder, to tell before
+	 * saving: a root data entity whose @id is relative, but not ./
+	 * (RO-Crate allows ./ or a URI); relative paths out of the folder
+	 * (../); folders' @ids not ending with /; and files and folders it
+	 * describes that are not in the folder (for a part of a file, e.g.
+	 * page.html#t2, the file).
+	 */
+	public static List<String> problems(Crate crate, Path folder) {
+		List<String> problems = new ArrayList<>();
+		String root = crate.getRoot().getId();
+		if (!root.equals("./") && !Crate.isAbsolute(root)) {
+			problems.add("The root data entity's @id must be ./ or an absolute URI, not " + root);
+		}
+		List<String> outside = new ArrayList<>();
+		List<String> noSlash = new ArrayList<>();
+		List<String> missing = new ArrayList<>();
+		List<String> otherCase = new ArrayList<>();
+		for (Entity entity : crate.getEntities()) {
+			String id = entity.getId();
+			String file = id.contains("#") ? id.substring(0, id.indexOf('#')) : id;
+			if (entity == crate.getRoot() || file.isEmpty() || !isRelativePath(file)) {
+				continue;
+			}
+			if (isOutside(file)) {
+				outside.add(id);
+				continue;
+			}
+			if (!id.contains("#") && entity.getTypes().contains("Dataset") && !id.endsWith("/")) {
+				noSlash.add(id);
+			}
+			Optional<String> problem = problem(folder, file);
+			if (problem.isPresent()) {
+				(problem.get().startsWith(NAMED) ? otherCase : missing).add(id);
+			}
+		}
+		if (!outside.isEmpty()) {
+			problems.add(outside.size() + (outside.size() == 1 ? " entity is" : " entities are")
+					+ " outside the crate's folder, which an attached crate can't have: " + examples(outside));
+		}
+		if (!noSlash.isEmpty()) {
+			problems.add(noSlash.size() + (noSlash.size() == 1 ? " Dataset's @id" : " Datasets' @ids")
+					+ " should end with / as a folder's: " + examples(noSlash));
+		}
+		if (!otherCase.isEmpty()) {
+			problems.add(otherCase.size() + (otherCase.size() == 1 ? " file or folder is" : " files or folders are")
+					+ " named with other upper and lower case in the crate's folder, which other computers tell apart: "
+					+ examples(otherCase));
+		}
+		if (!missing.isEmpty()) {
+			problems.add(missing.size() + (missing.size() == 1 ? " file or folder is" : " files or folders are")
+					+ " not in the crate's folder: " + examples(missing));
+		}
+		return problems;
+	}
+
+	/** Whether a relative path leads out of the crate's folder, e.g. ../other/data.csv */
+	static boolean isOutside(String id) {
+		try {
+			return Path.of(normalise(id)).normalize().startsWith("..");
+		} catch (InvalidPathException e) {
+			return false;
+		}
+	}
+
+	private static String examples(List<String> ids) {
+		return String.join(", ", ids.stream().limit(5).toList()) + (ids.size() > 5 ? ", …" : "");
+	}
+
 	/** A path relative to the crate: not absolute, #local, _:blank, ./ nor a part of a file */
 	private static boolean isRelativePath(String id) {
 		return !id.isEmpty() && !Crate.isAbsolute(id) && !Crate.isLocal(id) && !Crate.isBlankNode(id)
@@ -158,10 +227,37 @@ public final class CrateFolder {
 		}
 	}
 
+	private static final String NAMED = "Named ";
+
+	/**
+	 * What is wrong with a relative <code>@id</code> as a file or folder in
+	 * a folder, if anything: not there; or, where names are found ignoring
+	 * upper and lower case (Windows, macOS), there with other case, which
+	 * other computers (Linux, web servers) would not find
+	 */
+	public static Optional<String> problem(Path folder, String id) {
+		if (!exists(folder, id)) {
+			return Optional.of("Not found in the crate's folder: " + decode(id));
+		}
+		try {
+			String written = normalise(id);
+			Path real = folder.toRealPath().relativize(folder.resolve(written).toRealPath());
+			String onDisk = String.join("/", java.util.stream.StreamSupport.stream(real.spliterator(), false)
+					.map(Path::toString).toList());
+			if (!onDisk.equals(written) && onDisk.equalsIgnoreCase(written)) {
+				return Optional.of(NAMED + onDisk + " in the crate's folder: its upper and lower case differ from the"
+						+ " @id's, which other computers tell apart");
+			}
+		} catch (IOException | IllegalArgumentException e) {
+			// e.g. through a link out of the folder: there, as far as it goes
+		}
+		return Optional.empty();
+	}
+
 	/** Whether a relative <code>@id</code> is a file or folder in a folder */
 	public static boolean exists(Path folder, String id) {
 		try {
-			return Files.exists(folder.resolve(normalise(id)));
+			return !isOutside(id) && Files.exists(folder.resolve(normalise(id)));
 		} catch (InvalidPathException e) {
 			return false;
 		}

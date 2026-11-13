@@ -116,6 +116,7 @@ import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.CrateChecks;
 import no.s11.wpsld.crate.CrateDocument;
 import no.s11.wpsld.crate.CrateFolder;
+import no.s11.wpsld.crate.SafeSave;
 import no.s11.wpsld.crate.CrateDocument.Problem;
 import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
@@ -893,8 +894,8 @@ public class CrateEditor extends Application {
 			for (Entity entity : crate.getEntities()) {
 				String id = entity.getId();
 				String file = id.contains("#") ? id.substring(0, id.indexOf('#')) : id;
-				if (EntityTree.isPath(id) && !file.isEmpty() && !CrateFolder.exists(folder, file)) {
-					found.put(entity, "Not found in the crate's folder: " + CrateFolder.decode(file));
+				if (EntityTree.isPath(id) && !file.isEmpty()) {
+					CrateFolder.problem(folder, file).ifPresent(problem -> found.put(entity, problem));
 				}
 			}
 		});
@@ -1472,6 +1473,7 @@ public class CrateEditor extends Application {
 	private void edit(Crate other, Optional<Path> path) {
 		crate = other;
 		unavailable = Map.of();
+		previewAsked = false;
 		crateFile.open(path, crate.toJson());
 		// All types of another crate
 		entityType.setValue(null);
@@ -2189,6 +2191,98 @@ public class CrateEditor extends Application {
 		return false;
 	}
 
+	/** Whether the user was asked about this crate's stale HTML preview */
+	private boolean previewAsked;
+
+	/**
+	 * After saving an attached crate, its folder's ro-crate-preview.html no
+	 * longer shows it as it is, and wpsld can't make another yet: ask, once
+	 * for each crate opened, whether to move it aside (into
+	 * ro-crate-preview_files, named by its date), delete it, or keep it.
+	 */
+	private void stalePreview(Stage stage, Path folder) {
+		Path preview = folder.resolve("ro-crate-preview.html");
+		if (previewAsked || !Files.isRegularFile(preview)) {
+			return;
+		}
+		previewAsked = true;
+		ButtonType moveAside = new ButtonType("Move Aside", ButtonData.YES);
+		ButtonType delete = new ButtonType("Delete", ButtonData.OTHER);
+		ButtonType keep = new ButtonType("Keep", ButtonData.NO);
+		Alert alert = new Alert(AlertType.CONFIRMATION, "ro-crate-preview.html shows the crate as it was when the"
+				+ " preview was made, not as saved now, and wpsld can't make a new preview yet.\n\nMove it aside into"
+				+ " ro-crate-preview_files, as old-ro-crate-preview with its date, delete it, or keep it as it is?",
+				moveAside, delete, keep);
+		alert.initOwner(stage);
+		alert.setHeaderText("The crate's HTML preview is out of date");
+		alert.setResizable(true);
+		ButtonType chosen = alert.showAndWait().orElse(keep);
+		try {
+			if (chosen == moveAside) {
+				Path aside = Files.createDirectories(folder.resolve("ro-crate-preview_files"));
+				String date = java.time.LocalDate
+						.ofInstant(Files.getLastModifiedTime(preview).toInstant(), java.time.ZoneId.systemDefault())
+						.toString();
+				Path old = aside.resolve("old-ro-crate-preview-" + date + ".html");
+				for (int n = 2; Files.exists(old); n++) {
+					old = aside.resolve("old-ro-crate-preview-" + date + "-" + n + ".html");
+				}
+				Files.move(preview, old);
+			} else if (chosen == delete) {
+				Files.delete(preview);
+			}
+		} catch (IOException e) {
+			Alert error = new Alert(AlertType.ERROR, "Can't move or delete " + preview + ":\n" + e.getMessage());
+			error.initOwner(stage);
+			error.showAndWait();
+		}
+	}
+
+	/**
+	 * An RO-Crate 1.0 metadata file, ro-crate-metadata.jsonld, that saving
+	 * a crate of a later version in this folder would leave beside it, or
+	 * save as: not a symbolic link (e.g. to ro-crate-metadata.json, as on
+	 * GitHub Pages), which is fine.
+	 */
+	private Optional<Path> legacyFile(Path file) {
+		if (!CrateFile.isMetadataFile(file) || crate.specVersion().filter("1.0"::equals).isPresent()) {
+			return Optional.empty();
+		}
+		Path legacy = file.toAbsolutePath().getParent().resolve(CrateFile.RO_CRATE_METADATA_JSONLD);
+		return Files.isRegularFile(legacy, java.nio.file.LinkOption.NOFOLLOW_LINKS) ? Optional.of(legacy)
+				: Optional.empty();
+	}
+
+	/**
+	 * Ask whether to save as ro-crate-metadata.json, removing RO-Crate 1.0's
+	 * ro-crate-metadata.jsonld, so that other tools don't read the old one
+	 *
+	 * @return Where to save: ro-crate-metadata.json, or the file as chosen to
+	 *         keep it; none to cancel
+	 */
+	private Optional<Path> askAboutLegacy(Stage stage, Path file, Path legacy) {
+		Path json = legacy.getParent().resolve(Crate.RO_CRATE_METADATA_JSON);
+		boolean asLegacy = file.toAbsolutePath().equals(legacy);
+		String version = crate.specVersion().map(v -> "RO-Crate " + v).orElse("a later RO-Crate");
+		ButtonType useJson = new ButtonType(asLegacy ? "Save as .json" : "Remove .jsonld", ButtonData.YES);
+		ButtonType keep = new ButtonType(asLegacy ? "Keep .jsonld" : "Keep Both", ButtonData.NO);
+		Alert alert = new Alert(AlertType.CONFIRMATION, CrateFile.RO_CRATE_METADATA_JSONLD
+				+ " is RO-Crate 1.0's name for the metadata file. This crate is " + version + ", whose metadata file is "
+				+ Crate.RO_CRATE_METADATA_JSON + "; " + (asLegacy ? "saved as " + Crate.RO_CRATE_METADATA_JSON
+						+ ", the old file is removed." : "with both in the folder, other tools may read the old one.")
+				+ "\n\nA symbolic link " + CrateFile.RO_CRATE_METADATA_JSONLD + " to " + Crate.RO_CRATE_METADATA_JSON
+				+ ", as some web sites need, can stay.", useJson, keep, ButtonType.CANCEL);
+		alert.initOwner(stage);
+		alert.setHeaderText(asLegacy ? "Save as " + Crate.RO_CRATE_METADATA_JSON + "?"
+				: "Remove the old " + CrateFile.RO_CRATE_METADATA_JSONLD + "?");
+		alert.setResizable(true);
+		ButtonType chosen = alert.showAndWait().orElse(ButtonType.CANCEL);
+		if (chosen == useJson) {
+			return Optional.of(json);
+		}
+		return chosen == keep ? Optional.of(file) : Optional.empty();
+	}
+
 	/**
 	 * A name for a detached crate's metadata file, as RO-Crate 1.2 suggests:
 	 * <code>bird-survey-ro-crate-metadata.json</code> for a crate named
@@ -2211,8 +2305,11 @@ public class CrateEditor extends Application {
 		mentionUnlinked();
 		// The profile's required properties, then RO-Crate's own checks
 		// (worded alike, so each problem only once)
-		List<String> problems = Stream.concat(RequiredFields.check(crate, profiles.getValue(), terms).stream(),
-				CrateChecks.check(crate).stream()).distinct().toList();
+		List<String> problems = Stream.concat(Stream.concat(RequiredFields.check(crate, profiles.getValue(), terms)
+				.stream(), CrateChecks.check(crate).stream()),
+				// Those of an attached crate's files and folder
+				crateFile.folder().map(folder -> CrateFolder.problems(crate, folder)).orElse(List.of()).stream())
+				.distinct().toList();
 		if (problems.isEmpty()) {
 			return true;
 		}
@@ -2338,13 +2435,30 @@ public class CrateEditor extends Application {
 	 * @return Whether it was written
 	 */
 	boolean saveTo(Stage stage, Path file) {
+		Optional<Path> legacy = legacyFile(file);
+		if (legacy.isPresent()) {
+			Optional<Path> chosen = askAboutLegacy(stage, file, legacy.get());
+			if (chosen.isEmpty()) {
+				return false;
+			}
+			if (!chosen.get().equals(file)) {
+				// Saved as ro-crate-metadata.json, then the old one is removed
+				file = chosen.get();
+			} else {
+				legacy = Optional.empty();
+			}
+		}
 		try {
 			JsonNode json = crate.toJson();
-			// With the line ends the file had, else \n
-			Crate.writer(crateFile.lineEnd()).writeValue(file.toFile(), json);
+			// With the line ends the file had, else \n; never half written
+			SafeSave.write(file, Crate.writer(crateFile.lineEnd()).writeValueAsBytes(json));
+			if (legacy.isPresent()) {
+				Files.deleteIfExists(legacy.get());
+			}
 			crateFile.reset(Optional.of(file), json);
 			lastFolder = file.toAbsolutePath().getParent().toFile();
 			refresh();
+			crateFile.folder().ifPresent(folder -> stalePreview(stage, folder));
 			return true;
 		} catch (IOException e) {
 			Alert error = new Alert(AlertType.ERROR, "Can't save " + file + ":\n" + e.getMessage());

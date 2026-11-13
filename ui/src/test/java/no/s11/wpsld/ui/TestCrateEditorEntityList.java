@@ -567,6 +567,65 @@ public class TestCrateEditorEntityList extends ApplicationTest {
 				.map(cell -> rows(tree).get(tree.getRow(cell.getTreeItem()))).toList();
 	}
 
+	/**
+	 * A crate of RO-Crate 1.1 or later saved as ro-crate-metadata.jsonld, RO-Crate
+	 * 1.0's name, is saved as ro-crate-metadata.json instead, if chosen; a
+	 * symbolic link of that name is left as it is
+	 */
+	@Test
+	public void legacyName() throws Exception {
+		Path folder = Files.createDirectories(temp.resolve("legacy"));
+		Path legacy = folder.resolve("ro-crate-metadata.jsonld");
+		Files.writeString(legacy, CRATE);
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, legacy)).get());
+		interact(() -> List.copyOf(javafx.stage.Window.getWindows()).stream().filter(w -> w != stage)
+				.forEach(w -> ((Stage) w).close()));
+		var saving = WaitForAsyncUtils.asyncFx(() -> app.saveTo(stage, legacy));
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup("Save as ro-crate-metadata.json?").tryQuery().isPresent());
+		clickOn("Save as .json");
+		assertTrue(saving.get());
+		assertFalse(Files.exists(legacy));
+		Path json = folder.resolve("ro-crate-metadata.json");
+		assertTrue(Files.readString(json).contains("Survey"));
+		assertTrue(stage.getTitle(), stage.getTitle().contains("ro-crate-metadata.json"));
+
+		// As some web sites need: a link to it can stay
+		try {
+			Files.createSymbolicLink(legacy, json.getFileName());
+		} catch (UnsupportedOperationException | java.io.IOException e) {
+			return;
+		}
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.saveTo(stage, json)).get());
+		assertTrue(Files.isSymbolicLink(legacy));
+	}
+
+	/** Saving an attached crate with an HTML preview asks once to move it aside */
+	@Test
+	public void stalePreview() throws Exception {
+		Path folder = Files.createDirectories(temp.resolve("previewed"));
+		Files.createDirectories(folder.resolve("data"));
+		Files.writeString(folder.resolve("data/counts.csv"), "");
+		Files.writeString(folder.resolve("ro-crate-metadata.json"), CRATE);
+		Path preview = folder.resolve("ro-crate-preview.html");
+		Files.writeString(preview, "<html></html>");
+		Files.setLastModifiedTime(preview, java.nio.file.attribute.FileTime.from(java.time.Instant.parse("2024-12-24T12:00:00Z")));
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, folder.resolve("ro-crate-metadata.json"))).get());
+		var saving = WaitForAsyncUtils.asyncFx(() -> app.saveTo(stage, folder.resolve("ro-crate-metadata.json")));
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup("The crate's HTML preview is out of date").tryQuery().isPresent());
+		clickOn("Move Aside");
+		assertTrue(saving.get());
+		assertFalse(Files.exists(preview));
+		assertTrue(Files.exists(folder.resolve("ro-crate-preview_files/old-ro-crate-preview-2024-12-24.html")));
+		// Not asked again for this crate
+		Files.writeString(preview, "<html></html>");
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.saveTo(stage, folder.resolve("ro-crate-metadata.json"))).get());
+		assertTrue(Files.exists(preview));
+	}
+
 	@Test
 	public void editedNotListed() throws Exception {
 		addNamed("Person", "Alice");
