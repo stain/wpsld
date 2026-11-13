@@ -67,12 +67,21 @@ depositing data.
   linking a file and an author, and exploring types and properties with a
   photograph and a Wikidata person. It includes screenshots and further
   reading; the README links to the Markdown topics for reading outside the app.
-- Short topics cover opening and saving, profile loading and preferences,
-  types, entities and identifiers, properties and links, copy and paste,
-  and views. Paste Special is not implemented yet; document its actual
-  options when it is added.
-- **Next:** add topics on required fields, people and organisations,
-  files and troubleshooting; add a glossary. Check every instruction against
+- Short topics cover opening and saving, folders and files, file formats,
+  profile loading and preferences, types, entities and identifiers,
+  properties and links, with a page for each lookup (people,
+  organisations, publications and DOIs, licences, places), copy and
+  paste, and views. No page is over about 100 lines: split a page that
+  grows past that, and link it from `index.md` under its parent. Links to
+  sections (`page.md#section`, `#section`, named as GitHub names headings)
+  open the page there. Paste Special is not implemented yet; document its
+  actual options when it is added.
+- **Next:** the topics list as a tree, the pages split off under their
+  parent (Folders and files, File formats under Opening and saving; the
+  lookups under Properties and links), and each page's sections under it
+  to jump to; F1 on more controls (the entity tree to Folders and files,
+  Encoding format to File formats, each lookup's button to its page);
+  add topics on required fields and troubleshooting; add a glossary. Check every instruction against
   the app's actual behaviour and
   the applicable RO-Crate specification.
 - Extend contextual entry points as more topics and controls are added.
@@ -1093,6 +1102,28 @@ extension. Next:
 - **More signatures** where Tika has none and a media type exists or is
   common: NumPy `.npy` (`\x93NUMPY`), Avro (`Obj\x01`), NIfTI (`n+1` at
   344), ROOT (`root`), MRC maps (`MAP ` at 208).
+
+### Licences, defaults and the metadata descriptor
+
+- **Recommended licences first** in the licence finder (Licence from
+  SPDX…): a "Recommended" group at the very top, before the search
+  results, of `Apache-2.0`, `BSD-2-Clause`, `BSD-3-Clause`, `MIT`,
+  `CC0-1.0`, `CC-BY-4.0`, `CC-BY-NC-4.0` and `CC-BY-ND-4.0` (SPDX's
+  identifiers; "CC-NC-4.0" isn't one, the non-commercial licence is
+  CC-BY-NC-4.0). Software licences and data/content licences could be
+  told apart in the group.
+- **Preferences for defaults**: a default licence, author (e.g. the
+  user's own ORCID, looked up once) and publisher (e.g. their
+  organisation's ROR), filled in on a new crate's root, and offered first
+  in those fields. Kept in the settings, so the privacy note of File >
+  Recent applies.
+- **The metadata descriptor's own licence**: the `ro-crate-metadata.json`
+  entity may have a `license` (RO-Crate suggests e.g. CC0 for the
+  metadata, separate from the data's), but the editor never shows the
+  descriptor. Perhaps View > Show Metadata Descriptor, listing it as an
+  entity (with only the properties that make sense: license, and not its
+  @id, conformsTo or about, which wpsld manages), or a "Metadata licence"
+  field on the root's form.
 
 ### HTML preview (ro-crate-preview.html)
 

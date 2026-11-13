@@ -38,7 +38,7 @@ Use **Edit > Undo** if needed.
 
 Each entity has an `@id`. For a file, use its path relative to the crate
 folder; for a person, their ORCID iD (**Find in ORCID...** on their form,
-see [Properties and links](properties.md)) or another appropriate
+see [People](people.md)) or another appropriate
 persistent identifier. A generated identifier beginning with `#` identifies
 an entity within this crate.
 

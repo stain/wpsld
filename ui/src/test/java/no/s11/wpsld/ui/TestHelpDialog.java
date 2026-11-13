@@ -185,6 +185,31 @@ public class TestHelpDialog extends ApplicationTest {
 		clickOn("Close");
 	}
 
+	/** The names of a page's headings, as links to them have them */
+	private static List<String> anchors(HelpDialog.Topic topic) {
+		List<String> anchors = new ArrayList<>();
+		Parser.builder().build().parse(topic.content).accept(new AbstractVisitor() {
+			@Override
+			public void visit(org.commonmark.node.Heading heading) {
+				StringBuilder text = new StringBuilder();
+				heading.accept(new AbstractVisitor() {
+					@Override
+					public void visit(org.commonmark.node.Text value) {
+						text.append(value.getLiteral());
+					}
+
+					@Override
+					public void visit(org.commonmark.node.Code code) {
+						text.append(code.getLiteral());
+					}
+				});
+				anchors.add(HelpMarkdown.anchor(text.toString()));
+			}
+		});
+		return anchors;
+	}
+
+	/** Links to pages and their sections (page.md#section, #section) lead somewhere */
 	@Test
 	public void localTopicLinksAreRegistered() {
 		for (HelpDialog.Topic topic : HelpDialog.Topic.values()) {
@@ -192,13 +217,48 @@ public class TestHelpDialog extends ApplicationTest {
 				@Override
 				public void visit(org.commonmark.node.Link link) {
 					String destination = link.getDestination();
-					if (destination.endsWith(".md")) {
-						assertTrue("Unknown topic in " + topic + ": " + destination,
-								HelpDialog.Topic.fromResource(destination).isPresent());
+					if (destination.startsWith("http:") || destination.startsWith("https:")) {
+						return;
+					}
+					assertTrue("Not a help link in " + topic + ": " + destination, HelpMarkdown.isHelpLink(destination));
+					int hash = destination.indexOf('#');
+					HelpDialog.Topic target = hash == 0 ? topic
+							: HelpDialog.Topic.fromResource(hash < 0 ? destination : destination.substring(0, hash))
+									.orElseThrow();
+					if (hash >= 0) {
+						assertTrue("No such section in " + topic + ": " + destination + " of " + anchors(target),
+								anchors(target).contains(destination.substring(hash + 1)));
 					}
 				}
 			});
 		}
+	}
+
+	@Test
+	public void anchors() {
+		assertEquals("attached-and-detached-crates", HelpMarkdown.anchor("Attached and detached crates"));
+		assertEquals("show-in-explorer-or-finder", HelpMarkdown.anchor("Show in Explorer or Finder"));
+		assertEquals("1-prepare-a-folder", HelpMarkdown.anchor("1. Prepare a folder"));
+	}
+
+	/** A link to a section of another page opens it there */
+	@Test
+	public void sectionLinksScroll() {
+		HelpDialog[] dialog = new HelpDialog[1];
+		interact(() -> {
+			dialog[0] = new HelpDialog(stage, HelpDialog.Topic.FILES, address -> fail("Must stay offline"));
+			dialog[0].show();
+		});
+		ListView<?> topics = lookup("#helpTopics").queryListView();
+		TextFlow content = lookup("#helpContent").queryAs(TextFlow.class);
+		Hyperlink attached = content.getChildren().stream().filter(Hyperlink.class::isInstance)
+				.map(Hyperlink.class::cast).filter(link -> link.getText().equals("Attached and detached crates"))
+				.findFirst().orElseThrow();
+		interact(attached::fire);
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals("Folders and files", topics.getSelectionModel().getSelectedItem().toString());
+		assertTrue(lookup("#helpPage").queryAs(ScrollPane.class).getVvalue() > 0);
+		clickOn("Close");
 	}
 
 	@Test

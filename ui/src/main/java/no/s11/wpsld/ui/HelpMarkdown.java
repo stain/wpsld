@@ -21,6 +21,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
 import java.util.function.Consumer;
 
 import org.commonmark.node.*;
@@ -41,18 +44,45 @@ final class HelpMarkdown {
 	private HelpMarkdown() {
 	}
 
-	static void show(TextFlow flow, String markdown, Consumer<String> browse, ObservableDoubleValue imageWidth) {
+	/**
+	 * Show a help page's Markdown in a text flow
+	 *
+	 * @return Its headings, by their names in links to them (see
+	 *         {@link #anchor}), to scroll to
+	 */
+	static Map<String, javafx.scene.Node> show(TextFlow flow, String markdown, Consumer<String> browse,
+			ObservableDoubleValue imageWidth) {
 		flow.getChildren().clear();
 		Node document = PARSER.parse(markdown);
 		flow.setAccessibleText(PLAIN.render(document));
-		blocks(flow, document, browse, imageWidth, 0);
+		Map<String, javafx.scene.Node> headings = new LinkedHashMap<>();
+		blocks(flow, document, browse, imageWidth, 0, headings);
+		return headings;
+	}
+
+	/**
+	 * A heading's name in links to it, as GitHub makes it: in lower case,
+	 * without punctuation, spaces as hyphens, e.g. attached-and-detached-crates
+	 */
+	static String anchor(String heading) {
+		return heading.strip().toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N} _-]", "").replace(' ', '-');
+	}
+
+	/** Whether a link leads to a help page, or a section of one (#…) */
+	static boolean isHelpLink(String destination) {
+		String page = destination.contains("#") ? destination.substring(0, destination.indexOf('#')) : destination;
+		return page.isEmpty() && destination.length() > 1 || HelpDialog.Topic.fromResource(page).isPresent();
 	}
 
 	private static void blocks(TextFlow flow, Node parent, Consumer<String> browse,
-			ObservableDoubleValue imageWidth, int depth) {
+			ObservableDoubleValue imageWidth, int depth, Map<String, javafx.scene.Node> headings) {
 		for (Node node = parent.getFirstChild(); node != null; node = node.getNext()) {
 			if (node instanceof Heading) {
+				int first = flow.getChildren().size();
 				inline(flow, node, browse, imageWidth, "-fx-font-weight: bold; -fx-font-size: 1.25em;");
+				if (flow.getChildren().size() > first) {
+					headings.putIfAbsent(anchor(PLAIN.render(node)), flow.getChildren().get(first));
+				}
 				text(flow, "\n\n", "");
 			} else if (node instanceof Paragraph) {
 				inline(flow, node, browse, imageWidth, "");
@@ -63,7 +93,7 @@ final class HelpMarkdown {
 				for (Node item = node.getFirstChild(); item != null; item = item.getNext()) {
 					String marker = node instanceof OrderedList ? number++ + ". " : "• ";
 					text(flow, "  ".repeat(depth) + marker, "");
-					blocks(flow, item, browse, imageWidth, depth + 1);
+					blocks(flow, item, browse, imageWidth, depth + 1, headings);
 				}
 			} else if (node instanceof FencedCodeBlock code) {
 				text(flow, code.getLiteral() + "\n", "-fx-font-family: monospace;");
@@ -74,7 +104,7 @@ final class HelpMarkdown {
 			} else if (node instanceof HtmlBlock html) {
 				text(flow, html.getLiteral() + "\n", "");
 			} else {
-				blocks(flow, node, browse, imageWidth, depth);
+				blocks(flow, node, browse, imageWidth, depth, headings);
 			}
 		}
 	}
@@ -97,7 +127,7 @@ final class HelpMarkdown {
 			} else if (node instanceof org.commonmark.node.Image image) {
 				image(flow, image, imageWidth);
 			} else if (node instanceof Link link && (isWebLink(link.getDestination())
-					|| HelpDialog.Topic.fromResource(link.getDestination()).isPresent())) {
+					|| isHelpLink(link.getDestination()))) {
 				Hyperlink hyperlink = new Hyperlink(plainChildren(link));
 				hyperlink.setOnAction(e -> browse.accept(link.getDestination()));
 				flow.getChildren().add(hyperlink);
