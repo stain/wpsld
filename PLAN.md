@@ -919,6 +919,19 @@ Styles:
   JDK modules plugins need (they can't add any; e.g. java.desktop, there
   for JavaFX, and java.sql and java.xml), and plugins mustn't bring
   packages the boot layer has (e.g. commons-logging goes with PDFBox).
+  JDK modules to link for the plugins planned (metadata readers, lookups,
+  offline data; not visualisation, so no javafx.web, javafx.media or
+  javafx.swing): as now java.base, java.desktop (PDFBox, FontBox,
+  commons-lang3, image I/O), java.xml, jdk.zipfs, java.net.http,
+  java.logging, java.prefs, java.datatransfer; and, by jlink's
+  `--add-modules` as nothing in the image requires them, jdk.unsupported
+  (`sun.misc.Unsafe` of lz4-java and compress-lzf, which jHDF uses, and
+  of pdfbox-io), java.sql (Tika's `TikaInputStream`, libraries' dates)
+  and jdk.charsets (SPSS's, Stata's and IPTC's encodings beyond the
+  common ones). Not java.compiler, java.scripting, java.management,
+  java.naming or jdk.jfr until a plugin needs one. JavaFX's 3D classes
+  are in javafx.graphics, so they stay. Check each plugin's needs with
+  `jdeps --print-module-deps`.
 - **More lookups for RO-Crate's recommended identifiers** (Recommended
   Identifiers in RO-Crate 1.3's metadata page). Smaller helpers: `keywords` edited as tags but
   written as one comma-separated string, and `temporalCoverage` as a
