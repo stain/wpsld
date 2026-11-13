@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import org.testfx.util.WaitForAsyncUtils;
 
+import javafx.concurrent.Task;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Hyperlink;
@@ -87,6 +88,13 @@ public class TestCrateEditorMetadata extends UiTest {
 				.filter(l -> l.getText().equals(text)).findFirst().orElseThrow(() -> new AssertionError(text));
 	}
 
+	/** Metadata from the File… of the file selected, once read in the background */
+	private void fromFile(Stage stage) throws Exception {
+		Task<?> task = WaitForAsyncUtils.asyncFx(() -> app.metadataFromFile(stage)).get().orElseThrow();
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, task::isDone);
+		WaitForAsyncUtils.waitForFxEvents();
+	}
+
 	/**
 	 * A Word file's own metadata, chosen in a dialog: its title replaces the
 	 * name, its creator is a Person linked by name, its licence the SPDX
@@ -125,8 +133,7 @@ public class TestCrateEditorMetadata extends UiTest {
 		Entity file = entities().getItems().stream().filter(e -> e.getId().equals("workshop.docx")).findFirst()
 				.orElseThrow();
 		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().indexOf(file)));
-		WaitForAsyncUtils.asyncFx(() -> app.metadataFromFile(stage));
-		WaitForAsyncUtils.waitForFxEvents();
+		fromFile(stage);
 		// The name it has: not chosen to start with
 		List<javafx.scene.control.CheckBox> boxes = lookup("#fileMetadata").lookup(".check-box")
 				.queryAllAs(javafx.scene.control.CheckBox.class).stream().toList();
@@ -152,8 +159,7 @@ public class TestCrateEditorMetadata extends UiTest {
 		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().stream()
 				.filter(e -> e.getId().equals("workshop.docx")).findFirst().map(entities().getItems()::indexOf)
 				.orElseThrow()));
-		WaitForAsyncUtils.asyncFx(() -> app.metadataFromFile(stage));
-		WaitForAsyncUtils.waitForFxEvents();
+		fromFile(stage);
 		assertTrue(lookup("Nothing new in “Week 8 workshop”").tryQuery().isPresent());
 		clickDialogButton("OK");
 	}
@@ -181,8 +187,7 @@ public class TestCrateEditorMetadata extends UiTest {
 		WaitForAsyncUtils.waitForFxEvents();
 		Entity photo = listed("photo.jpg").orElseThrow();
 		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().indexOf(photo)));
-		WaitForAsyncUtils.asyncFx(() -> app.metadataFromFile(stage));
-		WaitForAsyncUtils.waitForFxEvents();
+		fromFile(stage);
 		javafx.scene.control.CheckBox where = lookup("#fileMetadata").lookup(".check-box")
 				.queryAllAs(javafx.scene.control.CheckBox.class).stream()
 				.filter(b -> b.getText().contains("53.466800, -2.233900")).findFirst().orElseThrow();
@@ -221,8 +226,11 @@ public class TestCrateEditorMetadata extends UiTest {
 		Stage stage = (Stage) entities().getScene().getWindow();
 		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir)).get());
 		WaitForAsyncUtils.waitForFxEvents();
-		List<String> done = WaitForAsyncUtils.asyncFx(() -> app.updateFiles(false, false, true)).get();
-		assertEquals(1, done.size());
+		Task<?> task = WaitForAsyncUtils.asyncFx(() -> app.updateFilesFromThem(stage, false, false)).get();
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, task::isDone);
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup("1 file updated").tryQuery().isPresent());
+		clickDialogButton("OK");
 		Entity photo = listed("photo.jpg").orElseThrow();
 		assertEquals("Bus stop", photo.getLabel());
 		assertEquals("Bus stop on Oxford Road", photo.get("description").orElseThrow().asText());
@@ -233,6 +241,10 @@ public class TestCrateEditorMetadata extends UiTest {
 		assertTrue(photo.get("contentLocation").isEmpty());
 		assertTrue(photo.get("exifData").isEmpty());
 		// Again: nothing new
-		assertEquals(List.of(), WaitForAsyncUtils.asyncFx(() -> app.updateFiles(false, false, true)).get());
+		Task<?> again = WaitForAsyncUtils.asyncFx(() -> app.updateFilesFromThem(stage, false, false)).get();
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, again::isDone);
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup("Nothing to update").tryQuery().isPresent());
+		clickDialogButton("OK");
 	}
 }

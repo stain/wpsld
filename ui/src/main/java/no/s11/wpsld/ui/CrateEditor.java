@@ -87,6 +87,7 @@ import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Control;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.control.Separator;
 import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.SeparatorMenuItem;
@@ -934,11 +935,42 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * What a file says about itself: an Office, OpenDocument or PDF file, an
-	 * image or an SVG, by all readers (see {@link FileMetadata})
+	 * Run a background task, showing a window with its progress and Cancel
+	 * if it takes more than a moment; the window closes when it is done
 	 */
-	private static List<EmbeddedMetadata.Found> embeddedMetadata(Path file) {
-		return FileMetadata.installed().read(file).found();
+	private <T> Task<T> inBackground(Stage stage, String header, Task<T> task) {
+		ProgressBar bar = new ProgressBar();
+		bar.setMaxWidth(Double.MAX_VALUE);
+		bar.progressProperty().bind(task.progressProperty());
+		Label message = new Label();
+		message.textProperty().bind(task.messageProperty());
+		message.setWrapText(true);
+		Alert progress = new Alert(AlertType.INFORMATION, null, ButtonType.CANCEL);
+		progress.initOwner(stage);
+		progress.initModality(javafx.stage.Modality.NONE);
+		progress.setHeaderText(header);
+		progress.getDialogPane().setContent(new VBox(8, message, bar));
+		progress.getDialogPane().setPrefWidth(420);
+		progress.setOnHidden(e -> task.cancel(true));
+		javafx.animation.PauseTransition moment = new javafx.animation.PauseTransition(
+				javafx.util.Duration.millis(400));
+		moment.setOnFinished(e -> {
+			if (task.isRunning()) {
+				progress.show();
+			}
+		});
+		task.runningProperty().addListener((o, was, running) -> {
+			if (!running) {
+				moment.stop();
+				progress.setOnHidden(null);
+				progress.close();
+			}
+		});
+		moment.play();
+		Thread thread = new Thread(task, header);
+		thread.setDaemon(true);
+		thread.start();
+		return task;
 	}
 
 	/**
@@ -947,11 +979,12 @@ public class CrateEditor extends Application {
 	 * but not what to give only on purpose (where a photo was taken, the
 	 * camera).
 	 *
+	 * @param says What the file says (see {@link FileMetadata})
 	 * @return What was given, e.g. "name Week 8 workshop"
 	 */
-	private List<String> fillFromFile(Entity entity, Path file) {
+	private List<String> fillFromFile(Entity entity, List<EmbeddedMetadata.Found> says) {
 		Map<String, List<EmbeddedMetadata.Found>> byProperty = new LinkedHashMap<>();
-		embeddedMetadata(file).stream().filter(f -> !f.onPurpose())
+		says.stream().filter(f -> !f.onPurpose())
 				.forEach(f -> byProperty.computeIfAbsent(f.property(), p -> new ArrayList<>()).add(f));
 		List<String> given = new ArrayList<>();
 		byProperty.forEach((property, found) -> {
@@ -966,36 +999,66 @@ public class CrateEditor extends Application {
 		return given;
 	}
 
+	/** What went wrong reading a file, as lines after a text */
+	private static String problems(List<String> problems) {
+		return problems.isEmpty() ? "" : "\n\nNot all of it could be read:\n" + String.join("\n", problems);
+	}
+
 	/** Properties a file's own value replaces the entity's of, rather than adding to them */
 	private static final Set<String> ONE_VALUE = Set.of("name", "description", "dateCreated", "dateModified",
 			"inLanguage");
 
 	/**
-	 * What the file selected says about itself (see {@link EmbeddedMetadata}),
-	 * to choose from and give its entity, as one undo step.
+	 * What the file selected says about itself (see {@link FileMetadata}),
+	 * read in the background, to choose from and give its entity, as one
+	 * undo step.
+	 *
+	 * @return The reading, if a file is selected
 	 */
-	void metadataFromFile(Stage stage) {
+	Optional<Task<FileMetadata.Reading>> metadataFromFile(Stage stage) {
 		Optional<Map.Entry<Entity, Path>> selected = selectedFile();
 		if (selected.isEmpty()) {
-			return;
+			return Optional.empty();
 		}
 		Entity entity = selected.get().getKey();
+		Path file = selected.get().getValue();
+		Crate readingFor = crate;
+		Task<FileMetadata.Reading> task = new Task<>() {
+			@Override
+			protected FileMetadata.Reading call() {
+				updateMessage(file.getFileName().toString());
+				return FileMetadata.installed().read(file);
+			}
+		};
+		task.setOnSucceeded(e -> {
+			if (crate == readingFor && crate.getEntities().contains(entity)) {
+				metadataFromFile(stage, entity, task.getValue());
+			}
+		});
+		return Optional.of(inBackground(stage, "Reading what “" + entity.getLabel() + "” says about itself", task));
+	}
+
+	/** What a file says about itself, read, to choose from and give its entity */
+	private void metadataFromFile(Stage stage, Entity entity, FileMetadata.Reading reading) {
 		// Not what it has already, e.g. the same author or licence
-		List<EmbeddedMetadata.Found> found = embeddedMetadata(selected.get().getValue()).stream()
+		List<EmbeddedMetadata.Found> found = reading.found().stream()
 				.filter(f -> !entity.getAll(f.property()).contains(fileValue(f, false, entity))).toList();
 		if (found.isEmpty()) {
-			Alert none = new Alert(AlertType.INFORMATION, "Office, OpenDocument and PDF files, images (JPEG, PNG,"
-					+ " TIFF, WebP) and SVGs can say what they are, who made them, when and under which licence;"
-					+ " this one says nothing the crate doesn't.",
+			Alert none = new Alert(reading.problems().isEmpty() ? AlertType.INFORMATION : AlertType.WARNING,
+					"Office, OpenDocument and PDF files, images (JPEG, PNG, TIFF, WebP), SVGs, EPS and PSD files"
+							+ " can say what they are, who made them, when and under which licence; this one says"
+							+ " nothing the crate doesn't." + problems(reading.problems()),
 					ButtonType.OK);
 			none.initOwner(stage);
 			none.setHeaderText("Nothing new in “" + entity.getLabel() + "”");
+			none.setResizable(true);
 			none.showAndWait();
 			return;
 		}
 		Function<JsonNode, String> shown = v -> v.isValueNode() ? v.asText()
 				: crate.get(v.path("@id").asText()).map(Entity::getLabel).orElse(v.path("@id").asText());
-		FileMetadataDialog dialog = new FileMetadataDialog(stage, entity, found, entityEditor::label, shown);
+		FileMetadataDialog dialog = new FileMetadataDialog(stage, entity, found, reading.problems(),
+				entityEditor::label, shown);
 		List<EmbeddedMetadata.Found> chosen = dialog.showAndWait().orElse(List.of());
 		if (chosen.isEmpty()) {
 			return;
@@ -1238,14 +1301,102 @@ public class CrateEditor extends Application {
 		if (dialog.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) {
 			return;
 		}
-		List<String> done = updateFiles(sizes.isSelected(), formats.isSelected(), embedded.isSelected());
-		Alert alert = new Alert(AlertType.INFORMATION, done.isEmpty() ? "The files' details were up to date."
-				: String.join("\n", done.stream().limit(30).toList()) + (done.size() > 30 ? "\n…" : ""), ButtonType.OK);
+		if (embedded.isSelected()) {
+			updateFilesFromThem(stage, sizes.isSelected(), formats.isSelected());
+		} else {
+			showUpdated(stage, updateFiles(sizes.isSelected(), formats.isSelected()), List.of());
+		}
+	}
+
+	/** Tell what Update File Details updated, and what files couldn't be read */
+	private void showUpdated(Stage stage, List<String> done, List<String> problems) {
+		Alert alert = new Alert(problems.isEmpty() ? AlertType.INFORMATION : AlertType.WARNING,
+				(done.isEmpty() ? "The files' details were up to date."
+						: String.join("\n", done.stream().limit(30).toList()) + (done.size() > 30 ? "\n…" : ""))
+						+ (problems.isEmpty() ? "" : "\n\nNot all of what the files say could be read:\n"
+								+ String.join("\n", problems.stream().limit(30).toList())
+								+ (problems.size() > 30 ? "\n…" : "")),
+				ButtonType.OK);
 		alert.initOwner(stage);
 		alert.setHeaderText(done.isEmpty() ? "Nothing to update"
 				: done.size() + (done.size() == 1 ? " file updated" : " files updated"));
 		alert.setResizable(true);
 		alert.show();
+	}
+
+	/**
+	 * Crate > Update File Details with what the files say about themselves:
+	 * read in the background, two files at a time, with progress and
+	 * Cancel; then all updated at once (see {@link #updateFiles}), and told
+	 * what was, with the files that couldn't be read
+	 *
+	 * @return The reading, by @id
+	 */
+	Task<Map<String, FileMetadata.Reading>> updateFilesFromThem(Stage stage, boolean sizes, boolean formats) {
+		Map<String, Path> files = new LinkedHashMap<>(crateFiles());
+		Crate readingFor = crate;
+		Task<Map<String, FileMetadata.Reading>> task = new Task<>() {
+			@Override
+			protected Map<String, FileMetadata.Reading> call() throws InterruptedException {
+				Map<String, FileMetadata.Reading> read = new LinkedHashMap<>();
+				java.util.concurrent.ExecutorService readers = java.util.concurrent.Executors.newFixedThreadPool(2,
+						r -> Thread.ofPlatform().daemon().name("Reading files").unstarted(r));
+				try {
+					java.util.concurrent.CompletionService<Map.Entry<String, FileMetadata.Reading>> done = new java.util.concurrent.ExecutorCompletionService<>(
+							readers);
+					files.forEach((id, path) -> done.submit(() -> Map.entry(id, FileMetadata.installed().read(path))));
+					for (int i = 0; i < files.size(); i++) {
+						updateProgress(i, files.size());
+						updateMessage(i + " of " + files.size() + " files read");
+						Map.Entry<String, FileMetadata.Reading> reading = done.take().get();
+						read.put(reading.getKey(), reading.getValue());
+					}
+				} catch (java.util.concurrent.ExecutionException e) {
+					throw new IllegalStateException(e.getCause());
+				} finally {
+					readers.shutdownNow();
+				}
+				return read;
+			}
+		};
+		task.setOnSucceeded(e -> {
+			if (crate != readingFor) {
+				return;
+			}
+			Map<String, List<EmbeddedMetadata.Found>> found = new LinkedHashMap<>();
+			List<String> problems = new ArrayList<>();
+			files.keySet().forEach(id -> Optional.ofNullable(task.getValue().get(id)).ifPresent(reading -> {
+				found.put(id, reading.found());
+				reading.problems().forEach(problem -> problems.add(id + ": " + problem));
+			}));
+			showUpdated(stage, updateFiles(sizes, formats, found), problems);
+		});
+		task.setOnFailed(e -> showUpdated(stage, List.of(), List.of(String.valueOf(task.getException()))));
+		return inBackground(stage, "Reading what the files say about themselves", task);
+	}
+
+	/**
+	 * The files an attached crate describes that are in its folder, by their
+	 * @ids: not folders, nor parts of files (page.html#t2)
+	 */
+	private Map<String, Path> crateFiles() {
+		Optional<Path> folder = crateFile.folder();
+		Map<String, Path> files = new LinkedHashMap<>();
+		if (folder.isEmpty()) {
+			return files;
+		}
+		for (Entity entity : crate.getEntities()) {
+			String id = entity.getId();
+			if (entity == crate.getRoot() || !EntityTree.isPath(id) || id.contains("#")
+					|| !CrateFolder.exists(folder.get(), id)) {
+				continue;
+			}
+			Path file = folder.get().resolve(CrateFolder.decode(id).replaceFirst("^(\\./)+", ""));
+			if (!Files.isDirectory(file)) {
+				files.put(id, file);
+			}
+		}
+		return files;
 	}
 
 	/**
@@ -1257,30 +1408,21 @@ public class CrateEditor extends Application {
 	 * @return What was changed, a line for each file
 	 */
 	List<String> updateFiles(boolean sizes, boolean formats) {
-		return updateFiles(sizes, formats, false);
+		return updateFiles(sizes, formats, Map.of());
 	}
 
 	/**
-	 * As {@link #updateFiles(boolean, boolean)}, and with embedded, what each
-	 * file says about itself where its entity has no value (see
-	 * {@link #fillFromFile})
+	 * As {@link #updateFiles(boolean, boolean)}, and what each file says
+	 * about itself where its entity has no value (see {@link #fillFromFile})
+	 *
+	 * @param embedded What the files say, read already, by @id
 	 */
-	List<String> updateFiles(boolean sizes, boolean formats, boolean embedded) {
-		Optional<Path> folder = crateFile.folder();
-		if (folder.isEmpty()) {
-			return List.of();
-		}
+	List<String> updateFiles(boolean sizes, boolean formats, Map<String, List<EmbeddedMetadata.Found>> embedded) {
 		List<String> done = new ArrayList<>();
-		for (Entity entity : List.copyOf(crate.getEntities())) {
-			String id = entity.getId();
-			if (entity == crate.getRoot() || !EntityTree.isPath(id) || id.contains("#")
-					|| !CrateFolder.exists(folder.get(), id)) {
-				continue;
-			}
-			Path file = folder.get().resolve(CrateFolder.decode(id).replaceFirst("^(\\./)+", ""));
-			if (Files.isDirectory(file)) {
-				continue;
-			}
+		for (Map.Entry<String, Path> part : crateFiles().entrySet()) {
+			String id = part.getKey();
+			Path file = part.getValue();
+			Entity entity = crate.get(id).orElseThrow();
 			List<String> changed = new ArrayList<>(sizes ? CrateFolder.update(entity, file) : List.of());
 			if (formats) {
 				List<JsonNode> before = entity.getAll("encodingFormat");
@@ -1290,8 +1432,8 @@ public class CrateEditor extends Application {
 							.map(v -> v.isTextual() ? v.asText() : v.path("@id").asText()).collect(Collectors.joining(", ")));
 				}
 			}
-			if (embedded) {
-				changed.addAll(fillFromFile(entity, file));
+			if (embedded.containsKey(id)) {
+				changed.addAll(fillFromFile(entity, embedded.get(id)));
 			}
 			if (!changed.isEmpty()) {
 				done.add(id + ": " + String.join("; ", changed));

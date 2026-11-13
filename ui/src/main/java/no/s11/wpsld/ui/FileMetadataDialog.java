@@ -47,11 +47,12 @@ import no.s11.wpsld.lookup.EmbeddedMetadata.Found;
  */
 class FileMetadataDialog extends Dialog<List<Found>> {
 	/**
-	 * @param found Values the entity doesn't have yet
-	 * @param shown A value as shown, e.g. the name of the entity it refers to
+	 * @param found    Values the entity doesn't have yet
+	 * @param problems What couldn't be read, e.g. "PDF (PDFBox) took over 20 s"
+	 * @param shown    A value as shown, e.g. the name of the entity it refers to
 	 */
-	FileMetadataDialog(Window owner, Entity entity, List<Found> found, Function<String, String> label,
-			Function<JsonNode, String> shown) {
+	FileMetadataDialog(Window owner, Entity entity, List<Found> found, List<String> problems,
+			Function<String, String> label, Function<JsonNode, String> shown) {
 		initOwner(owner);
 		setTitle("Metadata from the File");
 		setHeaderText("“" + entity.getLabel() + "” says this about itself");
@@ -84,7 +85,14 @@ class FileMetadataDialog extends Dialog<List<Found>> {
 		ScrollPane scroll = new ScrollPane(list);
 		scroll.setFitToWidth(true);
 		scroll.setPrefViewportHeight(Math.min(360, 30 * Math.max(1, boxes.size())));
-		getDialogPane().setContent(new VBox(10, scroll, note));
+		VBox content = new VBox(10, scroll, note);
+		if (!problems.isEmpty()) {
+			Label failed = new Label("Not all of it could be read: " + String.join("; ", problems));
+			failed.setId("fileMetadataProblems");
+			failed.setWrapText(true);
+			content.getChildren().add(failed);
+		}
+		getDialogPane().setContent(content);
 		getDialogPane().setPrefWidth(520);
 		getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
 		getDialogPane().lookupButton(ButtonType.OK).setDisable(boxes.isEmpty());

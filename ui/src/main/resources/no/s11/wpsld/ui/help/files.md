@@ -68,6 +68,8 @@ the File…** to see what it says:
   and last changed, and a licence in their custom properties.
 - PDFs: their document information (title, subject, author, keywords,
   dates) and their XMP metadata.
+- EPS and PostScript (also older Illustrator `.ai`), Photoshop (`.psd`)
+  and InDesign files: their XMP metadata.
 - Photos and images (JPEG, PNG, TIFF, WebP): description, artist,
   copyright, keywords, when taken and changed, a licence in their XMP,
   their size in pixels, the camera and its settings, and where the photo
@@ -87,6 +89,10 @@ if the crate has none; a licence known to SPDX a link to it; and where a
 photo was taken a new Place with its point on the map. **Edit > Undo**
 takes it all back at once. To fill in many files at once, where they have
 no value yet, use **Crate > Update File Details...**.
+
+Files are read in the background; a large one shows its progress, with
+**Cancel**. A file that is damaged, or that a reader takes too long over
+(20 seconds), says what could be read, and which reader failed.
 
 ## HTML preview
 

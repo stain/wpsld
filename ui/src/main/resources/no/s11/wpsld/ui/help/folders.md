@@ -78,7 +78,10 @@ their [formats](formats.md) where they have none, and what the files say
 about themselves (titles, authors, dates, licences, sizes; see
 [Metadata from the file](files.md#metadata-from-the-file)) where they
 have no value yet. Where a photo was taken and the camera are left out:
-choose those for one file with **Metadata from the File...**.
+choose those for one file with **Metadata from the File...**. The files
+are read in the background, two at a time, with progress and **Cancel**;
+then all is updated at once (one **Undo**), and you are told which files
+couldn't be read.
 
 ## Show in Explorer or Finder
 
