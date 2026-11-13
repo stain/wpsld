@@ -672,6 +672,25 @@ public class TestCrateEditorEntityList extends ApplicationTest {
 		assertTrue(files.isSelected());
 	}
 
+	/** Crate > Update File Details: sizes and dates, and formats only if asked */
+	@Test
+	public void updateFiles() throws Exception {
+		Path folder = Files.createDirectories(temp.resolve("survey"));
+		Files.createDirectories(folder.resolve("data"));
+		Files.writeString(folder.resolve("data/counts.csv"), "species,count\n");
+		Files.setLastModifiedTime(folder.resolve("data/counts.csv"),
+				java.nio.file.attribute.FileTime.from(java.time.Instant.parse("2025-06-02T10:15:30Z")));
+		Files.writeString(folder.resolve("ro-crate-metadata.json"), CRATE);
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, folder.resolve("ro-crate-metadata.json"))).get());
+		assertEquals(List.of("data/counts.csv: contentSize 14; dateModified 2025-06-02T10:15:30Z"),
+				WaitForAsyncUtils.asyncFx(() -> app.updateFiles(true, false)).get());
+		assertEquals(List.of(), WaitForAsyncUtils.asyncFx(() -> app.updateFiles(true, false)).get());
+		List<String> formats = WaitForAsyncUtils.asyncFx(() -> app.updateFiles(false, true)).get();
+		assertEquals(1, formats.size());
+		assertTrue(formats.get(0), formats.get(0).startsWith("data/counts.csv: encodingFormat text/csv, https://"));
+	}
+
 	@Test
 	public void editedNotListed() throws Exception {
 		addNamed("Person", "Alice");

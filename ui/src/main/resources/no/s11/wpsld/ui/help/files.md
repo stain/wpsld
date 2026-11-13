@@ -19,6 +19,13 @@ describe greyed out, to add with **Crate > Add to Has Part** (or **Add
 Dataset for Folder**), also several at once. Opening a folder shows
 **View > Entities by Folder**.
 
+**Crate > Update File Details...** brings the files an attached crate
+describes up to date with its folder: their size (`contentSize`) and date
+modified, where missing or changed since. Optionally, it also fills in
+formats from the files' names where they have none: the media type, and
+the PRONOM format when the name tells it for sure (`.csv`, but not `.pdf`,
+which has many versions). That is a guess, so it is not chosen at first.
+
 **File > Show in Explorer** (**Show in Finder** on macOS, **Show in File
 Manager** on Linux) shows the crate's metadata file in its folder; on the
 right-click menu, it shows the file or folder of the entity selected. A file added gets its size,

@@ -129,6 +129,26 @@ public class TestCrateFolder {
 		}
 	}
 
+	/** Size and date brought up to date; the same date written otherwise kept */
+	@Test
+	public void update() throws Exception {
+		Path file = temp.newFile("counts.csv").toPath();
+		Files.writeString(file, "a,b\n");
+		Files.setLastModifiedTime(file, FileTime.from(Instant.parse("2025-06-02T10:15:30Z")));
+		Entity entity = new Entity("counts.csv", "File");
+		assertEquals(List.of("contentSize 4", "dateModified 2025-06-02T10:15:30Z"), CrateFolder.update(entity, file));
+		assertEquals(List.of(), CrateFolder.update(entity, file));
+		entity.set("dateModified", java.util.Optional.of(com.fasterxml.jackson.databind.node.TextNode.valueOf("2025-06-02")));
+		entity.set("contentSize", java.util.Optional.of(com.fasterxml.jackson.databind.node.TextNode.valueOf("3")));
+		assertEquals(List.of("contentSize 3 → 4"), CrateFolder.update(entity, file));
+		entity.set("dateModified", java.util.Optional.of(com.fasterxml.jackson.databind.node.TextNode.valueOf("2025-06-02T12:15:30+02:00")));
+		assertEquals(List.of(), CrateFolder.update(entity, file));
+		Files.setLastModifiedTime(file, FileTime.from(Instant.parse("2025-07-01T00:00:00Z")));
+		assertEquals(List.of("dateModified 2025-06-02T12:15:30+02:00 → 2025-07-01T00:00:00Z"),
+				CrateFolder.update(entity, file));
+		assertEquals(List.of(), CrateFolder.update(entity, temp.getRoot().toPath().resolve("gone.csv")));
+	}
+
 	private static com.fasterxml.jackson.databind.JsonNode ref(String id) {
 		return com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("@id", id);
 	}

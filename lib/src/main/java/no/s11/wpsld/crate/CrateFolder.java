@@ -290,6 +290,56 @@ public final class CrateFolder {
 	}
 
 	/**
+	 * Bring a file's entity up to date with the file on disk: its
+	 * <code>contentSize</code> and <code>dateModified</code>, where missing
+	 * or different. A <code>dateModified</code> of the same moment written
+	 * otherwise, or of only the same day (in UTC), is kept.
+	 *
+	 * @return What was changed, e.g. "contentSize 114 → 120"; nothing for a
+	 *         folder, or a file not there
+	 */
+	public static List<String> update(Entity entity, Path file) {
+		List<String> changed = new ArrayList<>();
+		BasicFileAttributes attrs;
+		try {
+			attrs = Files.readAttributes(file, BasicFileAttributes.class);
+		} catch (IOException e) {
+			return changed;
+		}
+		if (attrs.isDirectory()) {
+			return changed;
+		}
+		String size = Long.toString(attrs.size());
+		Optional<String> oldSize = entity.get("contentSize").filter(v -> v.isValueNode()).map(v -> v.asText());
+		if (!oldSize.equals(Optional.of(size))) {
+			entity.set("contentSize", Optional.of(TextNode.valueOf(size)));
+			changed.add("contentSize " + oldSize.map(o -> o + " → ").orElse("") + size);
+		}
+		java.time.Instant modified = attrs.lastModifiedTime().toInstant().truncatedTo(ChronoUnit.SECONDS);
+		String date = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(modified.atOffset(ZoneOffset.UTC));
+		Optional<String> oldDate = entity.get("dateModified").filter(v -> v.isValueNode()).map(v -> v.asText());
+		if (oldDate.isEmpty() || !sameTime(oldDate.get(), modified)) {
+			entity.set("dateModified", Optional.of(TextNode.valueOf(date)));
+			changed.add("dateModified " + oldDate.map(o -> o + " → ").orElse("") + date);
+		}
+		return changed;
+	}
+
+	/** Whether a date or date-time written is this moment, or its day in UTC */
+	private static boolean sameTime(String written, java.time.Instant moment) {
+		try {
+			return java.time.OffsetDateTime.parse(written).toInstant().truncatedTo(ChronoUnit.SECONDS).equals(moment);
+		} catch (java.time.format.DateTimeParseException e) {
+			// A date only, or a local date-time
+		}
+		try {
+			return java.time.LocalDate.parse(written).equals(moment.atOffset(ZoneOffset.UTC).toLocalDate());
+		} catch (java.time.format.DateTimeParseException e) {
+			return false;
+		}
+	}
+
+	/**
 	 * Describe a file's entity by the file on disk, where it says nothing
 	 * yet: its <code>contentSize</code> in bytes and its
 	 * <code>dateModified</code>, to the second, in UTC.

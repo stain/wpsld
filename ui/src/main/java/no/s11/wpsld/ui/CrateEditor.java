@@ -70,6 +70,7 @@ import javafx.concurrent.Task;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
@@ -824,14 +825,18 @@ public class CrateEditor extends Application {
 			relist();
 			refresh();
 		});
+		MenuItem details = new MenuItem("Update _File Details…");
+		details.setId("menuUpdateFiles");
+		details.setOnAction(e -> askToUpdateFiles(stage));
 		MenuItem web = new MenuItem("Check _Web Availability…");
 		web.setId("menuCheckWeb");
 		web.setOnAction(e -> checkWeb(stage));
 		Menu menu = new Menu("_Crate", null, parts.toArray(MenuItem[]::new));
-		menu.getItems().addAll(new SeparatorMenuItem(), attached, new SeparatorMenuItem(), web, repair);
+		menu.getItems().addAll(new SeparatorMenuItem(), attached, new SeparatorMenuItem(), details, web, repair);
 		menu.setOnShowing(e -> {
 			enableParts(parts);
 			attached.setSelected(crateFile.isAttached());
+			details.setDisable(!crateFile.isAttached());
 			attached.setDisable(!crateFile.canAttach());
 		});
 		menu.setId("menuCrate");
@@ -1021,6 +1026,87 @@ public class CrateEditor extends Application {
 	private Map<Entity, String> problems = Map.of();
 	/** Web resources found unavailable, by @id, and why */
 	private Map<String, String> unavailable = Map.of();
+
+	/**
+	 * Crate > Update File Details: choose what to update of the files of an
+	 * attached crate (see {@link #updateFiles}), then tell what was.
+	 */
+	private void askToUpdateFiles(Stage stage) {
+		CheckBox sizes = new CheckBox("Size and date modified, from the files");
+		sizes.setId("updateSizes");
+		sizes.setSelected(true);
+		CheckBox formats = new CheckBox("Formats, guessed from the files' names where they have none (PRONOM)");
+		formats.setId("updateFormats");
+		Label note = new Label("Of each file the crate describes that is in its folder. A format from a name is"
+				+ " a guess: a .pdf may be any of PDF's versions, so only a format the name tells for sure is linked.");
+		note.setWrapText(true);
+		note.getStyleClass().add("dim-text");
+		Dialog<ButtonType> dialog = new Dialog<>();
+		dialog.initOwner(stage);
+		dialog.setTitle("Update File Details");
+		dialog.setHeaderText("Update the crate's files' details from its folder");
+		dialog.getDialogPane().setContent(new VBox(8, sizes, formats, note));
+		dialog.getDialogPane().setPrefWidth(480);
+		dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+		dialog.getDialogPane().lookupButton(ButtonType.OK).disableProperty()
+				.bind(sizes.selectedProperty().not().and(formats.selectedProperty().not()));
+		if (dialog.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) {
+			return;
+		}
+		List<String> done = updateFiles(sizes.isSelected(), formats.isSelected());
+		Alert alert = new Alert(AlertType.INFORMATION, done.isEmpty() ? "The files' details were up to date."
+				: String.join("\n", done.stream().limit(30).toList()) + (done.size() > 30 ? "\n…" : ""), ButtonType.OK);
+		alert.initOwner(stage);
+		alert.setHeaderText(done.isEmpty() ? "Nothing to update"
+				: done.size() + (done.size() == 1 ? " file updated" : " files updated"));
+		alert.setResizable(true);
+		alert.show();
+	}
+
+	/**
+	 * Update the details of each file an attached crate describes that is in
+	 * its folder: its size and date modified (see {@link CrateFolder#update}),
+	 * and, if asked, its format from its name where it has none (see
+	 * {@link PRONOMFormats#addByName}).
+	 *
+	 * @return What was changed, a line for each file
+	 */
+	List<String> updateFiles(boolean sizes, boolean formats) {
+		Optional<Path> folder = crateFile.folder();
+		if (folder.isEmpty()) {
+			return List.of();
+		}
+		List<String> done = new ArrayList<>();
+		for (Entity entity : List.copyOf(crate.getEntities())) {
+			String id = entity.getId();
+			if (entity == crate.getRoot() || !EntityTree.isPath(id) || id.contains("#")
+					|| !CrateFolder.exists(folder.get(), id)) {
+				continue;
+			}
+			Path file = folder.get().resolve(CrateFolder.decode(id).replaceFirst("^(\\./)+", ""));
+			if (Files.isDirectory(file)) {
+				continue;
+			}
+			List<String> changed = new ArrayList<>(sizes ? CrateFolder.update(entity, file) : List.of());
+			if (formats) {
+				List<JsonNode> before = entity.getAll("encodingFormat");
+				PRONOMFormats.bundled().addByName(crate, entity);
+				if (!entity.getAll("encodingFormat").equals(before)) {
+					changed.add("encodingFormat " + entity.getAll("encodingFormat").stream()
+							.map(v -> v.isTextual() ? v.asText() : v.path("@id").asText()).collect(Collectors.joining(", ")));
+				}
+			}
+			if (!changed.isEmpty()) {
+				done.add(id + ": " + String.join("; ", changed));
+			}
+		}
+		if (!done.isEmpty()) {
+			changed();
+			// Its fields show the values updated
+			Optional.ofNullable(entityEditor.getEntity()).ifPresent(entityEditor::edit);
+		}
+		return done;
+	}
 
 	/** Asks web resources whether they are available */
 	WebAvailability webAvailability = new WebAvailability(ProfileCache.httpClient(Duration.ofSeconds(15)),
