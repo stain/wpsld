@@ -76,6 +76,20 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   the dangling and ambiguous references `pasteEntity` already reports in
   the same dialog. Nothing to show when all were simply added. A start
   on PLAN.md's "A notice after Paste" (Copy and paste entities, step 2).
+- **Unknown types and properties used in the crate**: types in `@type`
+  that neither schema.org, the RO-Crate context nor the profile define
+  should be offered in Add Type, in a list of "Unknown types" (now
+  `EntityEditor.otherTypes()` offers only the profile's and the
+  context's). Their definition may be in the crate itself (`rdfs:Class`
+  entities, RO-Crate's ad hoc terms, with `rdfs:label`, `rdfs:comment`,
+  `rdfs:subClassOf`), or in a profile crate the crate `conformsTo` other
+  than the one chosen: use it for the label, description and place in
+  the tree when there is one. The same for properties: those used
+  elsewhere in the crate, but not known for the entity's types, found by
+  the property search to add. With an `rdf:Property` definition
+  (`domainIncludes`, `rangeIncludes`), offered for those classes with a
+  field of that range; without one, for any entity, as text or a
+  reference as they are used.
 - **File > Recent**: the last 6 crates opened or saved, kept in the
   settings. A preference turns it off (and forgets the list), as the
   names and places of crates can be private.
