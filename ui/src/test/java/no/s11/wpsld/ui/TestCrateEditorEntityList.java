@@ -655,8 +655,9 @@ public class TestCrateEditorEntityList extends ApplicationTest {
 		interact(() -> menuItem("menuAddPart").fire());
 		WaitForAsyncUtils.waitForFxEvents();
 		assertEquals("my%20notes.txt", lookup("#entityId").queryAs(TextField.class).getText());
-		assertEquals(List.of("Bird survey", "my%20notes.txt"), labels());
-		assertEquals(List.of("./", "my%20notes.txt"), entities().getItems().stream().map(Entity::getId).toList());
+		// Its format, by its content, described too: PRONOM's only plain text
+		assertEquals(List.of("Bird survey", "my%20notes.txt", "Plain Text File"), labels());
+		assertTrue(entities().getItems().stream().noneMatch(e -> e.getId().equals("my%20notes.txt") && e.getTypes().equals(List.of("File")) && e.getAll("encodingFormat").isEmpty()));
 
 		Files.writeString(folder.resolve("more.txt"), "");
 		choose("menuListByPart");

@@ -127,6 +127,7 @@ import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.lookup.GeoNames;
 import no.s11.wpsld.lookup.ORCID;
 import no.s11.wpsld.lookup.ROR;
+import no.s11.wpsld.lookup.FileFormats;
 import no.s11.wpsld.lookup.PRONOMFormats;
 import no.s11.wpsld.lookup.WebAvailability;
 import no.s11.wpsld.lookup.SPDXLicenses;
@@ -1041,10 +1042,11 @@ public class CrateEditor extends Application {
 		CheckBox sizes = new CheckBox("Size and date modified, from the files");
 		sizes.setId("updateSizes");
 		sizes.setSelected(true);
-		CheckBox formats = new CheckBox("Formats, guessed from the files' names where they have none (PRONOM)");
+		CheckBox formats = new CheckBox("Formats, from the files' contents and names, where they have none");
 		formats.setId("updateFormats");
-		Label note = new Label("Of each file the crate describes that is in its folder. A format from a name is"
-				+ " a guess: a .pdf may be any of PDF's versions, so only a format the name tells for sure is linked.");
+		Label note = new Label("Of each file the crate describes that is in its folder. A format is its media type,"
+				+ " and its PRONOM format where only one fits; a file whose content isn't known (e.g. a .dat of an"
+				+ " instrument) is application/octet-stream.");
 		note.setWrapText(true);
 		note.getStyleClass().add("dim-text");
 		Dialog<ButtonType> dialog = new Dialog<>();
@@ -1072,8 +1074,8 @@ public class CrateEditor extends Application {
 	/**
 	 * Update the details of each file an attached crate describes that is in
 	 * its folder: its size and date modified (see {@link CrateFolder#update}),
-	 * and, if asked, its format from its name where it has none (see
-	 * {@link PRONOMFormats#addByName}).
+	 * and, if asked, its format from its content and name where it has none
+	 * (see {@link FileFormats}).
 	 *
 	 * @return What was changed, a line for each file
 	 */
@@ -1096,7 +1098,7 @@ public class CrateEditor extends Application {
 			List<String> changed = new ArrayList<>(sizes ? CrateFolder.update(entity, file) : List.of());
 			if (formats) {
 				List<JsonNode> before = entity.getAll("encodingFormat");
-				PRONOMFormats.bundled().addByName(crate, entity);
+				FileFormats.bundled().addTo(crate, entity, file);
 				if (!entity.getAll("encodingFormat").equals(before)) {
 					changed.add("encodingFormat " + entity.getAll("encodingFormat").stream()
 							.map(v -> v.isTextual() ? v.asText() : v.path("@id").asText()).collect(Collectors.joining(", ")));
@@ -1197,7 +1199,7 @@ public class CrateEditor extends Application {
 	/**
 	 * The files selected that the crate doesn't describe yet, in its folder:
 	 * as Files, described by the file on disk (size, date modified) and its
-	 * name (format, see {@link PRONOMFormats#addByName})
+	 * content and name (format, see {@link FileFormats})
 	 */
 	private List<Entity> addSelectedFiles() {
 		return addFiles(selectedFileIds());
@@ -1205,8 +1207,8 @@ public class CrateEditor extends Application {
 
 	/**
 	 * Files in the crate's folder it doesn't describe yet, by their relative
-	 * @ids: as Files, described by the file on disk (size, date modified) and
-	 * its name (format, see {@link PRONOMFormats#addByName})
+	 * @ids: as Files, described by the file on disk (size, date modified, and
+	 * format from its content and name, see {@link FileFormats})
 	 */
 	private List<Entity> addFiles(List<String> ids) {
 		List<Entity> added = new ArrayList<>();
@@ -1216,9 +1218,11 @@ public class CrateEditor extends Application {
 			}
 			Entity file = crate.add("File");
 			crate.rename(file, id);
-			crateFile.folder().ifPresent(folder -> CrateFolder.describe(file,
-					folder.resolve(java.net.URLDecoder.decode(id.replace("+", "%2B"), StandardCharsets.UTF_8))));
-			PRONOMFormats.bundled().addByName(crate, file);
+			crateFile.folder().map(folder -> folder.resolve(CrateFolder.decode(id))).ifPresent(path -> {
+				CrateFolder.describe(file, path);
+				// By its content, then its name
+				FileFormats.bundled().addTo(crate, file, path);
+			});
 			added.add(file);
 		}
 		return added;

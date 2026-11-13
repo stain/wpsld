@@ -37,14 +37,22 @@ the folder can't be watched.
 **Crate > Update File Details...** brings the files an attached crate
 describes up to date with its folder: their size (`contentSize`) and date
 modified, where missing or changed since. Optionally, it also fills in
-formats from the files' names where they have none: the media type, and
-the PRONOM format when the name tells it for sure (`.csv`, but not `.pdf`,
-which has many versions). That is a guess, so it is not chosen at first.
+their formats where they have none.
+
+A file's format is found from its content, the "magic" of its first
+bytes, and then its name, by [Apache Tika](https://tika.apache.org/): its
+media type, e.g. `text/csv` or `application/x-hdf5`, and a link to its
+[PRONOM](https://www.nationalarchives.gov.uk/PRONOM/) format where only
+one fits. PRONOM tells a format's versions apart, so a PDF gets no PRONOM
+format, as the version can't be told for sure. A file whose content isn't
+a known format, e.g. a `.dat` or `.bin` of an instrument, gets
+`application/octet-stream`, and text `text/plain`, rather than a guess
+from an extension that many formats share.
 
 **File > Show in Explorer** (**Show in Finder** on macOS, **Show in File
 Manager** on Linux) shows the crate's metadata file in its folder; on the
 right-click menu, it shows the file or folder of the entity selected. A file added gets its size,
-date modified and, by its extension, its format from PRONOM.
+date modified and its format (see below).
 
 ### Attached and detached crates
 

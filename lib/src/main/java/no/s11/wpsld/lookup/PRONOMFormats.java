@@ -244,7 +244,7 @@ public final class PRONOMFormats {
 	 *
 	 * @return Whether it was added or described
 	 */
-	private static boolean describeIn(Crate crate, Format format) {
+	static boolean describeIn(Crate crate, Format format) {
 		Entity described = crate.get(format.iri()).orElseGet(() -> {
 			Entity added = crate.add("WebPage");
 			crate.rename(added, format.iri());

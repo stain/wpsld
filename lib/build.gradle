@@ -21,6 +21,8 @@ repositories {
 dependencies {
 
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.4'
+    // File formats by content (magic) and name, as media types; core only, no parsers
+    implementation 'org.apache.tika:tika-core:4.2.0'
 
     // Use JUnit test framework.
     testImplementation 'junit:junit:4.13'
