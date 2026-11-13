@@ -173,50 +173,6 @@ public class TestEmbeddedMetadata {
 		assertEquals(Optional.empty(), EmbeddedMetadata.date("yesterday"));
 	}
 
-	private static Path resource(String name) throws Exception {
-		Path file = Files.createTempDirectory("images").resolve(name);
-		try (var in = TestEmbeddedMetadata.class.getResourceAsStream("/no/s11/wpsld/lookup/" + name)) {
-			Files.copy(in, file);
-		}
-		return file;
-	}
-
-	/** A photo's EXIF, GPS, IPTC and XMP; not its camera */
-	@Test
-	public void jpeg() throws Exception {
-		List<Found> found = EmbeddedMetadata.read(resource("photo.jpg"));
-		Map<String, String> values = byProperty(found);
-		assertEquals("Bus stop on Oxford Road", values.get("description"));
-		assertEquals("Josiah Carberry", values.get("author"));
-		assertEquals("© 2026 Josiah Carberry", values.get("copyrightNotice"));
-		// When taken, with its offset; when changed, without one
-		assertEquals("2026-04-20T15:36:54+01:00", values.get("dateCreated"));
-		assertEquals("2026-04-21T09:00:00", values.get("dateModified"));
-		assertEquals("53.466800, -2.233900", values.get("contentLocation"));
-		assertEquals("bus, Manchester", values.get("keywords"));
-		assertEquals("https://creativecommons.org/licenses/by/4.0/", values.get("license"));
-		// The same author from EXIF and XMP: once
-		assertEquals(1, found.stream().filter(f -> f.property().equals("author")).count());
-		assertEquals("8 px", values.get("width"));
-		assertEquals("6 px", values.get("height"));
-		// The camera, and where: only on purpose
-		assertTrue(values.get("exifData"), values.get("exifData").startsWith("Canon EOS R6"));
-		assertTrue(found.stream().filter(f -> f.property().equals("exifData")).allMatch(Found::onPurpose));
-		assertTrue(found.stream().filter(f -> f.property().equals("contentLocation")).allMatch(Found::onPurpose));
-		assertFalse(found.stream().filter(f -> f.property().equals("author")).anyMatch(Found::onPurpose));
-	}
-
-	@Test
-	public void png() throws Exception {
-		Map<String, String> values = byProperty(EmbeddedMetadata.read(resource("picture.png")));
-		assertEquals("Workshop diagram", values.get("name"));
-		assertEquals("Ada Lovelace", values.get("author"));
-		assertEquals("diagram, workshop", values.get("keywords"));
-		assertEquals("Ada Lovelace", values.get("copyrightNotice"));
-		assertEquals("2026-04-20T15:36:54+01:00", values.get("dateCreated"));
-		assertEquals("https://creativecommons.org/licenses/by-sa/4.0/", values.get("license"));
-	}
-
 	/** As Inkscape writes it, with SVG 1.1's DOCTYPE, which isn't fetched */
 	@Test
 	public void svg() throws Exception {
@@ -246,7 +202,7 @@ public class TestEmbeddedMetadata {
 				values);
 	}
 
-	/** XMP as PDFs have it, for ui to read with PDFBox */
+	/** XMP as PDFs have it, as PDFBox gives it */
 	@Test
 	public void xmp() throws Exception {
 		List<Found> found = EmbeddedMetadata.xmp(new java.io.ByteArrayInputStream("""
@@ -266,15 +222,6 @@ public class TestEmbeddedMetadata {
 								.indexOf(v.substring(0, v.indexOf(' '))))).toList());
 		assertEquals("PDF XMP xmp:CreateDate", found.stream().filter(f -> f.property().equals("dateCreated"))
 				.findFirst().orElseThrow().source());
-	}
-
-	@Test
-	public void exifDates() {
-		assertEquals(Optional.of("2026-04-20T15:36:54"), EmbeddedMetadata.exifDate("2026:04:20 15:36:54", null));
-		assertEquals(Optional.of("2026-04-20T15:36:54-05:00"),
-				EmbeddedMetadata.exifDate("2026:04:20 15:36:54", "-05:00"));
-		// Unknown, as cameras write it
-		assertEquals(Optional.empty(), EmbeddedMetadata.exifDate("0000:00:00 00:00:00", null));
 	}
 
 	/** A licence a copyright notice names, unless found already */

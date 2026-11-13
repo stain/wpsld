@@ -135,6 +135,7 @@ import no.s11.wpsld.lookup.FileFormats;
 import no.s11.wpsld.lookup.PRONOMFormats;
 import no.s11.wpsld.lookup.WebAvailability;
 import no.s11.wpsld.lookup.EmbeddedMetadata;
+import no.s11.wpsld.lookup.FileMetadata;
 import no.s11.wpsld.lookup.SPDXLicenses;
 import no.s11.wpsld.crate.UndoHistory;
 import no.s11.wpsld.crate.UndoHistory.Place;
@@ -932,10 +933,12 @@ public class CrateEditor extends Application {
 		return selectedPath().filter(Files::isRegularFile).map(path -> Map.entry(entity, path));
 	}
 
-	/** What a file says about itself: an Office, OpenDocument or PDF file, an image or an SVG */
+	/**
+	 * What a file says about itself: an Office, OpenDocument or PDF file, an
+	 * image or an SVG, by all readers (see {@link FileMetadata})
+	 */
 	private static List<EmbeddedMetadata.Found> embeddedMetadata(Path file) {
-		return java.util.stream.Stream.concat(EmbeddedMetadata.read(file).stream(), PdfMetadata.read(file).stream())
-				.toList();
+		return FileMetadata.installed().read(file).found();
 	}
 
 	/**

@@ -172,15 +172,12 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   text; and JPEG 2000 is not planned (no library reads its metadata but
   jai-imageio-jpeg2000, whose JJ2000 licence is a problem).
 
-- **Metadata readers as modules (proto-plugins)**: lib declares a
-  `MetadataReader` service (`ServiceLoader`, `uses` in its module-info)
-  and keeps the readers needing only java.xml (Office, OpenDocument, SVG,
-  XMP/RDF); one Gradle subproject and module per group of readers with
-  their own dependencies, providing it: images and video
-  (metadata-extractor, xmpcore), PDF (PDFBox, and so java.desktop, out of
-  ui), scientific formats (below). ui asks the service for all readers
-  and, until plugins are found in a folder (see PLAN.md), requires them
-  so that jlink links them in.
+- **Metadata readers as modules (proto-plugins)**: *done* for images
+  (`readers-image`) and PDF (`readers-pdf`): lib's `MetadataReader`
+  service, `FileMetadata` asking them all, each on its own thread with
+  a time limit. Next: scientific formats (below) as a module too, and
+  plugins found in a folder (see PLAN.md) rather than ui requiring the
+  modules so that jlink links them in.
 - **PDF metadata without PDFBox in the app (option 3)**: scan files for
   their XMP packet (`<?xpacket begin=…?>` … `<?xpacket end=…?>`, Adobe's
   XMP specification's packet scanning; Acrobat, InDesign, LibreOffice and

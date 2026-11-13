@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package no.s11.wpsld.ui;
+package no.s11.wpsld.readers.pdf;
 
 import static org.junit.Assert.*;
 
@@ -62,7 +62,9 @@ public class TestPdfMetadata {
 			pdf.getDocumentCatalog().setMetadata(xmp);
 			pdf.save(file.toFile());
 		}
-		List<Found> found = PdfMetadata.read(file);
+		PdfMetadata reader = new PdfMetadata();
+		assertTrue(reader.reads(file, Files.readAllBytes(file)));
+		List<Found> found = reader.read(file);
 		assertEquals(List.of("name Report", "description Engines", "author Ada Lovelace", "author Charles Babbage",
 				"keywords engines, history", "dateCreated 2026-04-20T15:36:54+01:00",
 				"license https://creativecommons.org/licenses/by/4.0/"),
@@ -71,6 +73,6 @@ public class TestPdfMetadata {
 		assertEquals(Kind.PERSON, found.get(2).kind());
 		assertEquals("PDF document information Author", found.get(2).source());
 		// Not a PDF
-		assertEquals(List.of(), PdfMetadata.read(Files.writeString(file.resolveSibling("x.pdf"), "not")));
+		assertFalse(reader.reads(file, "not".getBytes(StandardCharsets.UTF_8)));
 	}
 }

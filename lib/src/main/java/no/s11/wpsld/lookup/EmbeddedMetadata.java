@@ -46,22 +46,6 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
-import com.drew.imaging.ImageMetadataReader;
-import com.drew.imaging.ImageProcessingException;
-import com.drew.lang.GeoLocation;
-import com.drew.lang.KeyValuePair;
-import com.drew.metadata.Directory;
-import com.drew.metadata.Metadata;
-import com.drew.metadata.jpeg.JpegDirectory;
-import com.drew.metadata.webp.WebpDirectory;
-import com.drew.metadata.exif.ExifDirectoryBase;
-import com.drew.metadata.exif.ExifIFD0Directory;
-import com.drew.metadata.exif.ExifSubIFDDirectory;
-import com.drew.metadata.exif.GpsDirectory;
-import com.drew.metadata.iptc.IptcDirectory;
-import com.drew.metadata.png.PngDirectory;
-import com.drew.metadata.xmp.XmpDirectory;
-
 /**
  * The metadata a file carries in it, to offer for its File entity:
  * <ul>
@@ -70,13 +54,14 @@ import com.drew.metadata.xmp.XmpDirectory;
  * OpenDocument files' (LibreOffice and OpenOffice: <code>.odt</code>,
  * <code>.ods</code>, <code>.odp</code>, …, and the older <code>.sxw</code>
  * and friends). Both are ZIP files, read with the JDK's zip file system.
- * <li>PDFs' XMP ({@link #xmp}), for ui to read their document information
- * with PDFBox, which needs java.desktop.
- * <li>Images' (JPEG, PNG, TIFF, WebP) EXIF, IPTC, XMP and PNG text, with
- * metadata-extractor, and where they were taken (GPS).
  * <li>SVG's RDF metadata, as Inkscape writes it, and its title and
  * description.
  * </ul>
+ * These are the built-in {@link MetadataReader}s ({@link #builtIn()}),
+ * needing only the JDK; readers with libraries of their own are modules of
+ * their own: images' (no.s11.wpsld.readers.image) and PDFs'
+ * (no.s11.wpsld.readers.pdf), which use the helpers here, e.g.
+ * {@link #xmp} and {@link #people}. {@link FileMetadata} asks them all.
  * XMP and SVG's metadata are RDF with Dublin Core, Creative Commons' and
  * Adobe's terms, read alike. What files say is untrusted: only small
  * parts are read, as XML without external entities or DTDs.
@@ -93,10 +78,6 @@ public final class EmbeddedMetadata {
 	/** Custom properties that name a licence */
 	private static final Pattern LICENSE_NAME = Pattern.compile("(?i)licen[cs]e|rights|usage ?terms");
 	private static final byte[] ZIP = { 'P', 'K', 3, 4 };
-	private static final byte[] RIFF = { 'R', 'I', 'F', 'F' };
-	/** JPEG, PNG, and TIFF both ways round */
-	private static final List<byte[]> IMAGES = List.of(new byte[] { (byte) 0xFF, (byte) 0xD8, (byte) 0xFF },
-			new byte[] { (byte) 0x89, 'P', 'N', 'G' }, new byte[] { 'I', 'I', 42, 0 }, new byte[] { 'M', 'M', 0, 42 });
 	private static final String RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 	private static final String SVG = "http://www.w3.org/2000/svg";
 	private static final String DC = "http://purl.org/dc/elements/1.1/";
@@ -150,38 +131,73 @@ public final class EmbeddedMetadata {
 	private EmbeddedMetadata() {
 	}
 
+	/** A reader of what a file starts with */
+	@FunctionalInterface
+	private interface Read {
+		void read(Path file, List<Found> found) throws IOException;
+	}
+
+	/** A built-in reader: its name, which files it reads, how */
+	private record BuiltIn(String name, java.util.function.BiPredicate<Path, byte[]> test, Read reader)
+			implements MetadataReader {
+		@Override
+		public boolean reads(Path file, byte[] head) {
+			return test.test(file, head);
+		}
+
+		@Override
+		public List<Found> read(Path file) throws IOException {
+			List<Found> found = new ArrayList<>();
+			reader.read(file, found);
+			return found;
+		}
+	}
+
 	/**
-	 * The metadata of an Office or OpenDocument file, an image or an SVG,
-	 * by what it starts with, in the order found, each value once; none
-	 * for other files, or files that can't be read.
+	 * The readers needing only the JDK: Office and OpenDocument files (ZIP
+	 * files with their parts), and SVG (by its name, or its start)
+	 */
+	public static List<MetadataReader> builtIn() {
+		return List.of(new BuiltIn("Office and OpenDocument", (file, head) -> startsWith(head, ZIP),
+				EmbeddedMetadata::zip),
+				new BuiltIn("SVG", (file, head) -> file.getFileName().toString().toLowerCase(Locale.ROOT)
+						.endsWith(".svg") || new String(head, StandardCharsets.UTF_8).contains("<svg"),
+						EmbeddedMetadata::svg));
+	}
+
+	/**
+	 * The metadata of an Office or OpenDocument file or an SVG, by the
+	 * built-in readers (see {@link #builtIn()}), on this thread, in the
+	 * order found, each value once; none for other files, or files that
+	 * can't be read. {@link FileMetadata} asks all readers, safely.
 	 */
 	public static List<Found> read(Path file) {
 		byte[] head;
 		try (InputStream in = Files.newInputStream(file)) {
-			head = in.readNBytes(1024);
+			head = in.readNBytes(MetadataReader.HEAD);
 		} catch (IOException e) {
 			return List.of();
 		}
 		List<Found> found = new ArrayList<>();
-		try {
-			if (startsWith(head, ZIP)) {
-				try (FileSystem zip = FileSystems.newFileSystem(file)) {
-					part(zip, OFFICE_CORE).ifPresent(core -> officeCore(core, found));
-					part(zip, OFFICE_CUSTOM).ifPresent(custom -> officeCustom(custom, found));
-					part(zip, OPEN_DOCUMENT_META).ifPresent(meta -> openDocument(meta, found));
+		for (MetadataReader reader : builtIn()) {
+			if (reader.reads(file, head)) {
+				try {
+					found.addAll(reader.read(file));
+				} catch (IOException | RuntimeException e) {
+					// Not what it started like after all, or broken: nothing to tell
 				}
-			} else if (IMAGES.stream().anyMatch(image -> startsWith(head, image))
-					|| startsWith(head, RIFF) && new String(head, 8, 4, StandardCharsets.ISO_8859_1).equals("WEBP")) {
-				image(file, found);
-			} else if (file.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".svg")
-					|| new String(head, StandardCharsets.UTF_8).contains("<svg")) {
-				svg(file, found);
 			}
-		} catch (IOException | RuntimeException e) {
-			// Not what it started like after all, or broken: nothing to tell
-			return List.of();
 		}
 		return withNamedLicences(found).stream().filter(distinct()).toList();
+	}
+
+	/** An Office or OpenDocument file's parts with metadata */
+	private static void zip(Path file, List<Found> found) throws IOException {
+		try (FileSystem zip = FileSystems.newFileSystem(file)) {
+			part(zip, OFFICE_CORE).ifPresent(core -> officeCore(core, found));
+			part(zip, OFFICE_CUSTOM).ifPresent(custom -> officeCustom(custom, found));
+			part(zip, OPEN_DOCUMENT_META).ifPresent(meta -> openDocument(meta, found));
+		}
 	}
 
 	/**
@@ -255,8 +271,8 @@ public final class EmbeddedMetadata {
 	}
 
 	/**
-	 * What XMP says (e.g. a PDF's, read in ui with PDFBox, which needs
-	 * java.desktop), as RDF/XML without a DOCTYPE
+	 * What XMP says (e.g. a PDF's, as PDFBox gives it), as RDF/XML without
+	 * a DOCTYPE
 	 *
 	 * @param source Where it is, e.g. "PDF XMP "
 	 */
@@ -271,175 +287,9 @@ public final class EmbeddedMetadata {
 		return Arrays.stream(names.split("\\s*;\\s*")).map(String::strip).filter(n -> !n.isEmpty()).toList();
 	}
 
-	private static Optional<String> text(String text) {
+	/** Text, trimmed, if there is any */
+	public static Optional<String> text(String text) {
 		return Optional.ofNullable(text).map(String::strip).filter(t -> !t.isEmpty());
-	}
-
-	/**
-	 * An image's EXIF (description, artist, copyright, when taken and
-	 * changed, where taken), IPTC (caption, by-line, copyright, keywords),
-	 * PNG text and XMP; its size; and the camera and how it was set, to
-	 * give only on purpose (it may identify the camera).
-	 */
-	private static void image(Path file, List<Found> found) throws IOException {
-		Metadata metadata;
-		try {
-			metadata = ImageMetadataReader.readMetadata(file.toFile());
-		} catch (ImageProcessingException e) {
-			return;
-		}
-		for (ExifIFD0Directory exif : metadata.getDirectoriesOfType(ExifIFD0Directory.class)) {
-			String source = "EXIF ";
-			text(exif.getString(ExifDirectoryBase.TAG_IMAGE_DESCRIPTION))
-					.ifPresent(t -> found.add(new Found("description", t, Kind.TEXT, source + "ImageDescription")));
-			text(exif.getString(ExifDirectoryBase.TAG_ARTIST)).ifPresent(t -> people(t)
-					.forEach(person -> found.add(new Found("author", person, Kind.PERSON, source + "Artist"))));
-			text(exif.getString(ExifDirectoryBase.TAG_COPYRIGHT))
-					.ifPresent(t -> found.add(new Found("copyrightNotice", t, Kind.TEXT, source + "Copyright")));
-			exifDate(exif.getString(ExifDirectoryBase.TAG_DATETIME), null)
-					.ifPresent(d -> found.add(new Found("dateModified", d, Kind.DATE, source + "DateTime")));
-		}
-		for (ExifSubIFDDirectory exif : metadata.getDirectoriesOfType(ExifSubIFDDirectory.class)) {
-			exifDate(exif.getString(ExifDirectoryBase.TAG_DATETIME_ORIGINAL),
-					exif.getString(ExifDirectoryBase.TAG_TIME_ZONE_ORIGINAL))
-					.ifPresent(d -> found.add(new Found("dateCreated", d, Kind.DATE, "EXIF DateTimeOriginal")));
-		}
-		camera(metadata).ifPresent(c -> found.add(new Found("exifData", c, Kind.TEXT, "EXIF Make, Model, …")));
-		size(metadata, found);
-		for (GpsDirectory gps : metadata.getDirectoriesOfType(GpsDirectory.class)) {
-			GeoLocation where = gps.getGeoLocation();
-			if (where != null && !where.isZero()) {
-				found.add(new Found("contentLocation", String.format(Locale.ROOT, "%.6f, %.6f", where.getLatitude(),
-						where.getLongitude()), Kind.PLACE, "EXIF GPS"));
-			}
-		}
-		for (IptcDirectory iptc : metadata.getDirectoriesOfType(IptcDirectory.class)) {
-			String source = "IPTC ";
-			text(iptc.getString(IptcDirectory.TAG_OBJECT_NAME))
-					.ifPresent(t -> found.add(new Found("name", t, Kind.TEXT, source + "ObjectName")));
-			text(iptc.getString(IptcDirectory.TAG_CAPTION))
-					.ifPresent(t -> found.add(new Found("description", t, Kind.TEXT, source + "Caption")));
-			Optional.ofNullable(iptc.getStringArray(IptcDirectory.TAG_BY_LINE)).stream().flatMap(Arrays::stream)
-					.flatMap(t -> text(t).stream())
-					.forEach(t -> found.add(new Found("author", t, Kind.PERSON, source + "By-line")));
-			text(iptc.getString(IptcDirectory.TAG_COPYRIGHT_NOTICE))
-					.ifPresent(t -> found.add(new Found("copyrightNotice", t, Kind.TEXT, source + "CopyrightNotice")));
-			List<String> keywords = iptc.getKeywords();
-			if (keywords != null && !keywords.isEmpty()) {
-				found.add(new Found("keywords", String.join(", ", keywords), Kind.KEYWORDS, source + "Keywords"));
-			}
-		}
-		for (PngDirectory png : metadata.getDirectoriesOfType(PngDirectory.class)) {
-			if (png.getObject(PngDirectory.TAG_TEXTUAL_DATA) instanceof List<?> texts) {
-				for (Object text : texts) {
-					if (text instanceof KeyValuePair pair) {
-						pngText(pair.getKey(), pair.getValue().toString(), found);
-					}
-				}
-			}
-		}
-		for (XmpDirectory xmp : metadata.getDirectoriesOfType(XmpDirectory.class)) {
-			Map<String, List<String>> values = new LinkedHashMap<>();
-			// e.g. dc:creator[1], not dc:title[1]/xml:lang; in the order of
-			// their items, as the map has none
-			Pattern item = Pattern.compile("(\\w+):(\\w+)(?:\\[(\\d+)\\])?");
-			xmp.getXmpProperties().entrySet().stream().map(e -> Map.entry(item.matcher(e.getKey()), e.getValue()))
-					.filter(e -> e.getKey().matches() && XMP_PREFIXES.containsKey(e.getKey().group(1))
-							&& !e.getValue().isBlank())
-					.sorted(java.util.Comparator.comparing((Map.Entry<java.util.regex.Matcher, String> e) -> e.getKey()
-							.group(1) + ":" + e.getKey().group(2))
-							.thenComparingInt(e -> e.getKey().group(3) == null ? 0 : Integer.parseInt(e.getKey().group(3))))
-					.forEach(e -> values.computeIfAbsent(XMP_PREFIXES.get(e.getKey().group(1)) + e.getKey().group(2),
-							k -> new ArrayList<>()).add(e.getValue().strip()));
-			values.forEach((term, list) -> term(term, list, "XMP ", found));
-		}
-	}
-
-	/**
-	 * The image's size in pixels, as schema.org's Distance (e.g.
-	 * <code>605 px</code>), from its format's own header: JPEG's frame,
-	 * PNG's IHDR, WebP's, else TIFF's (EXIF IFD0)
-	 */
-	private static void size(Metadata metadata, List<Found> found) {
-		List<Map.Entry<Class<? extends Directory>, int[]>> sources = List.of(
-				Map.entry(JpegDirectory.class, new int[] { JpegDirectory.TAG_IMAGE_WIDTH, JpegDirectory.TAG_IMAGE_HEIGHT }),
-				Map.entry(PngDirectory.class, new int[] { PngDirectory.TAG_IMAGE_WIDTH, PngDirectory.TAG_IMAGE_HEIGHT }),
-				Map.entry(WebpDirectory.class, new int[] { WebpDirectory.TAG_IMAGE_WIDTH, WebpDirectory.TAG_IMAGE_HEIGHT }),
-				Map.entry(ExifIFD0Directory.class,
-						new int[] { ExifDirectoryBase.TAG_IMAGE_WIDTH, ExifDirectoryBase.TAG_IMAGE_HEIGHT }));
-		for (Map.Entry<Class<? extends Directory>, int[]> source : sources) {
-			for (Directory d : metadata.getDirectoriesOfType(source.getKey())) {
-				Integer width = d.getInteger(source.getValue()[0]);
-				Integer height = d.getInteger(source.getValue()[1]);
-				if (width != null && height != null && width > 0 && height > 0) {
-					String where = d.getName() + " ";
-					found.add(new Found("width", width + " px", Kind.TEXT, where + "width"));
-					found.add(new Found("height", height + " px", Kind.TEXT, where + "height"));
-					return;
-				}
-			}
-		}
-	}
-
-	/**
-	 * The camera and how the photo was taken, as text, e.g. "Canon EOS R6,
-	 * RF 24-105mm F4 L, f/8.0, 1/350 sec, ISO 100, 105 mm"
-	 */
-	private static Optional<String> camera(Metadata metadata) {
-		List<String> parts = new ArrayList<>();
-		ExifIFD0Directory ifd0 = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
-		if (ifd0 != null) {
-			String make = text(ifd0.getString(ExifDirectoryBase.TAG_MAKE)).orElse("");
-			String model = text(ifd0.getString(ExifDirectoryBase.TAG_MODEL)).orElse("");
-			String camera = model.toLowerCase(Locale.ROOT).startsWith(make.toLowerCase(Locale.ROOT)) ? model
-					: (make + " " + model).strip();
-			text(camera).ifPresent(parts::add);
-		}
-		ExifSubIFDDirectory sub = metadata.getFirstDirectoryOfType(ExifSubIFDDirectory.class);
-		if (sub != null) {
-			for (int tag : new int[] { ExifDirectoryBase.TAG_LENS_MODEL, ExifDirectoryBase.TAG_FNUMBER,
-					ExifDirectoryBase.TAG_EXPOSURE_TIME, ExifDirectoryBase.TAG_ISO_EQUIVALENT,
-					ExifDirectoryBase.TAG_FOCAL_LENGTH }) {
-				text(sub.getDescription(tag)).map(t -> tag == ExifDirectoryBase.TAG_ISO_EQUIVALENT ? "ISO " + t : t)
-						.ifPresent(parts::add);
-			}
-		}
-		return parts.isEmpty() ? Optional.empty() : Optional.of(String.join(", ", parts));
-	}
-
-	/** PNG's own text keywords (tEXt, iTXt), as the PNG specification names them */
-	private static void pngText(String key, String value, List<Found> found) {
-		String source = "PNG text ";
-		text(value).ifPresent(t -> {
-			switch (key) {
-			case "Title" -> found.add(new Found("name", t, Kind.TEXT, source + key));
-			case "Description" -> found.add(new Found("description", t, Kind.TEXT, source + key));
-			case "Author" -> people(t).forEach(p -> found.add(new Found("author", p, Kind.PERSON, source + key)));
-			case "Copyright" -> found.add(new Found("copyrightNotice", t, Kind.TEXT, source + key));
-			case "Creation Time" -> date(t).ifPresent(d -> found.add(new Found("dateCreated", d, Kind.DATE,
-					source + key)));
-			default -> {
-				// Others, e.g. Software and XML:com.adobe.xmp (read as XMP)
-			}
-			}
-		});
-	}
-
-	/**
-	 * An EXIF date, <code>2026:04:20 15:36:54</code>, as ISO 8601, with
-	 * its offset if EXIF 2.31's OffsetTime* gives it
-	 */
-	static Optional<String> exifDate(String text, String offset) {
-		if (text == null) {
-			return Optional.empty();
-		}
-		java.util.regex.Matcher m = Pattern.compile("(\\d{4}):(\\d{2}):(\\d{2}) (\\d{2}:\\d{2}:\\d{2})")
-				.matcher(text.strip());
-		if (!m.matches() || m.group(1).compareTo("1900") < 0) {
-			return Optional.empty();
-		}
-		String zone = offset != null && offset.strip().matches("[+-]\\d{2}:\\d{2}") ? offset.strip() : "";
-		return Optional.of(m.group(1) + "-" + m.group(2) + "-" + m.group(3) + "T" + m.group(4) + zone);
 	}
 
 	/**
@@ -532,6 +382,33 @@ public final class EmbeddedMetadata {
 				term(term, list, source, found);
 			}
 		});
+	}
+
+	/**
+	 * What XMP says, as a flat map of its properties by their usual
+	 * prefixes (as metadata-extractor gives them), e.g.
+	 * <code>dc:creator[1]</code> (not <code>dc:title[1]/xml:lang</code>),
+	 * each list's items in their order
+	 *
+	 * @param source Where it is, e.g. "XMP "
+	 */
+	public static List<Found> xmpProperties(Map<String, String> properties, String source) {
+		Map<String, List<String>> values = new LinkedHashMap<>();
+		Pattern item = Pattern.compile("(\\w+):(\\w+)(?:\\[(\\d+)\\])?");
+		properties.entrySet().stream().map(e -> Map.entry(item.matcher(e.getKey()), e.getValue()))
+				.filter(e -> e.getKey().matches() && XMP_PREFIXES.containsKey(e.getKey().group(1))
+						&& e.getValue() != null && !e.getValue().isBlank())
+				.sorted(java.util.Comparator.comparing((Map.Entry<java.util.regex.Matcher, String> e) -> e.getKey()
+						.group(1) + ":" + e.getKey().group(2))
+						// By number, of any length (untrusted)
+						.thenComparing(e -> e.getKey().group(3) == null ? "" : e.getKey().group(3).replaceFirst("^0+", ""),
+								java.util.Comparator.comparingInt(String::length).thenComparing(
+										java.util.Comparator.naturalOrder())))
+				.forEach(e -> values.computeIfAbsent(XMP_PREFIXES.get(e.getKey().group(1)) + e.getKey().group(2),
+						k -> new ArrayList<>()).add(e.getValue().strip()));
+		List<Found> found = new ArrayList<>();
+		values.forEach((term, list) -> term(term, list, source, found));
+		return found;
 	}
 
 	/**
@@ -656,7 +533,7 @@ public final class EmbeddedMetadata {
 	 * time zone if it has one (Office's are UTC, OpenDocument's often have
 	 * none), e.g. <code>2026-04-20T15:36:54Z</code>; none if it isn't one.
 	 */
-	static Optional<String> date(String text) {
+	public static Optional<String> date(String text) {
 		java.util.regex.Matcher m = Pattern
 				.compile("(\\d{4}-\\d{2}-\\d{2})(T\\d{2}:\\d{2}(:\\d{2})?)?(\\.\\d+)?(Z|[+-]\\d{2}:?\\d{2})?")
 				.matcher(text.strip());

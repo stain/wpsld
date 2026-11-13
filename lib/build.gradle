@@ -26,9 +26,6 @@ dependencies {
     // Descriptions written in Markdown, in the HTML preview
     implementation 'org.commonmark:commonmark:0.31.0'
     implementation 'org.commonmark:commonmark-ext-gfm-tables:0.31.0'
-    // Files' own metadata (EmbeddedMetadata): images' EXIF, IPTC and XMP;
-    // PDFs' are read in ui, as PDFBox needs java.desktop
-    implementation 'com.drewnoakes:metadata-extractor:2.22.0'
 
     // Use JUnit test framework.
     testImplementation 'junit:junit:4.13'

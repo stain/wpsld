@@ -25,7 +25,8 @@ module no.s11.wpsld {
     // the zip file system is a service, so jlink only adds it if required
     requires java.xml;
     requires jdk.zipfs;
-    requires com.drew.metadata;
+    // Readers of files' own metadata in other modules (FileMetadata)
+    uses no.s11.wpsld.lookup.MetadataReader;
     requires org.commonmark;
     requires org.commonmark.ext.gfm.tables;
     exports no.s11.wpsld;

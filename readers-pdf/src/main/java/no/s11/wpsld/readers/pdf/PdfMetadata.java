@@ -15,11 +15,10 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package no.s11.wpsld.ui;
+package no.s11.wpsld.readers.pdf;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -37,28 +36,31 @@ import org.apache.pdfbox.pdmodel.common.PDMetadata;
 import no.s11.wpsld.lookup.EmbeddedMetadata;
 import no.s11.wpsld.lookup.EmbeddedMetadata.Found;
 import no.s11.wpsld.lookup.EmbeddedMetadata.Kind;
+import no.s11.wpsld.lookup.MetadataReader;
 
 /**
  * A PDF's own metadata, as {@link EmbeddedMetadata} reads other files':
  * its document information (title, subject, author, keywords, when created
- * and changed) and its XMP. With PDFBox, here rather than in lib as it
- * needs java.desktop. Not a PDF that needs a password to open.
+ * and changed) and its XMP, also if compressed. With PDFBox, in a module
+ * of its own as it is a library of its own and needs java.desktop. Not a
+ * PDF that needs a password to open.
  */
-final class PdfMetadata {
+public final class PdfMetadata implements MetadataReader {
 	private static final byte[] PDF = { '%', 'P', 'D', 'F', '-' };
 
-	private PdfMetadata() {
+	@Override
+	public String name() {
+		return "PDF (PDFBox)";
 	}
 
-	/** What a PDF says about itself; none for other files, or broken ones */
-	static List<Found> read(Path file) {
-		try (InputStream in = Files.newInputStream(file)) {
-			if (!Arrays.equals(in.readNBytes(PDF.length), PDF)) {
-				return List.of();
-			}
-		} catch (IOException e) {
-			return List.of();
-		}
+	@Override
+	public boolean reads(Path file, byte[] head) {
+		return head.length >= PDF.length && Arrays.equals(head, 0, PDF.length, PDF, 0, PDF.length);
+	}
+
+	/** What a PDF says about itself; what was read, if it is broken or needs a password */
+	@Override
+	public List<Found> read(Path file) throws IOException {
 		List<Found> found = new ArrayList<>();
 		try (PDDocument pdf = Loader.loadPDF(file.toFile())) {
 			PDDocumentInformation info = pdf.getDocumentInformation();
@@ -81,12 +83,14 @@ final class PdfMetadata {
 				}
 			}
 		} catch (IOException | RuntimeException e) {
-			// Broken, or needs a password: what was read so far
+			if (found.isEmpty()) {
+				throw e;
+			}
+			// Broken further on: what was read so far
 		}
 		// Each value once, e.g. the title in both the information and the XMP
 		java.util.Set<List<String>> seen = new java.util.HashSet<>();
-		return EmbeddedMetadata.withNamedLicences(found).stream().filter(f -> seen.add(List.of(f.property(), f.value())))
-				.toList();
+		return found.stream().filter(f -> seen.add(List.of(f.property(), f.value()))).toList();
 	}
 
 	private static Optional<String> text(String text) {
