@@ -463,10 +463,15 @@ public class CrateEditor extends Application {
 			protected void updateItem(Entity entity, boolean empty) {
 				super.updateItem(entity, empty);
 				label(empty ? null : entity);
-				getStyleClass().remove("problem");
+				getStyleClass().removeAll("problem", "not-data");
 				if (empty || entity == null) {
 					setGraphic(null);
 					setTooltip(null);
+				} else if (isNotInCrate(entity)) {
+					icon.set(EntityIcons.DOCUMENT);
+					setGraphic(icon);
+					getStyleClass().add("not-data");
+					setTooltip(new Tooltip("In the crate's folder, but not in the crate: Add to Has Part to add it"));
 				} else if (problems.containsKey(entity)) {
 					icon.set(EntityIcons.problem(entity, listing));
 					setGraphic(icon);
@@ -481,6 +486,7 @@ public class CrateEditor extends Application {
 
 			private void label(Entity entity) {
 				String text = entity == null ? null
+						: isNotInCrate(entity) ? CrateFolder.decode(entity.getId()) + "\n" + EntityTree.NOT_IN_CRATE
 						: entity.getLabel() + "\n"
 								+ String.join(", ", entity.getTypes().stream().map(listing::typeName).toList()) + "  "
 								+ entity.getId();
@@ -490,7 +496,8 @@ public class CrateEditor extends Application {
 			}
 		});
 		entities.getSelectionModel().selectedItemProperty().addListener((obs, old, entity) -> {
-			if (entity != null && !relisting) {
+			// A file not in the crate is selected, but the form stays
+			if (entity != null && !relisting && !isNotInCrate(entity)) {
 				entityEditor.edit(entity);
 				entityPreview.show(entity);
 			}
@@ -588,10 +595,16 @@ public class CrateEditor extends Application {
 		removeEntity.disableProperty().bind(cannotRemove);
 		removeEntity.setOnAction(e -> removeEntities());
 		List<MenuItem> parts = partItems("context");
+		MenuItem showFiles = new MenuItem(FileManager.label(FileManager.System.current()));
+		showFiles.setId("contextShowInFiles");
+		showFiles.setOnAction(e -> selectedPath().ifPresent(path -> showInFiles(stage, path)));
 		ContextMenu menu = new ContextMenu(copyEntity, pasteEntity, new SeparatorMenuItem());
 		menu.getItems().addAll(parts);
-		menu.getItems().addAll(new SeparatorMenuItem(), removeEntity);
-		menu.setOnShowing(e -> enableParts(parts));
+		menu.getItems().addAll(new SeparatorMenuItem(), showFiles, new SeparatorMenuItem(), removeEntity);
+		menu.setOnShowing(e -> {
+			enableParts(parts);
+			showFiles.setDisable(selectedPath().isEmpty());
+		});
 		return menu;
 	}
 
@@ -604,7 +617,7 @@ public class CrateEditor extends Application {
 	private void select() {
 		List<Entity> selected = byFolder ? tree.selectedEntities()
 				: new ArrayList<>(entities.getSelectionModel().getSelectedItems().stream()
-						.filter(Objects::nonNull).toList());
+						.filter(e -> e != null && !isNotInCrate(e)).toList());
 		if (!byFolder) {
 			Entity last = entities.getSelectionModel().getSelectedItem();
 			if (last != null && selected.remove(last)) {
@@ -741,8 +754,12 @@ public class CrateEditor extends Application {
 		exit.setAccelerator(new KeyCodeCombination(KeyCode.Q, KeyCombination.SHORTCUT_DOWN));
 		// As closing the window, rather than stage.close(), which doesn't ask
 		exit.setOnAction(e -> stage.fireEvent(new WindowEvent(stage, WindowEvent.WINDOW_CLOSE_REQUEST)));
+		MenuItem showFiles = new MenuItem(FileManager.label(FileManager.System.current()));
+		showFiles.setId("menuShowInFiles");
+		showFiles.setOnAction(e -> crateFolderPath().ifPresent(path -> showInFiles(stage, path)));
 		Menu file = new Menu("_File", null, newCrate, open, openFolder, close, new SeparatorMenuItem(), save, saveAs,
-				new SeparatorMenuItem(), load, new SeparatorMenuItem(), exit);
+				showFiles, new SeparatorMenuItem(), load, new SeparatorMenuItem(), exit);
+		file.setOnShowing(e -> showFiles.setDisable(crateFolderPath().isEmpty()));
 		file.setId("menuFile");
 
 		MenuItem undo = new MenuItem("_Undo");
@@ -838,7 +855,104 @@ public class CrateEditor extends Application {
 	/** As the menu opens, as what they act on changes with the crate */
 	private void enableParts(List<MenuItem> items) {
 		items.get(0).setDisable(selectedFolders().isEmpty());
-		items.get(1).setDisable(partable().isEmpty() && (!byFolder || byPart || tree.selectedFileIds().isEmpty()));
+		items.get(1).setDisable(partable().isEmpty() && selectedFileIds().isEmpty());
+	}
+
+	/**
+	 * The crate's metadata file, to show selected in its folder; the folder
+	 * of a new crate of a folder, not saved yet
+	 */
+	private Optional<Path> crateFolderPath() {
+		return crateFile.saveTarget().map(file -> Files.exists(file) ? file : file.toAbsolutePath().getParent())
+				.filter(Files::exists);
+	}
+
+	/**
+	 * The file or folder of what is selected, in an attached crate's folder,
+	 * if there is one: a data entity's, a file or folder not in the crate,
+	 * or the crate's own folder for the root
+	 */
+	private Optional<Path> selectedPath() {
+		Optional<Path> folder = crateFile.folder();
+		if (folder.isEmpty()) {
+			return Optional.empty();
+		}
+		Optional<String> id;
+		if (byFolder) {
+			id = Optional.ofNullable(tree.getSelectionModel().getSelectedItem()).map(TreeItem::getValue)
+					.flatMap(node -> node.entity().map(Entity::getId).or(() -> EntityTree.fileId(node))
+							.or(() -> EntityTree.folderId(node)));
+		} else {
+			id = Optional.ofNullable(entities.getSelectionModel().getSelectedItem()).map(Entity::getId);
+		}
+		return id.flatMap(i -> {
+			if (i.equals("./") || i.equals(crate.getRoot().getId())) {
+				return folder;
+			}
+			String file = i.contains("#") ? i.substring(0, i.indexOf('#')) : i;
+			return EntityTree.isPath(file) && CrateFolder.exists(folder.get(), file)
+					? Optional.of(folder.get().resolve(CrateFolder.decode(file).replaceFirst("^(\\./)+", "")))
+					: Optional.empty();
+		});
+	}
+
+	/** Show a file or folder in the operating system's file manager */
+	private void showInFiles(Stage stage, Path path) {
+		try {
+			FileManager.show(path);
+		} catch (IOException e) {
+			Alert error = new Alert(AlertType.ERROR, "Can't open the file manager for " + path + ":\n"
+					+ e.getMessage(), ButtonType.OK);
+			error.initOwner(stage);
+			error.show();
+		}
+	}
+
+	/** The files selected that are not in the crate, by their @ids */
+	private List<String> selectedFileIds() {
+		if (byFolder) {
+			return tree.selectedFileIds();
+		}
+		return entities.getSelectionModel().getSelectedItems().stream()
+				.filter(e -> e != null && isNotInCrate(e)).map(Entity::getId).toList();
+	}
+
+	/**
+	 * Whether each view shows the files of an attached crate's folder that
+	 * it doesn't describe: by type, by folder, by part
+	 */
+	private final boolean[] showFiles = { false, true, false };
+
+	private int view() {
+		return !byFolder ? 0 : byPart ? 2 : 1;
+	}
+
+	/** Whether the view shown shows the files not in the crate */
+	private boolean showingFiles() {
+		return showFiles[view()] && crateFile.isAttached();
+	}
+
+	/**
+	 * Stand-ins for the files not in the crate in the list by type, by @id,
+	 * kept as relisted, so they stay selected
+	 */
+	private final Map<String, Entity> notInCrate = new HashMap<>();
+
+	private boolean isNotInCrate(Entity entity) {
+		return notInCrate.get(entity.getId()) == entity;
+	}
+
+	/**
+	 * The files not in the crate to list by type, if shown: for All types,
+	 * or the types they would be, File and CreativeWork
+	 */
+	private List<Entity> notInCrateListed(String type) {
+		if (!showingFiles() || !List.of("", "File", "MediaObject", "CreativeWork").contains(type)) {
+			return List.of();
+		}
+		return EntityTree.notInCrate(crate, filesOnDisk()).map(node -> node.children().stream()
+				.map(EntityTree::fileId).flatMap(Optional::stream)
+				.map(id -> notInCrate.computeIfAbsent(id, i -> new Entity(i, "File"))).toList()).orElse(List.of());
 	}
 
 	/** The folders without a Dataset selected in the tree, by their @ids */
@@ -988,11 +1102,8 @@ public class CrateEditor extends Application {
 	 * name (format, see {@link PRONOMFormats#addByName})
 	 */
 	private List<Entity> addSelectedFiles() {
-		if (!byFolder || byPart) {
-			return List.of();
-		}
 		List<Entity> added = new ArrayList<>();
-		for (String id : tree.selectedFileIds()) {
+		for (String id : selectedFileIds()) {
 			if (crate.get(id).isPresent()) {
 				continue;
 			}
@@ -1217,7 +1328,9 @@ public class CrateEditor extends Application {
 				entityType.getItems().setAll(items);
 			}
 			entityType.setValue(chosen.orElse(items.get(0)));
-			List<Entity> listed = listing.list(crate, entityType.getValue().type());
+			List<Entity> listed = new ArrayList<>(listing.list(crate, entityType.getValue().type()));
+			// The folder's files not in the crate, at the end
+			listed.addAll(notInCrateListed(entityType.getValue().type()));
 			if (!listed.equals(entities.getItems())) {
 				entities.getItems().setAll(listed);
 				entities.getSelectionModel().clearSelection();
@@ -1235,8 +1348,13 @@ public class CrateEditor extends Application {
 			}
 			tree.setProblems(problems);
 			if (byFolder) {
-				tree.setNodes(byPart ? EntityTree.logical(crate, listing)
-						: EntityTree.physical(crate, listing, filesOnDisk()), edited);
+				List<String> onDisk = showingFiles() ? filesOnDisk() : List.of();
+				List<EntityTree.Node> nodes = new ArrayList<>(
+						byPart ? EntityTree.logical(crate, listing) : EntityTree.physical(crate, listing, onDisk));
+				if (byPart) {
+					EntityTree.notInCrate(crate, onDisk).ifPresent(nodes::add);
+				}
+				tree.setNodes(nodes, edited);
 			}
 		} finally {
 			relisting = false;
@@ -1332,6 +1450,7 @@ public class CrateEditor extends Application {
 		RadioMenuItem parts = new RadioMenuItem("Entities by _Part");
 		parts.setId("menuListByPart");
 		parts.setToggleGroup(group);
+		folderView = folders;
 		group.selectedToggleProperty().addListener((obs, old, item) -> {
 			if (item == null) {
 				return;
@@ -1348,8 +1467,30 @@ public class CrateEditor extends Application {
 				listByFolder(item != byType);
 			}
 		});
-		return List.of(byType, folders, parts);
+		CheckMenuItem files = new CheckMenuItem("Show Files _Not in Crate");
+		files.setId("menuShowFiles");
+		files.setOnAction(e -> {
+			showFiles[view()] = files.isSelected();
+			// Listed again now, as asked for
+			listedFolder = Optional.empty();
+			relist();
+		});
+		// As the view chosen has it; only for an attached crate's folder
+		Runnable update = () -> {
+			files.setSelected(showFiles[view()]);
+			files.setDisable(!crateFile.isAttached());
+		};
+		group.selectedToggleProperty().addListener((obs, old, item) -> update.run());
+		files.parentMenuProperty().addListener((obs, old, menu) -> {
+			if (menu != null) {
+				menu.addEventHandler(Menu.ON_SHOWING, e -> update.run());
+			}
+		});
+		return List.of(byType, folders, parts, files);
 	}
+
+	/** View > Entities by Folder, chosen when opening a folder */
+	private RadioMenuItem folderView;
 
 	/**
 	 * View: show or hide the sidebar of entities. As the operating system
@@ -1474,6 +1615,7 @@ public class CrateEditor extends Application {
 		crate = other;
 		unavailable = Map.of();
 		previewAsked = false;
+		notInCrate.clear();
 		crateFile.open(path, crate.toJson());
 		// All types of another crate
 		entityType.setValue(null);
@@ -1535,7 +1677,11 @@ public class CrateEditor extends Application {
 	boolean openFolder(Stage stage, Path folder) {
 		for (String name : List.of(Crate.RO_CRATE_METADATA_JSON, CrateFile.RO_CRATE_METADATA_JSONLD)) {
 			if (Files.isRegularFile(folder.resolve(name))) {
-				return open(stage, folder.resolve(name));
+				boolean opened = open(stage, folder.resolve(name));
+				if (opened) {
+					folderView.setSelected(true);
+				}
+				return opened;
 			}
 		}
 		Crate created = new Crate();
@@ -1549,6 +1695,8 @@ public class CrateEditor extends Application {
 		lastFolder = folder.toFile();
 		relist();
 		refresh();
+		// Its files, to add
+		folderView.setSelected(true);
 		return true;
 	}
 

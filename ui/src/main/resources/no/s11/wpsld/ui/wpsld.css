@@ -123,7 +123,7 @@
  * (EntityTreeView); by opacity, which no style sets, so it shows also
  * when selected
  */
-.tree-cell.not-data {
+.tree-cell.not-data, .list-cell.not-data {
     -fx-opacity: 0.55;
 }
 

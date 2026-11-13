@@ -42,6 +42,12 @@ itself if that folder has none; select the outer folders too to add them
 all at once. Add to Has Part also makes a File or Dataset on the web a
 part of the crate, under **External resources**.
 
+**View > Show Files Not in Crate** shows the files in an attached
+crate's folder that it doesn't describe yet, greyed out, to add with
+**Add to Has Part**: by folder at their places (on at first), by type at
+the end of the list, and by part in a folder **(Not in crate)** (both off
+at first). Each view keeps its own choice.
+
 In an attached crate (see [Opening and saving crates](files.md)), an
 entity whose file or folder is not in the crate's folder, e.g. moved or
 renamed since, is shown on a pale red background with a red icon, also

@@ -16,7 +16,12 @@ Choose **File > Open Folder...** to open a folder as a crate: its
 which is saved in it as `ro-crate-metadata.json`. Its files are not added
 by themselves: **View > Entities by Folder** lists those the crate doesn't
 describe greyed out, to add with **Crate > Add to Has Part** (or **Add
-Dataset for Folder**), also several at once. A file added gets its size,
+Dataset for Folder**), also several at once. Opening a folder shows
+**View > Entities by Folder**.
+
+**File > Show in Explorer** (**Show in Finder** on macOS, **Show in File
+Manager** on Linux) shows the crate's metadata file in its folder; on the
+right-click menu, it shows the file or folder of the entity selected. A file added gets its size,
 date modified and, by its extension, its format from PRONOM.
 
 ### Attached and detached crates

@@ -626,6 +626,52 @@ public class TestCrateEditorEntityList extends ApplicationTest {
 		assertTrue(Files.exists(preview));
 	}
 
+	/**
+	 * View > Show Files Not in Crate, as each view has it: on by folder, off
+	 * by type and part; Open Folder lists by folder
+	 */
+	@Test
+	public void showFiles() throws Exception {
+		Path folder = Files.createDirectories(temp.resolve("Bird survey"));
+		Files.writeString(folder.resolve("my notes.txt"), "notes");
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.openFolder(stage, folder)).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(((RadioMenuItem) menuItem("menuListByFolder")).isSelected());
+		EntityTreeView tree = lookup("#entityTree").queryAs(EntityTreeView.class);
+		assertEquals(List.of("Bird survey", "  my notes.txt ~"), rows(tree));
+
+		choose("menuListByType");
+		assertEquals(List.of("Bird survey"), labels());
+		javafx.scene.control.CheckMenuItem files = (javafx.scene.control.CheckMenuItem) menuItem("menuShowFiles");
+		interact(() -> {
+			files.setSelected(true);
+			files.fire();
+		});
+		assertEquals(List.of("Bird survey", "my%20notes.txt"), labels());
+		// Selected, it isn't edited, but can be added
+		interact(() -> entities().getSelectionModel().clearAndSelect(1));
+		assertEquals("./", lookup("#entityId").queryAs(TextField.class).getText());
+		interact(() -> menuItem("menuAddPart").fire());
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals("my%20notes.txt", lookup("#entityId").queryAs(TextField.class).getText());
+		assertEquals(List.of("Bird survey", "my%20notes.txt"), labels());
+		assertEquals(List.of("./", "my%20notes.txt"), entities().getItems().stream().map(Entity::getId).toList());
+
+		Files.writeString(folder.resolve("more.txt"), "");
+		choose("menuListByPart");
+		assertFalse(files.isSelected());
+		interact(() -> {
+			files.setSelected(true);
+			files.fire();
+		});
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(rows(tree).toString(), rows(tree).containsAll(List.of("(Not in crate)", "  more.txt ~")));
+		// Each view as it was
+		choose("menuListByType");
+		assertTrue(files.isSelected());
+	}
+
 	@Test
 	public void editedNotListed() throws Exception {
 		addNamed("Person", "Alice");
