@@ -183,8 +183,9 @@ public class Crate {
 	 * @param existing  Copies whose <code>@id</code> (absolute, or a relative
 	 *                  path) names an entity the crate already has, which
 	 *                  differs: each with that entity, to merge into it
-	 *                  (see {@link Crate#merge}) or leave out. Copies the
-	 *                  same as the crate's entity are left out silently.
+	 *                  (see {@link Crate#merge}) or leave out
+	 * @param same      The crate's entities that copies were the same as,
+	 *                  so left out, in the order pasted
 	 * @param renamed   New <code>@id</code>s of copies, by their own
 	 * @param dangling  <code>@id</code>s the pasted entities refer to, not
 	 *                  pasted, that the crate has no entity for
@@ -193,8 +194,8 @@ public class Crate {
 	 *                  from another crate and not as copied: it may be
 	 *                  another entity of the same <code>@id</code>
 	 */
-	public record Pasted(List<Entity> added, Map<Entity, Entity> existing, Map<String, String> renamed,
-			List<String> dangling, List<String> ambiguous) {
+	public record Pasted(List<Entity> added, Map<Entity, Entity> existing, List<Entity> same,
+			Map<String, String> renamed, List<String> dangling, List<String> ambiguous) {
 	}
 
 	/**
@@ -237,6 +238,7 @@ public class Crate {
 		Map<String, String> renamed = new LinkedHashMap<>();
 		Map<Entity, Entity> existing = new LinkedHashMap<>();
 		List<Entity> added = new ArrayList<>();
+		List<Entity> same = new ArrayList<>();
 		Set<String> copiedIds = new HashSet<>();
 		for (Entity copy : copies) {
 			String id = copy.getId();
@@ -248,7 +250,9 @@ public class Crate {
 				entity.setId(newId(copy.getTypes().get(0)));
 				renamed.put(id, entity.getId());
 			} else if (taken.isPresent()) {
-				if (!taken.get().toJson().equals(copy.toJson())) {
+				if (taken.get().toJson().equals(copy.toJson())) {
+					same.add(taken.get());
+				} else {
 					existing.put(entity, taken.get());
 				}
 				continue;
@@ -276,7 +280,7 @@ public class Crate {
 						ambiguous.add(id);
 					}
 				});
-		return new Pasted(added, existing, renamed, List.copyOf(dangling), List.copyOf(ambiguous));
+		return new Pasted(added, existing, List.copyOf(same), renamed, List.copyOf(dangling), List.copyOf(ambiguous));
 	}
 
 	/**

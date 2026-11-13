@@ -13,7 +13,10 @@ missing or possibly different referenced entities and review the links.
 Local `#` identifiers that are already in use get new identifiers. If an
 absolute identifier or file path already exists with different details,
 wpsld offers **Merge** or **Keep Existing**. Merge only descriptions of
-the same thing. Identical existing descriptions are not added again.
+the same thing. Identical existing descriptions are not added again, but
+are selected with those pasted. After pasting, one message lists the
+entities that were already in the crate, merged or kept, with any
+warnings about links.
 
 To link to one copied entity rather than duplicate it, paste into a
 reference field: wpsld inserts its identifier. This does not copy the

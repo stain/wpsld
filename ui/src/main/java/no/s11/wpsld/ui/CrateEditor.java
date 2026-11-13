@@ -1658,6 +1658,8 @@ public class CrateEditor extends Application {
 		boolean sameCrate = clip.get().crate().filter(crateFile.base()::equals).isPresent();
 		Crate.Pasted pasted = crate.paste(clip.get().entities(), clip.get().referenced(), sameCrate);
 		List<Entity> shown = new ArrayList<>(pasted.added());
+		List<Entity> merged = new ArrayList<>();
+		List<Entity> kept = new ArrayList<>();
 		pasted.existing().forEach((copy, existing) -> {
 			ButtonType merge = new ButtonType("Merge", ButtonData.OK_DONE);
 			ButtonType keep = new ButtonType("Keep Existing", ButtonData.CANCEL_CLOSE);
@@ -1670,42 +1672,81 @@ public class CrateEditor extends Application {
 			if (alert.showAndWait().orElse(keep) == merge) {
 				crate.merge(existing, copy);
 				existing.setTypes(entityTypes.simplify(existing.getTypes()));
+				merged.add(existing);
+			} else {
+				kept.add(existing);
 			}
 			shown.add(existing);
 		});
+		// Those already here selected too, to see where they are
+		shown.addAll(pasted.same());
 		crate.mentionUnlinked();
 		showListed(shown);
 		refresh();
 		checkpoint(placeOf(null), Optional.of("Paste"));
-		reportPasted(stage, pasted);
+		reportPasted(stage, pasted, merged, kept);
 	}
 
 	/**
-	 * Report references of entities pasted to entities not pasted that may
-	 * be wrong: missing in this crate, or another entity of the same local
-	 * @id than the one copied. Beside the crate, as the reader's warnings.
+	 * Say what a paste did, in one dialog, unless it simply added them all:
+	 * entities left out as already in the crate, merged into the crate's or
+	 * kept as they were, and references to entities not pasted that may be
+	 * wrong (missing in this crate, or another entity of the same local @id
+	 * than the one copied). Beside the crate, as the reader's warnings.
 	 */
-	private void reportPasted(Stage stage, Crate.Pasted pasted) {
-		List<String> problems = new ArrayList<>();
+	private void reportPasted(Stage stage, Crate.Pasted pasted, List<Entity> merged, List<Entity> kept) {
+		List<String> notes = new ArrayList<>();
+		if (!pasted.same().isEmpty()) {
+			notes.add("Already in this crate, the same, so not added again: " + names(pasted.same()) + ".");
+		}
+		if (!merged.isEmpty()) {
+			notes.add("Merged into those in this crate with the same @id: " + names(merged) + ".");
+		}
+		if (!kept.isEmpty()) {
+			notes.add("Kept as they were in this crate, leaving out the ones pasted: " + names(kept) + ".");
+		}
+		int references = pasted.dangling().size() + pasted.ambiguous().size();
 		if (!pasted.dangling().isEmpty()) {
-			problems.add("Not in this crate: " + String.join(", ", pasted.dangling())
+			notes.add("Not in this crate: " + String.join(", ", pasted.dangling())
 					+ ". Paste them too, or Crate > Repair Crate to add them as Things.");
 		}
 		if (!pasted.ambiguous().isEmpty()) {
-			problems.add("Another entity in this crate than the one copied may have the same @id: "
+			notes.add("Another entity in this crate than the one copied may have the same @id: "
 					+ String.join(", ", pasted.ambiguous()) + ". Check that these references are the ones meant.");
 		}
-		if (problems.isEmpty()) {
+		if (notes.isEmpty()) {
 			return;
 		}
-		int count = pasted.dangling().size() + pasted.ambiguous().size();
-		Alert alert = new Alert(AlertType.WARNING, String.join("\n\n", problems), ButtonType.OK);
+		int added = pasted.added().size();
+		int copied = added + pasted.same().size() + pasted.existing().size();
+		String header = added == copied ? "Pasted " + counted(added)
+				: added == 0 ? "Nothing new pasted: " + (copied == 1 ? "it is" : "all " + copied + " are")
+						+ " already in this crate"
+				: "Pasted " + added + " of " + counted(copied) + ": the others are already in this crate";
+		if (references > 0) {
+			header += ", with " + references + (references == 1 ? " reference" : " references")
+					+ " to an entity not copied";
+		}
+		Alert alert = new Alert(references > 0 ? AlertType.WARNING : AlertType.INFORMATION,
+				String.join("\n\n", notes), ButtonType.OK);
 		alert.initOwner(stage);
-		alert.setHeaderText("Pasted " + pasted.added().size() + (pasted.added().size() == 1 ? " entity" : " entities")
-				+ ", with " + count + (count == 1 ? " reference" : " references") + " to an entity not copied");
+		alert.setHeaderText(header);
 		alert.setResizable(true);
 		alert.initModality(javafx.stage.Modality.NONE);
 		alert.show();
+	}
+
+	private static String counted(int count) {
+		return count + (count == 1 ? " entity" : " entities");
+	}
+
+	/** Entities by name and @id, the first few of many */
+	private static String names(List<Entity> entities) {
+		int shown = entities.size() > 8 ? 6 : entities.size();
+		String names = entities.stream().limit(shown)
+				.map(e -> e.getLabel().equals(e.getId()) ? e.getId() : e.getLabel() + " (" + e.getId() + ")")
+				.collect(Collectors.joining(", "));
+		return shown < entities.size() ? names + " and " + (entities.size() - shown) + " more" : names;
 	}
 
 	/**

@@ -16,14 +16,23 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   `.label`'s `-warp-text` (#e4e4e4), also after switching style and
   colours while open. Maybe Windows only (as the cut-off dialog text was);
   needs a screenshot, and whether the colours were Dark or Same as System.
-- **Parts that are not File get no link to open them in the preview**,
-  e.g. an `ImageObject` in `hasPart`. Not reproduced: `CratePreview`
-  (the saved `ro-crate-preview.html`) links every data entity reached by
-  `hasPart` with a relative `@id` to its file, whatever its type, and the
-  Preview tab (`EntityPreview.identifier`) links any relative `@id` whose
-  file exists beside the crate. A test with an ImageObject `photo.jpg` in
-  the root's `hasPart` gets `<a href="photo.jpg">`. Needs the crate, and
-  which preview (saved HTML or Preview tab), that shows it.
+- **The HTML preview (`ro-crate-preview.html`)**, seen on
+  `debug/workshop8`:
+  - **Files only mentioned get no link to the file**, e.g.
+    `data/exports/csv/dim_date.csv` and the ImageObject `Picture1.png`,
+    in the root's `mentions` rather than reached by `hasPart`:
+    `CratePreview` links only data entities' paths. Link every entity
+    whose `@id` is a relative path (not `#local` or `_:blank`).
+  - **Descriptions lose their line breaks**: written as one `<p>`, so
+    they look different than in the app. Each blank-line-separated part
+    a `<p>`, a lone newline a `<br>`; or render as Markdown when it looks
+    like Markdown (see "Markdown descriptions in the preview" below:
+    tells are `` `code` ``, `_italics_`, `**bold**`, `[link](http…)`,
+    lines starting `- ` or `#`).
+  - **A link back to the top** (the crate) from each entity's section.
+  - **The JSON-LD in a `<script type="application/ld+json">`** in the
+    `<head>`, as the RO-Crate specification asks of previews (with `</`
+    escaped so that it can't end the script).
 
 ## Repair Crate
 
@@ -50,17 +59,6 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   PLAN.md (which says that within one crate there is nothing to copy:
   update it). Ask before changing files on disk, with Replace, Keep Both
   or Skip for names taken.
-- **Say what Paste left out and merged**: pasting entities whose `@id`
-  the crate already has, e.g. files or absolute URIs copied within the
-  same crate, now does nothing silently when they are the same
-  (`Crate.paste` leaves them out) and asks once per entity when they
-  differ (Merge or Keep Existing). Afterwards, show one dialog for the
-  whole paste, as some of the entities may be new and others not:
-  how many were pasted, which were left out as already in the crate,
-  which were merged into existing ones and which kept as they were, with
-  the dangling and ambiguous references `pasteEntity` already reports in
-  the same dialog. Nothing to show when all were simply added. A start
-  on PLAN.md's "A notice after Paste" (Copy and paste entities, step 2).
 - **Unknown types and properties used in the crate**: types in `@type`
   that neither schema.org, the RO-Crate context nor the profile define
   should be offered in Add Type, in a list of "Unknown types" (now
