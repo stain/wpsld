@@ -27,7 +27,6 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import javafx.scene.Scene;
@@ -52,7 +51,7 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
 /**
  * View > Style and Colours: the look of every window, kept in the settings.
  */
-public class TestCrateEditorTheme extends ApplicationTest {
+public class TestCrateEditorTheme extends UiTest {
 	private Stage stage;
 	private Path settingsFile;
 

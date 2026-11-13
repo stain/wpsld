@@ -24,7 +24,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import javafx.application.Platform;
@@ -37,7 +36,7 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
  * schema, so building the editor on the JavaFX thread doesn't load it; the
  * editor appears once both are ready.
  */
-public class TestCrateEditorLoading extends ApplicationTest {
+public class TestCrateEditorLoading extends UiTest {
 	private static final SchemaFromJsonLd SCHEMA = new SchemaFromJsonLd();
 	/** Threads that loaded the context, and when */
 	private final List<Boolean> contextLoadedOnFxThread = new CopyOnWriteArrayList<>();

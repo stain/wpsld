@@ -27,7 +27,6 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -49,7 +48,7 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
 /**
  * File formats chosen from the bundled PRONOM formats.
  */
-public class TestCrateEditorFormats extends ApplicationTest {
+public class TestCrateEditorFormats extends UiTest {
 	@Override
 	public void start(Stage stage) throws Exception {
 		Path temp = Files.createTempDirectory("wpsld-formats");

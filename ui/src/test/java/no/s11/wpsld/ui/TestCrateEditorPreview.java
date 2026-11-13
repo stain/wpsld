@@ -27,7 +27,6 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import javafx.scene.Node;
@@ -47,7 +46,7 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
  * (Apart from TestCrateEditor, whose JVM would otherwise run out of memory:
  * every test's window stays in memory, see ui/build.gradle.)
  */
-public class TestCrateEditorPreview extends ApplicationTest {
+public class TestCrateEditorPreview extends UiTest {
 	private CrateEditor app;
 
 	@Override

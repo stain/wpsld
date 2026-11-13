@@ -28,7 +28,6 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import javafx.application.Platform;
@@ -50,7 +49,7 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
  * Works found by DOI or title (here a stand-in for Crossref and DataCite,
  * which looks a DOI up, in any of its forms, and searches titles).
  */
-public class TestCrateEditorWorks extends ApplicationTest {
+public class TestCrateEditorWorks extends UiTest {
 	private static final Work SPEC = new Work("10.5281/zenodo.3541888", "ScholarlyArticle",
 			"RO-Crate Metadata Specification 1.0",
 			List.of(new Author("Peter Sefton", Optional.of("Peter"), Optional.of("Sefton"),

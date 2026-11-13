@@ -33,7 +33,6 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import javafx.scene.control.CheckBox;
@@ -55,7 +54,7 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
 /**
  * Loading profiles from a URL or file, kept for next time.
  */
-public class TestCrateEditorProfiles extends ApplicationTest {
+public class TestCrateEditorProfiles extends UiTest {
 	private static final String TEST_PROFILE = "https://example.com/test-profile/";
 
 	private Path temp;

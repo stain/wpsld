@@ -24,7 +24,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
-import org.testfx.framework.junit.ApplicationTest;
 
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
@@ -36,7 +35,7 @@ import no.s11.wpsld.test.Online;
  * onlineTest</code>, one tile.
  */
 @Category(Online.class)
-public class TestMapTilesOnline extends ApplicationTest {
+public class TestMapTilesOnline extends UiTest {
 	@Override
 	public void start(Stage stage) {
 		// Only the JavaFX toolkit, to make images

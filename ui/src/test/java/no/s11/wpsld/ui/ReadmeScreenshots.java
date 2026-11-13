@@ -33,7 +33,6 @@ import java.util.zip.DeflaterOutputStream;
 
 import org.junit.Assume;
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import javafx.scene.Node;
@@ -75,7 +74,13 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
  * They are taken headless (see ui/build.gradle), so with JavaFX's own text
  * rendering rather than the desktop's.
  */
-public class ReadmeScreenshots extends ApplicationTest {
+public class ReadmeScreenshots extends UiTest {
+	/** Many screenshots in one test */
+	@Override
+	protected long timeoutSeconds() {
+		return 600;
+	}
+
 	private Stage stage;
 	private CrateEditor app;
 

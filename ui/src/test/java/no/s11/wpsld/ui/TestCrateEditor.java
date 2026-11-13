@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -65,7 +64,7 @@ import no.s11.wpsld.form.FormFields;
 /**
  * GUI tests of the crate window, run headless (see ui/build.gradle).
  */
-public class TestCrateEditor extends ApplicationTest {
+public class TestCrateEditor extends UiTest {
 
 	private CrateEditor app;
 
