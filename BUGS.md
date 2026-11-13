@@ -31,6 +31,14 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   Keep My Changes work. The alert is in `CrateEditor.checkDisk()`; Warp's
   font is larger, so the dialog may need to grow, or the content label to
   wrap (check the Save Anyway dialog in `askBeforeOverwriting` too).
+- **Parts that are not File get no link to open them in the preview**,
+  e.g. an `ImageObject` in `hasPart`. Not reproduced: `CratePreview`
+  (the saved `ro-crate-preview.html`) links every data entity reached by
+  `hasPart` with a relative `@id` to its file, whatever its type, and the
+  Preview tab (`EntityPreview.identifier`) links any relative `@id` whose
+  file exists beside the crate. A test with an ImageObject `photo.jpg` in
+  the root's `hasPart` gets `<a href="photo.jpg">`. Needs the crate, and
+  which preview (saved HTML or Preview tab), that shows it.
 
 ## Repair Crate
 
@@ -45,6 +53,29 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
 
 ## Requests
 
+- **Cut, copy and paste of files into a folder, within a crate**: in the
+  entity tree, cutting a File with a relative `@id` and pasting it into a
+  folder should move the file there on disk, if the folder is a real one
+  in an attached crate, renaming its `@id` (and the references to it) and
+  moving it to that folder's Dataset's `hasPart`. Copy and paste should
+  copy the file there, adding a File entity for the copy. Now Edit > Cut
+  does nothing in the entity list, and pasting a File into its own crate
+  is skipped as the same entity. Shares the moving with "Drag and drop
+  within the tree" and the copying with "Copy and paste of files" in
+  PLAN.md (which says that within one crate there is nothing to copy:
+  update it). Ask before changing files on disk, with Replace, Keep Both
+  or Skip for names taken.
+- **Say what Paste left out and merged**: pasting entities whose `@id`
+  the crate already has, e.g. files or absolute URIs copied within the
+  same crate, now does nothing silently when they are the same
+  (`Crate.paste` leaves them out) and asks once per entity when they
+  differ (Merge or Keep Existing). Afterwards, show one dialog for the
+  whole paste, as some of the entities may be new and others not:
+  how many were pasted, which were left out as already in the crate,
+  which were merged into existing ones and which kept as they were, with
+  the dangling and ambiguous references `pasteEntity` already reports in
+  the same dialog. Nothing to show when all were simply added. A start
+  on PLAN.md's "A notice after Paste" (Copy and paste entities, step 2).
 - **File > Recent**: the last 6 crates opened or saved, kept in the
   settings. A preference turns it off (and forgets the list), as the
   names and places of crates can be private.
