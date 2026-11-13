@@ -152,7 +152,23 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   MP4's creation date, `duration` (ISO 8601), the phone's make and model
   and GPS (ISO 6709). Test files from temporary tools (ffmpeg, libheif,
   libavif). Still to do: offering it when adding files (Insert >
-  Files, dropping files in); `exifData` as PropertyValues rather than one
+  Files, dropping files in), never blocking the window: for one or a few
+  files (up to about 5), read in the background and, if they say
+  anything new, a non-modal notice ("photo.jpg says who made it, when and
+  its licence: Review…") opening the dialog; for many (10 or more) or
+  large ones, not read at once but offered ("Added 37 files. Read what
+  they say…"), as Crate > Update File Details does: one background job
+  with progress and Cancel (as copying files has), two files at a time
+  each with its time limit, filling in only what entities lack (never
+  where or the camera), a summary with the files that failed or took too
+  long, one undo step. Results remembered by path, size and date
+  modified, so nothing is read twice. Readers isolated: each on its own
+  thread with a time limit, any Throwable (also LinkageError,
+  StackOverflowError, OutOfMemoryError) caught and reported as a problem,
+  never thrown at the window; damaged-input tests (cut short, garbage
+  after the start bytes, huge lengths, deep nesting, oversized parts) as
+  integration tests in their own GitHub workflow, as the online tests
+  are. `exifData` as PropertyValues rather than one
   text; and JPEG 2000 is not planned (no library reads its metadata but
   jai-imageio-jpeg2000, whose JJ2000 licence is a problem).
 
