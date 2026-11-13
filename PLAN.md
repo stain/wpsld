@@ -468,7 +468,8 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
     of marking them; "Required" as placeholder would hide the type hint).
 
 Next: opening zipped crates and crates from a URL (with `CrateRetriever`),
-and recent files (in the state folder).
+and recent files (in the state folder); see "Crates as ZIP, BagIt and on
+the web" below.
 
 ### Platform guidelines and styles: still to do
 
@@ -1058,6 +1059,16 @@ folder (`FileCopy`, `CopyWindow`) and adds them. Next ways in:
   copied with their contents, which FileCopy doesn't do yet.
 - Moving rather than copying (with Shift, as file managers do), and
   copying folders.
+- **Copy and paste of files**: copying a File entity from one crate and
+  pasting it into another (Edit > Copy and Paste, as entities are copied
+  now) should also copy the file itself into the other crate's folder,
+  when both are attached: into the folder pasted in (or chosen), with
+  FileCopy's window, conflicts and checks, the pasted entity's `@id` its
+  new path. For a Dataset it is unclear: copy the whole folder with its
+  files (possibly big), only the Dataset and those of its parts also
+  selected, or ask; decide when there is a use for it. Within one crate,
+  pasting a File is a second description of the same file, so nothing to
+  copy.
 - **Drag and drop within the tree, into a folder**: in Entities by
   Folder, drop files or folders (several selected) onto a folder to move
   them there: on disk in an attached crate (asking first, as it changes
@@ -1112,6 +1123,43 @@ extension. Next:
 - **More signatures** where Tika has none and a media type exists or is
   common: NumPy `.npy` (`\x93NUMPY`), Avro (`Obj\x01`), NIfTI (`n+1` at
   344), ROOT (`root`), MRC maps (`MAP ` at 208).
+
+### Crates as ZIP, BagIt and on the web
+
+- **Open from the web, by dereferencing**: File > Open URL…, for a crate's
+  URL, DOI (`https://doi.org/…`) or other persistent identifier.
+  `CrateRetriever` (lib, not used by the editor yet) already follows
+  FAIR Signposting (`Link: <…>; rel="describedby"`), content negotiation
+  (`Accept: application/ld+json;profile="https://w3id.org/ro/crate"`),
+  `ro-crate-metadata.json` beside a landing page, and HTML previews
+  linking their metadata; it limits sizes and requests, as all it fetches
+  is untrusted. Opened read-only, or as a detached crate whose relative
+  `@id`s are resolved against where it came from (RO-Crate's base URI for
+  a crate on the web), to save locally with Save As. Also an RO-Crate
+  zip at a URL (below), downloaded to a temporary folder.
+- **Save as ZIP and open ZIP**: File > Export as ZIP… writes an attached
+  crate's folder as a zip, `ro-crate-metadata.json` at its top (or in a
+  single folder, as RO-Crate allows), with the preview, skipping hidden
+  files, through a temporary file as Save does; and File > Open on a
+  `.zip` (or `.crate.zip`, `.eln`) unpacks it to a folder of the user's
+  choice (or a temporary one, read-only), then opens it as an attached
+  crate. Big zips in a window of their own, as copying files is. Check
+  zip entries' names for `..` and absolute paths (zip slip), and sizes
+  (zip bombs).
+- **BagIt**: a crate packaged as a BagIt bag (RFC 8493), as RO-Crate
+  describes in its implementation notes: `bagit.txt`, the payload in
+  `data/` with `ro-crate-metadata.json` there (or at the top, as some
+  profiles do), and checksum manifests (`manifest-sha512.txt`,
+  `tagmanifest-…`). Recognise a bag when opening a folder, open its
+  crate, and check its manifests (in the background), reporting files
+  missing or changed. Convert a folder to a bag (Crate > Make BagIt Bag…):
+  move the payload into `data/` (asking first, as it moves the user's
+  files, and only within the folder), keep `@id`s relative to the crate
+  (so the metadata moves with it), write `bagit.txt`, `bag-info.txt`
+  (from the crate's name, description, dates, creator) and the
+  manifests; and update the manifests on save. Check
+  https://github.com/LibraryOfCongress/bagit-java (archived) or write the
+  little BagIt needs (it is simple: text files and checksums).
 
 ### Nested RO-Crates
 
