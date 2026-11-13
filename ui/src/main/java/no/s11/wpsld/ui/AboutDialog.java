@@ -53,6 +53,7 @@ import javafx.stage.Window;
  */
 class AboutDialog extends Dialog<Void> {
 	static final String SOURCE = "https://github.com/stain/wpsld";
+	static final String ISSUES = SOURCE + "/issues";
 
 	AboutDialog(Window owner, Consumer<String> browse) {
 		initOwner(owner);
@@ -61,9 +62,12 @@ class AboutDialog extends Dialog<Void> {
 		Label about = new Label("A desktop editor for RO-Crate metadata.\n"
 				+ "Copyright 2026 The University of Manchester, UK. Apache License 2.0.");
 		about.setWrapText(true);
-		Hyperlink source = new Hyperlink(SOURCE);
+		Hyperlink source = new Hyperlink("Source code and releases on GitHub: " + SOURCE);
 		source.setId("aboutSource");
 		source.setOnAction(e -> browse.accept(SOURCE));
+		Hyperlink issues = new Hyperlink("Report a problem or suggest an improvement");
+		issues.setId("aboutIssues");
+		issues.setOnAction(e -> browse.accept(ISSUES));
 		Label runtime = new Label("Java " + System.getProperty("java.version") + ", JavaFX "
 				+ System.getProperty("javafx.runtime.version", System.getProperty("javafx.version", "?")));
 		runtime.setId("aboutRuntime");
@@ -77,7 +81,7 @@ class AboutDialog extends Dialog<Void> {
 						"JavaFX"))));
 		texts.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 		VBox.setVgrow(texts, Priority.ALWAYS);
-		VBox content = new VBox(6, about, source, runtime, texts);
+		VBox content = new VBox(6, about, source, issues, runtime, texts);
 		content.setPadding(new Insets(4, 0, 0, 0));
 		content.setPrefSize(640, 480);
 		getDialogPane().setContent(content);

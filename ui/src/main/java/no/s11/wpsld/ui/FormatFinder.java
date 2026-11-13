@@ -168,7 +168,7 @@ class FormatFinder extends Dialog<Format> {
 			label.setWrapText(true);
 			details.getChildren().add(label);
 		}
-		Hyperlink page = new Hyperlink("Its page in PRONOM");
+		Hyperlink page = new Hyperlink("PRONOM definition " + format.puid());
 		page.setOnAction(e -> browse.accept(format.page()));
 		details.getChildren().add(page);
 	}

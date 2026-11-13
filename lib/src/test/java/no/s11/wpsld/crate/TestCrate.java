@@ -522,4 +522,72 @@ public class TestCrate {
 			assertEquals(new String(expected.readAllBytes(), StandardCharsets.UTF_8).strip(), written.strip());
 		}
 	}
+
+	private static List<String> parts(Entity entity) {
+		return entity.getAll("hasPart").stream().map(v -> v.get("@id").asText()).toList();
+	}
+
+	/** Files become parts of the dataset of their folder, else of the root */
+	@Test
+	public void addParts() {
+		Crate crate = new Crate();
+		Entity data = crate.add("Dataset");
+		crate.rename(data, "data/");
+		crate.getRoot().setAll("hasPart", List.of(ref("data/")));
+		Entity counts = crate.add("File");
+		crate.rename(counts, "data/raw/counts.csv");
+		Entity readme = crate.add("File");
+		crate.rename(readme, "./README.md");
+		assertSame(data, crate.partOf("data/raw/counts.csv"));
+		assertSame(crate.getRoot(), crate.partOf("README.md"));
+		assertEquals(List.of(readme, counts), crate.addParts(List.of(counts, readme, crate.getRoot(), data)));
+		assertEquals(List.of("data/raw/counts.csv"), parts(data));
+		assertEquals(List.of("data/", "./README.md"), parts(crate.getRoot()));
+		// Already parts: not again
+		assertEquals(List.of(), crate.addParts(List.of(counts)));
+	}
+
+	/** Datasets for folders, the outer one first, so the inner is its part */
+	@Test
+	public void addFolders() {
+		Crate crate = new Crate();
+		Entity counts = crate.add("File");
+		crate.rename(counts, "raw/2025/counts.csv");
+		List<Entity> added = crate.addFolders(List.of("raw/2025/", "raw/"));
+		assertEquals(List.of("raw/2025/", "raw/"), added.stream().map(Entity::getId).toList());
+		assertEquals(List.of("Dataset"), added.get(0).getTypes());
+		assertEquals(List.of("raw/"), parts(crate.getRoot()));
+		assertEquals(List.of("raw/2025/"), parts(added.get(1)));
+		assertSame(added.get(0), crate.partOf("raw/2025/counts.csv"));
+	}
+
+	@Test
+	public void specVersion() {
+		assertEquals(Optional.of("1.3"), new Crate().specVersion());
+		CrateReader reader = new CrateReader();
+		String v12 = "{\"@context\": \"https://w3id.org/ro/crate/1.2/context\", \"@graph\": ["
+				+ "{\"@id\": \"ro-crate-metadata.json\", \"@type\": \"CreativeWork\", \"about\": {\"@id\": \"./\"},"
+				+ " \"conformsTo\": {\"@id\": \"https://w3id.org/ro/crate/1.2\"}},"
+				+ "{\"@id\": \"./\", \"@type\": \"Dataset\"}]}";
+		assertEquals(Optional.of("1.2"), reader.read(new java.io.ByteArrayInputStream(v12.getBytes(StandardCharsets.UTF_8)),
+				"test").crate().orElseThrow().specVersion());
+		String v10 = "{\"@context\": \"https://w3id.org/ro/crate/1.0/context\", \"@graph\": ["
+				+ "{\"@id\": \"ro-crate-metadata.jsonld\", \"@type\": \"CreativeWork\", \"about\": {\"@id\": \"./\"}},"
+				+ "{\"@id\": \"./\", \"@type\": \"Dataset\"}]}";
+		assertEquals(Optional.of("1.0"), reader.read(new java.io.ByteArrayInputStream(v10.getBytes(StandardCharsets.UTF_8)),
+				"test").crate().orElseThrow().specVersion());
+	}
+
+	/** The HTML preview described as RO-Crate shows it, once, and not a part */
+	@Test
+	public void describePreview() {
+		Crate crate = new Crate();
+		Entity preview = crate.describePreview();
+		assertEquals("ro-crate-preview.html", preview.getId());
+		assertEquals(List.of("CreativeWork"), preview.getTypes());
+		assertEquals("./", preview.get("about").orElseThrow().get("@id").asText());
+		assertSame(preview, crate.describePreview());
+		assertEquals(List.of(), crate.getRoot().getAll("hasPart"));
+		assertEquals(List.of(), crate.mentionUnlinked());
+	}
 }

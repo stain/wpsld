@@ -30,11 +30,21 @@ import java.util.UUID;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+import no.s11.wpsld.crate.Crate;
+
 /**
  * The RO-Crate Metadata File being edited: where it is, once opened or
  * saved, and the crate as it was then, to tell whether it has unsaved
  * changes; the file as it was on disk then, to tell whether another
  * application changed it since; and the window title for it.
+ * <p>
+ * An attached crate is the folder its metadata file is in: the file is
+ * named <code>ro-crate-metadata.json</code> (<code>.jsonld</code> in
+ * RO-Crate 1.0), and the relative <code>@id</code>s of its entities are
+ * paths in that folder. A file of another name is a detached crate, with
+ * no folder: its relative <code>@id</code>s name no files. A crate opened
+ * from a folder without a metadata file is attached to it before it is
+ * saved there.
  */
 final class CrateFile {
 	static final String UNTITLED = "Untitled";
@@ -62,6 +72,10 @@ final class CrateFile {
 	private Optional<String> keptOver = Optional.empty();
 	/** The crate's base, to tell entities copied from it, see {@link #base()} */
 	private String base = newBase();
+	/** The folder of a new crate, opened from a folder, to save it in */
+	private Optional<Path> newIn = Optional.empty();
+	/** Whether the crate is its folder's, see {@link #folder()} */
+	private boolean attached;
 
 	/**
 	 * @param saved A new crate, not saved anywhere yet
@@ -76,7 +90,68 @@ final class CrateFile {
 	 */
 	void open(Optional<Path> path, JsonNode saved) {
 		base = newBase();
+		newIn = Optional.empty();
+		attached = false;
+		this.path = Optional.empty();
 		reset(path, saved);
+	}
+
+	/**
+	 * A new crate of a folder without a metadata file: attached to it, to be
+	 * saved in it as <code>ro-crate-metadata.json</code>.
+	 */
+	void openIn(Path folder, JsonNode saved) {
+		open(Optional.empty(), saved);
+		newIn = Optional.of(folder.toAbsolutePath());
+		attached = true;
+	}
+
+	/** Whether a file is named as an attached crate's metadata file */
+	static boolean isMetadataFile(Path file) {
+		String name = file.getFileName() == null ? "" : file.getFileName().toString();
+		return name.equals(Crate.RO_CRATE_METADATA_JSON) || name.equals(RO_CRATE_METADATA_JSONLD);
+	}
+
+	/** RO-Crate 1.0's name for the metadata file */
+	static final String RO_CRATE_METADATA_JSONLD = "ro-crate-metadata.jsonld";
+
+	/**
+	 * The folder of an attached crate, that its relative <code>@id</code>s
+	 * are paths in; none for a detached crate.
+	 */
+	Optional<Path> folder() {
+		if (!attached) {
+			return Optional.empty();
+		}
+		return path.map(p -> p.toAbsolutePath().getParent()).or(() -> newIn);
+	}
+
+	boolean isAttached() {
+		return folder().isPresent();
+	}
+
+	/**
+	 * Whether the crate could be attached to its folder: its file is named
+	 * so, or it is a new crate of a folder
+	 */
+	boolean canAttach() {
+		return path.filter(CrateFile::isMetadataFile).isPresent() || (path.isEmpty() && newIn.isPresent());
+	}
+
+	/**
+	 * Attach the crate to its folder, or treat it as detached, e.g. a crate
+	 * downloaded on its own, whose files are elsewhere.
+	 */
+	void setAttached(boolean attached) {
+		this.attached = attached && canAttach();
+	}
+
+	/**
+	 * Where Save writes without asking: the file opened or saved, or a new
+	 * crate's folder's <code>ro-crate-metadata.json</code>.
+	 */
+	Optional<Path> saveTarget() {
+		return path.or(() -> newIn.map(folder -> folder.resolve(Crate.RO_CRATE_METADATA_JSON)));
 	}
 
 	/**
@@ -88,6 +163,11 @@ final class CrateFile {
 	void reset(Optional<Path> path, JsonNode saved) {
 		if (this.path.isPresent() && !this.path.equals(path)) {
 			base = newBase();
+		}
+		// Attached by its name when first in a file, or in another; else as it was
+		if (path.isPresent() && !path.equals(this.path)) {
+			attached = isMetadataFile(path.get());
+			newIn = Optional.empty();
 		}
 		this.path = path;
 		this.saved = saved;
@@ -222,7 +302,7 @@ final class CrateFile {
 	 * the same name; "Untitled" for a new crate.
 	 */
 	String name() {
-		return path.map(p -> p.getParent() == null || p.getParent().getFileName() == null ? p.getFileName()
+		return saveTarget().map(p -> p.getParent() == null || p.getParent().getFileName() == null ? p.getFileName()
 				: p.getParent().getFileName().resolve(p.getFileName())).map(Path::toString).orElse(UNTITLED);
 	}
 

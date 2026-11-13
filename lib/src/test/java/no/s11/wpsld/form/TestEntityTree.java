@@ -1,0 +1,284 @@
+/*
+ * Copyright 2026 The University of Manchester, UK
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+package no.s11.wpsld.form;
+
+import static org.junit.Assert.*;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.BeforeClass;
+import org.junit.Test;
+
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.TextNode;
+
+import no.s11.wpsld.crate.Crate;
+import no.s11.wpsld.crate.CrateTerms;
+import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.form.EntityTree.Kind;
+import no.s11.wpsld.form.EntityTree.Node;
+import no.s11.wpsld.soss.SchemaFromJsonLd;
+
+public class TestEntityTree {
+	private static EntityListing listing;
+
+	@BeforeClass
+	public static void terms() {
+		listing = new EntityListing(new CrateTerms(new SchemaFromJsonLd()));
+	}
+
+	private static Entity add(Crate crate, String id, String name, String... types) {
+		Entity entity = crate.add(types[0]);
+		crate.rename(entity, id);
+		entity.setTypes(List.of(types));
+		if (name != null) {
+			entity.set("name", Optional.of(TextNode.valueOf(name)));
+		}
+		return entity;
+	}
+
+	private static void hasPart(Entity entity, String... ids) {
+		var parts = JsonNodeFactory.instance.arrayNode();
+		for (String id : ids) {
+			parts.addObject().put("@id", id);
+		}
+		entity.set("hasPart", Optional.of(parts));
+	}
+
+	/**
+	 * The tree as indented lines: kind, name, "*" if it has no entity, "-"
+	 * if it has a path but is not a data entity
+	 */
+	private static List<String> lines(List<Node> nodes) {
+		List<String> lines = new ArrayList<>();
+		lines(nodes, "", lines);
+		return lines;
+	}
+
+	private static boolean isPath(Node node) {
+		return node.kind() == Kind.FILE || node.kind() == Kind.FOLDER;
+	}
+
+	private static void lines(List<Node> nodes, String indent, List<String> lines) {
+		for (Node node : nodes) {
+			lines.add(indent + node.kind() + " " + node.name()
+					+ (node.entity().isEmpty() ? " *" : node.data() || !isPath(node) ? "" : " -"));
+			lines(node.children(), indent + "  ", lines);
+		}
+	}
+
+	@Test
+	public void physical() {
+		Crate crate = new Crate();
+		crate.getRoot().set("name", Optional.of(TextNode.valueOf("Survey")));
+		add(crate, "data/counts.csv", "Counts", "File");
+		add(crate, "README.md", null, "File");
+		add(crate, "data/", "Data", "Dataset");
+		// No entity for raw/ nor raw/2025/
+		add(crate, "raw/2025/my%20notes.txt", null, "File");
+		add(crate, "raw/2025/a.txt", null, "File");
+		add(crate, "https://example.com/z.csv", null, "File");
+		add(crate, "https://example.com/a.csv", null, "File");
+		// Absolute, but not a part: contextual
+		add(crate, "https://example.com/cited.pdf", null, "File");
+		add(crate, "#bob", "Bob", "Person");
+		add(crate, "#alice", "Alice", "Person");
+		add(crate, "https://ror.org/01xtthb56", "University of Oslo", "Organization");
+		// A path, but contextual: e.g. cited, not a part
+		add(crate, "docs/cited.pdf", null, "File");
+		hasPart(crate.getRoot(), "data/", "README.md", "https://example.com/z.csv", "https://example.com/a.csv");
+		hasPart(crate.get("data/").orElseThrow(), "data/counts.csv");
+
+		assertEquals(List.of(
+				"ROOT Survey",
+				"  FOLDER data",
+				"    FILE counts.csv",
+				"  FOLDER docs *",
+				"    FILE cited.pdf -",
+				"  FOLDER raw *",
+				"    FOLDER 2025 *",
+				"      FILE a.txt -",
+				"      FILE my notes.txt -",
+				"  FILE README.md",
+				"EXTERNAL External resources *",
+				"  RESOURCE https://example.com/a.csv",
+				"  RESOURCE https://example.com/z.csv",
+				"TYPE File *",
+				"  CONTEXTUAL https://example.com/cited.pdf",
+				"TYPE Organization *",
+				"  CONTEXTUAL University of Oslo",
+				"TYPE Person *",
+				"  CONTEXTUAL Alice",
+				"  CONTEXTUAL Bob"), lines(EntityTree.physical(crate, listing)));
+	}
+
+	/**
+	 * Contextual entities in the folder of each of their types, by name;
+	 * parts of files (page.html#table2) under their file, and by type;
+	 * not so for absolute URIs with fragments
+	 */
+	@Test
+	public void typesAndParts() {
+		Crate crate = new Crate();
+		add(crate, "#alice", "Alice", "http://xmlns.com/foaf/0.1/Agent", "http://schema.org/Person");
+		add(crate, "#uio", "UiO", "Organization", "Place");
+		add(crate, "report.html", null, "File");
+		add(crate, "report.html#table2", "Counts", "Table");
+		add(crate, "report.html#fig1", null, "ImageObject", "Thing");
+		add(crate, "other.html#x", "X", "Table");
+		add(crate, "https://example.com/page#y", "Y", "Table");
+		hasPart(crate.getRoot(), "report.html");
+		assertEquals(List.of(
+				"ROOT ./",
+				"  FILE report.html",
+				"    FILE #fig1 -",
+				"    FILE #table2 -",
+				"TYPE http://xmlns.com/foaf/0.1/Agent *",
+				"  CONTEXTUAL Alice",
+				"TYPE ImageObject *",
+				"  CONTEXTUAL report.html#fig1",
+				"TYPE Organization *",
+				"  CONTEXTUAL UiO",
+				"TYPE Person *",
+				"  CONTEXTUAL Alice",
+				"TYPE Place *",
+				"  CONTEXTUAL UiO",
+				"TYPE Table *",
+				"  CONTEXTUAL Counts",
+				"  CONTEXTUAL X",
+				"  CONTEXTUAL Y",
+				"TYPE Thing *",
+				"  CONTEXTUAL report.html#fig1"), lines(EntityTree.physical(crate, listing)));
+	}
+
+	/**
+	 * The logical tree: hasPart from the root, wherever the files are, a
+	 * part of two datasets in each, named from their folder; the rest by type
+	 */
+	@Test
+	public void logical() {
+		Crate crate = new Crate();
+		crate.getRoot().set("name", Optional.of(TextNode.valueOf("Survey")));
+		add(crate, "data/", "Data", "Dataset");
+		add(crate, "data/raw/counts.csv", "Counts", "File");
+		add(crate, "shared.txt", null, "File");
+		add(crate, "https://example.com/z.csv", null, "File");
+		add(crate, "#loop", "Loop", "Dataset");
+		add(crate, "notes.txt", null, "File");
+		add(crate, "#alice", "Alice", "Person");
+		hasPart(crate.getRoot(), "data/", "https://example.com/z.csv", "shared.txt", "#loop");
+		hasPart(crate.get("data/").orElseThrow(), "data/raw/counts.csv", "shared.txt");
+		hasPart(crate.get("#loop").orElseThrow(), "#loop");
+		assertEquals(List.of(
+				"ROOT Survey",
+				"  FOLDER #loop",
+				"    FOLDER #loop",
+				"  FOLDER data",
+				"    FILE raw/counts.csv",
+				"    FILE shared.txt",
+				"  RESOURCE https://example.com/z.csv",
+				"  FILE shared.txt",
+				"TYPE File *",
+				"  CONTEXTUAL notes.txt",
+				"TYPE Person *",
+				"  CONTEXTUAL Alice"), lines(EntityTree.logical(crate, listing)));
+		List<String> keys = new ArrayList<>();
+		collect(EntityTree.logical(crate, listing), keys, new ArrayList<>());
+		assertEquals(keys.size(), keys.stream().distinct().count());
+	}
+
+	/** Files and folders on disk without an entity, greyed out among the rest */
+	@Test
+	public void onDisk() {
+		Crate crate = new Crate();
+		add(crate, "data/", "Data", "Dataset");
+		add(crate, "data/b.csv", null, "File");
+		hasPart(crate.getRoot(), "data/");
+		hasPart(crate.get("data/").orElseThrow(), "data/b.csv");
+		List<Node> nodes = EntityTree.physical(crate, listing,
+				List.of("data/", "data/a.csv", "data/b.csv", "raw/", "raw/my%20notes.txt", "empty/"));
+		assertEquals(List.of(
+				"ROOT ./",
+				"  FOLDER data",
+				"    FILE a.csv *",
+				"    FILE b.csv",
+				"  FOLDER empty *",
+				"  FOLDER raw *",
+				"    FILE my notes.txt *"), lines(nodes));
+		Node notes = nodes.get(0).children().get(2).children().get(0);
+		assertEquals(Optional.of("raw/my%20notes.txt"), EntityTree.fileId(notes));
+		assertEquals(Optional.of("raw/"), EntityTree.folderId(nodes.get(0).children().get(2)));
+	}
+
+	/** The folder's files not in the crate, as a folder of their own */
+	@Test
+	public void notInCrate() {
+		Crate crate = new Crate();
+		add(crate, "data/b.csv", null, "File");
+		Node node = EntityTree.notInCrate(crate, List.of("data/", "data/b.csv", "data/my%20a.csv", "z.txt"))
+				.orElseThrow();
+		assertEquals(List.of("TYPE (Not in crate) *", "  FILE data/my a.csv *", "  FILE z.txt *"), lines(List.of(node)));
+		assertEquals(Optional.of("data/my%20a.csv"), EntityTree.fileId(node.children().get(0)));
+		assertTrue(EntityTree.notInCrate(crate, List.of("data/b.csv")).isEmpty());
+	}
+
+	/** Each entity at least once, with keys unique in the tree */
+	@Test
+	public void keys() {
+		Crate crate = new Crate();
+		add(crate, "data/", null, "Dataset");
+		add(crate, "data", null, "File");
+		add(crate, "#data", null, "Thing");
+		List<Node> nodes = EntityTree.physical(crate, listing);
+		List<String> keys = new ArrayList<>();
+		List<Entity> entities = new ArrayList<>();
+		collect(nodes, keys, entities);
+		assertEquals(keys.size(), keys.stream().distinct().count());
+		assertTrue(entities.containsAll(crate.getEntities()));
+	}
+
+	private static void collect(List<Node> nodes, List<String> keys, List<Entity> entities) {
+		for (Node node : nodes) {
+			keys.add(node.key());
+			node.entity().ifPresent(entities::add);
+			collect(node.children(), keys, entities);
+		}
+	}
+
+	@Test
+	public void paths() {
+		assertEquals(List.of("data", "my notes.txt"), EntityTree.path("./data/my%20notes.txt"));
+		assertEquals(List.of("data"), EntityTree.path("data/"));
+		assertEquals(List.of("ø"), EntityTree.path("%C3%B8"));
+		// Not percent-encoding: as it is
+		assertEquals(List.of("100%"), EntityTree.path("100%"));
+		assertEquals(List.of("%zz"), EntityTree.path("%zz"));
+		assertTrue(EntityTree.isPath("data/"));
+		assertFalse(EntityTree.isPath("./"));
+		assertFalse(EntityTree.isPath("#bob"));
+		assertFalse(EntityTree.isPath("_:b0"));
+		assertFalse(EntityTree.isPath("https://example.com/"));
+		assertEquals("my%20notes", EntityTree.encode("my notes"));
+		assertEquals("100%25%20%23", EntityTree.encode("100% #"));
+		assertEquals("ø", EntityTree.encode("ø"));
+		assertEquals(Optional.of("raw/my%20notes/"), EntityTree.folderId(new Node("path:raw/my notes/", "my notes",
+				Kind.FOLDER, Optional.empty(), false, List.of())));
+	}
+}

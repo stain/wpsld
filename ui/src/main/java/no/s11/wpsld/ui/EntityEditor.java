@@ -143,6 +143,14 @@ public class EntityEditor extends ScrollPane {
 	private Runnable onStep = () -> {
 	};
 	/** Opens a web address, e.g. in the browser */
+	/** Show another entity, e.g. one a reference links to */
+	private Consumer<Entity> show = e -> {
+	};
+	/**
+	 * Where an @id leads, to open: a web address, or the file or folder
+	 * beside the crate it names; none for #local and _:blank ones
+	 */
+	private Function<String, Optional<String>> address = id -> Optional.empty();
 	private Consumer<String> browse = address -> {
 	};
 	private Consumer<Window> typeHelp;
@@ -435,8 +443,22 @@ public class EntityEditor extends ScrollPane {
 				applyId.run();
 			}
 		});
+		// Open where the @id leads, as the preview's link does
+		Button openId = iconButton("↗", FluentUiRegularMZ.OPEN_16);
+		openId.setId("openId");
+		Runnable updateOpenId = () -> {
+			Optional<String> to = address.apply(idField.getText().strip());
+			openId.setDisable(to.isEmpty());
+			openId.setTooltip(new Tooltip(to.map(a -> "Open " + a).orElse("Not a web address or a file to open")));
+		};
+		updateOpenId.run();
+		idField.textProperty().addListener((obs, old, v) -> updateOpenId.run());
+		openId.setOnAction(e -> address.apply(idField.getText().strip()).ifPresent(browse));
+		HBox.setHgrow(idField, Priority.ALWAYS);
+		HBox idRow = new HBox(4, idField, openId);
+		idRow.setAlignment(Pos.CENTER_LEFT);
 		header.addRow(0, new Label("@type"), typeChips());
-		header.addRow(1, new Label("@id"), idField);
+		header.addRow(1, new Label("@id"), idRow);
 		form.getChildren().add(header);
 		noMatches.setVisible(false);
 		noMatches.setManaged(false);
@@ -533,8 +555,13 @@ public class EntityEditor extends ScrollPane {
 		if (!others.isEmpty()) {
 			int row = 0;
 			for (String name : others) {
-				TextField value = new TextField(text(entity.get(name).orElseThrow()));
-				value.setEditable(false);
+				// One row per value, as other properties with several have
+				VBox value = new VBox(4);
+				for (JsonNode each : entity.getAll(name)) {
+					TextField field = new TextField(text(each));
+					field.setEditable(false);
+					value.getChildren().add(field);
+				}
 				Button remove = new Button("Remove");
 				remove.setOnAction(e -> {
 					entity.set(name, Optional.empty());
@@ -544,6 +571,10 @@ public class EntityEditor extends ScrollPane {
 				Label label = new Label(label(name));
 				label.setId(id("label", name));
 				label.setTooltip(new Tooltip(name));
+				// Beside its first value
+				GridPane.setValignment(label, VPos.TOP);
+				label.setPadding(new Insets(4, 0, 0, 0));
+				GridPane.setValignment(remove, VPos.TOP);
 				grid.addRow(row++, label, value, remove);
 				Optional<Label> retired = retiredNote(name);
 				if (retired.isPresent()) {
@@ -971,6 +1002,8 @@ public class EntityEditor extends ScrollPane {
 		graphic.getStyleClass().add("icon");
 		Button button = new Button(text, graphic);
 		button.getStyleClass().add("icon-button");
+		// Never squeezed to "...", e.g. beside a long value
+		button.setMinWidth(Region.USE_PREF_SIZE);
 		return button;
 	}
 
@@ -1265,6 +1298,21 @@ public class EntityEditor extends ScrollPane {
 	 */
 	public void setFindLicense(Supplier<Optional<SPDXLicenses.License>> findLicense) {
 		this.findLicense = Objects.requireNonNull(findLicense);
+	}
+
+	/**
+	 * Set how to show another entity, as the → beside a reference does.
+	 */
+	public void setShow(Consumer<Entity> show) {
+		this.show = Objects.requireNonNull(show);
+	}
+
+	/**
+	 * Set where an @id leads, for the ↗ beside it, e.g. a web address or a
+	 * file beside the crate.
+	 */
+	public void setAddress(Function<String, Optional<String>> address) {
+		this.address = Objects.requireNonNull(address);
 	}
 
 	/**
@@ -1663,6 +1711,20 @@ public class EntityEditor extends ScrollPane {
 					: iconButton("×", FluentUiRegularAL.DISMISS_16);
 			remove.setTooltip(new Tooltip("Remove this value"));
 			HBox rowNode = new HBox(4, control, remove);
+			if (control instanceof ComboBox<?> combo && combo.isEditable()) {
+				// → shows the entity the reference links to
+				Button open = iconButton("→", FluentUiRegularAL.ARROW_FORWARD_16);
+				open.setId(id(prefix("open"), field.name()) + "-" + rows.size());
+				Runnable updateOpen = () -> {
+					Optional<Entity> linked = crateEntity(combo.getEditor().getText().strip());
+					open.setDisable(linked.isEmpty());
+					open.setTooltip(new Tooltip(linked.map(l -> "Show " + l.getLabel()).orElse("Not an entity of the crate")));
+				};
+				updateOpen.run();
+				combo.getEditor().textProperty().addListener((obs, old, v) -> updateOpen.run());
+				open.setOnAction(e -> crateEntity(combo.getEditor().getText().strip()).ifPresent(show));
+				rowNode.getChildren().add(1, open);
+			}
 			rowNode.setAlignment(Pos.CENTER_LEFT);
 			Row row = new Row(rowNode, text);
 			remove.setOnAction(e -> {

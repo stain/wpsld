@@ -21,6 +21,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
+import javafx.application.Platform;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -55,10 +58,17 @@ class HelpDialog extends Dialog<Void> {
 		CONTENTS("Contents", "index.md"),
 		GETTING_STARTED("Getting started", "getting-started.md"),
 		FILES("Opening and saving crates", "files.md"),
+		FOLDERS("Folders and files", "folders.md"),
+		FORMATS("File formats", "formats.md"),
 		PROFILES("Profiles", "profiles.md"),
 		TYPES("Types", "types.md"),
 		ENTITIES("Entities and identifiers", "entities.md"),
 		PROPERTIES("Properties and links", "properties.md"),
+		PEOPLE("People", "people.md"),
+		ORGANISATIONS("Organisations", "organisations.md"),
+		PUBLICATIONS("Publications and DOIs", "publications.md"),
+		LICENCES("Licences", "licences.md"),
+		PLACES("Places", "places.md"),
 		CLIPBOARD("Copy and paste", "clipboard.md"),
 		VIEWS("Views and styles", "views.md");
 
@@ -123,12 +133,39 @@ class HelpDialog extends Dialog<Void> {
 				() -> Math.max(1, page.getViewportBounds().getWidth()
 						- content.getPadding().getLeft() - content.getPadding().getRight()),
 				page.viewportBoundsProperty(), content.paddingProperty());
-		Consumer<String> openLink = target -> Topic.fromResource(target).ifPresentOrElse(topic -> {
+		// The headings of the page shown, to scroll to
+		Map<String, javafx.scene.Node> headings = new HashMap<>();
+		Consumer<String> scrollTo = anchor -> Platform.runLater(() -> {
+			javafx.scene.Node heading = headings.get(anchor);
+			if (heading == null) {
+				return;
+			}
+			page.layout();
+			double range = content.getBoundsInLocal().getHeight() - page.getViewportBounds().getHeight();
+			page.setVvalue(range <= 0 ? 0 : Math.min(1, heading.getBoundsInParent().getMinY() / range));
+		});
+		// Another page, a section of this or another (page.md#section), or the web
+		Consumer<String> openLink = target -> {
+			int hash = target.indexOf('#');
+			String resource = hash < 0 ? target : target.substring(0, hash);
+			Optional<Topic> topic = resource.isEmpty() ? Optional.ofNullable(topics.getSelectionModel().getSelectedItem())
+					: Topic.fromResource(resource);
+			if (topic.isEmpty()) {
+				browse.accept(target);
+				return;
+			}
 			search.clear();
-			topics.getSelectionModel().select(topic);
-		}, () -> browse.accept(target));
-		topics.getSelectionModel().selectedItemProperty().addListener((obs, old, selected) ->
-				HelpMarkdown.show(content, selected == null ? "" : selected.content, openLink, imageWidth));
+			topics.getSelectionModel().select(topic.get());
+			if (hash >= 0) {
+				scrollTo.accept(target.substring(hash + 1));
+			} else {
+				page.setVvalue(0);
+			}
+		};
+		topics.getSelectionModel().selectedItemProperty().addListener((obs, old, selected) -> {
+			headings.clear();
+			headings.putAll(HelpMarkdown.show(content, selected == null ? "" : selected.content, openLink, imageWidth));
+		});
 		search.textProperty().addListener((obs, old, query) -> {
 			String term = query.strip().toLowerCase(Locale.ROOT);
 			Topic selected = topics.getSelectionModel().getSelectedItem();

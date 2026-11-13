@@ -67,12 +67,21 @@ depositing data.
   linking a file and an author, and exploring types and properties with a
   photograph and a Wikidata person. It includes screenshots and further
   reading; the README links to the Markdown topics for reading outside the app.
-- Short topics cover opening and saving, profile loading and preferences,
-  types, entities and identifiers, properties and links, copy and paste,
-  and views. Paste Special is not implemented yet; document its actual
-  options when it is added.
-- **Next:** add topics on required fields, people and organisations,
-  files and troubleshooting; add a glossary. Check every instruction against
+- Short topics cover opening and saving, folders and files, file formats,
+  profile loading and preferences, types, entities and identifiers,
+  properties and links, with a page for each lookup (people,
+  organisations, publications and DOIs, licences, places), copy and
+  paste, and views. No page is over about 100 lines: split a page that
+  grows past that, and link it from `index.md` under its parent. Links to
+  sections (`page.md#section`, `#section`, named as GitHub names headings)
+  open the page there. Paste Special is not implemented yet; document its
+  actual options when it is added.
+- **Next:** the topics list as a tree, the pages split off under their
+  parent (Folders and files, File formats under Opening and saving; the
+  lookups under Properties and links), and each page's sections under it
+  to jump to; F1 on more controls (the entity tree to Folders and files,
+  Encoding format to File formats, each lookup's button to its page);
+  add topics on required fields and troubleshooting; add a glossary. Check every instruction against
   the app's actual behaviour and
   the applicable RO-Crate specification.
 - Extend contextual entry points as more topics and controls are added.
@@ -459,7 +468,8 @@ A File menu and an Edit menu above the toolbar, which keeps its buttons:
     of marking them; "Required" as placeholder would hide the type hint).
 
 Next: opening zipped crates and crates from a URL (with `CrateRetriever`),
-and recent files (in the state folder).
+and recent files (in the state folder); see "Crates as ZIP, BagIt and on
+the web" below.
 
 ### Platform guidelines and styles: still to do
 
@@ -608,7 +618,7 @@ Styles:
        ambiguous (it may be another organisation of the same `#uom`), so
        linked and reported (an absolute one is the same entity, a question
        of merging, not ambiguity). Not in the crate: dangling, kept and
-       reported (Edit > Repair Crate would make it a Thing). Within one
+       reported (Crate > Repair Crate would make it a Thing). Within one
        crate, the usual case, nothing is reported.
   2. **Paste options and Paste Special…** Powerful even without a deep
      copy.
@@ -660,7 +670,7 @@ Styles:
   SPDX, `propertyID` https://registry.identifiers.org/registry/spdx,
   `value` the identifier, `url` its SPDX page), as RO-Crate 1.3's Root Data
   Entity identifier section describes; a licence the crate has is linked.
-  Edit > Repair Crate turns other forms of SPDX addresses
+  Crate > Repair Crate turns other forms of SPDX addresses
   (`https://spdx.org/licenses/MIT.html`, another case) and `license` text
   that is an SPDX address or identifier into the IRI, merging duplicates,
   and completes the licences; also licences known by an address the list
@@ -952,10 +962,50 @@ Styles:
   and "Events", each with an icon for its kind, as the Workplace Shell had
   specialised folders; data entities by their folders (`hasPart`). Related
   to the type selector below and to browsing large crates.
-- **A type selector above the entity list**, showing only entities of the
-  chosen type, its subtypes included (e.g. Organization also shows
-  ResearchOrganization). Only types the crate's entities have are offered.
-  Tabs in the OS/2 Warp style, a drop-down in the others.
+- **A type selector above the entity list** *(done, as a drop-down in all
+  styles)*, showing only entities of the chosen type, its subtypes included
+  (e.g. CreativeWork also shows Dataset and File), with how many there are
+  of each. Offered are the types the crate's entities have, and those two
+  or more of them are kinds of, except Thing. Choosing it again lists all
+  types when an entity is added or shown that is not of it, or the entity
+  edited stops being of it. Still to do: tabs in the OS/2 Warp style.
+- **The entity list sorted** *(done)*: the root data entity first, then by
+  types (as listed), name (else `@id`, as shown) and `@id`, ignoring case
+  and in the user's language's order (`EntityListing` in lib). Sorted again
+  at each undo point (leaving a field, adding, renaming), not while typing,
+  so the entity edited doesn't move under the cursor; the selection is
+  kept.
+- **Logical and physical listings** (a tree, next to the flat list by
+  type), proposed after sorting the list. The physical one is *done*, as
+  View > Entities by Folder (`EntityTree` in lib, `EntityTreeView`), with
+  icons by type (`EntityIcons`, Fluent UI, for the major schema.org types,
+  coloured by family) also in the list; entities with a path that are not
+  data entities are greyed out at their path; an entity of several types
+  is in the folder of each; parts of files (`page.html#table2`) are under
+  their file. *Done*: Crate > Add Dataset for Folder and Add to Has Part
+  (also on the right-click menu) bring greyed out folders and files into
+  `hasPart`. The logical one is *done* too, as View > Entities by Part
+  (`EntityTree.logical`), and Open Folder, attached and detached crates,
+  Insert > Files with copying, the folder watched, Update File Details,
+  files not found and web availability marked, and safe saving. Next:
+  pasting file paths and drag and drop (see Adding files from the
+  operating system); relinking files that were moved (a missing file's
+  entity to a file of the same name and size elsewhere in the folder);
+  the
+  Workplace Shell's look in the Warp style (lines joining the tree,
+  hatched icon when selected); a header with the selected folder's path
+  and counts.
+  - *Logical*: the root's `hasPart` hierarchy of Datasets and their parts,
+    which may include entities with absolute URIs or in other folders; an
+    entity can appear under more than one Dataset. Contextual entities
+    below, in virtual folders by class ("Persons", "Organizations"…).
+  - *Physical*: the relative `@id`s broken down by path segment, with
+    folders even where there is no Dataset entity for them (shown as
+    such, to add one); data entities with absolute URIs in `hasPart`
+    under "External resources", sorted by URL without a breakdown.
+  - Open questions: where contextual entities go in the physical view;
+    entities neither in `hasPart` nor contextual (e.g. unlinked data);
+    cycles in `hasPart`; files on disk not described (with Open Folder).
 
 - **Opening a folder for annotation**, with or without an
   `ro-crate-metadata.json`: the whole folder opened as a crate, which
@@ -965,14 +1015,18 @@ Styles:
   only for an attached crate (opened from or saved to a folder), whose
   relative `@id`s are files beside it.
 
-### To debug: labels of properties outside the profile
+### Done: labels of properties outside the profile
 
 Loading the crate of
 https://www.rohub.org/3b9d1622-2ff1-4a08-8e4a-9fe002f47180?activetab=overview,
 a property outside the profile, `https://w3id.org/ro-id/rohub/model#has_version`,
-gets a strange label in the editor and the preview, "Https://w 3d.org…":
-the whole IRI is split into words, rather than its local name after `#`
-or `/` (here "Has version").
+got the label "Https://w 3d.org…"; an IRI is now named by its local name
+after `#` or `/`, with `_` between words ("Has version"). The same crate
+nests entities in `hasPart` (`{"@id": …, "@type": "Dataset"}`), which are
+now flattened as it is read, writes types as IRIs (`http://schema.org/Person`),
+now named as the context names them in the entity list, and has
+properties outside the types with several values, now one row each.
+Still to do: Repair Crate could write such types by their names.
 
 ### To debug: a large workflow run crate
 
@@ -991,6 +1045,243 @@ run) loads, but shows what to work on:
 - **A hang or slowness** when following Orchestration of `#Task_1636` to
   the Run of "COMPSs runtime version 3.4": find out where the time goes
   (preview, form building, or reference lookups across many entities).
+
+### Adding files from the operating system
+
+Insert > Files copies files from elsewhere into an attached crate's
+folder (`FileCopy`, `CopyWindow`) and adds them. Next ways in:
+- **Paste file paths**: Edit > Paste in the entity list or tree with files
+  copied in Explorer or Finder (the clipboard's file list, or text that is
+  paths), adding those in the folder and copying the others, as Insert >
+  Files does.
+- **Drag and drop** files and folders from Explorer or Finder onto the
+  list or tree; onto a folder of the tree to copy them into it. Folders
+  copied with their contents, which FileCopy doesn't do yet.
+- Moving rather than copying (with Shift, as file managers do), and
+  copying folders.
+- **Copy and paste of files**: copying a File entity from one crate and
+  pasting it into another (Edit > Copy and Paste, as entities are copied
+  now) should also copy the file itself into the other crate's folder,
+  when both are attached: into the folder pasted in (or chosen), with
+  FileCopy's window, conflicts and checks, the pasted entity's `@id` its
+  new path. For a Dataset it is unclear: copy the whole folder with its
+  files (possibly big), only the Dataset and those of its parts also
+  selected, or ask; decide when there is a use for it. Within one crate,
+  pasting a File is a second description of the same file, so nothing to
+  copy.
+- **Drag and drop within the tree, into a folder**: in Entities by
+  Folder, drop files or folders (several selected) onto a folder to move
+  them there: on disk in an attached crate (asking first, as it changes
+  the user's files; Replace, Keep Both or Skip for names taken), and their
+  `@id`s renamed with the links to them, and the parts moved to that
+  folder's Dataset (`hasPart`). For files not yet in the crate, only on
+  disk. In a detached crate, only the `@id`s. In Entities by Part, drop
+  onto a Dataset to make them its parts instead (no files moved).
+  Undoable as one step, though moving files back on disk would need its
+  own undo.
+
+### File formats beyond media types
+
+`FileFormats` finds a file's media type by content (Apache Tika, plus
+wpsld's own signatures for HDF5 after a user block, NASA CDF, GRIB, BUFR
+and Arrow) and links PRONOM where one format fits both media type and
+extension. Next:
+- **EDAM formats** for life sciences, which have no media types (FASTA,
+  FASTQ, SAM/BAM, VCF, PDB, mmCIF): Bioschemas and Workflow RO-Crate use
+  EDAM's format IRIs (e.g. `http://edamontology.org/format_1929` for
+  FASTA) in `encodingFormat`; link those by content or extension.
+- **PRONOM identifiers by content**, which tell versions apart (PDF 1.4
+  from PDF/A): a small matcher of DROID's signature file (V125 has 2,273
+  internal signatures, byte sequences at offsets from the start or end,
+  with gaps and byte ranges; no dependencies needed), container
+  signatures for Office and ZIP-based formats later. DROID itself as a
+  library brings about 48 MB of dependencies and no modules.
+- **Choosing a media type by hand from IANA's registry**: bundle IANA's
+  media types (https://www.iana.org/assignments/media-types/, as XML or
+  the CSV per top-level type; about 2,350 current types, each with its
+  template and references) and offer them in the `encodingFormat` field
+  as suggestions, with Tika's readable names where it has them (about
+  500 of its 1,700). Warn about a media type that is neither registered
+  at IANA nor an `x-`, `vnd.` or `prs.` one (e.g. a typo, or one made
+  up). Note PRONOM has only 191 of IANA's types.
+- **Biomedical and microscopy formats**: check detection of OME-TIFF
+  (TIFF with OME-XML in its description, `image/tiff` now), OME-Zarr
+  (a folder), Zeiss CZI (`ZISRAWFILE`), Leica LIF, Nikon ND2, Olympus
+  OIR/VSI, Imaris `.ims` (HDF5), NIfTI and Analyze, MRC, DICOM series,
+  EDF, BrainVision; add signatures where they are simple, and find their
+  PRONOM and EDAM entries. Bio-Formats (Java, from the OME project) knows
+  most of these, but check its licence (GPL for most readers) and size
+  before considering it; its format list is a good reference either way.
+- **EDAM formats chosen by hand** too, like PRONOM's Format from PRONOM…:
+  a finder of EDAM's formats (about 600 under `format_1915`), with their
+  names, synonyms and definitions. EDAM is published as OWL (RDF/XML),
+  and its releases also have CSV and TSV tables (check:
+  https://github.com/edamontology/edamontology/releases), which can be
+  read without Jena; else the OWL's few elements wpsld needs (classes,
+  labels, synonyms, subClassOf, deprecation) can be read with the JDK's
+  XML parser. Bundle a subset (formats only) as JSON, as for PRONOM.
+- **Format identifiers besides PRONOM**: Tika's media types carry links
+  for 64 types, some to the Library of Congress's format descriptions
+  (e.g. FITS, `https://www.digitalpreservation.gov/formats/fdd/fdd000317.shtml`),
+  which could be `encodingFormat` links where PRONOM has none; and
+  Tika's readable names (493 of 1,693 types) for the format's entity.
+- **More signatures** where Tika has none and a media type exists or is
+  common: NumPy `.npy` (`\x93NUMPY`), Avro (`Obj\x01`), NIfTI (`n+1` at
+  344), ROOT (`root`), MRC maps (`MAP ` at 208).
+
+### Crates as ZIP, BagIt and on the web
+
+- **Open from the web, by dereferencing**: File > Open URL…, for a crate's
+  URL, DOI (`https://doi.org/…`) or other persistent identifier.
+  `CrateRetriever` (lib, not used by the editor yet) already follows
+  FAIR Signposting (`Link: <…>; rel="describedby"`), content negotiation
+  (`Accept: application/ld+json;profile="https://w3id.org/ro/crate"`),
+  `ro-crate-metadata.json` beside a landing page, and HTML previews
+  linking their metadata; it limits sizes and requests, as all it fetches
+  is untrusted. Opened read-only, or as a detached crate whose relative
+  `@id`s are resolved against where it came from (RO-Crate's base URI for
+  a crate on the web), to save locally with Save As. Also an RO-Crate
+  zip at a URL (below), downloaded to a temporary folder.
+- **Save as ZIP and open ZIP**: File > Export as ZIP… writes an attached
+  crate's folder as a zip, `ro-crate-metadata.json` at its top (or in a
+  single folder, as RO-Crate allows), with the preview, skipping hidden
+  files, through a temporary file as Save does; and File > Open on a
+  `.zip` (or `.crate.zip`, `.eln`) unpacks it to a folder of the user's
+  choice (or a temporary one, read-only), then opens it as an attached
+  crate. Big zips in a window of their own, as copying files is. Check
+  zip entries' names for `..` and absolute paths (zip slip), and sizes
+  (zip bombs).
+- **BagIt**: a crate packaged as a BagIt bag (RFC 8493), as RO-Crate
+  describes in its implementation notes: `bagit.txt`, the payload in
+  `data/` with `ro-crate-metadata.json` there (or at the top, as some
+  profiles do), and checksum manifests (`manifest-sha512.txt`,
+  `tagmanifest-…`). Recognise a bag when opening a folder, open its
+  crate, and check its manifests (in the background), reporting files
+  missing or changed. Convert a folder to a bag (Crate > Make BagIt Bag…):
+  move the payload into `data/` (asking first, as it moves the user's
+  files, and only within the folder), keep `@id`s relative to the crate
+  (so the metadata moves with it), write `bagit.txt`, `bag-info.txt`
+  (from the crate's name, description, dates, creator) and the
+  manifests; and update the manifests on save. Check
+  https://github.com/LibraryOfCongress/bagit-java (archived) or write the
+  little BagIt needs (it is simple: text files and checksums).
+
+### Nested RO-Crates
+
+A crate may contain other crates: a folder of an attached crate with its
+own `ro-crate-metadata.json`, which RO-Crate describes as a Dataset whose
+`conformsTo` is the RO-Crate specification (see "Referencing other
+RO-Crates" in the spec's data entities). Recognise them:
+- When listing an attached crate's folder, a subfolder with its own
+  metadata file is a crate of its own: show it with a crate icon, its
+  files not as the outer crate's (they are the inner crate's to
+  describe), and offer to add it as such a Dataset (`@id` its folder,
+  `conformsTo` RO-Crate, its name and description from its metadata).
+- Open the inner crate from there in another window (File > Open on its
+  metadata file), and go back to the outer one.
+- Also crates referenced by URL or DOI (a Dataset with `conformsTo`
+  RO-Crate), opened by retrieving them (see the ro-crate-retrieve notes:
+  Signposting, content negotiation).
+- Checks: files of a nested crate shouldn't be the outer crate's parts
+  directly; the nested crate's own metadata file and preview are not
+  data of the outer one.
+
+### Licences, defaults and the metadata descriptor
+
+- **Recommended licences first** in the licence finder (Licence from
+  SPDX…): a "Recommended" group at the very top, before the search
+  results, of `Apache-2.0`, `BSD-2-Clause`, `BSD-3-Clause`, `MIT`,
+  `CC0-1.0`, `CC-BY-4.0`, `CC-BY-NC-4.0` and `CC-BY-ND-4.0` (SPDX's
+  identifiers; "CC-NC-4.0" isn't one, the non-commercial licence is
+  CC-BY-NC-4.0). Software licences and data/content licences could be
+  told apart in the group.
+- **Preferences for defaults**: a default licence, author (e.g. the
+  user's own ORCID, looked up once) and publisher (e.g. their
+  organisation's ROR), filled in on a new crate's root, and offered first
+  in those fields. Kept in the settings, so the privacy note of File >
+  Recent applies.
+- **The metadata descriptor's own licence**: the `ro-crate-metadata.json`
+  entity may have a `license` (RO-Crate suggests e.g. CC0 for the
+  metadata, separate from the data's), but the editor never shows the
+  descriptor. Perhaps View > Show Metadata Descriptor, listing it as an
+  entity (with only the properties that make sense: license, and not its
+  @id, conformsTo or about, which wpsld manages), or a "Metadata licence"
+  field on the root's form.
+
+### HTML preview (ro-crate-preview.html)
+
+*Done, basic*: saving an attached crate writes `ro-crate-preview.html`
+(`CratePreview`): plain HTML and CSS, light and dark, no scripts; the
+crate's name and description, a contents list, a section per entity with
+its properties, `#entity-n` anchors between them, links to files and the
+web; marked with `<meta name="generator" content="wpsld …">` so that
+only wpsld's own is written over; another tool's is replaced (moved
+aside into `ro-crate-preview_files/`) or kept, asked once. The crate
+describes it as RO-Crate's example does (a CreativeWork about the root,
+not in hasPart). Next: a preference to not write it; the generator as a
+SoftwareApplication with a CreateAction (object the metadata, result the
+preview), as the spec's example; images and maps for files and places;
+"Referenced by" as in the editor's preview; anchors that stay the same
+across saves (by @id rather than position); Markdown descriptions
+rendered. For a richer preview, investigate which existing previewer
+is easiest to reuse without running JavaScript or Python inside the Java
+application (no GraalJS, Jython or a bundled Node):
+- Previewers whose template could run in Java as it is: e.g. ro-crate-py's
+  preview is a Jinja template, which Jinjava (a Java implementation of
+  Jinja) might render; check the template's filters and its licence.
+- Previewers that render in the browser: a static HTML page with its
+  script, and the crate's JSON-LD embedded or beside it, which wpsld would
+  only copy and fill in (e.g. what ro-crate-html-js / rochtml can make;
+  check whether a page works offline, from `file:`).
+- Others to compare: ro-crate-html-lite, and Crate-O's and Describo's
+  previews; what each shows (files, people, licences, provenance), its
+  size, how it is maintained, and its licence.
+- Or wpsld's own: the preview pane already renders entities; writing that
+  as HTML is the fallback, with the most control and the most to maintain.
+
+### Performance on larger crates
+
+Measure before optimising, on crates of growing size: e.g. the COMPSs run
+crate above, a ROHub crate, and generated ones with 1 000, 10 000 and
+100 000 entities and as many files in an attached crate's folder.
+- What to time: opening (reading, the profile, the first form), selecting
+  an entity (form, preview, references across the crate), typing in a
+  field (each change checks the crate for undo and relists), saving and
+  Repair Crate; switching to Entities by Folder and by Part; listing the
+  folder's files (now at most 10 000, again after 5 seconds).
+- How: a benchmark test (not run by default, as `onlineTest` isn't) that
+  builds such crates and reports times, and the JDK's Flight Recorder on
+  the running editor for where the time goes.
+- Likely costs to look at: `crate.toJson()` compared on every change
+  (undo, the title's "modified"), `dataEntities()` and `byId()` built
+  again in loops, the tree made again from scratch, and the preview's
+  "Referenced by" scanning all entities.
+
+### Internationalisation (i18n)
+
+wpsld is in English only. Translating it means more than the UI's labels:
+- **The UI**: menus, buttons, dialogs, messages and help pages in resource
+  bundles, chosen by the system's language with a preference to change
+  it; dates and numbers formatted for the language.
+- **The vocabulary**: property and type labels and their descriptions come
+  from schema.org's definitions (`rdfs:label`, `rdfs:comment`), which are
+  in English; translations would need another source, e.g. community
+  translations of schema.org, or labels in a profile. Labels made from
+  terms (`datePublished` → "Date published", see `Labels`) are English
+  word rules too.
+- **Profiles**: some MASP profiles may already give labels and
+  descriptions with `@language`: check which do, and show those in the
+  user's language, falling back to English.
+- **The crate's own values**: `name` and `description` may be given in
+  several languages (`{"@value": …, "@language": "nb"}`), which the form
+  shows read-only now; editing values per language would follow.
+- **Right-to-left languages** (Arabic, Hebrew): the UI mirrored (JavaFX's
+  node orientation), and text fields that take mixed directions; the
+  Warp notebook's tabs and the tree's lines mirrored too.
+- **Keyboard layouts**: shortcuts and mnemonics that work on layouts
+  without the letters (e.g. Cyrillic, Greek) or where the keys move
+  (AZERTY, QWERTZ; `Ctrl+/` for help on macOS), and input methods for
+  Chinese, Japanese and Korean in the text fields.
 
 ### Start-up
 

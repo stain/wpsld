@@ -167,7 +167,7 @@ class LicenseFinder extends Dialog<License> {
 			note.getStyleClass().add("dim-text");
 			details.getChildren().add(note);
 		}
-		details.getChildren().add(link("Its page on the SPDX License List", license.page()));
+		details.getChildren().add(link("SPDX entry " + license.id(), license.page()));
 		license.seeAlso().forEach(address -> details.getChildren().add(link(address, address)));
 	}
 

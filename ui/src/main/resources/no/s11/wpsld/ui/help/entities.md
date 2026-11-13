@@ -20,13 +20,14 @@ entity without linking it from a property: it is mentioned by the root
 dataset, and shown, so that you can link it later, e.g. by typing its
 `@id` in a property. If the crate already has it, it is just shown.
 
-Select one or more entities and choose **Remove** to remove their
-descriptions. The root dataset cannot be removed. This does not delete
+Select one or more entities and choose **Remove**, below the list, in
+the **Edit** menu or by right-clicking, or press **Del**, to remove their
+descriptions from the crate. The root dataset cannot be removed. This does not delete
 files from your computer. References to removed entities may remain in
 other descriptions: check and remove or replace those references as needed.
 **Edit > Undo** can restore an accidental removal.
 
-**Edit > Repair Crate** can add placeholder Things for references to
+**Crate > Repair Crate** can add placeholder Things for references to
 entities not described in the crate, and update the root's mentions for
 otherwise unlinked entities. It also tidies licences from the SPDX License
 List, file formats from PRONOM, ORCID iDs, ROR identifiers and DOIs, see [Properties and links](properties.md). It reports what it changed. Give any
@@ -37,9 +38,13 @@ Use **Edit > Undo** if needed.
 
 Each entity has an `@id`. For a file, use its path relative to the crate
 folder; for a person, their ORCID iD (**Find in ORCID...** on their form,
-see [Properties and links](properties.md)) or another appropriate
+see [People](people.md)) or another appropriate
 persistent identifier. A generated identifier beginning with `#` identifies
 an entity within this crate.
+
+**↗** beside `@id` opens a web address in the browser, or the file or
+folder beside the crate that a relative `@id` names; it is not available
+for identifiers beginning with `#` or `_:`.
 
 To change an identifier, select the entity, edit `@id` and press Enter or
 leave the field. Links to it are updated. If another entity already has

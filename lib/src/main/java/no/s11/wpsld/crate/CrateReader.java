@@ -112,6 +112,8 @@ public class CrateReader {
 		private final Map<String, String> unknownTerms = new LinkedHashMap<>();
 		private final Map<String, String> undefinedPrefixes = new LinkedHashMap<>();
 		private final Map<String, Integer> uses = new LinkedHashMap<>();
+		/** Entities nested in values, with their @id, to flatten into the graph */
+		private final List<JsonNode> nested = new ArrayList<>();
 
 		Reading(String source) {
 			this.source = source;
@@ -260,7 +262,53 @@ public class CrateReader {
 					entities.put(entity.getId(), entity);
 				}
 			}
+			flattenNested(entities);
 			return entities;
+		}
+
+		/**
+		 * Entities nested in values (e.g. <code>"hasPart": [{"@id": "data/",
+		 * "@type": "Dataset"}]</code>), which RO-Crate's flattened JSON-LD
+		 * doesn't allow, as entities of their own, merged into the entity of
+		 * the same @id if there is one, as flattening does; the values became
+		 * references to them as they were read.
+		 */
+		private void flattenNested(Map<String, Entity> entities) {
+			int flattened = 0;
+			for (int i = 0; i < nested.size(); i++) {
+				JsonNode node = nested.get(i);
+				String id = node.get("@id").asText();
+				Entity entity = readEntity(node, id);
+				Entity existing = entities.get(id);
+				if (existing != null) {
+					if (!node.has("@type")) {
+						// Not Thing too
+						entity.setTypes(existing.getTypes());
+					}
+					merge(existing, entity);
+				} else {
+					entities.put(id, entity);
+				}
+				flattened++;
+			}
+			if (flattened > 0) {
+				warn(flattened + (flattened == 1 ? " entity was" : " entities were")
+						+ " nested in values, e.g. " + nested.get(0).get("@id").asText()
+						+ "; RO-Crate JSON-LD should be flattened, so moved into @graph as entities of their own");
+			}
+		}
+
+		/**
+		 * A reference to an entity nested in a value, kept to flatten, or the
+		 * value as it is
+		 */
+		private JsonNode unnest(JsonNode value) {
+			if (value.isObject() && value.size() > 1 && value.path("@id").isTextual()
+					&& !value.get("@id").asText().isEmpty() && !value.has("@value") && !value.has("@list")) {
+				nested.add(value);
+				return MAPPER.createObjectNode().put("@id", value.get("@id").asText());
+			}
+			return value;
 		}
 
 		private Entity readEntity(JsonNode node, String id) {
@@ -281,11 +329,11 @@ public class CrateReader {
 				if (value.isArray()) {
 					value.forEach(v -> {
 						if (!v.isNull()) {
-							values.add(v);
+							values.add(unnest(v));
 						}
 					});
 				} else if (!value.isNull()) {
-					values.add(value);
+					values.add(unnest(value));
 				}
 				// JSON-LD drops null and empty values
 				values.forEach(v -> checkValue(v, id + " " + key));
@@ -296,7 +344,9 @@ public class CrateReader {
 
 		private List<String> readTypes(JsonNode type, String id) {
 			List<String> types = new ArrayList<>();
-			if (type == null) {
+			if (type == null && nested.stream().anyMatch(n -> n.path("@id").asText().equals(id))) {
+				// Nested without a type, as a reference with more to it: Thing if not in @graph
+			} else if (type == null) {
 				warn(id + " has no @type, read as Thing");
 			} else if (type.isTextual()) {
 				types.add(type.asText());

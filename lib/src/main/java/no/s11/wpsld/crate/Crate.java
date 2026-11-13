@@ -20,6 +20,7 @@ package no.s11.wpsld.crate;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -99,6 +100,25 @@ public class Crate {
 		entities.addAll(others);
 		this.context = context.deepCopy();
 		this.descriptor = descriptor;
+	}
+
+	/**
+	 * The RO-Crate version the crate conforms to, e.g. <code>1.3</code>, by
+	 * its metadata descriptor's <code>conformsTo</code>; 1.3 for a new crate,
+	 * 1.0 for a descriptor of RO-Crate 1.0 (<code>ro-crate-metadata.jsonld</code>,
+	 * which had no <code>conformsTo</code>); none if it can't tell.
+	 */
+	public Optional<String> specVersion() {
+		if (descriptor.isEmpty()) {
+			return Optional.of("1.3");
+		}
+		Optional<String> version = descriptor.get().getAll("conformsTo").stream().map(v -> v.path("@id").asText(""))
+				.filter(id -> id.startsWith(RO_CRATE_SPEC)).map(id -> id.substring(RO_CRATE_SPEC.length()))
+				.map(v -> v.replaceAll("[/#].*", "")).filter(v -> !v.isEmpty()).findFirst();
+		if (version.isEmpty() && descriptor.get().getId().endsWith(".jsonld")) {
+			return Optional.of("1.0");
+		}
+		return version;
 	}
 
 	/**
@@ -356,6 +376,79 @@ public class Crate {
 	}
 
 	/**
+	 * The dataset whose <code>hasPart</code> a path belongs in: the nearest
+	 * folder above it that is a data entity, e.g. <code>data/</code> for
+	 * <code>data/raw/a.csv</code>, else the root data entity.
+	 */
+	public Entity partOf(String id) {
+		Set<Entity> data = Set.copyOf(dataEntities());
+		String path = withoutDot(id);
+		if (path.endsWith("/")) {
+			path = path.substring(0, path.length() - 1);
+		}
+		for (int slash = path.lastIndexOf('/'); slash > 0; slash = path.lastIndexOf('/', slash - 1)) {
+			String folder = path.substring(0, slash + 1);
+			Optional<Entity> dataset = entities.stream()
+					.filter(e -> data.contains(e) && withoutDot(e.getId()).equals(folder)).findFirst();
+			if (dataset.isPresent()) {
+				return dataset.get();
+			}
+		}
+		return getRoot();
+	}
+
+	private static String withoutDot(String id) {
+		return id.startsWith("./") ? id.substring(2) : id;
+	}
+
+	/**
+	 * Make these entities data entities: each a part (<code>hasPart</code>)
+	 * of the dataset of its folder (see {@link #partOf}), those in folders
+	 * first, so that a folder added becomes the dataset of its files. Not the
+	 * root data entity, nor those that already are.
+	 *
+	 * @return The entities added as parts
+	 */
+	public List<Entity> addParts(List<Entity> parts) {
+		List<Entity> added = new ArrayList<>();
+		List<Entity> sorted = parts.stream().filter(e -> e != getRoot())
+				.sorted(Comparator.comparing((Entity e) -> withoutDot(e.getId()).replaceAll("/$", "").split("/").length))
+				.toList();
+		for (Entity part : sorted) {
+			if (dataEntities().contains(part)) {
+				continue;
+			}
+			Entity dataset = partOf(part.getId());
+			List<JsonNode> hasPart = new ArrayList<>(dataset.getAll("hasPart"));
+			hasPart.add(JsonNodeFactory.instance.objectNode().put("@id", part.getId()));
+			dataset.setAll("hasPart", hasPart);
+			added.add(part);
+		}
+		return added;
+	}
+
+	/**
+	 * Add a Dataset for each of these folders, e.g. <code>raw/</code>, as a
+	 * part of the dataset above it (see {@link #addParts}).
+	 *
+	 * @return The Datasets added, in the order of the folders
+	 */
+	public List<Entity> addFolders(List<String> folders) {
+		List<Entity> added = new ArrayList<>();
+		for (String folder : folders) {
+			String id = folder.endsWith("/") ? folder : folder + "/";
+			if (get(id).isPresent()) {
+				continue;
+			}
+			Entity dataset = new Entity(id, "Dataset");
+			entities.add(dataset);
+			added.add(dataset);
+		}
+		addParts(added);
+		return added;
+	}
+
+	/**
 	 * Entities not linked from the root data entity: not referred to by any
 	 * of its properties (e.g. its parts in <code>hasPart</code>, or
 	 * <code>mentions</code>), nor by any property of an entity that is,
@@ -478,6 +571,25 @@ public class Crate {
 	 * Whether the entity is the crate's metadata descriptor or HTML preview,
 	 * by its <code>@id</code> relative to the crate or to the root's.
 	 */
+	/**
+	 * Describe the crate's HTML preview, ro-crate-preview.html, as RO-Crate
+	 * shows it: a CreativeWork about the root data entity; not one of its
+	 * parts (hasPart), which it SHOULD NOT be. Kept as it is if described.
+	 *
+	 * @return Its entity
+	 */
+	public Entity describePreview() {
+		Entity preview = get(RO_CRATE_PREVIEW_HTML).orElseGet(() -> {
+			Entity added = add("CreativeWork");
+			rename(added, RO_CRATE_PREVIEW_HTML);
+			return added;
+		});
+		if (preview.get("about").isEmpty()) {
+			preview.set("about", Optional.of(JsonNodeFactory.instance.objectNode().put("@id", getRoot().getId())));
+		}
+		return preview;
+	}
+
 	private boolean isCrateFile(Entity entity) {
 		return List.of(RO_CRATE_METADATA_JSON, RO_CRATE_PREVIEW_HTML).stream()
 				.anyMatch(name -> entity.getId().equals(name) || entity.getId().equals(getRoot().getId() + name));

@@ -23,6 +23,7 @@ import java.util.function.Consumer;
 
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
@@ -174,7 +175,11 @@ class PersonFinder extends Dialog<Person> {
 		Label name = new Label(person.name());
 		name.setWrapText(true);
 		name.setStyle("-fx-font-weight: bold;");
-		details.getChildren().addAll(name, new Label("ORCID iD: " + person.id()));
+		Hyperlink record = new Hyperlink(person.id());
+		record.setOnAction(e -> browse.accept(person.iri()));
+		HBox orcid = new HBox(4, new Label("ORCID iD:"), record);
+		orcid.setAlignment(Pos.BASELINE_LEFT);
+		details.getChildren().addAll(name, orcid);
 		if (!person.otherNames().isEmpty()) {
 			Label others = new Label("Also known as: " + String.join("; ", person.otherNames()));
 			others.setWrapText(true);
@@ -185,8 +190,5 @@ class PersonFinder extends Dialog<Person> {
 			institutions.setWrapText(true);
 			details.getChildren().add(institutions);
 		}
-		Hyperlink record = new Hyperlink("Their ORCID record");
-		record.setOnAction(e -> browse.accept(person.iri()));
-		details.getChildren().add(record);
 	}
 }

@@ -25,6 +25,10 @@ public class TestLabels {
 	@Test
 	public void fromTerm() {
 		assertEquals("Name", Labels.fromTerm("name"));
+		assertEquals("Has version", Labels.fromTerm("https://w3id.org/ro-id/rohub/model#has_version"));
+		assertEquals("Is part of", Labels.fromTerm("https://schema.org/isPartOf"));
+		assertEquals("Creation mode", Labels.fromTerm("http://w3id.org/ro-id/rohub/model#creation_mode"));
+		assertEquals("https://example.com/", Labels.fromTerm("https://example.com/"));
 		assertEquals("Date published", Labels.fromTerm("datePublished"));
 		assertEquals("Is based on", Labels.fromTerm("isBasedOn"));
 		assertEquals("URL", Labels.fromTerm("url"));

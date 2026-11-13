@@ -72,11 +72,20 @@ public final class Labels {
 	/**
 	 * A name from a camelCase term: <code>datePublished</code> becomes "Date
 	 * published", <code>url</code> "URL", <code>numTracks</code> "Number of
-	 * tracks". Terms starting with <code>@</code> stay as they are.
+	 * tracks". Terms starting with <code>@</code> stay as they are. An IRI
+	 * is named by its local name, after its last <code>#</code> or
+	 * <code>/</code>, with <code>_</code> between words:
+	 * <code>https://w3id.org/ro-id/rohub/model#has_version</code> is "Has
+	 * version".
 	 */
 	public static String fromTerm(String term) {
 		if (term.isEmpty() || term.startsWith("@")) {
 			return term;
+		}
+		int colon = term.indexOf(':');
+		if (colon > 0 && term.startsWith("//", colon + 1)) {
+			String local = term.substring(Math.max(term.lastIndexOf('#'), term.lastIndexOf('/')) + 1);
+			return local.isBlank() ? term : fromTerm(local.replace('_', ' ').strip());
 		}
 		if (NAMES.containsKey(term)) {
 			return NAMES.get(term);

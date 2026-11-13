@@ -39,6 +39,8 @@ one's form is in the middle, and its preview on the right.
 | A person, in the Classic style | The crate itself, with the fields its profile requires first, in the Windows 11 style |
 | ![A file in the macOS style, in dark colours](docs/screenshots/macos-dark-file.png) | ![An event in the OS/2 Warp style](docs/screenshots/warp-event.png) |
 | A file, in the macOS style in dark colours, each value with − and + | An event, in the OS/2 Warp style, with the form as a notebook |
+| ![Entities by folder in the OS/2 Warp style](docs/screenshots/warp-tree.png) | |
+| View > Entities by Folder: files by their paths, the other entities by type, in the OS/2 Warp style | |
 
 ### Making the screenshots again
 

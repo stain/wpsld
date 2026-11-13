@@ -20,6 +20,7 @@ module no.s11.wpsld {
     requires com.fasterxml.jackson.databind;
     // Loading MASP profiles by URL
     requires java.net.http;
+    requires org.apache.tika.core;
     exports no.s11.wpsld;
     exports no.s11.wpsld.arcp;
     exports no.s11.wpsld.soss;

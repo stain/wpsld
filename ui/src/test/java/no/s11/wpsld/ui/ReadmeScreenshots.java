@@ -161,6 +161,41 @@ public class ReadmeScreenshots extends ApplicationTest {
 		look("warp", "light");
 		select("#spring-survey");
 		png(out.resolve("warp-event.png"));
+
+		// View > Entities by Folder, as the Workplace Shell's tree view
+		select("data/counts.csv");
+		listByFolder(true);
+		png(out.resolve("warp-tree.png"));
+		listByFolder(false);
+	}
+
+	/** View > Entities by Folder or by Type, as chosen from the menu */
+	private void listByFolder(boolean folders) {
+		MenuBar bar = lookup("#menuBar").queryAs(MenuBar.class);
+		String id = folders ? "menuListByFolder" : "menuListByType";
+		interact(() -> bar.getMenus().stream().flatMap(m -> m.getItems().stream()).filter(i -> id.equals(i.getId()))
+				.map(RadioMenuItem.class::cast).findFirst().orElseThrow().setSelected(true));
+		WaitForAsyncUtils.waitForFxEvents();
+	}
+
+	/** The entity tree, for the help */
+	@Test
+	public void treeScreenshots() throws Exception {
+		String folder = System.getenv("HELP_SCREENSHOTS");
+		Assume.assumeTrue("Set HELP_SCREENSHOTS to the folder for them", folder != null && !folder.isBlank());
+		Path out = Files.createDirectories(Path.of(folder));
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		interact(() -> {
+			stage.setWidth(1200);
+			stage.setHeight(720);
+		});
+		Path crate = copyExample();
+		WaitForAsyncUtils.asyncFx(() -> app.open(stage, crate)).get();
+		look("classic", "light");
+		select("data/counts.csv");
+		listByFolder(true);
+		png(out.resolve("entity-tree.png"), lookup("#entityTree").query().getParent());
+		listByFolder(false);
 	}
 
 	/** Screenshots for the help walkthrough, with the same example values. */
