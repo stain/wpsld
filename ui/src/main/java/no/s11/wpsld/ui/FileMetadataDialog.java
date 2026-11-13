@@ -37,11 +37,12 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import no.s11.wpsld.crate.Entity;
-import no.s11.wpsld.lookup.DocumentMetadata.Found;
+import no.s11.wpsld.lookup.EmbeddedMetadata.Found;
+import no.s11.wpsld.lookup.EmbeddedMetadata.Kind;
 
 /**
  * Choose which of the values a file says about itself (see
- * {@link no.s11.wpsld.lookup.DocumentMetadata}) to give its entity: each
+ * {@link no.s11.wpsld.lookup.EmbeddedMetadata}) to give its entity: each
  * with where in the file it is, and the entity's values now. Those the
  * entity has no value for yet are chosen to start with, one of each.
  */
@@ -66,7 +67,8 @@ class FileMetadataDialog extends Dialog<List<Found>> {
 			box.setId("fileMetadata-" + boxes.size());
 			box.setMnemonicParsing(false);
 			// One value of each property to start with, where it has none
-			box.setSelected(now.isEmpty() && chosen.add(f.property()));
+			// Where a photo was taken only on purpose
+			box.setSelected(f.kind() != Kind.PLACE && now.isEmpty() && chosen.add(f.property()));
 			box.setTooltip(new Tooltip("From " + f.source() + (now.isEmpty() ? ""
 					: "\nNow: " + now.stream().map(FileMetadataDialog::oneLine).collect(Collectors.joining(", ")))));
 			boxes.put(box, f);
@@ -75,7 +77,9 @@ class FileMetadataDialog extends Dialog<List<Found>> {
 		Label note = new Label(boxes.isEmpty() ? "The entity has all of it already."
 				: "Chosen are those it has no value for yet. A name, description, date or language replaces the"
 						+ " entity's; authors, keywords and licences are added. Authors are linked by name, to a"
-						+ " Person added if the crate has none of that name; SPDX licences by their SPDX address.");
+						+ " Person added if the crate has none of that name; SPDX licences by their SPDX address; where"
+						+ " a photo was taken by a new Place. Photos can tell more than meant, e.g. where someone"
+						+ " lives: choose with care.");
 		note.setWrapText(true);
 		note.getStyleClass().add("dim-text");
 		ScrollPane scroll = new ScrollPane(list);

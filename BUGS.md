@@ -138,93 +138,23 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   `@id` and maybe values as you type; with a type chosen, say at the end
   of the list what else matches, e.g. "Hidden: 15 entities of other
   types", to show them all.
-- **Image metadata from EXIF**: for PNG and JPEG images, read their
-  embedded metadata (EXIF, and XMP or IPTC where present) to offer as an
-  ImageObject's properties: `width` and `height`, `dateCreated`
-  (DateTimeOriginal), `creator` (Artist), `copyrightNotice`, `caption` or
-  `description`, the camera in `exifData` (PropertyValues), and where it
-  was taken (GPS) as a Place in `contentLocation`. Offered to choose, not
-  filled in silently, as photos can carry private details (location,
-  camera serial numbers). Not JPEG 2000: no library reads its metadata
-  but jai-imageio-jpeg2000, whose JJ2000 licence is a problem, and it
-  would mean native-ish binary handling of our own.
-  Library: **metadata-extractor** (2.22.0, Oct 2026, Apache-2.0; xmpcore
-  BSD-3-Clause): JPEG (EXIF, XMP, IPTC) and PNG (text chunks, XMP, eXIf),
-  about 1 MB with xmpcore, typed access (e.g.
-  `GpsDirectory.getGeoLocation()`); it is what Tika's image parser uses.
-  Compared with Apache Commons Imaging (1.0.0-alpha6, still alpha, about
-  2 MB with commons-io and commons-lang3) and Tika's image module (more
-  jars than needed).
-  Tried (13 November 2026) on a JPEG and a PNG tagged with exiftool: it
-  reads EXIF Artist, Copyright, ImageDescription, Make and Model,
-  DateTimeOriginal with OffsetTimeOriginal, GPS as decimal degrees
-  (`GpsDirectory.getGeoLocation()`), and XMP `cc:license`,
-  `xmpRights:WebStatement`, `dc:creator`, `dc:title`, `xmp:CreateDate`;
-  from PNG both its eXIf chunk and XMP. Take XMP through
-  `XmpDirectory.getXmpProperties()` (a map of path to value, e.g.
-  `cc:license`), not xmpcore's `XMPMeta`: xmpcore has no module name, so
-  it is on the class path and our module can't read its types. Take dates
-  as their text: `getDateOriginal()` takes UTC when the file has no zone.
-  The jlink plugin merges both jars into `wpsld.merged.module`, as it does
-  tika-core (linking itself not tried here: the container's JDK has no
-  jmods).
-- **SVG metadata**: SVG files can describe themselves in RDF in a
-  `<metadata>` element; Inkscape writes a `cc:Work` with Dublin Core
-  (`dc:title`, `dc:creator` as a `cc:Agent` with its `dc:title`,
-  `dc:date`, `dc:rights`, `dc:description`, `dc:subject` keywords) and
-  `cc:license` with an `rdf:resource` URL. Read with the JDK's XML parser
-  (DTDs and external entities off), no library needed; also `<title>` and
-  `<desc>`, and the size from `width`, `height` or `viewBox`.
-- **Document metadata from PDF, Office and OpenDocument files**, the same
-  way. *Office and OpenDocument done* (`DocumentMetadata`, the entity
-  list's Metadata from the File…); PDF to do, and images and SVG with
-  it in the same dialog: `name`, `author`/`creator`, `dateCreated`, `dateModified`,
-  `keywords`, `description`, `numberOfPages`, offered to choose. Tika can
-  (its PDF and Microsoft parser modules), but they bring PDFBox and Apache
-  POI with xmlbeans (many MB). Instead:
-  - **PDF**: Apache PDFBox (Apache-2.0; a few MB with fontbox and
-    pdfbox-io, to check): the document information dictionary (Title,
-    Author, Subject, Keywords, Creator, Producer, CreationDate, ModDate),
-    the page count, and the XMP metadata stream, which is RDF with Dublin
-    Core (`dc:title`, `dc:creator`, `dc:description`, `dc:rights`), read
-    with xmpcore as for images.
-  - **DOCX, XLSX, PPTX**: no library needed: open the file as a file
-    system (`FileSystems.newFileSystem(path)`, the JDK's zip file system
-    in `jdk.zipfs`, which the runtime image must then include, e.g. by
-    `requires jdk.zipfs` or jlink's `--add-modules`, as it is a service
-    provider) and read `docProps/core.xml`
-    (Dublin Core: title, creator, description, subject, keywords, created,
-    modified), `docProps/app.xml` (application, pages, words) and
-    `docProps/custom.xml` (custom properties, where a licence may be).
-    LibreOffice and OpenOffice's OpenDocument files (`.odt`, `.ods`,
-    `.odp`, `.odg`, and the older `.sxw` and friends) likewise: a ZIP with
-    `meta.xml` (Dublin Core and `meta:` statistics such as page count).
-- **Dates from embedded metadata**, as `dateCreated` and `dateModified`
-  (and `datePublished` only if the file says so), rather than the file
-  system's times, which copying changes:
-  - EXIF: DateTimeOriginal (taken), DateTimeDigitized, DateTime
-    (changed), as `2026:04:20 15:36:54` without a time zone, unless
-    OffsetTimeOriginal (EXIF 2.31) gives it; GPS has its own UTC date.
-  - XMP (images and PDF): `xmp:CreateDate`, `xmp:ModifyDate`,
-    `photoshop:DateCreated`, `dc:date`, ISO 8601.
-  - PDF information dictionary: CreationDate and ModDate as
-    `D:20260420153654+01'00'`.
-  - Office: `dcterms:created` and `dcterms:modified` in core.xml (W3CDTF,
-    usually UTC); OpenDocument: `meta:creation-date` and `dc:date` in
-    meta.xml (often without a zone).
-  Written as ISO 8601, with the zone only when the file gives one; when
-  sources disagree (e.g. XMP and EXIF), prefer the most precise and say
-  which.
-- **Licences from embedded metadata**, across images and documents:
-  SVG's RDF has `cc:license`; XMP (in JPEG, PNG and PDF) has `cc:license` (Creative Commons' schema,
-  a URL), `xmpRights:WebStatement` (a URL), `xmpRights:UsageTerms` and
-  `dc:rights` (text); EXIF has Copyright and IPTC CopyrightNotice (text);
-  Office files may name one in custom properties. Match URLs with
-  `SPDXLicenses.byLink` (e.g. `https://creativecommons.org/licenses/by/4.0/`
-  is CC-BY-4.0) and SPDX identifiers in text with `meant`; names such as
-  "CC BY 4.0" or "Creative Commons Attribution 4.0 International" need
-  matching by name too. Offer the match as the file's `license`, and keep
-  rights text as `copyrightNotice` or `creditText`.
+- **Files' own metadata, what is left**: Metadata from the File… now reads
+  Office, OpenDocument, PDF (PDFBox, in ui as it needs java.desktop),
+  JPEG, PNG, TIFF and WebP (metadata-extractor: EXIF, IPTC, XMP, PNG
+  text, GPS) and SVG (its RDF, as Inkscape writes it), with dates and
+  licences (`EmbeddedMetadata`, `PdfMetadata`). Still to do:
+  - An image's `width` and `height` (schema.org wants a Distance or
+    QuantitativeValue, e.g. `{"@type": "QuantitativeValue", "value": 605,
+    "unitCode": "E37"}` for pixels: decide how to write them).
+  - The camera and its settings as `exifData` PropertyValues, on request
+    only (they can identify the camera).
+  - Licence names in text, e.g. "CC BY 4.0" or "Creative Commons
+    Attribution 4.0 International", matched to SPDX by name; now only
+    URLs (`SPDXLicenses.byLink`) and SPDX identifiers (`meant`) are.
+  - Reading it for several files at once, e.g. in Crate > Update File
+    Details, or when adding files (offered, not filled in).
+  - JPEG 2000: not planned (no library reads its metadata but
+    jai-imageio-jpeg2000, whose JJ2000 licence is a problem).
 
 ## To check on Windows and macOS
 

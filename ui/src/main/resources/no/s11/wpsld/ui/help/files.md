@@ -58,17 +58,30 @@ of that name can stay).
 
 ## Metadata from the file
 
-Some files say what they are, who made them and when. Right-click a file
-in the entity list and choose **Metadata from the File…** to see what an
-Office file (`.docx`, `.xlsx`, `.pptx`) or an OpenDocument file from
-LibreOffice or OpenOffice (`.odt`, `.ods`, `.odp`, and the older `.sxw`)
-says: its title, description, author, keywords, language, when it was
-created and last changed, and a licence given in its custom properties.
+Some files say what they are, who made them, when and under which
+licence. Right-click a file in the entity list and choose **Metadata from
+the File…** to see what it says:
+
+- Office files (`.docx`, `.xlsx`, `.pptx`) and OpenDocument files from
+  LibreOffice or OpenOffice (`.odt`, `.ods`, `.odp`, and the older
+  `.sxw`): title, description, author, keywords, language, when created
+  and last changed, and a licence in their custom properties.
+- PDFs: their document information (title, subject, author, keywords,
+  dates) and their XMP metadata.
+- Photos and images (JPEG, PNG, TIFF, WebP): description, artist,
+  copyright, keywords, when taken and changed, a licence in their XMP, and
+  where the photo was taken, if the camera recorded it.
+- SVG drawings: their title and description, and the metadata Inkscape
+  writes (creator, date, rights, keywords, licence).
+
 Tick what to give the file's entity. Those it has no value for yet are
-ticked to start with; hover over one to see where in the file it is, and
-the entity's value now. Authors become links to a Person of that name,
-added if the crate has none, and a licence known to SPDX a link to it.
-**Edit > Undo** takes it all back at once.
+ticked to start with, except where a photo was taken: a photo can tell
+more than meant, such as where someone lives, so give that only on
+purpose. Hover over a value to see where in the file it is, and the
+entity's value now. Authors become links to a Person of that name, added
+if the crate has none; a licence known to SPDX a link to it; and where a
+photo was taken a new Place with its point on the map. **Edit > Undo**
+takes it all back at once.
 
 ## HTML preview
 

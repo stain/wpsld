@@ -126,13 +126,14 @@ import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.lookup.DOI;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.crate.Places;
 import no.s11.wpsld.lookup.GeoNames;
 import no.s11.wpsld.lookup.ORCID;
 import no.s11.wpsld.lookup.ROR;
 import no.s11.wpsld.lookup.FileFormats;
 import no.s11.wpsld.lookup.PRONOMFormats;
 import no.s11.wpsld.lookup.WebAvailability;
-import no.s11.wpsld.lookup.DocumentMetadata;
+import no.s11.wpsld.lookup.EmbeddedMetadata;
 import no.s11.wpsld.lookup.SPDXLicenses;
 import no.s11.wpsld.crate.UndoHistory;
 import no.s11.wpsld.crate.UndoHistory.Place;
@@ -935,7 +936,7 @@ public class CrateEditor extends Application {
 			"inLanguage");
 
 	/**
-	 * What the file selected says about itself (see {@link DocumentMetadata}),
+	 * What the file selected says about itself (see {@link EmbeddedMetadata}),
 	 * to choose from and give its entity, as one undo step.
 	 */
 	void metadataFromFile(Stage stage) {
@@ -945,11 +946,14 @@ public class CrateEditor extends Application {
 		}
 		Entity entity = selected.get().getKey();
 		// Not what it has already, e.g. the same author or licence
-		List<DocumentMetadata.Found> found = DocumentMetadata.read(selected.get().getValue()).stream()
-				.filter(f -> !entity.getAll(f.property()).contains(fileValue(f, false))).toList();
+		Path path = selected.get().getValue();
+		List<EmbeddedMetadata.Found> found = java.util.stream.Stream
+				.concat(EmbeddedMetadata.read(path).stream(), PdfMetadata.read(path).stream())
+				.filter(f -> !entity.getAll(f.property()).contains(fileValue(f, false, entity))).toList();
 		if (found.isEmpty()) {
-			Alert none = new Alert(AlertType.INFORMATION, "Office and OpenDocument files (e.g. .docx, .xlsx, .odt)"
-					+ " can say what they are, who made them and when; this one says nothing the crate doesn't.",
+			Alert none = new Alert(AlertType.INFORMATION, "Office, OpenDocument and PDF files, images (JPEG, PNG,"
+					+ " TIFF, WebP) and SVGs can say what they are, who made them, when and under which licence;"
+					+ " this one says nothing the crate doesn't.",
 					ButtonType.OK);
 			none.initOwner(stage);
 			none.setHeaderText("Nothing new in “" + entity.getLabel() + "”");
@@ -959,13 +963,13 @@ public class CrateEditor extends Application {
 		Function<JsonNode, String> shown = v -> v.isValueNode() ? v.asText()
 				: crate.get(v.path("@id").asText()).map(Entity::getLabel).orElse(v.path("@id").asText());
 		FileMetadataDialog dialog = new FileMetadataDialog(stage, entity, found, entityEditor::label, shown);
-		List<DocumentMetadata.Found> chosen = dialog.showAndWait().orElse(List.of());
+		List<EmbeddedMetadata.Found> chosen = dialog.showAndWait().orElse(List.of());
 		if (chosen.isEmpty()) {
 			return;
 		}
 		Set<String> replaced = new HashSet<>();
-		for (DocumentMetadata.Found f : chosen) {
-			JsonNode value = fileValue(f, true);
+		for (EmbeddedMetadata.Found f : chosen) {
+			JsonNode value = fileValue(f, true, entity);
 			List<JsonNode> values = new ArrayList<>(
 					ONE_VALUE.contains(f.property()) && replaced.add(f.property()) ? List.of()
 							: entity.getAll(f.property()));
@@ -983,11 +987,11 @@ public class CrateEditor extends Application {
 
 	/**
 	 * The value to give for what a file says: text, or for a person a link
-	 * to the crate's Person (or Organization) of that name, and for a licence
-	 * a link to its SPDX licence if it is one; with add, added to the crate
-	 * if it has none.
+	 * to the crate's Person (or Organization) of that name, for a licence a
+	 * link to its SPDX licence if it is one, and for where, a link to a new
+	 * Place there; with add, added to the crate if it has none.
 	 */
-	private JsonNode fileValue(DocumentMetadata.Found found, boolean add) {
+	private JsonNode fileValue(EmbeddedMetadata.Found found, boolean add, Entity file) {
 		ObjectNode ref = JsonNodeFactory.instance.objectNode();
 		switch (found.kind()) {
 		case PERSON -> {
@@ -1023,6 +1027,17 @@ public class CrateEditor extends Application {
 				});
 			}
 			return ref.put("@id", iri);
+		}
+		case PLACE -> {
+			if (!add) {
+				return TextNode.valueOf(found.value());
+			}
+			String[] where = found.value().split(",\\s*");
+			Entity place = crate.add("Place");
+			place.set("name", Optional.of(TextNode.valueOf("Where " + file.getLabel() + " was made")));
+			Places.setPoint(place, Double.parseDouble(where[0]), Double.parseDouble(where[1]), crate::get,
+					() -> crate.add("Geometry"));
+			return ref.put("@id", place.getId());
 		}
 		default -> {
 			return TextNode.valueOf(found.value());

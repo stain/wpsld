@@ -1276,6 +1276,47 @@ public class TestCrateEditor extends ApplicationTest {
 	}
 
 	/**
+	 * A photo's metadata: where it was taken offered, but only given on
+	 * purpose, as a Place with its point; its licence the SPDX licence.
+	 */
+	@Test
+	public void metadataFromPhoto() throws Exception {
+		entities();
+		Path dir = Files.createTempDirectory("crate");
+		try (var in = getClass().getResourceAsStream("/no/s11/wpsld/lookup/photo.jpg")) {
+			Files.copy(in, dir.resolve("photo.jpg"));
+		}
+		Files.writeString(dir.resolve("ro-crate-metadata.json"), """
+				{"@context": "https://w3id.org/ro/crate/1.3/context",
+				 "@graph": [
+				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.3"}},
+				  {"@id": "./", "@type": "Dataset", "name": "A crate", "hasPart": {"@id": "photo.jpg"}},
+				  {"@id": "photo.jpg", "@type": ["File", "ImageObject"], "name": "Bus stop"}]}""");
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir)).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		Entity photo = listed("photo.jpg").orElseThrow();
+		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().indexOf(photo)));
+		WaitForAsyncUtils.asyncFx(() -> app.metadataFromFile(stage));
+		WaitForAsyncUtils.waitForFxEvents();
+		javafx.scene.control.CheckBox where = lookup("#fileMetadata").lookup(".check-box")
+				.queryAllAs(javafx.scene.control.CheckBox.class).stream()
+				.filter(b -> b.getText().contains("53.466800, -2.233900")).findFirst().orElseThrow();
+		assertFalse(where.isSelected());
+		clickOn(where);
+		clickDialogButton("OK");
+		Entity place = listed(photo.get("contentLocation").orElseThrow().get("@id").asText()).orElseThrow();
+		assertEquals(List.of("Place"), place.getTypes());
+		Entity geometry = listed(place.get("geo").orElseThrow().get("@id").asText()).orElseThrow();
+		assertTrue(geometry.get("asWKT").orElseThrow().asText(),
+				geometry.get("asWKT").orElseThrow().asText().endsWith("POINT (-2.2339 53.4668)"));
+		assertEquals("http://spdx.org/licenses/CC-BY-4.0", photo.get("license").orElseThrow().get("@id").asText());
+		assertEquals("2026-04-20T15:36:54+01:00", photo.get("dateCreated").orElseThrow().asText());
+		assertEquals("© 2026 Josiah Carberry", photo.get("copyrightNotice").orElseThrow().asText());
+	}
+
+	/**
 	 * A place, as RO-Crate 1.3 describes it: its geo a Geometry with
 	 * Well-Known Text, shown on a map from the preview, and new geometries
 	 * made from its geo field.
