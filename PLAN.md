@@ -905,6 +905,20 @@ Styles:
   attributes), or Microsoft's old binary Office files with Apache POI. A
   plugin that is installed separately keeps its licence out of wpsld's
   release.
+  The jlink image is only the boot layer: modules not linked into it can
+  be loaded at run time into a layer above it, also wpsld's own, shipped
+  in a `plugins/` folder of the release zip beside the runtime (jpackage
+  `--app-content`), not linked. So keep the linked image minimal (the
+  JDK modules, JavaFX, wpsld's lib and ui with the interfaces, Jackson)
+  and let plugins bring the rest: the metadata readers (metadata-extractor
+  and xmpcore, PDFBox, jHDF), perhaps Tika. A library without
+  module-info, e.g. PDFBox, then stays an automatic module there rather
+  than being merged into wpsld.merged.module, whose generated module-info
+  missed java.xml and java.desktop (tried 13 November 2026: PDFBox in
+  such a layer reads a PDF; see BUGS.md). The boot layer must have the
+  JDK modules plugins need (they can't add any; e.g. java.desktop, there
+  for JavaFX, and java.sql and java.xml), and plugins mustn't bring
+  packages the boot layer has (e.g. commons-logging goes with PDFBox).
 - **More lookups for RO-Crate's recommended identifiers** (Recommended
   Identifiers in RO-Crate 1.3's metadata page). Smaller helpers: `keywords` edited as tags but
   written as one comma-separated string, and `temporalCoverage` as a
