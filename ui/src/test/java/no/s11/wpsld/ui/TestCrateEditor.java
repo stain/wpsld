@@ -1199,6 +1199,82 @@ public class TestCrateEditor extends ApplicationTest {
 		assertEquals("Line one\nline two", lookup("#previewDescription").queryAs(Label.class).getText());
 	}
 
+	/** The entity of an @id, as listed */
+	private Optional<Entity> listed(String id) {
+		return entities().getItems().stream().filter(e -> e.getId().equals(id)).findFirst();
+	}
+
+	/**
+	 * A Word file's own metadata, chosen in a dialog: its title replaces the
+	 * name, its creator is a Person linked by name, its licence the SPDX
+	 * licence; asked again, only what is new.
+	 */
+	@Test
+	public void metadataFromFile() throws Exception {
+		entities();
+		Path dir = Files.createTempDirectory("crate");
+		try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(
+				Files.newOutputStream(dir.resolve("workshop.docx")))) {
+			zip.putNextEntry(new java.util.zip.ZipEntry("docProps/core.xml"));
+			zip.write("""
+					<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+					 xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/">
+					<dc:title>Week 8 workshop</dc:title><dc:creator>Josiah Carberry</dc:creator>
+					<dcterms:created>2026-04-20T15:36:54Z</dcterms:created></cp:coreProperties>"""
+					.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+			zip.putNextEntry(new java.util.zip.ZipEntry("docProps/custom.xml"));
+			zip.write("""
+					<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties"
+					 xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+					<property name="License"><vt:lpwstr>https://creativecommons.org/licenses/by/4.0/</vt:lpwstr></property>
+					</Properties>""".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+		}
+		Files.writeString(dir.resolve("ro-crate-metadata.json"), """
+				{"@context": "https://w3id.org/ro/crate/1.3/context",
+				 "@graph": [
+				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.3"}},
+				  {"@id": "./", "@type": "Dataset", "name": "A crate", "hasPart": {"@id": "workshop.docx"}},
+				  {"@id": "workshop.docx", "@type": "File", "name": "Draft"}]}""");
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir)).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		Entity file = entities().getItems().stream().filter(e -> e.getId().equals("workshop.docx")).findFirst()
+				.orElseThrow();
+		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().indexOf(file)));
+		WaitForAsyncUtils.asyncFx(() -> app.metadataFromFile(stage));
+		WaitForAsyncUtils.waitForFxEvents();
+		// The name it has: not chosen to start with
+		List<javafx.scene.control.CheckBox> boxes = lookup("#fileMetadata").lookup(".check-box")
+				.queryAllAs(javafx.scene.control.CheckBox.class).stream().toList();
+		assertEquals(4, boxes.size());
+		javafx.scene.control.CheckBox name = boxes.stream().filter(b -> b.getText().startsWith("Name"))
+				.findFirst().orElseThrow();
+		assertFalse(name.isSelected());
+		assertEquals(3, boxes.stream().filter(javafx.scene.control.CheckBox::isSelected).count());
+		clickOn(name);
+		clickDialogButton("OK");
+		assertEquals("Week 8 workshop", file.getLabel());
+		assertEquals("2026-04-20T15:36:54Z", file.get("dateCreated").orElseThrow().asText());
+		Entity author = listed(file.get("author").orElseThrow().get("@id").asText()).orElseThrow();
+		assertEquals(List.of("Person"), author.getTypes());
+		assertEquals("Josiah Carberry", author.getLabel());
+		assertEquals("http://spdx.org/licenses/CC-BY-4.0", file.get("license").orElseThrow().get("@id").asText());
+		assertTrue(listed("http://spdx.org/licenses/CC-BY-4.0").isPresent());
+		// One undo step
+		push(KeyCode.SHORTCUT, KeyCode.Z);
+		assertEquals("Draft", listed("workshop.docx").orElseThrow().getLabel());
+		push(KeyCode.SHORTCUT, KeyCode.SHIFT, KeyCode.Z);
+		// Again: all there already
+		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().stream()
+				.filter(e -> e.getId().equals("workshop.docx")).findFirst().map(entities().getItems()::indexOf)
+				.orElseThrow()));
+		WaitForAsyncUtils.asyncFx(() -> app.metadataFromFile(stage));
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup("Nothing new in “Week 8 workshop”").tryQuery().isPresent());
+		clickDialogButton("OK");
+	}
+
 	/**
 	 * A place, as RO-Crate 1.3 describes it: its geo a Geometry with
 	 * Well-Known Text, shown on a map from the preview, and new geometries

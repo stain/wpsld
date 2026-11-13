@@ -161,7 +161,9 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   (DTDs and external entities off), no library needed; also `<title>` and
   `<desc>`, and the size from `width`, `height` or `viewBox`.
 - **Document metadata from PDF, Office and OpenDocument files**, the same
-  way: `name`, `author`/`creator`, `dateCreated`, `dateModified`,
+  way. *Office and OpenDocument done* (`DocumentMetadata`, the entity
+  list's Metadata from the File…); PDF to do, and images and SVG with
+  it in the same dialog: `name`, `author`/`creator`, `dateCreated`, `dateModified`,
   `keywords`, `description`, `numberOfPages`, offered to choose. Tika can
   (its PDF and Microsoft parser modules), but they bring PDFBox and Apache
   POI with xmlbeans (many MB). Instead:

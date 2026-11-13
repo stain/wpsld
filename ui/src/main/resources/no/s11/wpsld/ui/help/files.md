@@ -56,6 +56,20 @@ Saving a crate of RO-Crate 1.1 or later beside RO-Crate 1.0's
 `ro-crate-metadata.jsonld` offers to remove that old file (a symbolic link
 of that name can stay).
 
+## Metadata from the file
+
+Some files say what they are, who made them and when. Right-click a file
+in the entity list and choose **Metadata from the File…** to see what an
+Office file (`.docx`, `.xlsx`, `.pptx`) or an OpenDocument file from
+LibreOffice or OpenOffice (`.odt`, `.ods`, `.odp`, and the older `.sxw`)
+says: its title, description, author, keywords, language, when it was
+created and last changed, and a licence given in its custom properties.
+Tick what to give the file's entity. Those it has no value for yet are
+ticked to start with; hover over one to see where in the file it is, and
+the entity's value now. Authors become links to a Person of that name,
+added if the crate has none, and a licence known to SPDX a link to it.
+**Edit > Undo** takes it all back at once.
+
 ## HTML preview
 
 Saving an attached crate also writes `ro-crate-preview.html` beside its

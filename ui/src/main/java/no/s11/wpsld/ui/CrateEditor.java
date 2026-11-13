@@ -29,6 +29,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -38,6 +39,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -130,6 +132,7 @@ import no.s11.wpsld.lookup.ROR;
 import no.s11.wpsld.lookup.FileFormats;
 import no.s11.wpsld.lookup.PRONOMFormats;
 import no.s11.wpsld.lookup.WebAvailability;
+import no.s11.wpsld.lookup.DocumentMetadata;
 import no.s11.wpsld.lookup.SPDXLicenses;
 import no.s11.wpsld.crate.UndoHistory;
 import no.s11.wpsld.crate.UndoHistory.Place;
@@ -606,12 +609,17 @@ public class CrateEditor extends Application {
 		MenuItem showFiles = new MenuItem(FileManager.label(FileManager.System.current()));
 		showFiles.setId("contextShowInFiles");
 		showFiles.setOnAction(e -> selectedPath().ifPresent(path -> showInFiles(stage, path)));
+		MenuItem fileMetadata = new MenuItem("Metadata from the File…");
+		fileMetadata.setId("contextFileMetadata");
+		fileMetadata.setOnAction(e -> metadataFromFile(stage));
 		ContextMenu menu = new ContextMenu(copyEntity, pasteEntity, new SeparatorMenuItem());
 		menu.getItems().addAll(parts);
-		menu.getItems().addAll(new SeparatorMenuItem(), showFiles, new SeparatorMenuItem(), removeEntity);
+		menu.getItems().addAll(new SeparatorMenuItem(), showFiles, fileMetadata, new SeparatorMenuItem(),
+				removeEntity);
 		menu.setOnShowing(e -> {
 			enableParts(parts);
 			showFiles.setDisable(selectedPath().isEmpty());
+			fileMetadata.setDisable(selectedFile().isEmpty());
 		});
 		return menu;
 	}
@@ -911,6 +919,115 @@ public class CrateEditor extends Application {
 					? Optional.of(folder.get().resolve(CrateFolder.decode(file).replaceFirst("^(\\./)+", "")))
 					: Optional.empty();
 		});
+	}
+
+	/** The entity selected, if one, and the file in the crate's folder it describes */
+	private Optional<Map.Entry<Entity, Path>> selectedFile() {
+		Entity entity = entityEditor.getEntity();
+		if (entity == null || selection.size() != 1 || !selection.contains(entity) || entity == crate.getRoot()) {
+			return Optional.empty();
+		}
+		return selectedPath().filter(Files::isRegularFile).map(path -> Map.entry(entity, path));
+	}
+
+	/** Properties a file's own value replaces the entity's of, rather than adding to them */
+	private static final Set<String> ONE_VALUE = Set.of("name", "description", "dateCreated", "dateModified",
+			"inLanguage");
+
+	/**
+	 * What the file selected says about itself (see {@link DocumentMetadata}),
+	 * to choose from and give its entity, as one undo step.
+	 */
+	void metadataFromFile(Stage stage) {
+		Optional<Map.Entry<Entity, Path>> selected = selectedFile();
+		if (selected.isEmpty()) {
+			return;
+		}
+		Entity entity = selected.get().getKey();
+		// Not what it has already, e.g. the same author or licence
+		List<DocumentMetadata.Found> found = DocumentMetadata.read(selected.get().getValue()).stream()
+				.filter(f -> !entity.getAll(f.property()).contains(fileValue(f, false))).toList();
+		if (found.isEmpty()) {
+			Alert none = new Alert(AlertType.INFORMATION, "Office and OpenDocument files (e.g. .docx, .xlsx, .odt)"
+					+ " can say what they are, who made them and when; this one says nothing the crate doesn't.",
+					ButtonType.OK);
+			none.initOwner(stage);
+			none.setHeaderText("Nothing new in “" + entity.getLabel() + "”");
+			none.showAndWait();
+			return;
+		}
+		Function<JsonNode, String> shown = v -> v.isValueNode() ? v.asText()
+				: crate.get(v.path("@id").asText()).map(Entity::getLabel).orElse(v.path("@id").asText());
+		FileMetadataDialog dialog = new FileMetadataDialog(stage, entity, found, entityEditor::label, shown);
+		List<DocumentMetadata.Found> chosen = dialog.showAndWait().orElse(List.of());
+		if (chosen.isEmpty()) {
+			return;
+		}
+		Set<String> replaced = new HashSet<>();
+		for (DocumentMetadata.Found f : chosen) {
+			JsonNode value = fileValue(f, true);
+			List<JsonNode> values = new ArrayList<>(
+					ONE_VALUE.contains(f.property()) && replaced.add(f.property()) ? List.of()
+							: entity.getAll(f.property()));
+			if (!values.contains(value)) {
+				values.add(value);
+			}
+			entity.setAll(f.property(), values);
+		}
+		crate.mentionUnlinked();
+		relist();
+		entityEditor.edit(entity);
+		refresh();
+		checkpoint(placeOf(null), Optional.of("Metadata from File"));
+	}
+
+	/**
+	 * The value to give for what a file says: text, or for a person a link
+	 * to the crate's Person (or Organization) of that name, and for a licence
+	 * a link to its SPDX licence if it is one; with add, added to the crate
+	 * if it has none.
+	 */
+	private JsonNode fileValue(DocumentMetadata.Found found, boolean add) {
+		ObjectNode ref = JsonNodeFactory.instance.objectNode();
+		switch (found.kind()) {
+		case PERSON -> {
+			Optional<Entity> named = crate.getEntities().stream()
+					.filter(e -> e.getTypes().contains("Person") || e.getTypes().contains("Organization"))
+					.filter(e -> e.get("name").map(JsonNode::asText).filter(found.value()::equals).isPresent())
+					.findFirst();
+			if (named.isEmpty() && !add) {
+				return TextNode.valueOf(found.value());
+			}
+			Entity person = named.orElseGet(() -> {
+				Entity added = crate.add("Person");
+				added.set("name", Optional.of(TextNode.valueOf(found.value())));
+				return added;
+			});
+			return ref.put("@id", person.getId());
+		}
+		case LICENSE -> {
+			SPDXLicenses spdx = SPDXLicenses.bundled();
+			Optional<SPDXLicenses.License> license = spdx.meant(found.value(), true)
+					.or(() -> spdx.byLink(found.value()));
+			if (license.isEmpty()) {
+				return TextNode.valueOf(found.value());
+			}
+			String iri = license.get().iri();
+			if (add && crate.get(iri).isEmpty()) {
+				Entity licence = crate.add("CreativeWork");
+				crate.rename(licence, iri);
+				SPDXLicenses.describe(licence, license.get(), crate::get, id -> {
+					Entity value = crate.add("PropertyValue");
+					crate.rename(value, id);
+					return value;
+				});
+			}
+			return ref.put("@id", iri);
+		}
+		default -> {
+			return TextNode.valueOf(found.value());
+		}
+		}
 	}
 
 	/** Show a file or folder in the operating system's file manager */
