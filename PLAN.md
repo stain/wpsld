@@ -1120,6 +1120,11 @@ extension. Next:
   read without Jena; else the OWL's few elements wpsld needs (classes,
   labels, synonyms, subClassOf, deprecation) can be read with the JDK's
   XML parser. Bundle a subset (formats only) as JSON, as for PRONOM.
+- **Format identifiers besides PRONOM**: Tika's media types carry links
+  for 64 types, some to the Library of Congress's format descriptions
+  (e.g. FITS, `https://www.digitalpreservation.gov/formats/fdd/fdd000317.shtml`),
+  which could be `encodingFormat` links where PRONOM has none; and
+  Tika's readable names (493 of 1,693 types) for the format's entity.
 - **More signatures** where Tika has none and a media type exists or is
   common: NumPy `.npy` (`\x93NUMPY`), Avro (`Obj\x01`), NIfTI (`n+1` at
   344), ROOT (`root`), MRC maps (`MAP ` at 208).

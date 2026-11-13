@@ -22,6 +22,8 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   below. There, the root dataset is also typed File, so it is listed first
   under Dataset, File and CreativeWork, where Remove is rightly disabled.
   Needs the steps that show it.
+- **The "Entities" heading in OS/2 Warp dark** is dark grey on the dark
+  sidebar, barely readable.
 
 ## Repair Crate
 
@@ -71,18 +73,24 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   lists, emphasis, links such as `[text](url)`), or when the crate says so
   (`encodingFormat` `text/markdown`). ROHub's and COMPSs' crates write
   Markdown descriptions; see also PLAN.md.
-- **Open Folder with files not in the crate**: show them in Entities by
-  Folder greyed out, as folders without a Dataset are now. Right-click
-  adds them as a Dataset (a folder) or a File, also several selected at
-  once. For a file, detect its format from its contents (file magic and
-  PRONOM), and fill in its size, media type and other details.
-- **Formats from file contents**: files added from a folder get their
-  format by extension only, as the bundled PRONOM data has extensions and
-  media types but not DROID's byte signatures. Matching contents ("file
-  magic") needs the signature file's internal signatures and a matcher
-  for them, or a library such as Apache Tika.
-- **Refresh the folder's files**: they are listed again at most every 5
-  seconds as the crate changes; a View > Refresh (F5) would list them at
-  once, e.g. after copying files in.
-- **The "Entities" heading in OS/2 Warp dark** is dark grey on the dark
-  sidebar, barely readable.
+
+## To check on Windows and macOS
+
+Built and tested on Linux only so far; the tests that need another system
+skip or take the Linux path. Try in the Windows and macOS builds:
+- **Saving**: SafeSave's atomic move over the metadata file (Windows has
+  no hard links on FAT, and NTFS replaces by MoveFileEx); saving with
+  the file open in another program; a folder without write access.
+- **Upper and lower case**: an `@id` whose case differs from the file's
+  (`Data.csv` for `data.csv`) is marked and reported; the test of it only
+  runs where names are found ignoring case.
+- **Show in Explorer / Finder**: `explorer.exe /select,` on a file, a
+  folder, and paths with spaces and non-ASCII letters; `open -R` on macOS.
+- **Watching the folder**: on macOS Java polls (every few seconds), so
+  check that changes show and Refresh works; on Windows, network drives
+  and OneDrive folders.
+- **Copying files in**: from another drive, a full disk (e.g. a small USB
+  stick), Cancel midway; file dates kept.
+- **Tika and the runtime image**: formats found by content in the
+  packaged app (the image includes Tika, checked in the Linux build).
+
