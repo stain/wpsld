@@ -242,10 +242,19 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
     the same kinds and ranges; several sheets as several groups.
   - SPSS, Stata, NetCDF and HDF5 (above): their variables with labels,
     units and value labels.
-  - schema.org gives `variableMeasured` to Dataset, not MediaObject: a
-    File with variables shows it among "other properties" unless it is
-    also typed Dataset (as Science-on-Schema's is); decide which, perhaps
-    offering to add the type.
+  - Where they go: schema.org gives `variableMeasured` to Dataset, not
+    MediaObject, but a File must not also be typed Dataset, which in
+    RO-Crate is a folder (a path `@id`). Instead, as DCAT does, a
+    Dataset of its own beside the files, e.g. `#count-days` with `name`,
+    `description`, `variableMeasured` and `distribution` linking the
+    Files (typed File and DataDownload, which `distribution` takes and is
+    a MediaObject): one Dataset for the same table in several files, e.g.
+    workshop8's `data/exports/csv/count_days.csv` and
+    `data/exports/parquet/count_days.parquet`. Its `#` id keeps it out of
+    the folder tree; the root mentions it. Offered when reading a
+    tabular file's variables: a new such Dataset, or one the crate has.
+    Check how RO-Crate 1.3 and its validators take a Dataset whose `@id`
+    is not a folder, and say so in the help.
   - Spatial coverage: Science-on-Schema writes a GeoShape `box` ("south
     west north east") or GeoCoordinates, RO-Crate 1.3 a Geometry with
     WKT; write what RO-Crate says, perhaps both.
