@@ -70,6 +70,14 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   DOI), as the DOI and ROR lookups do: rate-limited, untrusted input,
   shown to confirm before adding. Perhaps write `codemeta.json` back
   from the crate's SoftwareSourceCode.
+- **An entity from a web page's schema.org** (not now: a can of worms):
+  Insert > From Web Page… reads the schema.org a page embeds, e.g. a
+  `<script type="application/ld+json">`, also microdata (`itemscope`,
+  `itemprop`) and RDFa, and offers its entities to add. Pages use
+  schema.org loosely and in several ways at once, and their identifiers
+  are all over the place (none, blank nodes, `#` ids relative to the
+  page, the page's own URL for several things), so each would need
+  checking and renaming before it is added; and the page is untrusted.
 - **File > Recent**: the last 6 crates opened or saved, kept in the
   settings. A preference turns it off (and forgets the list), as the
   names and places of crates can be private.
