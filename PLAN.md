@@ -975,7 +975,13 @@ Styles:
   their file. *Done*: Crate > Add Dataset for Folder and Add to Has Part
   (also on the right-click menu) bring greyed out folders and files into
   `hasPart`. The logical one is *done* too, as View > Entities by Part
-  (`EntityTree.logical`). Next: Open Folder (see BUGS.md); the
+  (`EntityTree.logical`), and Open Folder, attached and detached crates,
+  Insert > Files with copying, the folder watched, Update File Details,
+  files not found and web availability marked, and safe saving. Next:
+  pasting file paths and drag and drop (see Adding files from the
+  operating system); relinking files that were moved (a missing file's
+  entity to a file of the same name and size elsewhere in the folder);
+  the
   Workplace Shell's look in the Warp style (lines joining the tree,
   hatched icon when selected); a header with the selected folder's path
   and counts.
@@ -1043,6 +1049,50 @@ folder (`FileCopy`, `CopyWindow`) and adds them. Next ways in:
   copied with their contents, which FileCopy doesn't do yet.
 - Moving rather than copying (with Shift, as file managers do), and
   copying folders.
+
+### File formats beyond media types
+
+`FileFormats` finds a file's media type by content (Apache Tika, plus
+wpsld's own signatures for HDF5 after a user block, NASA CDF, GRIB, BUFR
+and Arrow) and links PRONOM where one format fits both media type and
+extension. Next:
+- **EDAM formats** for life sciences, which have no media types (FASTA,
+  FASTQ, SAM/BAM, VCF, PDB, mmCIF): Bioschemas and Workflow RO-Crate use
+  EDAM's format IRIs (e.g. `http://edamontology.org/format_1929` for
+  FASTA) in `encodingFormat`; link those by content or extension.
+- **PRONOM identifiers by content**, which tell versions apart (PDF 1.4
+  from PDF/A): a small matcher of DROID's signature file (V125 has 2,273
+  internal signatures, byte sequences at offsets from the start or end,
+  with gaps and byte ranges; no dependencies needed), container
+  signatures for Office and ZIP-based formats later. DROID itself as a
+  library brings about 48 MB of dependencies and no modules.
+- **Choosing a media type by hand from IANA's registry**: bundle IANA's
+  media types (https://www.iana.org/assignments/media-types/, as XML or
+  the CSV per top-level type; about 2,350 current types, each with its
+  template and references) and offer them in the `encodingFormat` field
+  as suggestions, with Tika's readable names where it has them (about
+  500 of its 1,700). Warn about a media type that is neither registered
+  at IANA nor an `x-`, `vnd.` or `prs.` one (e.g. a typo, or one made
+  up). Note PRONOM has only 191 of IANA's types.
+- **Biomedical and microscopy formats**: check detection of OME-TIFF
+  (TIFF with OME-XML in its description, `image/tiff` now), OME-Zarr
+  (a folder), Zeiss CZI (`ZISRAWFILE`), Leica LIF, Nikon ND2, Olympus
+  OIR/VSI, Imaris `.ims` (HDF5), NIfTI and Analyze, MRC, DICOM series,
+  EDF, BrainVision; add signatures where they are simple, and find their
+  PRONOM and EDAM entries. Bio-Formats (Java, from the OME project) knows
+  most of these, but check its licence (GPL for most readers) and size
+  before considering it; its format list is a good reference either way.
+- **EDAM formats chosen by hand** too, like PRONOM's Format from PRONOM…:
+  a finder of EDAM's formats (about 600 under `format_1915`), with their
+  names, synonyms and definitions. EDAM is published as OWL (RDF/XML),
+  and its releases also have CSV and TSV tables (check:
+  https://github.com/edamontology/edamontology/releases), which can be
+  read without Jena; else the OWL's few elements wpsld needs (classes,
+  labels, synonyms, subClassOf, deprecation) can be read with the JDK's
+  XML parser. Bundle a subset (formats only) as JSON, as for PRONOM.
+- **More signatures** where Tika has none and a media type exists or is
+  common: NumPy `.npy` (`\x93NUMPY`), Avro (`Obj\x01`), NIfTI (`n+1` at
+  344), ROOT (`root`), MRC maps (`MAP ` at 208).
 
 ### HTML preview (ro-crate-preview.html)
 

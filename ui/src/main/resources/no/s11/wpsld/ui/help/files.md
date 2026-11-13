@@ -39,15 +39,8 @@ describes up to date with its folder: their size (`contentSize`) and date
 modified, where missing or changed since. Optionally, it also fills in
 their formats where they have none.
 
-A file's format is found from its content, the "magic" of its first
-bytes, and then its name, by [Apache Tika](https://tika.apache.org/): its
-media type, e.g. `text/csv` or `application/x-hdf5`, and a link to its
-[PRONOM](https://www.nationalarchives.gov.uk/PRONOM/) format where only
-one fits. PRONOM tells a format's versions apart, so a PDF gets no PRONOM
-format, as the version can't be told for sure. A file whose content isn't
-a known format, e.g. a `.dat` or `.bin` of an instrument, gets
-`application/octet-stream`, and text `text/plain`, rather than a guess
-from an extension that many formats share.
+A file's format is found from its content, and then its name: see
+[File formats](#file-formats) below.
 
 **File > Show in Explorer** (**Show in Finder** on macOS, **Show in File
 Manager** on Linux) shows the crate's metadata file in its folder; on the
@@ -125,6 +118,71 @@ Before saving, wpsld reports missing requirements it detects. Choose
 description. These checks are not a complete validator; validate the
 finished crate and check its contents before sharing. The
 [Getting started](getting-started.md) guide shows how to correct a warning.
+
+## File formats
+
+When wpsld adds a file from the crate's folder (**Add to Has Part**,
+**Insert > Files...**, or **Crate > Update File Details...**), it fills in
+the file's `encodingFormat`, if it has none, with its media type, and a
+link to its [PRONOM](https://www.nationalarchives.gov.uk/PRONOM/) format
+where it can tell which. It looks at the file's content first, the
+"magic" of its first bytes, using [Apache Tika](https://tika.apache.org/),
+and then at its name. So a PDF named `scan.bin` is still a PDF.
+
+Formats common in research data, and what wpsld writes for them:
+
+- **Tables**: CSV `text/csv` (PRONOM x-fmt/18), tab-separated
+  `text/tab-separated-values` (x-fmt/13), Parquet
+  `application/vnd.apache.parquet`, Arrow and Feather
+  `application/vnd.apache.arrow.file`, SQLite `application/x-sqlite3`
+  (fmt/729); SPSS, Stata and SAS data files.
+- **HDF5** `application/x-hdf5`, found by its signature also after a user
+  block of 512, 1024, 2048... bytes, as some instruments write. NetCDF-4
+  and MATLAB 7.3 `.mat` files are HDF5 inside, so they show as HDF5.
+  HDF4 is `application/x-hdf`.
+- **NetCDF-3** (classic, 64-bit offset and CDF-5) `application/x-netcdf`.
+  NASA's **CDF**, which also uses `.cdf`, is `application/x-cdf`, told
+  apart by its content.
+- **Weather and climate**: GRIB `application/grib`, BUFR
+  `application/bufr`.
+- **Geography**: GeoJSON `application/geo+json` (fmt/1367), KML
+  (fmt/244), shapefiles, LAS point clouds.
+- **FITS** `application/fits` (x-fmt/383), **DICOM** `application/dicom`
+  (fmt/574), MATLAB 5 `.mat` `application/x-matlab-data`.
+- **Life sciences**: FASTA, FASTQ, SAM, VCF and PDB files are text,
+  `text/plain`, as they have no media types of their own; BAM files are
+  `application/gzip`.
+- **Images, sound and video**: PNG `image/png`, TIFF `image/tiff`, JPEG
+  2000 `image/jp2`, SVG, WAV, FLAC, MP4.
+- **Documents**: PDF `application/pdf`, Markdown `text/markdown`
+  (fmt/1149), Word `.docx` and other Office files by their names.
+- **Code and notebooks**: Python `text/x-python`, R `text/x-rsrc`,
+  Jupyter notebooks `application/x-ipynb+json`.
+- **Structured text**: JSON `application/json`, JSON-LD
+  `application/ld+json`, YAML `application/yaml`.
+- **Archives**: ZIP `application/zip` (x-fmt/263), gzip
+  `application/gzip` (x-fmt/266), tar, bzip2, xz, Zstandard, 7-Zip.
+
+Some formats share an extension, and wpsld goes by the content: a
+`.vcf` of variant calls isn't taken for a vCard, nor an electron
+microscopy `.mrc` map for a MARC library record. Formats without a known
+signature or media type, e.g. NumPy `.npy`, Avro, NIfTI or ROOT files,
+are `application/octet-stream`.
+
+PRONOM describes each version of a format apart, e.g. PDF 1.4, PDF/A-1b
+and so on, and many formats share a media type. wpsld links a PRONOM
+format only when exactly one has both the file's media type and its
+extension: so PDF, PNG and TIFF files get their media type but no PRONOM
+format. If you know the version, choose **New** beside
+**Encoding format**, then **Format from PRONOM...** (see [Properties and
+links](properties.md)).
+
+A file whose content wpsld doesn't recognise, as many instruments' `.dat`
+and `.bin` files are, gets `application/octet-stream` (any bytes), or
+`text/plain` if it is text, rather than a guess from an extension that
+many formats share. Describe what it is in its **Description**, and,
+where the format has a specification on the web, link it in **Encoding
+format** too.
 
 ## Changes on disk
 
