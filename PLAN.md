@@ -894,6 +894,17 @@ Styles:
     4. The special cases stay hand-written, behind small hooks: the map,
        the DOI typed into Citation, PRONOM's media type on the file.
     Only then plugin JARs from a folder (module layer), as above.
+- **Plugins for files' metadata readers** *(TODO, consider)*: the same
+  mechanism for what reads files' own metadata (`EmbeddedMetadata`, and
+  `PdfMetadata` in ui as PDFBox needs java.desktop): an interface in lib
+  (which files it reads, by start bytes or media type; `read(path)` giving
+  `EmbeddedMetadata.Found`s), the built-in readers behind it first, and
+  plugin JARs for formats whose library has a licence wpsld shouldn't
+  carry or is large: JPEG 2000 with jai-imageio-jpeg2000 (its JJ2000
+  licence), perhaps audio tags, scientific formats (NetCDF, HDF5 and FITS
+  attributes), or Microsoft's old binary Office files with Apache POI. A
+  plugin that is installed separately keeps its licence out of wpsld's
+  release.
 - **More lookups for RO-Crate's recommended identifiers** (Recommended
   Identifiers in RO-Crate 1.3's metadata page). Smaller helpers: `keywords` edited as tags but
   written as one comma-separated string, and `temporalCoverage` as a

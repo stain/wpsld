@@ -138,24 +138,53 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   `@id` and maybe values as you type; with a type chosen, say at the end
   of the list what else matches, e.g. "Hidden: 15 entities of other
   types", to show them all.
-- **Files' own metadata, what is left**: Metadata from the File… now reads
-  Office, OpenDocument, PDF (PDFBox, in ui as it needs java.desktop),
-  JPEG, PNG, TIFF and WebP (metadata-extractor: EXIF, IPTC, XMP, PNG
-  text, GPS) and SVG (its RDF, as Inkscape writes it), with dates and
-  licences (`EmbeddedMetadata`, `PdfMetadata`). Still to do:
-  - An image's `width` and `height` (schema.org wants a Distance or
-    QuantitativeValue, e.g. `{"@type": "QuantitativeValue", "value": 605,
-    "unitCode": "E37"}` for pixels: decide how to write them).
-  - The camera and its settings as `exifData` PropertyValues, on request
-    only (they can identify the camera).
-  - Licence names in text, e.g. "CC BY 4.0" or "Creative Commons
-    Attribution 4.0 International", matched to SPDX by name; now only
-    URLs (`SPDXLicenses.byLink`) and SPDX identifiers (`meant`) are.
-  - Reading it for several files at once, e.g. in Crate > Update File
-    Details, or when adding files (offered, not filled in).
-  - JPEG 2000: not planned (no library reads its metadata but
-    jai-imageio-jpeg2000, whose JJ2000 licence is a problem).
+- **Files' own metadata, what is left**: Metadata from the File… and
+  Crate > Update File Details… read Office, OpenDocument, PDF, JPEG, PNG,
+  TIFF, WebP and SVG files: names, descriptions, authors, keywords, dates,
+  copyright, licences (also named in text, `SPDXLicenses.named`), sizes,
+  the camera and where a photo was taken (`EmbeddedMetadata`,
+  `PdfMetadata`). Next: more formats with no new dependency, as
+  metadata-extractor reads them already: decide by its
+  `FileTypeDetector` rather than our own start bytes, to read HEIC/HEIF,
+  AVIF, DNG and other raw formats (CR2, CR3, NEF, ARW, ORF, RW2, RAF),
+  PSD, EPS and old PostScript `.ai` (newer `.ai` are PDFs, read already),
+  GIF, and videos (MP4, MOV); map videos' own metadata: QuickTime's and
+  MP4's creation date, `duration` (ISO 8601), the phone's make and model
+  and GPS (ISO 6709). Test files from temporary tools (ffmpeg, libheif,
+  libavif). Still to do: offering it when adding files (Insert >
+  Files, dropping files in); `exifData` as PropertyValues rather than one
+  text; and JPEG 2000 is not planned (no library reads its metadata but
+  jai-imageio-jpeg2000, whose JJ2000 licence is a problem).
 
+- **Metadata readers as modules (proto-plugins)**: lib declares a
+  `MetadataReader` service (`ServiceLoader`, `uses` in its module-info)
+  and keeps the readers needing only java.xml (Office, OpenDocument, SVG,
+  XMP/RDF); one Gradle subproject and module per group of readers with
+  their own dependencies, providing it: images and video
+  (metadata-extractor, xmpcore), PDF (PDFBox, and so java.desktop, out of
+  ui), scientific formats (below). ui asks the service for all readers
+  and, until plugins are found in a folder (see PLAN.md), requires them
+  so that jlink links them in.
+- **Metadata of scientific formats**: global attributes by the CF and
+  ACDD conventions map onto the file's or dataset's properties: `title`
+  (name), `summary` (description), `creator_name`/`creator_email`
+  (author), `institution` (publisher), `license`, `keywords`,
+  `date_created`, `time_coverage_start`/`_end` (temporalCoverage),
+  `geospatial_lat_min`… (spatialCoverage, a Place with a box). Formats:
+  HDF5 and NetCDF-4 with jHDF (0.14.0, MIT, pure Java, about 1 MB with
+  commons-lang3, lz4-java and compress-lzf; not the HDF Group's, which
+  needs native libraries); NetCDF-3 classic, FITS (80-character header
+  cards: OBJECT, TELESCOP, INSTRUME, DATE-OBS, AUTHOR) and Zarr (JSON
+  attributes) read by our own code; netcdf-java (GRIB and more) too big,
+  a plugin if ever; Parquet's footer later.
+- **Key-value metadata as PropertyValues**: what has no schema.org
+  property, as PropertyValue entities (`name`, `value`, `unitText`,
+  `propertyID` where a convention defines it): a scientific file's other
+  global attributes on `additionalProperty`; its variables on
+  `variableMeasured` (`long_name` as description, `units`, CF
+  `standard_name` as propertyID); a photo's camera and settings on
+  `exifData` (now one text). Offered as one choice per group in the
+  dialog (e.g. "12 attributes"), not one per value.
 - **Upgrade dependencies, one at a time**, e.g. for security fixes:
   PDFBox, metadata-extractor and Tika parse files from anywhere, so keep
   them current. One dependency per commit: bump it, run all the tests,
