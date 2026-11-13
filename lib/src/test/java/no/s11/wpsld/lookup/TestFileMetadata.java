@@ -131,7 +131,7 @@ public class TestFileMetadata {
 	/** The built-in readers, and no others in lib */
 	@Test
 	public void installed() {
-		assertEquals(List.of("Office and OpenDocument", "SVG"),
+		assertEquals(List.of("Office and OpenDocument", "SVG", "XMP packets"),
 				FileMetadata.installed().readers().stream().map(MetadataReader::name).toList());
 	}
 }

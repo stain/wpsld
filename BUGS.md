@@ -178,24 +178,15 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   a time limit. Next: scientific formats (below) as a module too, and
   plugins found in a folder (see PLAN.md) rather than ui requiring the
   modules so that jlink links them in.
-- **PDF metadata without PDFBox in the app (option 3)**: scan files for
-  their XMP packet (`<?xpacket begin=…?>` … `<?xpacket end=…?>`, Adobe's
-  XMP specification's packet scanning; Acrobat, InDesign, LibreOffice and
-  most `.ai` write a PDF's XMP uncompressed so that it can be found) in
-  lib, needing only java.base and java.xml: PDF, `.ai`, EPS, PSD and
-  others. PDFBox then an optional reader module for what the scan misses,
-  the document information dictionary (all that LaTeX and Word PDFs often
-  have, and possibly compressed). PDFBox (3.0.8, and 2.0.37 alike) has
-  no module-info, only an Automatic-Module-Name (and OSGi headers), and
-  needs java.desktop: linked into the image the jlink plugin merges it
-  into wpsld.merged.module, which must then require java.desktop (done);
-  loaded as a plugin, from a folder into a module layer of its own
-  (`ModuleFinder.of`, `resolveAndBind`, `defineModulesWithOneLoader`,
-  `ServiceLoader.load(layer, …)`), it stays an automatic module, reads
-  every module, and works: tried 13 November 2026 with a module of ours
-  that `requires org.apache.pdfbox` and provides a service, reading a
-  PDF's title and author (java.desktop being in the boot layer, as
-  JavaFX needs it).
+- **PDF metadata without PDFBox in the app (option 3)**: *done*, lib
+  scans PDF, PostScript/EPS (and old `.ai`), PSD and InDesign files for
+  their XMP packets (`XmpPackets`; a PDF's document packet is the one
+  with `pdf:` terms, else its only one), and PDFBox is a reader module
+  for the document information dictionary and compressed XMP. Left:
+  PDFBox as an optional plugin rather than linked in (see PLAN.md;
+  tried 13 November 2026, it works as an automatic module in a module
+  layer of its own with java.desktop in the boot layer), and packets in
+  other formats (MP4/MOV's `uuid` box, by FileTypeDetector, above).
 - **Metadata of scientific formats**: global attributes by the CF and
   ACDD conventions map onto the file's or dataset's properties: `title`
   (name), `summary` (description), `creator_name`/`creator_email`

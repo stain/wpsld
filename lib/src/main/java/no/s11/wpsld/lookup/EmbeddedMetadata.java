@@ -56,6 +56,8 @@ import org.xml.sax.SAXException;
  * and friends). Both are ZIP files, read with the JDK's zip file system.
  * <li>SVG's RDF metadata, as Inkscape writes it, and its title and
  * description.
+ * <li>The XMP of PDF, PostScript, EPS, PSD and InDesign files, found by
+ * scanning them for XMP packets ({@link XmpPackets}).
  * </ul>
  * These are the built-in {@link MetadataReader}s ({@link #builtIn()}),
  * needing only the JDK; readers with libraries of their own are modules of
@@ -85,12 +87,14 @@ public final class EmbeddedMetadata {
 	private static final String XMP = "http://ns.adobe.com/xap/1.0/";
 	private static final String XMP_RIGHTS = "http://ns.adobe.com/xap/1.0/rights/";
 	private static final String PHOTOSHOP = "http://ns.adobe.com/photoshop/1.0/";
+	/** PDF's own terms in XMP, e.g. pdf:Keywords */
+	private static final String PDF = "http://ns.adobe.com/pdf/1.3/";
 	/** XMP's usual prefixes, as metadata-extractor gives its properties */
 	private static final Map<String, String> XMP_PREFIXES = Map.of("dc", DC, "cc", CC, "xmp", XMP, "xmpRights",
-			XMP_RIGHTS, "photoshop", PHOTOSHOP);
+			XMP_RIGHTS, "photoshop", PHOTOSHOP, "pdf", PDF);
 	/** The prefixes, to say where a value is */
 	private static final Map<String, String> TERM_NAMES = Map.of(DC, "dc:", CC, "cc:", XMP, "xmp:", XMP_RIGHTS,
-			"xmpRights:", PHOTOSHOP, "photoshop:");
+			"xmpRights:", PHOTOSHOP, "photoshop:", PDF, "pdf:");
 
 	/** What the value is, to write it as the property needs */
 	public enum Kind {
@@ -155,14 +159,17 @@ public final class EmbeddedMetadata {
 
 	/**
 	 * The readers needing only the JDK: Office and OpenDocument files (ZIP
-	 * files with their parts), and SVG (by its name, or its start)
+	 * files with their parts), SVG (by its name, or its start), and the
+	 * XMP packets of PDF, PostScript, EPS, PSD and InDesign files (see
+	 * {@link XmpPackets})
 	 */
 	public static List<MetadataReader> builtIn() {
 		return List.of(new BuiltIn("Office and OpenDocument", (file, head) -> startsWith(head, ZIP),
 				EmbeddedMetadata::zip),
 				new BuiltIn("SVG", (file, head) -> file.getFileName().toString().toLowerCase(Locale.ROOT)
 						.endsWith(".svg") || new String(head, StandardCharsets.UTF_8).contains("<svg"),
-						EmbeddedMetadata::svg));
+						EmbeddedMetadata::svg),
+				new XmpPackets());
 	}
 
 	/**
@@ -412,7 +419,7 @@ public final class EmbeddedMetadata {
 	}
 
 	/**
-	 * What a term of Dublin Core, Creative Commons, XMP or Photoshop says,
+	 * What a term of Dublin Core, Creative Commons, XMP, Photoshop or PDF says,
 	 * with its values
 	 */
 	private static void term(String term, List<String> values, String source, List<Found> found) {
@@ -425,6 +432,7 @@ public final class EmbeddedMetadata {
 		case DC + "description" -> found.add(new Found("description", first, Kind.TEXT, name));
 		case DC + "creator" -> values.forEach(v -> found.add(new Found("author", v, Kind.PERSON, name)));
 		case DC + "subject" -> found.add(new Found("keywords", String.join(", ", values), Kind.KEYWORDS, name));
+		case PDF + "Keywords" -> found.add(new Found("keywords", first, Kind.KEYWORDS, name));
 		case DC + "rights", XMP_RIGHTS + "UsageTerms" -> found.add(new Found("copyrightNotice", first, Kind.TEXT,
 				name));
 		case DC + "date", XMP + "CreateDate", PHOTOSHOP + "DateCreated" -> date(first)

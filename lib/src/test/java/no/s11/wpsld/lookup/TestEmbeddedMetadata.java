@@ -224,6 +224,63 @@ public class TestEmbeddedMetadata {
 				.findFirst().orElseThrow().source());
 	}
 
+	/** An XMP packet, as Adobe's tools write them, of RDF/XML in between */
+	private static String packet(String rdf) {
+		return "<?xpacket begin=\"\uFEFF\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n"
+				+ "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">"
+				+ rdf + "</rdf:RDF></x:xmpmeta>\n" + " ".repeat(200) + "\n<?xpacket end=\"w\"?>";
+	}
+
+	/**
+	 * A PDF's XMP found by scanning for its packets: its document's, with
+	 * PDF's own terms, not an image's in it; without PDFBox
+	 */
+	@Test
+	public void pdfPackets() throws Exception {
+		Path file = Files.createTempDirectory("pdf").resolve("report.pdf");
+		Files.write(file, ("%PDF-1.7\n%\u00e2\u00e3\n5 0 obj\n<</Type/Metadata/Subtype/XML>>\nstream\n" + packet("""
+				<rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/">
+				<dc:creator><rdf:Seq><rdf:li>A photographer</rdf:li></rdf:Seq></dc:creator></rdf:Description>""")
+				+ "\nendstream\nendobj\n12 0 obj\n<</Type/Metadata/Subtype/XML>>\nstream\n" + packet("""
+				<rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/"
+				 xmlns:pdf="http://ns.adobe.com/pdf/1.3/" xmlns:xmp="http://ns.adobe.com/xap/1.0/"
+				 pdf:Producer="LibreOffice 25.8" pdf:Keywords="engines, history" xmp:CreateDate="2026-04-20T15:36:54+01:00">
+				<dc:title><rdf:Alt><rdf:li xml:lang="x-default">Report</rdf:li></rdf:Alt></dc:title>
+				<dc:creator><rdf:Seq><rdf:li>Ada Lovelace</rdf:li></rdf:Seq></dc:creator>
+				</rdf:Description>""") + "\nendstream\nendobj\n%%EOF\n").getBytes(StandardCharsets.UTF_8));
+		List<Found> found = EmbeddedMetadata.read(file);
+		assertEquals(List.of("name Report", "author Ada Lovelace", "dateCreated 2026-04-20T15:36:54+01:00",
+				"keywords engines, history"),
+				found.stream().map(f -> f.property() + " " + f.value()).sorted(java.util.Comparator
+						.comparing((String v) -> List.of("name", "author", "dateCreated", "keywords")
+								.indexOf(v.substring(0, v.indexOf(' '))))).toList());
+		assertEquals("PDF XMP dc:title", found.stream().filter(f -> f.property().equals("name")).findFirst()
+				.orElseThrow().source());
+		// Its only packet, even without PDF's terms
+		Files.write(file, ("%PDF-1.4\n" + packet("""
+				<rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/">
+				<dc:title><rdf:Alt><rdf:li xml:lang="x-default">Notes</rdf:li></rdf:Alt></dc:title></rdf:Description>"""))
+				.getBytes(StandardCharsets.UTF_8));
+		assertEquals(Map.of("name", "Notes"), byProperty(EmbeddedMetadata.read(file)));
+	}
+
+	/** EPS: its first packet; one never ended, or not XML, is nothing */
+	@Test
+	public void epsPackets() throws Exception {
+		Path file = Files.createTempDirectory("eps").resolve("figure.eps");
+		String title = """
+				<rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/">
+				<dc:title><rdf:Alt><rdf:li xml:lang="x-default">%s</rdf:li></rdf:Alt></dc:title></rdf:Description>""";
+		Files.writeString(file, "%!PS-Adobe-3.0 EPSF-3.0\n%%BeginMetadata\n" + packet(title.formatted("Figure 1"))
+				+ "\n" + packet(title.formatted("Embedded")));
+		assertEquals(Map.of("name", "Figure 1"), byProperty(EmbeddedMetadata.read(file)));
+		Files.writeString(file, "%!PS-Adobe-3.0\n<?xpacket begin=\"\" id=\"x\"?><x:xmpmeta xmlns:x=\"adobe:ns:meta/\">"
+				+ "a".repeat(2 << 20));
+		assertEquals(List.of(), EmbeddedMetadata.read(file));
+		Files.writeString(file, "%!PS-Adobe-3.0\n<?xpacket begin=\"\"?><not xml<?xpacket end=\"w\"?>");
+		assertEquals(List.of(), EmbeddedMetadata.read(file));
+	}
+
 	/** A licence a copyright notice names, unless found already */
 	@Test
 	public void namedLicences() {
