@@ -55,6 +55,21 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   (`domainIncludes`, `rangeIncludes`), offered for those classes with a
   field of that range; without one, for any entity, as text or a
   reference as they are used.
+- **CodeMeta**: read `codemeta.json` files (JSON-LD, context
+  `https://w3id.org/codemeta/3.0`, mostly schema.org terms) to describe a
+  SoftwareSourceCode or SoftwareApplication: name, description, version,
+  author (with ORCIDs), license, codeRepository, programmingLanguage,
+  softwareRequirements, dates, keywords, funding. A `codemeta.json` in
+  the crate (or a folder of it) offers to describe its folder's entity;
+  its terms mapped through the CodeMeta context, keeping what schema.org
+  doesn't define (e.g. `codemeta:continuousIntegration`) as known
+  properties. Also Insert > Software from a GitHub or GitLab URL:
+  fetch the repository's `codemeta.json` if it has one, else build from
+  its API (name, description, licence's SPDX id, homepage, topics as
+  keywords, languages) and `CITATION.cff` (authors with ORCIDs, version,
+  DOI), as the DOI and ROR lookups do: rate-limited, untrusted input,
+  shown to confirm before adding. Perhaps write `codemeta.json` back
+  from the crate's SoftwareSourceCode.
 - **File > Recent**: the last 6 crates opened or saved, kept in the
   settings. A preference turns it off (and forgets the list), as the
   names and places of crates can be private.
@@ -116,8 +131,27 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   `GpsDirectory.getGeoLocation()`); it is what Tika's image parser uses.
   Compared with Apache Commons Imaging (1.0.0-alpha6, still alpha, about
   2 MB with commons-io and commons-lang3) and Tika's image module (more
-  jars than needed). Both its jars are automatic modules (xmpcore without
-  a name): check that the jlink image takes them.
+  jars than needed).
+  Tried (13 November 2026) on a JPEG and a PNG tagged with exiftool: it
+  reads EXIF Artist, Copyright, ImageDescription, Make and Model,
+  DateTimeOriginal with OffsetTimeOriginal, GPS as decimal degrees
+  (`GpsDirectory.getGeoLocation()`), and XMP `cc:license`,
+  `xmpRights:WebStatement`, `dc:creator`, `dc:title`, `xmp:CreateDate`;
+  from PNG both its eXIf chunk and XMP. Take XMP through
+  `XmpDirectory.getXmpProperties()` (a map of path to value, e.g.
+  `cc:license`), not xmpcore's `XMPMeta`: xmpcore has no module name, so
+  it is on the class path and our module can't read its types. Take dates
+  as their text: `getDateOriginal()` takes UTC when the file has no zone.
+  The jlink plugin merges both jars into `wpsld.merged.module`, as it does
+  tika-core (linking itself not tried here: the container's JDK has no
+  jmods).
+- **SVG metadata**: SVG files can describe themselves in RDF in a
+  `<metadata>` element; Inkscape writes a `cc:Work` with Dublin Core
+  (`dc:title`, `dc:creator` as a `cc:Agent` with its `dc:title`,
+  `dc:date`, `dc:rights`, `dc:description`, `dc:subject` keywords) and
+  `cc:license` with an `rdf:resource` URL. Read with the JDK's XML parser
+  (DTDs and external entities off), no library needed; also `<title>` and
+  `<desc>`, and the size from `width`, `height` or `viewBox`.
 - **Document metadata from PDF, Office and OpenDocument files**, the same
   way: `name`, `author`/`creator`, `dateCreated`, `dateModified`,
   `keywords`, `description`, `numberOfPages`, offered to choose. Tika can
@@ -157,7 +191,7 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   sources disagree (e.g. XMP and EXIF), prefer the most precise and say
   which.
 - **Licences from embedded metadata**, across images and documents:
-  XMP (in JPEG, PNG and PDF) has `cc:license` (Creative Commons' schema,
+  SVG's RDF has `cc:license`; XMP (in JPEG, PNG and PDF) has `cc:license` (Creative Commons' schema,
   a URL), `xmpRights:WebStatement` (a URL), `xmpRights:UsageTerms` and
   `dc:rights` (text); EXIF has Copyright and IPTC CopyrightNotice (text);
   Office files may name one in custom properties. Match URLs with
