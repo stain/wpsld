@@ -24,6 +24,13 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   Needs the steps that show it.
 - **The "Entities" heading in OS/2 Warp dark** is dark grey on the dark
   sidebar, barely readable.
+- **The "changed by another application" dialog cuts off its text in
+  OS/2 Warp.** With unsaved changes, when the file changed on disk (e.g.
+  `workshop8\ro-crate-metadata.json`), the text under the header ends in
+  "or keep them and ..." instead of wrapping onto more lines. Reload and
+  Keep My Changes work. The alert is in `CrateEditor.checkDisk()`; Warp's
+  font is larger, so the dialog may need to grow, or the content label to
+  wrap (check the Save Anyway dialog in `askBeforeOverwriting` too).
 
 ## Repair Crate
 
