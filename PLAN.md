@@ -1296,3 +1296,31 @@ wpsld is in English only. Translating it means more than the UI's labels:
   file or a registry, and chosen by the crate's `conformsTo`. See
   [MASP.md](MASP.md) for how, and for what's next (SHACL shapes for profiles
   such as FAIRSCAPE, checking kept profiles for updates).
+- **Infer a profile from an example crate**: Crate > Make Profile from
+  This Crate… drafts a MASP profile crate from one (or later several)
+  example crates, as a start to edit rather than a finished profile:
+  - A class rule (`rdfs:Class`, `prov:specializationOf` the type's IRI)
+    for each type used, with how many entities of it the crate has as a
+    suggested `sh:minCount`/`sh:maxCount` (e.g. exactly one root, one
+    license). Several `@type`s on one entity: a rule for the combination,
+    or for the most specific type (see the open question below).
+  - A property rule per property per class: `rdfs:label` as written in
+    the crate, `domainIncludes` that class rule, `rangeIncludes` from the
+    values seen (class rules of the entities referred to, or Text,
+    Number, Boolean, Date, URL by the values' form), `sh:minCount` 1 when
+    every entity of the class has it, `sh:maxCount` 1 when none has more
+    than one value. Comments from schema.org or the crate's own
+    definitions (ad hoc `rdfs:Class`/`rdf:Property` entities, or another
+    profile it conforms to).
+  - The root and descriptor rules MASP finds the root by; types and
+    properties the crate defines itself carried into the profile.
+  - From several crates: the union of types and properties, required
+    only when all have it, counts as ranges seen across them; a value
+    the same in all (e.g. a fixed `conformsTo` or `license`) as a
+    `PropertyValue` or `ItemList` to choose from.
+  - Shown in a dialog to choose which types and properties to keep and
+    to loosen what was inferred (one example says little about what is
+    required), then written as a new profile crate with its own
+    `profile-documentation.md`, opened in the editor like any crate and
+    usable at once as a profile for other crates. One example is not
+    enough to infer value patterns (regexes); leave those to editing.
