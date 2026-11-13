@@ -140,6 +140,22 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
     LibreOffice and OpenOffice's OpenDocument files (`.odt`, `.ods`,
     `.odp`, `.odg`, and the older `.sxw` and friends) likewise: a ZIP with
     `meta.xml` (Dublin Core and `meta:` statistics such as page count).
+- **Dates from embedded metadata**, as `dateCreated` and `dateModified`
+  (and `datePublished` only if the file says so), rather than the file
+  system's times, which copying changes:
+  - EXIF: DateTimeOriginal (taken), DateTimeDigitized, DateTime
+    (changed), as `2026:04:20 15:36:54` without a time zone, unless
+    OffsetTimeOriginal (EXIF 2.31) gives it; GPS has its own UTC date.
+  - XMP (images and PDF): `xmp:CreateDate`, `xmp:ModifyDate`,
+    `photoshop:DateCreated`, `dc:date`, ISO 8601.
+  - PDF information dictionary: CreationDate and ModDate as
+    `D:20260420153654+01'00'`.
+  - Office: `dcterms:created` and `dcterms:modified` in core.xml (W3CDTF,
+    usually UTC); OpenDocument: `meta:creation-date` and `dc:date` in
+    meta.xml (often without a zone).
+  Written as ISO 8601, with the zone only when the file gives one; when
+  sources disagree (e.g. XMP and EXIF), prefer the most precise and say
+  which.
 - **Licences from embedded metadata**, across images and documents:
   XMP (in JPEG, PNG and PDF) has `cc:license` (Creative Commons' schema,
   a URL), `xmpRights:WebStatement` (a URL), `xmpRights:UsageTerms` and
