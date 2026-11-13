@@ -106,6 +106,54 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   `@id` and maybe values as you type; with a type chosen, say at the end
   of the list what else matches, e.g. "Hidden: 15 entities of other
   types", to show them all.
+- **Image metadata from EXIF**: for PNG and JPEG images, read their
+  embedded metadata (EXIF, and XMP or IPTC where present) to offer as an
+  ImageObject's properties: `width` and `height`, `dateCreated`
+  (DateTimeOriginal), `creator` (Artist), `copyrightNotice`, `caption` or
+  `description`, the camera in `exifData` (PropertyValues), and where it
+  was taken (GPS) as a Place in `contentLocation`. Offered to choose, not
+  filled in silently, as photos can carry private details (location,
+  camera serial numbers). Not JPEG 2000: no library reads its metadata
+  but jai-imageio-jpeg2000, whose JJ2000 licence is a problem, and it
+  would mean native-ish binary handling of our own.
+  Library: **metadata-extractor** (2.22.0, Oct 2026, Apache-2.0; xmpcore
+  BSD-3-Clause): JPEG (EXIF, XMP, IPTC) and PNG (text chunks, XMP, eXIf),
+  about 1 MB with xmpcore, typed access (e.g.
+  `GpsDirectory.getGeoLocation()`); it is what Tika's image parser uses.
+  Compared with Apache Commons Imaging (1.0.0-alpha6, still alpha, about
+  2 MB with commons-io and commons-lang3) and Tika's image module (more
+  jars than needed). Both its jars are automatic modules (xmpcore without
+  a name): check that the jlink image takes them.
+- **Document metadata from PDF, Office and OpenDocument files**, the same
+  way: `name`, `author`/`creator`, `dateCreated`, `dateModified`,
+  `keywords`, `description`, `numberOfPages`, offered to choose. Tika can
+  (its PDF and Microsoft parser modules), but they bring PDFBox and Apache
+  POI with xmlbeans (many MB). Instead:
+  - **PDF**: Apache PDFBox (Apache-2.0; a few MB with fontbox and
+    pdfbox-io, to check): the document information dictionary (Title,
+    Author, Subject, Keywords, Creator, Producer, CreationDate, ModDate),
+    the page count, and the XMP metadata stream, which is RDF with Dublin
+    Core (`dc:title`, `dc:creator`, `dc:description`, `dc:rights`), read
+    with xmpcore as for images.
+  - **DOCX, XLSX, PPTX**: no library needed: open the file as a file
+    system (`FileSystems.newFileSystem(path)`, the JDK's zip file system
+    in `jdk.zipfs`, which the runtime image must then include, e.g. by
+    `requires jdk.zipfs` or jlink's `--add-modules`, as it is a service
+    provider) and read `docProps/core.xml`
+    (Dublin Core: title, creator, description, subject, keywords, created,
+    modified), `docProps/app.xml` (application, pages, words) and
+    `docProps/custom.xml` (custom properties, where a licence may be).
+    OpenDocument (`.odt`, `.ods`, `.odp`) likewise with `meta.xml`.
+- **Licences from embedded metadata**, across images and documents:
+  XMP (in JPEG, PNG and PDF) has `cc:license` (Creative Commons' schema,
+  a URL), `xmpRights:WebStatement` (a URL), `xmpRights:UsageTerms` and
+  `dc:rights` (text); EXIF has Copyright and IPTC CopyrightNotice (text);
+  Office files may name one in custom properties. Match URLs with
+  `SPDXLicenses.byLink` (e.g. `https://creativecommons.org/licenses/by/4.0/`
+  is CC-BY-4.0) and SPDX identifiers in text with `meant`; names such as
+  "CC BY 4.0" or "Creative Commons Attribution 4.0 International" need
+  matching by name too. Offer the match as the file's `license`, and keep
+  rights text as `copyrightNotice` or `creditText`.
 
 ## To check on Windows and macOS
 
