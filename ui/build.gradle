@@ -33,6 +33,19 @@ jlink {
     // package. They are unused outside OSGi and newer jlink rejects the split.
     options = ['--strip-debug', '--no-header-files', '--no-man-pages',
                '--exclude-resources', 'glob:/org.kordamp.ikonli.*/OSGI-INF/**']
+    // The jars without modules (Tika, metadata-extractor, xmpcore, PDFBox)
+    // are merged into one, whose generated module doesn't require the JDK
+    // modules some of them use, failing only in the image, with
+    // IllegalAccessError: xmpcore parses XMP with java.xml, PDFBox needs
+    // java.desktop, and Tika's TikaInputStream refers to java.sql (Tika's
+    // java.compiler is its annotation processor's, for building). Check
+    // with jdeps --print-module-deps when adding such a dependency.
+    mergedModule {
+        additive = true
+        requires 'java.xml'
+        requires 'java.desktop'
+        requires 'java.sql'
+    }
     launcher {
         name = 'wpsld'
         // Windows .bat launcher starts javaw, without a console window
