@@ -193,6 +193,21 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   cards: OBJECT, TELESCOP, INSTRUME, DATE-OBS, AUTHOR) and Zarr (JSON
   attributes) read by our own code; netcdf-java (GRIB and more) too big,
   a plugin if ever; Parquet's footer later.
+- **Where a photo was taken, named**: now GPS gives a Place "Where
+  photo.jpg was made" with its point (only on purpose). Also:
+  - Name it by GeoNames' nearest place to the point (`findNearbyPlaceName`,
+    with the GeoNames username Preferences already has; online, so shown
+    to confirm), linked as GeoNames' place is now; or reuse a Place of
+    the crate at (about) that point.
+  - Read location written as text: XMP `photoshop:City`, `State`,
+    `Country`, `Iptc4xmpCore:Location` (sub-location), IPTC
+    Sub-location, City, Province-State, Country-PrimaryLocationName: a
+    Place's name and address even without GPS, and a better GeoNames
+    search.
+  - GPS altitude (the Geometry's or GeoCoordinates' `elevation`), and its
+    UTC date and time (GPSDateStamp, GPSTimeStamp): a better
+    `dateCreated` when the camera's clock has no offset.
+
 - **Key-value metadata as PropertyValues**: what has no schema.org
   property, as PropertyValue entities (`name`, `value`, `unitText`,
   `propertyID` where a convention defines it): a scientific file's other
