@@ -1030,6 +1030,20 @@ run) loads, but shows what to work on:
   the Run of "COMPSs runtime version 3.4": find out where the time goes
   (preview, form building, or reference lookups across many entities).
 
+### Adding files from the operating system
+
+Insert > Files copies files from elsewhere into an attached crate's
+folder (`FileCopy`, `CopyWindow`) and adds them. Next ways in:
+- **Paste file paths**: Edit > Paste in the entity list or tree with files
+  copied in Explorer or Finder (the clipboard's file list, or text that is
+  paths), adding those in the folder and copying the others, as Insert >
+  Files does.
+- **Drag and drop** files and folders from Explorer or Finder onto the
+  list or tree; onto a folder of the tree to copy them into it. Folders
+  copied with their contents, which FileCopy doesn't do yet.
+- Moving rather than copying (with Shift, as file managers do), and
+  copying folders.
+
 ### HTML preview (ro-crate-preview.html)
 
 An attached crate may have an `ro-crate-preview.html`, which goes out of

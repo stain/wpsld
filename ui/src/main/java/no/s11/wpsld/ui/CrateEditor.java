@@ -117,6 +117,7 @@ import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.CrateChecks;
 import no.s11.wpsld.crate.CrateDocument;
 import no.s11.wpsld.crate.CrateFolder;
+import no.s11.wpsld.crate.FileCopy;
 import no.s11.wpsld.crate.SafeSave;
 import no.s11.wpsld.crate.CrateDocument.Problem;
 import no.s11.wpsld.crate.CrateReader;
@@ -693,11 +694,14 @@ public class CrateEditor extends Application {
 	 * The Insert menu: a new entity of any type, as Add entity, then those
 	 * looked up, under which more lookups may come.
 	 */
-	private Menu insertMenu() {
+	private Menu insertMenu(Stage stage) {
 		MenuItem entity = new MenuItem("_Entity…");
 		entity.setId("menuInsertEntity");
 		entity.setOnAction(e -> addEntity());
-		Menu insert = new Menu("_Insert", null, entity, new SeparatorMenuItem(),
+		MenuItem files = new MenuItem("F_iles…");
+		files.setId("menuInsertFiles");
+		files.setOnAction(e -> askToInsertFiles(stage));
+		Menu insert = new Menu("_Insert", null, entity, files, new SeparatorMenuItem(),
 				insertItem("_Person from ORCID…", "menuInsertPerson", EntityEditor.Lookup.PERSON),
 				insertItem("_Organization from ROR…", "menuInsertOrganization", EntityEditor.Lookup.ORGANIZATION),
 				insertItem("Publication by _DOI…", "menuInsertPublication", EntityEditor.Lookup.PUBLICATION),
@@ -705,6 +709,8 @@ public class CrateEditor extends Application {
 				insertItem("File _format from PRONOM…", "menuInsertFormat", EntityEditor.Lookup.FORMAT),
 				insertItem("Pl_ace from GeoNames…", "menuInsertPlace", EntityEditor.Lookup.PLACE));
 		insert.setId("menuInsert");
+		// Files only into an attached crate's folder
+		insert.setOnShowing(e -> files.setDisable(crateFile.folder().isEmpty()));
 		return insert;
 	}
 
@@ -800,7 +806,7 @@ public class CrateEditor extends Application {
 		Menu help = new Menu("_Help", null, manual, new SeparatorMenuItem(), about);
 		help.setId("menuHelp");
 
-		MenuBar bar = new MenuBar(file, edit, view, insertMenu(), crateMenu(stage), help);
+		MenuBar bar = new MenuBar(file, edit, view, insertMenu(stage), crateMenu(stage), help);
 		bar.setId("menuBar");
 		// In the macOS style, on macOS the menus are in the screen's menu bar
 		// (set, as JavaFX doesn't allow binding it)
@@ -1176,6 +1182,12 @@ public class CrateEditor extends Application {
 		return Optional.of(task);
 	}
 
+	/** Lists the folder's files again soon after they change */
+	private final FolderWatch folderWatch = new FolderWatch(() -> {
+		listedFolder = Optional.empty();
+		relist();
+	});
+
 	/** The most files of a folder to list */
 	private static final int MAX_FILES = 10_000;
 	private List<String> listed = List.of();
@@ -1188,8 +1200,17 @@ public class CrateEditor extends Application {
 	 * name (format, see {@link PRONOMFormats#addByName})
 	 */
 	private List<Entity> addSelectedFiles() {
+		return addFiles(selectedFileIds());
+	}
+
+	/**
+	 * Files in the crate's folder it doesn't describe yet, by their relative
+	 * @ids: as Files, described by the file on disk (size, date modified) and
+	 * its name (format, see {@link PRONOMFormats#addByName})
+	 */
+	private List<Entity> addFiles(List<String> ids) {
 		List<Entity> added = new ArrayList<>();
-		for (String id : selectedFileIds()) {
+		for (String id : ids) {
 			if (crate.get(id).isPresent()) {
 				continue;
 			}
@@ -1201,6 +1222,161 @@ public class CrateEditor extends Application {
 			added.add(file);
 		}
 		return added;
+	}
+
+	/** Where Insert > Files last chose files from */
+	private File insertFrom;
+
+	/**
+	 * Insert > Files: choose files to add to an attached crate (see
+	 * {@link #insertFiles})
+	 */
+	private void askToInsertFiles(Stage stage) {
+		Optional<Path> folder = crateFile.folder();
+		if (folder.isEmpty()) {
+			return;
+		}
+		FileChooser chooser = new FileChooser();
+		chooser.setTitle("Insert Files");
+		chooser.setInitialDirectory(Optional.ofNullable(insertFrom).filter(File::isDirectory)
+				.orElse(folder.get().toFile()));
+		List<File> chosen = chooser.showOpenMultipleDialog(stage);
+		if (chosen == null || chosen.isEmpty()) {
+			return;
+		}
+		insertFrom = chosen.get(0).getParentFile();
+		insertFiles(stage, chosen.stream().map(File::toPath).toList());
+	}
+
+	/**
+	 * Add files to an attached crate, as parts of the datasets of their
+	 * folders: those in its folder as they are; others copied into a folder
+	 * of the crate chosen first, in a window of their own (see
+	 * {@link CopyWindow}), and added once copied.
+	 */
+	void insertFiles(Stage stage, List<Path> files) {
+		Optional<Path> folder = crateFile.folder().map(f -> f.toAbsolutePath().normalize());
+		if (folder.isEmpty()) {
+			return;
+		}
+		List<Path> inside = new ArrayList<>();
+		List<Path> outside = new ArrayList<>();
+		for (Path file : files) {
+			Path absolute = file.toAbsolutePath().normalize();
+			(absolute.startsWith(folder.get()) && !absolute.equals(folder.get()) ? inside : outside).add(absolute);
+		}
+		addFilesAsParts(inside.stream().map(f -> relativeId(folder.get(), f)).toList());
+		if (outside.isEmpty()) {
+			return;
+		}
+		Optional<Path> target = chooseCopyFolder(stage, folder.get(), outside.size());
+		if (target.isEmpty()) {
+			return;
+		}
+		Optional<FileCopy.Conflict> conflict = askAboutConflicts(stage, outside, target.get());
+		if (conflict.isPresent()) {
+			copyInto(stage, outside, target.get(), conflict.get());
+		}
+	}
+
+	/**
+	 * Copy files into a folder of the crate, in their own window, adding
+	 * those copied as parts once done, and telling what wasn't
+	 */
+	Task<FileCopy.Result> copyInto(Stage stage, List<Path> files, Path target, FileCopy.Conflict conflict) {
+		Crate copyingFor = crate;
+		Path folder = crateFile.folder().map(f -> f.toAbsolutePath().normalize()).orElseThrow();
+		return new CopyWindow(stage, files, target, conflict, result -> {
+			if (crate == copyingFor) {
+				addFilesAsParts(result.copied().stream().map(c -> relativeId(folder, c.to().toAbsolutePath().normalize()))
+						.toList());
+			}
+			List<String> notCopied = new ArrayList<>();
+			result.failed().forEach(f -> notCopied.add(f.from().getFileName() + ": " + f.why()));
+			result.skipped().forEach(f -> notCopied.add(f.getFileName() + ": skipped, as one of that name is there"));
+			if (!notCopied.isEmpty() || result.cancelled()) {
+				Alert alert = new Alert(result.failed().isEmpty() ? AlertType.INFORMATION : AlertType.WARNING,
+						String.join("\n", notCopied), ButtonType.OK);
+				alert.initOwner(stage);
+				alert.setHeaderText((result.cancelled() ? "Cancelled: " : "") + result.copied().size() + " of "
+						+ files.size() + (files.size() == 1 ? " file" : " files") + " copied and added");
+				alert.setResizable(true);
+				alert.show();
+			}
+		}).start();
+	}
+
+	/** The relative @id of a file in the crate's folder, each name percent-encoded */
+	private static String relativeId(Path folder, Path file) {
+		List<String> names = new ArrayList<>();
+		folder.relativize(file).forEach(name -> names.add(CrateFolder.encode(name.toString())));
+		return String.join("/", names);
+	}
+
+	/** Add files of the crate's folder, by their @ids, as parts, and show them */
+	private void addFilesAsParts(List<String> ids) {
+		List<Entity> files = addFiles(ids);
+		// Those already in the crate become parts too, if not yet
+		List<Entity> parts = new ArrayList<>(files);
+		ids.stream().map(crate::get).flatMap(Optional::stream).filter(e -> !parts.contains(e)).forEach(parts::add);
+		if (parts.isEmpty()) {
+			return;
+		}
+		crate.addParts(parts);
+		crate.unmentionLinked();
+		listedFolder = Optional.empty();
+		changed();
+		showListed(parts);
+	}
+
+	/**
+	 * The folder of the crate to copy files from elsewhere into, chosen;
+	 * asked again if one outside the crate's folder is chosen
+	 */
+	private Optional<Path> chooseCopyFolder(Stage stage, Path folder, int count) {
+		DirectoryChooser chooser = new DirectoryChooser();
+		chooser.setTitle("Copy " + count + (count == 1 ? " file" : " files") + " into which folder of the crate?");
+		chooser.setInitialDirectory(folder.toFile());
+		while (true) {
+			File chosen = chooser.showDialog(stage);
+			if (chosen == null) {
+				return Optional.empty();
+			}
+			Path target = chosen.toPath().toAbsolutePath().normalize();
+			if (target.startsWith(folder)) {
+				return Optional.of(target);
+			}
+			Alert alert = new Alert(AlertType.WARNING, "Files from elsewhere are copied into the crate's folder, "
+					+ folder + ", or a folder in it. Choose one of those.", ButtonType.OK);
+			alert.initOwner(stage);
+			alert.setHeaderText(target + " is not in the crate's folder");
+			alert.showAndWait();
+		}
+	}
+
+	/**
+	 * If files of the same names are in the folder, whether to replace them,
+	 * keep both (as name (2).csv) or skip those; none to cancel
+	 */
+	private Optional<FileCopy.Conflict> askAboutConflicts(Stage stage, List<Path> files, Path target) {
+		List<Path> conflicts = FileCopy.conflicts(files, target);
+		if (conflicts.isEmpty()) {
+			return Optional.of(FileCopy.Conflict.SKIP);
+		}
+		ButtonType replace = new ButtonType("Replace", ButtonData.YES);
+		ButtonType keepBoth = new ButtonType("Keep Both", ButtonData.NO);
+		ButtonType skip = new ButtonType("Skip", ButtonData.OTHER);
+		Alert alert = new Alert(AlertType.CONFIRMATION, String.join(", ",
+				conflicts.stream().limit(5).map(f -> f.getFileName().toString()).toList())
+				+ (conflicts.size() > 5 ? ", …" : "") + "\n\nReplace them, keep both (copied as e.g. name (2).csv),"
+				+ " or skip those?", replace, keepBoth, skip, ButtonType.CANCEL);
+		alert.initOwner(stage);
+		alert.setHeaderText(target.getFileName() + " already has " + conflicts.size()
+				+ (conflicts.size() == 1 ? " file" : " files") + " of the same name");
+		ButtonType chosen = alert.showAndWait().orElse(ButtonType.CANCEL);
+		return chosen == replace ? Optional.of(FileCopy.Conflict.REPLACE)
+				: chosen == keepBoth ? Optional.of(FileCopy.Conflict.KEEP_BOTH)
+						: chosen == skip ? Optional.of(FileCopy.Conflict.SKIP) : Optional.empty();
 	}
 
 	/** A Dataset for each folder selected, as a part of the one above it */
@@ -1427,6 +1603,8 @@ public class CrateEditor extends Application {
 					entities.getSelectionModel().select(edited);
 				}
 			}
+			// The attached crate's folder, as it changes
+			folderWatch.watch(crateFile.folder());
 			Map<Entity, String> found = problems();
 			if (!found.equals(problems)) {
 				problems = found;
@@ -1553,6 +1731,13 @@ public class CrateEditor extends Application {
 				listByFolder(item != byType);
 			}
 		});
+		MenuItem refresh = new MenuItem("_Refresh");
+		refresh.setId("menuRefresh");
+		refresh.setAccelerator(new KeyCodeCombination(KeyCode.F5));
+		refresh.setOnAction(e -> {
+			listedFolder = Optional.empty();
+			relist();
+		});
 		CheckMenuItem files = new CheckMenuItem("Show Files _Not in Crate");
 		files.setId("menuShowFiles");
 		files.setOnAction(e -> {
@@ -1572,7 +1757,7 @@ public class CrateEditor extends Application {
 				menu.addEventHandler(Menu.ON_SHOWING, e -> update.run());
 			}
 		});
-		return List.of(byType, folders, parts, files);
+		return List.of(byType, folders, parts, files, refresh);
 	}
 
 	/** View > Entities by Folder, chosen when opening a folder */

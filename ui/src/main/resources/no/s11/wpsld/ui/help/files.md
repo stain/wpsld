@@ -19,6 +19,21 @@ describe greyed out, to add with **Crate > Add to Has Part** (or **Add
 Dataset for Folder**), also several at once. Opening a folder shows
 **View > Entities by Folder**.
 
+**Insert > Files...** adds files you choose to an attached crate, as
+parts of the Dataset of their folder, with their size, date and format.
+Files from elsewhere are copied in first, into a folder of the crate you
+choose: if it has files of the same names, choose **Replace**, **Keep
+Both** (copied as e.g. `counts (2).csv`) or **Skip**. Copying happens in
+a window of its own, with its progress and **Cancel**, so you can go on
+editing. Each file is written in full under a hidden name before it gets
+its own, so a full disk or a file that can't be read leaves no half
+copies; what wasn't copied, and why, is told at the end.
+
+wpsld watches an attached crate's folder: files added, removed or changed
+there, also by other programs, show in a moment, once the copying has
+quietened down. **View > Refresh** (F5) looks again at once, e.g. where
+the folder can't be watched.
+
 **Crate > Update File Details...** brings the files an attached crate
 describes up to date with its folder: their size (`contentSize`) and date
 modified, where missing or changed since. Optionally, it also fills in

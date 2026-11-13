@@ -691,6 +691,40 @@ public class TestCrateEditorEntityList extends ApplicationTest {
 		assertTrue(formats.get(0), formats.get(0).startsWith("data/counts.csv: encodingFormat text/csv, https://"));
 	}
 
+	/**
+	 * Insert > Files: those in the crate's folder added as they are; others
+	 * copied in, in a window of their own, then added; the folder watched
+	 */
+	@Test
+	public void insertFiles() throws Exception {
+		Path folder = Files.createDirectories(temp.resolve("survey"));
+		Files.createDirectories(folder.resolve("data"));
+		Files.writeString(folder.resolve("data/counts.csv"), "species,count\n");
+		Path elsewhere = Files.createDirectories(temp.resolve("elsewhere"));
+		Path notes = Files.writeString(elsewhere.resolve("field notes.txt"), "notes");
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.openFolder(stage, folder)).get());
+		EntityTreeView tree = lookup("#entityTree").queryAs(EntityTreeView.class);
+
+		interact(() -> app.insertFiles(stage, List.of(folder.resolve("data/counts.csv"))));
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals("data/counts.csv", lookup("#entityId").queryAs(TextField.class).getText());
+
+		var copying = WaitForAsyncUtils.asyncFx(
+				() -> app.copyInto(stage, List.of(notes), folder.resolve("data"), no.s11.wpsld.crate.FileCopy.Conflict.SKIP))
+				.get();
+		assertEquals(1, copying.get(10, TimeUnit.SECONDS).copied().size());
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals("notes", Files.readString(folder.resolve("data/field notes.txt")));
+		assertEquals("data/field%20notes.txt", lookup("#entityId").queryAs(TextField.class).getText());
+		interact(() -> tree.getTreeItem(1).setExpanded(true));
+		assertEquals(List.of("survey", "  data ~", "    counts.csv", "    field notes.txt"), rows(tree).subList(0, 4));
+
+		// Copied in by another program: shown soon, without Refresh
+		Files.writeString(folder.resolve("data/later.csv"), "");
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> rows(tree).contains("    later.csv ~"));
+	}
+
 	@Test
 	public void editedNotListed() throws Exception {
 		addNamed("Person", "Alice");
