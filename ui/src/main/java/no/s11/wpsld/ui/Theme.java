@@ -20,6 +20,7 @@ package no.s11.wpsld.ui;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import javafx.application.ColorScheme;
@@ -33,6 +34,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.DialogPane;
 import javafx.scene.layout.Region;
 import javafx.stage.Window;
+import javafx.stage.WindowEvent;
 
 /**
  * The editor's look: a {@link Style} in {@link Colours}, both on top of
@@ -205,6 +207,13 @@ final class Theme {
 	private static void watch(Window window) {
 		window.sceneProperty().addListener((obs, old, scene) -> watch(scene));
 		watch(window.getScene());
+		// Sized again once shown, with the look's fonts laid out: sized before,
+		// a dialog's wrapped text can get one line too few (on Windows at 150 %)
+		window.addEventHandler(WindowEvent.WINDOW_SHOWN, e -> {
+			if (window.getScene() != null && dialogPane(window.getScene().getRoot()).isPresent()) {
+				window.sizeToScene();
+			}
+		});
 	}
 
 	private static void watch(Scene scene) {
@@ -219,17 +228,15 @@ final class Theme {
 			});
 		}
 		apply(scene);
-		fitText(scene.getRoot());
+		// Kept at least as tall as its text needs, which could be cut off
+		dialogPane(scene.getRoot()).ifPresent(pane -> pane.setMinHeight(Region.USE_PREF_SIZE));
 	}
 
-	/**
-	 * Keep a dialog at least as tall as its text needs: on Windows an alert's
-	 * wrapped text can otherwise be cut off ("or keep them and ...").
-	 */
-	private static void fitText(Parent root) {
-		if (root != null && (root instanceof DialogPane ? root : root.lookup(".dialog-pane")) instanceof DialogPane pane) {
-			pane.setMinHeight(Region.USE_PREF_SIZE);
-		}
+	/** The dialog a window shows, if it is one */
+	private static Optional<DialogPane> dialogPane(Parent root) {
+		return root != null && (root instanceof DialogPane ? root : root.lookup(".dialog-pane")) instanceof DialogPane pane
+				? Optional.of(pane)
+				: Optional.empty();
 	}
 
 	private static void applyToAll() {
