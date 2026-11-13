@@ -30,6 +30,8 @@ import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.ListChangeListener;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.DialogPane;
+import javafx.scene.layout.Region;
 import javafx.stage.Window;
 
 /**
@@ -217,6 +219,17 @@ final class Theme {
 			});
 		}
 		apply(scene);
+		fitText(scene.getRoot());
+	}
+
+	/**
+	 * Keep a dialog at least as tall as its text needs: on Windows an alert's
+	 * wrapped text can otherwise be cut off ("or keep them and ...").
+	 */
+	private static void fitText(Parent root) {
+		if (root != null && (root instanceof DialogPane ? root : root.lookup(".dialog-pane")) instanceof DialogPane pane) {
+			pane.setMinHeight(Region.USE_PREF_SIZE);
+		}
 	}
 
 	private static void applyToAll() {

@@ -23,14 +23,10 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   under Dataset, File and CreativeWork, where Remove is rightly disabled.
   Needs the steps that show it.
 - **The "Entities" heading in OS/2 Warp dark** is dark grey on the dark
-  sidebar, barely readable.
-- **The "changed by another application" dialog cuts off its text in
-  OS/2 Warp.** With unsaved changes, when the file changed on disk (e.g.
-  `workshop8\ro-crate-metadata.json`), the text under the header ends in
-  "or keep them and ..." instead of wrapping onto more lines. Reload and
-  Keep My Changes work. The alert is in `CrateEditor.checkDisk()`; Warp's
-  font is larger, so the dialog may need to grow, or the content label to
-  wrap (check the Save Anyway dialog in `askBeforeOverwriting` too).
+  sidebar, barely readable. Not reproduced on Linux: the label takes
+  `.label`'s `-warp-text` (#e4e4e4), also after switching style and
+  colours while open. Maybe Windows only (as the cut-off dialog text was);
+  needs a screenshot, and whether the colours were Dark or Same as System.
 - **Parts that are not File get no link to open them in the preview**,
   e.g. an `ImageObject` in `hasPart`. Not reproduced: `CratePreview`
   (the saved `ro-crate-preview.html`) links every data entity reached by
