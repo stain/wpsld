@@ -71,6 +71,8 @@ public class TestAboutDialog extends ApplicationTest {
 
 		clickOn("#aboutSource");
 		assertEquals(List.of(AboutDialog.SOURCE), browsed);
+		clickOn("#aboutIssues");
+		assertEquals(List.of(AboutDialog.SOURCE, AboutDialog.ISSUES), browsed);
 		clickOn("Close");
 	}
 }

@@ -166,6 +166,10 @@ public class TestHelpDialog extends ApplicationTest {
 		Parser.builder().build().parse(HelpDialog.Topic.CONTENTS.content).accept(new AbstractVisitor() {
 			@Override
 			public void visit(org.commonmark.node.Link link) {
+				// And the project on GitHub
+				if (link.getDestination().startsWith("https://github.com/stain/wpsld")) {
+					return;
+				}
 				assertTrue("Unknown topic: " + link.getDestination(),
 						HelpDialog.Topic.fromResource(link.getDestination()).isPresent());
 				links.add(link.getDestination());

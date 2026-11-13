@@ -239,6 +239,8 @@ public class TestCrateEditor extends ApplicationTest {
 		} finally {
 			Files.deleteIfExists(metadata);
 			Files.deleteIfExists(data);
+			// Written with it, as an attached crate's
+			Files.deleteIfExists(folder.resolve("ro-crate-preview.html"));
 			Files.deleteIfExists(folder);
 		}
 	}

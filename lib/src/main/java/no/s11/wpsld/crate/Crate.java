@@ -571,6 +571,25 @@ public class Crate {
 	 * Whether the entity is the crate's metadata descriptor or HTML preview,
 	 * by its <code>@id</code> relative to the crate or to the root's.
 	 */
+	/**
+	 * Describe the crate's HTML preview, ro-crate-preview.html, as RO-Crate
+	 * shows it: a CreativeWork about the root data entity; not one of its
+	 * parts (hasPart), which it SHOULD NOT be. Kept as it is if described.
+	 *
+	 * @return Its entity
+	 */
+	public Entity describePreview() {
+		Entity preview = get(RO_CRATE_PREVIEW_HTML).orElseGet(() -> {
+			Entity added = add("CreativeWork");
+			rename(added, RO_CRATE_PREVIEW_HTML);
+			return added;
+		});
+		if (preview.get("about").isEmpty()) {
+			preview.set("about", Optional.of(JsonNodeFactory.instance.objectNode().put("@id", getRoot().getId())));
+		}
+		return preview;
+	}
+
 	private boolean isCrateFile(Entity entity) {
 		return List.of(RO_CRATE_METADATA_JSON, RO_CRATE_PREVIEW_HTML).stream()
 				.anyMatch(name -> entity.getId().equals(name) || entity.getId().equals(getRoot().getId() + name));

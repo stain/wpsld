@@ -135,6 +135,7 @@ import no.s11.wpsld.crate.UndoHistory;
 import no.s11.wpsld.crate.UndoHistory.Place;
 import no.s11.wpsld.crate.UndoHistory.Step;
 import no.s11.wpsld.form.EntityListing;
+import no.s11.wpsld.form.CratePreview;
 import no.s11.wpsld.form.EntityTree;
 import no.s11.wpsld.form.EntityListing.TypeCount;
 import no.s11.wpsld.form.EntityTypes;
@@ -1890,6 +1891,7 @@ public class CrateEditor extends Application {
 		crate = other;
 		unavailable = Map.of();
 		previewAsked = false;
+		keepPreview = false;
 		notInCrate.clear();
 		crateFile.open(path, crate.toJson());
 		// All types of another crate
@@ -2614,34 +2616,40 @@ public class CrateEditor extends Application {
 		return false;
 	}
 
-	/** Whether the user was asked about this crate's stale HTML preview */
+	/** Whether the user was asked about another tool's HTML preview of this crate */
 	private boolean previewAsked;
+	/** Whether to keep another tool's HTML preview, rather than write wpsld's */
+	private boolean keepPreview;
 
 	/**
-	 * After saving an attached crate, its folder's ro-crate-preview.html no
-	 * longer shows it as it is, and wpsld can't make another yet: ask, once
-	 * for each crate opened, whether to move it aside (into
-	 * ro-crate-preview_files, named by its date), delete it, or keep it.
+	 * Whether wpsld may write an attached crate's HTML preview,
+	 * ro-crate-preview.html (see {@link CratePreview}): yes, unless there is
+	 * one made by another tool, which is only replaced if the user chooses,
+	 * once for each crate opened, and then moved aside into
+	 * ro-crate-preview_files, as old-ro-crate-preview with its date.
 	 */
-	private void stalePreview(Stage stage, Path folder) {
-		Path preview = folder.resolve("ro-crate-preview.html");
-		if (previewAsked || !Files.isRegularFile(preview)) {
-			return;
-		}
-		previewAsked = true;
-		ButtonType moveAside = new ButtonType("Move Aside", ButtonData.YES);
-		ButtonType delete = new ButtonType("Delete", ButtonData.OTHER);
-		ButtonType keep = new ButtonType("Keep", ButtonData.NO);
-		Alert alert = new Alert(AlertType.CONFIRMATION, "ro-crate-preview.html shows the crate as it was when the"
-				+ " preview was made, not as saved now, and wpsld can't make a new preview yet.\n\nMove it aside into"
-				+ " ro-crate-preview_files, as old-ro-crate-preview with its date, delete it, or keep it as it is?",
-				moveAside, delete, keep);
-		alert.initOwner(stage);
-		alert.setHeaderText("The crate's HTML preview is out of date");
-		alert.setResizable(true);
-		ButtonType chosen = alert.showAndWait().orElse(keep);
-		try {
-			if (chosen == moveAside) {
+	private boolean mayWritePreview(Stage stage, Path folder) {
+		Path preview = folder.resolve(CratePreview.FILE);
+		if (Files.isRegularFile(preview) && !isOurPreview(preview)) {
+			if (keepPreview || previewAsked) {
+				return false;
+			}
+			previewAsked = true;
+			ButtonType replace = new ButtonType("Replace", ButtonData.YES);
+			ButtonType keep = new ButtonType("Keep", ButtonData.NO);
+			Alert alert = new Alert(AlertType.CONFIRMATION, "wpsld writes ro-crate-preview.html, the crate described"
+					+ " as a web page, each time it saves an attached crate. This folder has one made by another"
+					+ " tool, which no longer shows the crate as saved.\n\nReplace it (the old one is moved aside"
+					+ " into ro-crate-preview_files, as old-ro-crate-preview with its date), or keep it as it is?",
+					replace, keep);
+			alert.initOwner(stage);
+			alert.setHeaderText("The crate has an HTML preview made by another tool");
+			alert.setResizable(true);
+			if (alert.showAndWait().orElse(keep) != replace) {
+				keepPreview = true;
+				return false;
+			}
+			try {
 				Path aside = Files.createDirectories(folder.resolve("ro-crate-preview_files"));
 				String date = java.time.LocalDate
 						.ofInstant(Files.getLastModifiedTime(preview).toInstant(), java.time.ZoneId.systemDefault())
@@ -2651,13 +2659,36 @@ public class CrateEditor extends Application {
 					old = aside.resolve("old-ro-crate-preview-" + date + "-" + n + ".html");
 				}
 				Files.move(preview, old);
-			} else if (chosen == delete) {
-				Files.delete(preview);
+			} catch (IOException e) {
+				Alert error = new Alert(AlertType.ERROR, "Can't move " + preview + " aside:\n" + e.getMessage());
+				error.initOwner(stage);
+				error.showAndWait();
+				return false;
 			}
+		}
+		return true;
+	}
+
+	/** Write an attached crate's HTML preview, after its metadata */
+	private void writePreview(Stage stage, Path folder) {
+		Path preview = folder.resolve(CratePreview.FILE);
+		try {
+			SafeSave.write(preview, CratePreview.html(crate, entityEditor::label, "wpsld " + AboutDialog.version())
+					.getBytes(StandardCharsets.UTF_8));
 		} catch (IOException e) {
-			Alert error = new Alert(AlertType.ERROR, "Can't move or delete " + preview + ":\n" + e.getMessage());
+			Alert error = new Alert(AlertType.ERROR, "Saved the crate, but can't write its HTML preview, " + preview
+					+ ":\n" + e.getMessage());
 			error.initOwner(stage);
-			error.showAndWait();
+			error.show();
+		}
+	}
+
+	/** Whether a preview is one wpsld wrote, by its generator */
+	private static boolean isOurPreview(Path preview) {
+		try (var in = Files.newInputStream(preview)) {
+			return CratePreview.isOurs(new String(in.readNBytes(4096), StandardCharsets.UTF_8));
+		} catch (IOException e) {
+			return false;
 		}
 	}
 
@@ -2871,6 +2902,14 @@ public class CrateEditor extends Application {
 				legacy = Optional.empty();
 			}
 		}
+		// An attached crate's HTML preview: described in the crate, if wpsld writes it
+		Path folder = file.toAbsolutePath().getParent();
+		boolean attached = CrateFile.isMetadataFile(file)
+				&& (!crateFile.path().equals(Optional.of(file)) || crateFile.isAttached());
+		boolean preview = attached && mayWritePreview(stage, folder);
+		if (preview) {
+			crate.describePreview();
+		}
 		try {
 			JsonNode json = crate.toJson();
 			// With the line ends the file had, else \n; never half written
@@ -2881,7 +2920,9 @@ public class CrateEditor extends Application {
 			crateFile.reset(Optional.of(file), json);
 			lastFolder = file.toAbsolutePath().getParent().toFile();
 			refresh();
-			crateFile.folder().ifPresent(folder -> stalePreview(stage, folder));
+			if (preview) {
+				writePreview(stage, folder);
+			}
 			return true;
 		} catch (IOException e) {
 			Alert error = new Alert(AlertType.ERROR, "Can't save " + file + ":\n" + e.getMessage());

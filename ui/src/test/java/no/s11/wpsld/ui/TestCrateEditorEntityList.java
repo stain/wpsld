@@ -601,35 +601,63 @@ public class TestCrateEditorEntityList extends ApplicationTest {
 		assertTrue(Files.isSymbolicLink(legacy));
 	}
 
-	/** Saving an attached crate with an HTML preview asks once to move it aside */
+	/**
+	 * Saving an attached crate writes its HTML preview; one made by another
+	 * tool is replaced only if chosen, once, and moved aside
+	 */
 	@Test
-	public void stalePreview() throws Exception {
+	public void preview() throws Exception {
 		Path folder = Files.createDirectories(temp.resolve("previewed"));
 		Files.createDirectories(folder.resolve("data"));
 		Files.writeString(folder.resolve("data/counts.csv"), "");
 		Files.writeString(folder.resolve("ro-crate-metadata.json"), CRATE);
 		Path preview = folder.resolve("ro-crate-preview.html");
-		Files.writeString(preview, "<html></html>");
+		Files.writeString(preview, "<html><meta name=\"generator\" content=\"rochtml\"></html>");
 		Files.setLastModifiedTime(preview, java.nio.file.attribute.FileTime.from(java.time.Instant.parse("2024-12-24T12:00:00Z")));
 		Stage stage = (Stage) entities().getScene().getWindow();
 		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, folder.resolve("ro-crate-metadata.json"))).get());
 		var saving = WaitForAsyncUtils.asyncFx(() -> app.saveTo(stage, folder.resolve("ro-crate-metadata.json")));
 		WaitForAsyncUtils.waitForFxEvents();
-		assertTrue(lookup("The crate's HTML preview is out of date").tryQuery().isPresent());
-		clickOn("Move Aside");
+		assertTrue(lookup("The crate has an HTML preview made by another tool").tryQuery().isPresent());
+		clickOn("Replace");
 		assertTrue(saving.get());
-		assertFalse(Files.exists(preview));
 		assertTrue(Files.exists(folder.resolve("ro-crate-preview_files/old-ro-crate-preview-2024-12-24.html")));
-		// Not asked again for this crate
-		Files.writeString(preview, "<html></html>");
+		String html = Files.readString(preview);
+		assertTrue(html, html.contains("<title>Survey</title>"));
+		assertTrue(html.contains("<a href=\"data/counts.csv\">"));
+		// Described in the crate, as RO-Crate shows it, and not one of its parts
+		com.fasterxml.jackson.databind.JsonNode graph = new com.fasterxml.jackson.databind.ObjectMapper()
+				.readTree(folder.resolve("ro-crate-metadata.json").toFile()).get("@graph");
+		com.fasterxml.jackson.databind.JsonNode described = java.util.stream.StreamSupport.stream(graph.spliterator(), false)
+				.filter(e -> e.path("@id").asText().equals("ro-crate-preview.html")).findFirst().orElseThrow();
+		assertEquals("CreativeWork", described.get("@type").asText());
+		assertEquals("./", described.get("about").get("@id").asText());
+		assertFalse(graph.toString().contains("\"hasPart\":[{\"@id\":\"ro-crate-preview.html\""));
+		// Ours: written again without asking
 		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.saveTo(stage, folder.resolve("ro-crate-metadata.json"))).get());
-		assertTrue(Files.exists(preview));
+		assertTrue(Files.readString(preview).contains("<title>Survey</title>"));
 	}
 
-	/**
-	 * View > Show Files Not in Crate, as each view has it: on by folder, off
-	 * by type and part; Open Folder lists by folder
-	 */
+	/** Another tool's preview kept, if chosen: not written over */
+	@Test
+	public void keepOthersPreview() throws Exception {
+		Path folder = Files.createDirectories(temp.resolve("kept"));
+		Files.createDirectories(folder.resolve("data"));
+		Files.writeString(folder.resolve("data/counts.csv"), "");
+		Files.writeString(folder.resolve("ro-crate-metadata.json"), CRATE);
+		Path preview = folder.resolve("ro-crate-preview.html");
+		Files.writeString(preview, "<html>theirs</html>");
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, folder.resolve("ro-crate-metadata.json"))).get());
+		var saving = WaitForAsyncUtils.asyncFx(() -> app.saveTo(stage, folder.resolve("ro-crate-metadata.json")));
+		WaitForAsyncUtils.waitForFxEvents();
+		clickOn("Keep");
+		assertTrue(saving.get());
+		assertEquals("<html>theirs</html>", Files.readString(preview));
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.saveTo(stage, folder.resolve("ro-crate-metadata.json"))).get());
+		assertEquals("<html>theirs</html>", Files.readString(preview));
+	}
+
 	@Test
 	public void showFiles() throws Exception {
 		Path folder = Files.createDirectories(temp.resolve("Bird survey"));

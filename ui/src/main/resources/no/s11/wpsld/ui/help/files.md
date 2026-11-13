@@ -54,9 +54,23 @@ to correct a warning.
 
 Saving a crate of RO-Crate 1.1 or later beside RO-Crate 1.0's
 `ro-crate-metadata.jsonld` offers to remove that old file (a symbolic link
-of that name can stay), and saving an attached crate with an
-`ro-crate-preview.html` offers to move it aside or delete it, as it no
-longer shows the crate as saved.
+of that name can stay).
+
+## HTML preview
+
+Saving an attached crate also writes `ro-crate-preview.html` beside its
+metadata file: the crate described as a web page, to read in a browser.
+It has the crate's name and description, a list of its entities (files
+and folders first, then the others by type) and a section for each, with
+its properties; links go to the entities it refers to, to its files, and
+to the web. The crate describes the page, as RO-Crate shows it: an entity
+`ro-crate-preview.html`, a CreativeWork about the crate, not one of its
+parts.
+
+A preview made by another tool is not written over without asking: choose
+**Replace** to move it aside, into `ro-crate-preview_files/` as
+`old-ro-crate-preview-` with its date, and write wpsld's, or **Keep** to
+leave it as it is, no longer showing the crate as saved.
 
 ## Changes on disk
 

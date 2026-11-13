@@ -22,3 +22,8 @@ works). Help stays open while you work.
   - [Places](places.md): from GeoNames, on a map.
 - [Copy and paste](clipboard.md): copy descriptions or link a copied entity.
 - [Views and styles](views.md): change the layout and inspect the preview.
+
+wpsld is developed on GitHub, at
+[github.com/stain/wpsld](https://github.com/stain/wpsld): its source code,
+releases and these help pages. Report a problem or suggest an improvement
+in its [issues](https://github.com/stain/wpsld/issues).

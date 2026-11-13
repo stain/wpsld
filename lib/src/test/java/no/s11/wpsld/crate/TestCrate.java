@@ -577,4 +577,17 @@ public class TestCrate {
 		assertEquals(Optional.of("1.0"), reader.read(new java.io.ByteArrayInputStream(v10.getBytes(StandardCharsets.UTF_8)),
 				"test").crate().orElseThrow().specVersion());
 	}
+
+	/** The HTML preview described as RO-Crate shows it, once, and not a part */
+	@Test
+	public void describePreview() {
+		Crate crate = new Crate();
+		Entity preview = crate.describePreview();
+		assertEquals("ro-crate-preview.html", preview.getId());
+		assertEquals(List.of("CreativeWork"), preview.getTypes());
+		assertEquals("./", preview.get("about").orElseThrow().get("@id").asText());
+		assertSame(preview, crate.describePreview());
+		assertEquals(List.of(), crate.getRoot().getAll("hasPart"));
+		assertEquals(List.of(), crate.mentionUnlinked());
+	}
 }

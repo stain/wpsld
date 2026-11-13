@@ -1103,6 +1103,26 @@ extension. Next:
   common: NumPy `.npy` (`\x93NUMPY`), Avro (`Obj\x01`), NIfTI (`n+1` at
   344), ROOT (`root`), MRC maps (`MAP ` at 208).
 
+### Nested RO-Crates
+
+A crate may contain other crates: a folder of an attached crate with its
+own `ro-crate-metadata.json`, which RO-Crate describes as a Dataset whose
+`conformsTo` is the RO-Crate specification (see "Referencing other
+RO-Crates" in the spec's data entities). Recognise them:
+- When listing an attached crate's folder, a subfolder with its own
+  metadata file is a crate of its own: show it with a crate icon, its
+  files not as the outer crate's (they are the inner crate's to
+  describe), and offer to add it as such a Dataset (`@id` its folder,
+  `conformsTo` RO-Crate, its name and description from its metadata).
+- Open the inner crate from there in another window (File > Open on its
+  metadata file), and go back to the outer one.
+- Also crates referenced by URL or DOI (a Dataset with `conformsTo`
+  RO-Crate), opened by retrieving them (see the ro-crate-retrieve notes:
+  Signposting, content negotiation).
+- Checks: files of a nested crate shouldn't be the outer crate's parts
+  directly; the nested crate's own metadata file and preview are not
+  data of the outer one.
+
 ### Licences, defaults and the metadata descriptor
 
 - **Recommended licences first** in the licence finder (Licence from
@@ -1127,10 +1147,20 @@ extension. Next:
 
 ### HTML preview (ro-crate-preview.html)
 
-An attached crate may have an `ro-crate-preview.html`, which goes out of
-date as the crate is edited. For now, saving asks once to move it aside
-(into `ro-crate-preview_files/old-ro-crate-preview-DATE.html`), delete
-it, or keep it. To write a new one, investigate which existing previewer
+*Done, basic*: saving an attached crate writes `ro-crate-preview.html`
+(`CratePreview`): plain HTML and CSS, light and dark, no scripts; the
+crate's name and description, a contents list, a section per entity with
+its properties, `#entity-n` anchors between them, links to files and the
+web; marked with `<meta name="generator" content="wpsld …">` so that
+only wpsld's own is written over; another tool's is replaced (moved
+aside into `ro-crate-preview_files/`) or kept, asked once. The crate
+describes it as RO-Crate's example does (a CreativeWork about the root,
+not in hasPart). Next: a preference to not write it; the generator as a
+SoftwareApplication with a CreateAction (object the metadata, result the
+preview), as the spec's example; images and maps for files and places;
+"Referenced by" as in the editor's preview; anchors that stay the same
+across saves (by @id rather than position); Markdown descriptions
+rendered. For a richer preview, investigate which existing previewer
 is easiest to reuse without running JavaScript or Python inside the Java
 application (no GraalJS, Jython or a bundled Node):
 - Previewers whose template could run in Java as it is: e.g. ro-crate-py's
