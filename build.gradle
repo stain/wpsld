@@ -3,14 +3,38 @@
 // so of build, which must neither fail when a service is down nor ask the
 // services on every build; the other tests can't reach the network (see
 // OfflineResolverProvider). Run them with ./gradlew onlineTest, as GitHub
-// Actions does on release and monthly (.github/workflows).
+// Actions does on release and monthly (.github/workflows). Likewise the
+// tests reading damaged files (no.s11.wpsld.test.Damaged), damagedTest.
 subprojects {
     plugins.withType(JavaPlugin).configureEach {
         tasks.named('test', Test) {
             useJUnit {
-                excludeCategories 'no.s11.wpsld.test.Online'
+                excludeCategories 'no.s11.wpsld.test.Online', 'no.s11.wpsld.test.Damaged'
             }
             systemProperty 'wpsld.test.offline', 'true'
+        }
+        // The tests that read many damaged copies of files with the
+        // metadata readers (no.s11.wpsld.test.Damaged), which take minutes:
+        // ./gradlew damagedTest, as GitHub Actions does on release and monthly
+        tasks.register('damagedTest', Test) {
+            description = 'Runs the tests that read damaged files.'
+            group = 'verification'
+            def unit = tasks.named('test', Test).get()
+            testClassesDirs = unit.testClassesDirs
+            classpath = unit.classpath
+            jvmArgs unit.jvmArgs
+            systemProperties unit.systemProperties
+            // Rounds of damaged copies, each of its own seed (see Damage):
+            // -PdamageRounds=200 for more
+            systemProperty 'wpsld.test.damageRounds', findProperty('damageRounds') ?: '20'
+            maxHeapSize = '1g'
+            // The readers may have changed
+            outputs.upToDateWhen { false }
+            useJUnit {
+                includeCategories 'no.s11.wpsld.test.Damaged'
+            }
+            // Only the readers' projects have them
+            failOnNoDiscoveredTests = false
         }
         // As test (its JVM arguments and properties, e.g. headless JavaFX),
         // but only the online tests, and on the network

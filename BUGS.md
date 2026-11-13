@@ -165,10 +165,11 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   modified, so nothing is read twice. Readers isolated: each on its own
   thread with a time limit, any Throwable (also LinkageError,
   StackOverflowError, OutOfMemoryError) caught and reported as a problem,
-  never thrown at the window; damaged-input tests (cut short, garbage
-  after the start bytes, huge lengths, deep nesting, oversized parts) as
-  integration tests in their own GitHub workflow, as the online tests
-  are. `exifData` as PropertyValues rather than one
+  never thrown at the window (*done*, `FileMetadata`, and reading in the
+  background with progress and Cancel in both); damaged-input tests (cut
+  short, garbage after the start bytes, huge lengths, deep nesting,
+  oversized parts) as integration tests in their own GitHub workflow, as
+  the online tests are (*done*, `./gradlew damagedTest`). `exifData` as PropertyValues rather than one
   text; and JPEG 2000 is not planned (no library reads its metadata but
   jai-imageio-jpeg2000, whose JJ2000 licence is a problem).
 

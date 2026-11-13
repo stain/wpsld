@@ -29,6 +29,8 @@ dependencies {
 
     // Use JUnit test framework.
     testImplementation 'junit:junit:4.13'
+    // Damage's checks
+    testFixturesImplementation 'junit:junit:4.13'
 
 }
 

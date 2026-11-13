@@ -142,6 +142,13 @@ they answer today; they are in the JUnit category `Online` and left out of
     ./gradlew onlineTest                         # ORCID, ROR, Crossref, DataCite, OpenStreetMap
     GEONAMES_USERNAME=<you> ./gradlew onlineTest # and GeoNames
 
+Likewise, the tests that read thousands of damaged copies of files with
+the readers of files' own metadata, which must neither hang nor run out of
+memory (JUnit category `Damaged`):
+
+    ./gradlew damagedTest                        # 20 rounds of each file
+    ./gradlew damagedTest -PdamageRounds=200     # more
+
 ### With conda
 
 [`environment.yml`](environment.yml) gives OpenJDK 25 and the libraries
@@ -183,6 +190,8 @@ also runs them on each platform before making a release.
 runs the online tests once a month, when run by hand, and on each release
 (reported, without holding the release up). GeoNames' test needs the
 repository secret `GEONAMES_USERNAME`, and is skipped without it.
+[`.github/workflows/damaged-input-tests.yml`](.github/workflows/damaged-input-tests.yml)
+runs the damaged-file tests likewise, with 200 rounds.
 
 ### Releases
 

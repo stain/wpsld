@@ -111,6 +111,11 @@ jobs:
     secrets:
       GEONAMES_USERNAME: ${{ secrets.GEONAMES_USERNAME }}
 
+  # The metadata readers on damaged files, none hanging nor running out of
+  # memory; reported, but not holding up the release
+  damaged-input-tests:
+    uses: ./.github/workflows/damaged-input-tests.yml
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
