@@ -85,7 +85,8 @@ final class PdfMetadata {
 		}
 		// Each value once, e.g. the title in both the information and the XMP
 		java.util.Set<List<String>> seen = new java.util.HashSet<>();
-		return found.stream().filter(f -> seen.add(List.of(f.property(), f.value()))).toList();
+		return EmbeddedMetadata.withNamedLicences(found).stream().filter(f -> seen.add(List.of(f.property(), f.value())))
+				.toList();
 	}
 
 	private static Optional<String> text(String text) {

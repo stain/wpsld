@@ -38,7 +38,6 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.lookup.EmbeddedMetadata.Found;
-import no.s11.wpsld.lookup.EmbeddedMetadata.Kind;
 
 /**
  * Choose which of the values a file says about itself (see
@@ -67,8 +66,8 @@ class FileMetadataDialog extends Dialog<List<Found>> {
 			box.setId("fileMetadata-" + boxes.size());
 			box.setMnemonicParsing(false);
 			// One value of each property to start with, where it has none
-			// Where a photo was taken only on purpose
-			box.setSelected(f.kind() != Kind.PLACE && now.isEmpty() && chosen.add(f.property()));
+			// Where a photo was taken, and the camera, only on purpose
+			box.setSelected(!f.onPurpose() && now.isEmpty() && chosen.add(f.property()));
 			box.setTooltip(new Tooltip("From " + f.source() + (now.isEmpty() ? ""
 					: "\nNow: " + now.stream().map(FileMetadataDialog::oneLine).collect(Collectors.joining(", ")))));
 			boxes.put(box, f);

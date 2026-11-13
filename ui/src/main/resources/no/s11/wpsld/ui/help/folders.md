@@ -74,7 +74,11 @@ the folder are shown in red (see [Views and styles](views.md)).
 **Crate > Update File Details...** brings the files an attached crate
 describes up to date with its folder: their size (`contentSize`) and date
 modified, where missing or changed since. Optionally, it also fills in
-their [formats](formats.md) where they have none.
+their [formats](formats.md) where they have none, and what the files say
+about themselves (titles, authors, dates, licences, sizes; see
+[Metadata from the file](files.md#metadata-from-the-file)) where they
+have no value yet. Where a photo was taken and the camera are left out:
+choose those for one file with **Metadata from the File...**.
 
 ## Show in Explorer or Finder
 

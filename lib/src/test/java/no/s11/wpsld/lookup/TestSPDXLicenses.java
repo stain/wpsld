@@ -83,6 +83,29 @@ public class TestSPDXLicenses {
 		assertEquals(List.of(), spdx.search("no such licence"));
 	}
 
+	/** Licences named in text, e.g. a photo's copyright notice */
+	@Test
+	public void named() {
+		SPDXLicenses spdx = SPDXLicenses.bundled();
+		java.util.function.Function<String, Optional<String>> id = text -> spdx.named(text).map(License::id);
+		assertEquals(Optional.of("CC-BY-4.0"), id.apply("CC BY 4.0"));
+		assertEquals(Optional.of("CC-BY-SA-4.0"), id.apply("© 2026 Josiah Carberry, CC BY-SA 4.0"));
+		assertEquals(Optional.of("CC-BY-NC-ND-4.0"), id.apply("Licensed under cc-by-nc-nd 4.0."));
+		assertEquals(Optional.of("CC0-1.0"), id.apply("Released as CC0"));
+		assertEquals(Optional.of("CC-BY-4.0"), id.apply("Creative Commons Attribution 4.0 International"));
+		assertEquals(Optional.of("CC-BY-4.0"),
+				id.apply("This work is under the Creative Commons Attribution 4.0 International licence."));
+		assertEquals(Optional.of("Apache-2.0"), id.apply("Apache License 2.0"));
+		assertEquals(Optional.of("Apache-2.0"), id.apply("apache-2.0"));
+		assertEquals(Optional.of("MIT"), id.apply("MIT License"));
+		assertEquals(Optional.of("MIT"), id.apply("mit"));
+		assertEquals(Optional.of("GPL-3.0-only"), id.apply("GNU General Public License v3.0 only"));
+		// Not licences, nor short identifiers within other words or text
+		assertEquals(Optional.empty(), id.apply("All rights reserved"));
+		assertEquals(Optional.empty(), id.apply("Submitted to MIT in 2026"));
+		assertEquals(Optional.empty(), id.apply("© 2026 Josiah Carberry"));
+	}
+
 	@Test
 	public void idOf() {
 		assertEquals(Optional.of("CC-BY-4.0"), SPDXLicenses.idOf("http://spdx.org/licenses/CC-BY-4.0"));

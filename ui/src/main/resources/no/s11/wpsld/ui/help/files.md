@@ -69,19 +69,24 @@ the File…** to see what it says:
 - PDFs: their document information (title, subject, author, keywords,
   dates) and their XMP metadata.
 - Photos and images (JPEG, PNG, TIFF, WebP): description, artist,
-  copyright, keywords, when taken and changed, a licence in their XMP, and
-  where the photo was taken, if the camera recorded it.
-- SVG drawings: their title and description, and the metadata Inkscape
-  writes (creator, date, rights, keywords, licence).
+  copyright, keywords, when taken and changed, a licence in their XMP,
+  their size in pixels, the camera and its settings, and where the photo
+  was taken, if the camera recorded it.
+- SVG drawings: their title, description and size, and the metadata
+  Inkscape writes (creator, date, rights, keywords, licence).
+
+A licence named in a copyright notice, e.g. "© 2026 Ada Lovelace, CC BY
+4.0", is offered as the licence too.
 
 Tick what to give the file's entity. Those it has no value for yet are
-ticked to start with, except where a photo was taken: a photo can tell
-more than meant, such as where someone lives, so give that only on
-purpose. Hover over a value to see where in the file it is, and the
+ticked to start with, except where a photo was taken and the camera: a
+photo can tell more than meant, such as where someone lives, so give
+those only on purpose. Hover over a value to see where in the file it is, and the
 entity's value now. Authors become links to a Person of that name, added
 if the crate has none; a licence known to SPDX a link to it; and where a
 photo was taken a new Place with its point on the map. **Edit > Undo**
-takes it all back at once.
+takes it all back at once. To fill in many files at once, where they have
+no value yet, use **Crate > Update File Details...**.
 
 ## HTML preview
 

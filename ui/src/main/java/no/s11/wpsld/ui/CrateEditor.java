@@ -30,6 +30,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -931,6 +932,37 @@ public class CrateEditor extends Application {
 		return selectedPath().filter(Files::isRegularFile).map(path -> Map.entry(entity, path));
 	}
 
+	/** What a file says about itself: an Office, OpenDocument or PDF file, an image or an SVG */
+	private static List<EmbeddedMetadata.Found> embeddedMetadata(Path file) {
+		return java.util.stream.Stream.concat(EmbeddedMetadata.read(file).stream(), PdfMetadata.read(file).stream())
+				.toList();
+	}
+
+	/**
+	 * Give an entity what its file says about itself, where it has no value
+	 * yet: the first value of each such property (all authors and keywords),
+	 * but not what to give only on purpose (where a photo was taken, the
+	 * camera).
+	 *
+	 * @return What was given, e.g. "name Week 8 workshop"
+	 */
+	private List<String> fillFromFile(Entity entity, Path file) {
+		Map<String, List<EmbeddedMetadata.Found>> byProperty = new LinkedHashMap<>();
+		embeddedMetadata(file).stream().filter(f -> !f.onPurpose())
+				.forEach(f -> byProperty.computeIfAbsent(f.property(), p -> new ArrayList<>()).add(f));
+		List<String> given = new ArrayList<>();
+		byProperty.forEach((property, found) -> {
+			if (!entity.getAll(property).isEmpty()) {
+				return;
+			}
+			List<EmbeddedMetadata.Found> chosen = property.equals("author") ? found : List.of(found.get(0));
+			entity.setAll(property, chosen.stream().map(f -> fileValue(f, true, entity)).distinct().toList());
+			given.add(property + " " + chosen.stream().map(EmbeddedMetadata.Found::value)
+					.collect(Collectors.joining(", ")));
+		});
+		return given;
+	}
+
 	/** Properties a file's own value replaces the entity's of, rather than adding to them */
 	private static final Set<String> ONE_VALUE = Set.of("name", "description", "dateCreated", "dateModified",
 			"inLanguage");
@@ -946,9 +978,7 @@ public class CrateEditor extends Application {
 		}
 		Entity entity = selected.get().getKey();
 		// Not what it has already, e.g. the same author or licence
-		Path path = selected.get().getValue();
-		List<EmbeddedMetadata.Found> found = java.util.stream.Stream
-				.concat(EmbeddedMetadata.read(path).stream(), PdfMetadata.read(path).stream())
+		List<EmbeddedMetadata.Found> found = embeddedMetadata(selected.get().getValue()).stream()
 				.filter(f -> !entity.getAll(f.property()).contains(fileValue(f, false, entity))).toList();
 		if (found.isEmpty()) {
 			Alert none = new Alert(AlertType.INFORMATION, "Office, OpenDocument and PDF files, images (JPEG, PNG,"
@@ -1012,7 +1042,7 @@ public class CrateEditor extends Application {
 		case LICENSE -> {
 			SPDXLicenses spdx = SPDXLicenses.bundled();
 			Optional<SPDXLicenses.License> license = spdx.meant(found.value(), true)
-					.or(() -> spdx.byLink(found.value()));
+					.or(() -> spdx.byLink(found.value())).or(() -> spdx.named(found.value()));
 			if (license.isEmpty()) {
 				return TextNode.valueOf(found.value());
 			}
@@ -1181,24 +1211,31 @@ public class CrateEditor extends Application {
 		sizes.setSelected(true);
 		CheckBox formats = new CheckBox("Formats, from the files' contents and names, where they have none");
 		formats.setId("updateFormats");
+		CheckBox embedded = new CheckBox("What the files say about themselves (titles, authors, dates, licences),"
+				+ " where they have none");
+		embedded.setId("updateEmbedded");
+		embedded.setWrapText(true);
 		Label note = new Label("Of each file the crate describes that is in its folder. A format is its media type,"
 				+ " and its PRONOM format where only one fits; a file whose content isn't known (e.g. a .dat of an"
-				+ " instrument) is application/octet-stream.");
+				+ " instrument) is application/octet-stream. What files say about themselves: Office, OpenDocument"
+				+ " and PDF files, images and SVGs; not where a photo was taken nor the camera, which only"
+				+ " Metadata from the File… (right-click a file) offers.");
 		note.setWrapText(true);
 		note.getStyleClass().add("dim-text");
 		Dialog<ButtonType> dialog = new Dialog<>();
 		dialog.initOwner(stage);
 		dialog.setTitle("Update File Details");
 		dialog.setHeaderText("Update the crate's files' details from its folder");
-		dialog.getDialogPane().setContent(new VBox(8, sizes, formats, note));
+		dialog.getDialogPane().setContent(new VBox(8, sizes, formats, embedded, note));
 		dialog.getDialogPane().setPrefWidth(480);
 		dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
 		dialog.getDialogPane().lookupButton(ButtonType.OK).disableProperty()
-				.bind(sizes.selectedProperty().not().and(formats.selectedProperty().not()));
+				.bind(sizes.selectedProperty().not().and(formats.selectedProperty().not())
+						.and(embedded.selectedProperty().not()));
 		if (dialog.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) {
 			return;
 		}
-		List<String> done = updateFiles(sizes.isSelected(), formats.isSelected());
+		List<String> done = updateFiles(sizes.isSelected(), formats.isSelected(), embedded.isSelected());
 		Alert alert = new Alert(AlertType.INFORMATION, done.isEmpty() ? "The files' details were up to date."
 				: String.join("\n", done.stream().limit(30).toList()) + (done.size() > 30 ? "\n…" : ""), ButtonType.OK);
 		alert.initOwner(stage);
@@ -1217,6 +1254,15 @@ public class CrateEditor extends Application {
 	 * @return What was changed, a line for each file
 	 */
 	List<String> updateFiles(boolean sizes, boolean formats) {
+		return updateFiles(sizes, formats, false);
+	}
+
+	/**
+	 * As {@link #updateFiles(boolean, boolean)}, and with embedded, what each
+	 * file says about itself where its entity has no value (see
+	 * {@link #fillFromFile})
+	 */
+	List<String> updateFiles(boolean sizes, boolean formats, boolean embedded) {
 		Optional<Path> folder = crateFile.folder();
 		if (folder.isEmpty()) {
 			return List.of();
@@ -1240,6 +1286,9 @@ public class CrateEditor extends Application {
 					changed.add("encodingFormat " + entity.getAll("encodingFormat").stream()
 							.map(v -> v.isTextual() ? v.asText() : v.path("@id").asText()).collect(Collectors.joining(", ")));
 				}
+			}
+			if (embedded) {
+				changed.addAll(fillFromFile(entity, file));
 			}
 			if (!changed.isEmpty()) {
 				done.add(id + ": " + String.join("; ", changed));

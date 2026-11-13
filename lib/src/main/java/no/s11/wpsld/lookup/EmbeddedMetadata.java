@@ -50,7 +50,10 @@ import com.drew.imaging.ImageMetadataReader;
 import com.drew.imaging.ImageProcessingException;
 import com.drew.lang.GeoLocation;
 import com.drew.lang.KeyValuePair;
+import com.drew.metadata.Directory;
 import com.drew.metadata.Metadata;
+import com.drew.metadata.jpeg.JpegDirectory;
+import com.drew.metadata.webp.WebpDirectory;
 import com.drew.metadata.exif.ExifDirectoryBase;
 import com.drew.metadata.exif.ExifIFD0Directory;
 import com.drew.metadata.exif.ExifSubIFDDirectory;
@@ -134,6 +137,14 @@ public final class EmbeddedMetadata {
 	 *                 <code>docProps/core.xml dcterms:created</code>
 	 */
 	public record Found(String property, String value, Kind kind, String source) {
+		/**
+		 * Whether to give it only on purpose, not chosen to start with nor
+		 * filled in for several files: where a photo was taken, and the
+		 * camera, which can tell more than meant
+		 */
+		public boolean onPurpose() {
+			return kind == Kind.PLACE || property.equals("exifData");
+		}
 	}
 
 	private EmbeddedMetadata() {
@@ -170,7 +181,28 @@ public final class EmbeddedMetadata {
 			// Not what it started like after all, or broken: nothing to tell
 			return List.of();
 		}
-		return found.stream().filter(distinct()).toList();
+		return withNamedLicences(found).stream().filter(distinct()).toList();
+	}
+
+	/**
+	 * The values found, and a licence where a text names one (see
+	 * {@link SPDXLicenses#named}), e.g. "© 2026 Ada Lovelace, CC BY 4.0" in
+	 * a photo's copyright, if no licence found already is that one
+	 */
+	public static List<Found> withNamedLicences(List<Found> found) {
+		SPDXLicenses spdx = SPDXLicenses.bundled();
+		Set<String> licences = new HashSet<>();
+		found.stream().filter(f -> f.kind() == Kind.LICENSE)
+				.forEach(f -> spdx.meant(f.value(), true).or(() -> spdx.byLink(f.value()))
+						.or(() -> spdx.named(f.value())).ifPresent(l -> licences.add(l.id())));
+		List<Found> all = new ArrayList<>(found);
+		for (Found f : found) {
+			if (f.property().equals("copyrightNotice")) {
+				spdx.named(f.value()).filter(l -> licences.add(l.id())).ifPresent(l -> all.add(
+						new Found("license", l.id(), Kind.LICENSE, f.source() + ", which names " + l.id())));
+			}
+		}
+		return all;
 	}
 
 	/** Each property's value once, the first found */
@@ -246,8 +278,8 @@ public final class EmbeddedMetadata {
 	/**
 	 * An image's EXIF (description, artist, copyright, when taken and
 	 * changed, where taken), IPTC (caption, by-line, copyright, keywords),
-	 * PNG text and XMP. Not the camera and its settings, which say little
-	 * about the image and may identify the camera.
+	 * PNG text and XMP; its size; and the camera and how it was set, to
+	 * give only on purpose (it may identify the camera).
 	 */
 	private static void image(Path file, List<Found> found) throws IOException {
 		Metadata metadata;
@@ -272,6 +304,8 @@ public final class EmbeddedMetadata {
 					exif.getString(ExifDirectoryBase.TAG_TIME_ZONE_ORIGINAL))
 					.ifPresent(d -> found.add(new Found("dateCreated", d, Kind.DATE, "EXIF DateTimeOriginal")));
 		}
+		camera(metadata).ifPresent(c -> found.add(new Found("exifData", c, Kind.TEXT, "EXIF Make, Model, …")));
+		size(metadata, found);
 		for (GpsDirectory gps : metadata.getDirectoriesOfType(GpsDirectory.class)) {
 			GeoLocation where = gps.getGeoLocation();
 			if (where != null && !where.isZero()) {
@@ -319,6 +353,58 @@ public final class EmbeddedMetadata {
 							k -> new ArrayList<>()).add(e.getValue().strip()));
 			values.forEach((term, list) -> term(term, list, "XMP ", found));
 		}
+	}
+
+	/**
+	 * The image's size in pixels, as schema.org's Distance (e.g.
+	 * <code>605 px</code>), from its format's own header: JPEG's frame,
+	 * PNG's IHDR, WebP's, else TIFF's (EXIF IFD0)
+	 */
+	private static void size(Metadata metadata, List<Found> found) {
+		List<Map.Entry<Class<? extends Directory>, int[]>> sources = List.of(
+				Map.entry(JpegDirectory.class, new int[] { JpegDirectory.TAG_IMAGE_WIDTH, JpegDirectory.TAG_IMAGE_HEIGHT }),
+				Map.entry(PngDirectory.class, new int[] { PngDirectory.TAG_IMAGE_WIDTH, PngDirectory.TAG_IMAGE_HEIGHT }),
+				Map.entry(WebpDirectory.class, new int[] { WebpDirectory.TAG_IMAGE_WIDTH, WebpDirectory.TAG_IMAGE_HEIGHT }),
+				Map.entry(ExifIFD0Directory.class,
+						new int[] { ExifDirectoryBase.TAG_IMAGE_WIDTH, ExifDirectoryBase.TAG_IMAGE_HEIGHT }));
+		for (Map.Entry<Class<? extends Directory>, int[]> source : sources) {
+			for (Directory d : metadata.getDirectoriesOfType(source.getKey())) {
+				Integer width = d.getInteger(source.getValue()[0]);
+				Integer height = d.getInteger(source.getValue()[1]);
+				if (width != null && height != null && width > 0 && height > 0) {
+					String where = d.getName() + " ";
+					found.add(new Found("width", width + " px", Kind.TEXT, where + "width"));
+					found.add(new Found("height", height + " px", Kind.TEXT, where + "height"));
+					return;
+				}
+			}
+		}
+	}
+
+	/**
+	 * The camera and how the photo was taken, as text, e.g. "Canon EOS R6,
+	 * RF 24-105mm F4 L, f/8.0, 1/350 sec, ISO 100, 105 mm"
+	 */
+	private static Optional<String> camera(Metadata metadata) {
+		List<String> parts = new ArrayList<>();
+		ExifIFD0Directory ifd0 = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
+		if (ifd0 != null) {
+			String make = text(ifd0.getString(ExifDirectoryBase.TAG_MAKE)).orElse("");
+			String model = text(ifd0.getString(ExifDirectoryBase.TAG_MODEL)).orElse("");
+			String camera = model.toLowerCase(Locale.ROOT).startsWith(make.toLowerCase(Locale.ROOT)) ? model
+					: (make + " " + model).strip();
+			text(camera).ifPresent(parts::add);
+		}
+		ExifSubIFDDirectory sub = metadata.getFirstDirectoryOfType(ExifSubIFDDirectory.class);
+		if (sub != null) {
+			for (int tag : new int[] { ExifDirectoryBase.TAG_LENS_MODEL, ExifDirectoryBase.TAG_FNUMBER,
+					ExifDirectoryBase.TAG_EXPOSURE_TIME, ExifDirectoryBase.TAG_ISO_EQUIVALENT,
+					ExifDirectoryBase.TAG_FOCAL_LENGTH }) {
+				text(sub.getDescription(tag)).map(t -> tag == ExifDirectoryBase.TAG_ISO_EQUIVALENT ? "ISO " + t : t)
+						.ifPresent(parts::add);
+			}
+		}
+		return parts.isEmpty() ? Optional.empty() : Optional.of(String.join(", ", parts));
 	}
 
 	/** PNG's own text keywords (tEXt, iTXt), as the PNG specification names them */
@@ -369,6 +455,15 @@ public final class EmbeddedMetadata {
 			return;
 		}
 		Element root = svg.get().getDocumentElement();
+		// Its size as drawn, e.g. 210mm, or 800 (pixels); not a percentage
+		Pattern length = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*(px|mm|cm|in|pt|pc)?");
+		for (String side : List.of("width", "height")) {
+			java.util.regex.Matcher m = length.matcher(root.getAttribute(side).strip());
+			if (m.matches()) {
+				found.add(new Found(side, m.group(1) + " " + (m.group(2) == null ? "px" : m.group(2)), Kind.TEXT,
+						"SVG " + side));
+			}
+		}
 		for (Element e : children(root)) {
 			if (SVG.equals(e.getNamespaceURI()) && !text(e).isEmpty()) {
 				switch (e.getLocalName()) {

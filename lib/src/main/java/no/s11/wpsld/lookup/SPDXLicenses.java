@@ -290,6 +290,53 @@ public final class SPDXLicenses {
 		return identifier;
 	}
 
+	/** Creative Commons' short forms, e.g. CC BY 4.0, CC-BY-SA 4.0 */
+	private static final Pattern CC_SHORT = Pattern
+			.compile("(?i)(?<![\\w-])CC[\\s-]+(BY(?:[\\s-]+(?:NC|SA|ND))*)[\\s-]+v?(\\d\\.\\d)(?!\\w|\\.\\d)");
+	private static final Pattern CC_ZERO = Pattern.compile("(?i)(?<![\\w-])CC[\\s-]?0(?:[\\s-]+v?1\\.0)?(?!\\w|\\.\\d)");
+
+	/**
+	 * The licence a text names, e.g. a photo's copyright notice: the whole
+	 * text an SPDX identifier or name (ignoring case, punctuation, licence or
+	 * license, and a trailing "License"), e.g. "Apache License 2.0" or
+	 * "mit"; else, within the text, Creative Commons' short forms ("CC BY
+	 * 4.0", "CC-BY-SA 4.0", "CC0") or a licence's full name of four words or
+	 * more (e.g. "Creative Commons Attribution 4.0 International"), the
+	 * longest if several. None if it names none, or several alike.
+	 */
+	public Optional<License> named(String text) {
+		String whole = words(text);
+		List<License> current = licenses.stream().filter(l -> !l.deprecated()).toList();
+		List<License> exact = current.stream().filter(l -> {
+			String id = words(l.id());
+			String name = words(l.name());
+			return whole.equals(id) || whole.equals(name) || whole.equals(name.replaceFirst(" license$", ""))
+					|| whole.replaceFirst(" license$", "").equals(id);
+		}).toList();
+		if (exact.size() == 1) {
+			return Optional.of(exact.get(0));
+		}
+		Matcher cc = CC_SHORT.matcher(text);
+		if (cc.find()) {
+			return get("CC-" + cc.group(1).toUpperCase(Locale.ROOT).replaceAll("[\\s-]+", "-") + "-" + cc.group(2));
+		}
+		if (CC_ZERO.matcher(text).find()) {
+			return get("CC0-1.0");
+		}
+		String padded = " " + whole + " ";
+		List<License> within = current.stream().filter(l -> words(l.name()).split(" ").length >= 4)
+				.filter(l -> padded.contains(" " + words(l.name()) + " ")).toList();
+		int longest = within.stream().mapToInt(l -> words(l.name()).length()).max().orElse(0);
+		List<License> best = within.stream().filter(l -> words(l.name()).length() == longest).toList();
+		return best.size() == 1 ? Optional.of(best.get(0)) : Optional.empty();
+	}
+
+	/** Words of a licence's name or identifier, to compare */
+	private static String words(String text) {
+		return text.toLowerCase(Locale.ROOT).replace("licence", "license").replaceAll("[^\\p{L}\\p{N}]+", " ")
+				.strip().replaceFirst("^the ", "");
+	}
+
 	/**
 	 * The SPDX licence a reference or <code>license</code> text means: an
 	 * SPDX address in any of its forms (e.g.

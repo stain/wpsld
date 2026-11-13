@@ -197,7 +197,13 @@ public class TestEmbeddedMetadata {
 		assertEquals("https://creativecommons.org/licenses/by/4.0/", values.get("license"));
 		// The same author from EXIF and XMP: once
 		assertEquals(1, found.stream().filter(f -> f.property().equals("author")).count());
-		assertFalse(found.stream().anyMatch(f -> f.value().contains("Canon")));
+		assertEquals("8 px", values.get("width"));
+		assertEquals("6 px", values.get("height"));
+		// The camera, and where: only on purpose
+		assertTrue(values.get("exifData"), values.get("exifData").startsWith("Canon EOS R6"));
+		assertTrue(found.stream().filter(f -> f.property().equals("exifData")).allMatch(Found::onPurpose));
+		assertTrue(found.stream().filter(f -> f.property().equals("contentLocation")).allMatch(Found::onPurpose));
+		assertFalse(found.stream().filter(f -> f.property().equals("author")).anyMatch(Found::onPurpose));
 	}
 
 	@Test
@@ -236,7 +242,8 @@ public class TestEmbeddedMetadata {
 		Map<String, String> values = byProperty(EmbeddedMetadata.read(file));
 		assertEquals(Map.of("name", "Route map", "description", "The bus routes", "author", "Ada Lovelace",
 				"dateCreated", "2026-04-20", "copyrightNotice", "The University", "keywords", "buses, map",
-				"license", "http://creativecommons.org/licenses/by/4.0/"), values);
+				"license", "http://creativecommons.org/licenses/by/4.0/", "width", "210 mm", "height", "297 mm"),
+				values);
 	}
 
 	/** XMP as PDFs have it, for ui to read with PDFBox */
@@ -268,5 +275,18 @@ public class TestEmbeddedMetadata {
 				EmbeddedMetadata.exifDate("2026:04:20 15:36:54", "-05:00"));
 		// Unknown, as cameras write it
 		assertEquals(Optional.empty(), EmbeddedMetadata.exifDate("0000:00:00 00:00:00", null));
+	}
+
+	/** A licence a copyright notice names, unless found already */
+	@Test
+	public void namedLicences() {
+		List<Found> found = EmbeddedMetadata.withNamedLicences(List.of(
+				new Found("copyrightNotice", "© 2026 Ada Lovelace, CC BY 4.0", Kind.TEXT, "EXIF Copyright")));
+		assertEquals(new Found("license", "CC-BY-4.0", Kind.LICENSE, "EXIF Copyright, which names CC-BY-4.0"),
+				found.get(1));
+		// Already found by its address
+		assertEquals(2, EmbeddedMetadata.withNamedLicences(List.of(
+				new Found("license", "https://creativecommons.org/licenses/by/4.0/", Kind.LICENSE, "XMP cc:license"),
+				new Found("copyrightNotice", "CC BY 4.0", Kind.TEXT, "EXIF Copyright"))).size());
 	}
 }
