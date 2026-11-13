@@ -16,6 +16,22 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   `.label`'s `-warp-text` (#e4e4e4), also after switching style and
   colours while open. Maybe Windows only (as the cut-off dialog text was);
   needs a screenshot, and whether the colours were Dark or Same as System.
+- **Menus open away from the menu bar after a DPI change (Windows)**:
+  after the window went to a display with a higher scale, File's menu
+  opened about 240 px right of and 80 px below File, "hanging", and the
+  mnemonic underlines were drawn too low (`debug/Screenshot 2026-11-13
+  140920.png`, JavaFX 27.0.1). JavaFX's, not ours, as far as known: still
+  open are JDK-8251912 (a Stage doesn't take up a change of its screen's
+  scale, e.g. in Settings while running; its workaround: move the window
+  to another screen and back) and JDK-8301386 (popups offset where two
+  screens of different scales meet); JDK-8346281 and JDK-8371302, fixed
+  in JavaFX 26, are in ours. Not reproducible headless (one screen, scale
+  1). To find out: was the scale changed in Settings, or the window moved
+  to another screen, and was it across both? Does it stay after moving
+  the window back and forth, or after a restart on that screen? If it
+  needs a workaround of ours, perhaps re-showing the stage when its
+  `outputScaleX` changes.
+
 ## Repair Crate
 
 - **Types written as IRIs**, e.g. ROHub's `http://schema.org/Person` and
