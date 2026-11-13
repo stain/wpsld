@@ -26,11 +26,10 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   to another screen and back) and JDK-8301386 (popups offset where two
   screens of different scales meet); JDK-8346281 and JDK-8371302, fixed
   in JavaFX 26, are in ours. Not reproducible headless (one screen, scale
-  1). To find out: was the scale changed in Settings, or the window moved
-  to another screen, and was it across both? Does it stay after moving
-  the window back and forth, or after a restart on that screen? If it
-  needs a workaround of ours, perhaps re-showing the stage when its
-  `outputScaleX` changes.
+  1). It happened when the external monitors were disconnected, so that
+  Windows moved the window to the laptop's own screen. Left to JavaFX
+  for now; if it needs a workaround of ours, perhaps re-showing the
+  stage when its `outputScaleX` changes.
 
 ## Repair Crate
 
