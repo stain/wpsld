@@ -227,6 +227,18 @@ public class TestEntityTree {
 		assertEquals(Optional.of("raw/"), EntityTree.folderId(nodes.get(0).children().get(2)));
 	}
 
+	/** The folder's files not in the crate, as a folder of their own */
+	@Test
+	public void notInCrate() {
+		Crate crate = new Crate();
+		add(crate, "data/b.csv", null, "File");
+		Node node = EntityTree.notInCrate(crate, List.of("data/", "data/b.csv", "data/my%20a.csv", "z.txt"))
+				.orElseThrow();
+		assertEquals(List.of("TYPE (Not in crate) *", "  FILE data/my a.csv *", "  FILE z.txt *"), lines(List.of(node)));
+		assertEquals(Optional.of("data/my%20a.csv"), EntityTree.fileId(node.children().get(0)));
+		assertTrue(EntityTree.notInCrate(crate, List.of("data/b.csv")).isEmpty());
+	}
+
 	/** Each entity at least once, with keys unique in the tree */
 	@Test
 	public void keys() {

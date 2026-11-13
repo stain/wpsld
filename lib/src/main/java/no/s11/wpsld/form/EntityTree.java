@@ -208,6 +208,27 @@ public class EntityTree {
 		return nodes;
 	}
 
+	/** The name of the folder of files not in the crate */
+	public static final String NOT_IN_CRATE = "(Not in crate)";
+
+	/**
+	 * A folder of the files in the crate's folder that it doesn't describe,
+	 * by their paths (see {@link CrateFolder#list}), e.g. at the end of the
+	 * logical tree; none if there are none.
+	 */
+	public static Optional<Node> notInCrate(Crate crate, Collection<String> onDisk) {
+		Set<List<String>> described = new HashSet<>();
+		crate.getEntities().stream().map(Entity::getId).filter(EntityTree::isPath).map(EntityTree::path)
+				.forEach(described::add);
+		Collator collator = Collator.getInstance();
+		collator.setStrength(Collator.SECONDARY);
+		List<Node> files = onDisk.stream().filter(id -> !id.endsWith("/")).map(EntityTree::path)
+				.filter(path -> !described.contains(path)).map(path -> String.join("/", path)).sorted(collator)
+				.map(path -> new Node("path:" + path, path, Kind.FILE, Optional.empty(), false, List.of())).toList();
+		return files.isEmpty() ? Optional.empty()
+				: Optional.of(new Node("notInCrate", NOT_IN_CRATE, Kind.TYPE, Optional.empty(), false, files));
+	}
+
 	/**
 	 * The parts of an entity: those with parts, or Datasets, first, as
 	 * folders; not again within themselves, if parts are in a cycle
