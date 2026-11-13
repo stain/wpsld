@@ -192,7 +192,21 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   needs native libraries); NetCDF-3 classic, FITS (80-character header
   cards: OBJECT, TELESCOP, INSTRUME, DATE-OBS, AUTHOR) and Zarr (JSON
   attributes) read by our own code; netcdf-java (GRIB and more) too big,
-  a plugin if ever; Parquet's footer later.
+  a plugin if ever; Parquet's footer later. Also statistics packages'
+  files, read for their dictionary only, by our own code (no maintained
+  Java library; ReadStat, which R's haven and pyreadstat use, is C):
+  - SPSS `.sav` and `.zsav` (only the data is compressed), as GNU PSPP's
+    "System File Format" documents it: the header's product (e.g. "IBM
+    SPSS Statistics 29"), creation date and time, file label and number
+    of cases; each variable's name (also the long names), label, type,
+    value labels (1 = "Male"…), missing values and measurement level
+    (nominal, ordinal, scale); document records (notes, often what was
+    done to the data); file and variable attributes (key-value); the
+    encoding.
+  - Stata `.dta` (format 117 and later, documented by StataCorp; older
+    ones too if simple): dataset label, timestamp, variables' names,
+    labels and value labels, notes (characteristics).
+  - SAS `.sas7bdat`: undocumented, reverse-engineered; later, if asked.
 - **Where a photo was taken, named**: now GPS gives a Place "Where
   photo.jpg was made" with its point (only on purpose). Also:
   - Name it by GeoNames' nearest place to the point (`findNearbyPlaceName`,
@@ -208,6 +222,35 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
     UTC date and time (GPSDateStamp, GPSTimeStamp): a better
     `dateCreated` when the camera's clock has no offset.
 
+- **Variables of tabular files, `variableMeasured`**, compatible with
+  Science-on-Schema's Dataset guide
+  (https://github.com/ESIPFed/science-on-schema.org/blob/main/guides/Dataset.md),
+  as RO-Crate says nothing of it. Their Dataset is our File (e.g.
+  `data/counts.csv`), not the root. One PropertyValue per column or
+  variable, an entity of its own (`#…`, as the crate is flattened), in
+  their tiers: `name` (the column's label), `alternateName` and
+  `description`; `propertyID` (an IRI defining it, e.g. a CF standard
+  name, chosen by hand otherwise); for numbers `unitText`, `unitCode`
+  (an IRI, e.g. QUDT), `minValue`, `maxValue`, `measurementTechnique`.
+  - CSV and TSV: the header row's names, each column's kind (number,
+    date, text) and for numbers their minimum and maximum, by reading the
+    file (in the background, as files may be large); with CSVW metadata
+    beside it (`csv-metadata.json`, `<file>-metadata.json`) its titles,
+    descriptions, datatypes and units instead.
+  - XLSX (with the zip file system, no POI) and ODS: each sheet's first
+    row as names (`xl/sharedStrings.xml`, `xl/worksheets/sheet1.xml`),
+    the same kinds and ranges; several sheets as several groups.
+  - SPSS, Stata, NetCDF and HDF5 (above): their variables with labels,
+    units and value labels.
+  - schema.org gives `variableMeasured` to Dataset, not MediaObject: a
+    File with variables shows it among "other properties" unless it is
+    also typed Dataset (as Science-on-Schema's is); decide which, perhaps
+    offering to add the type.
+  - Spatial coverage: Science-on-Schema writes a GeoShape `box` ("south
+    west north east") or GeoCoordinates, RO-Crate 1.3 a Geometry with
+    WKT; write what RO-Crate says, perhaps both.
+  - The form: variables as a table to edit (name, description, unit,
+    min, max) rather than one form per PropertyValue.
 - **Key-value metadata as PropertyValues**: what has no schema.org
   property, as PropertyValue entities (`name`, `value`, `unitText`,
   `propertyID` where a convention defines it): a scientific file's other
