@@ -1058,6 +1058,16 @@ folder (`FileCopy`, `CopyWindow`) and adds them. Next ways in:
   copied with their contents, which FileCopy doesn't do yet.
 - Moving rather than copying (with Shift, as file managers do), and
   copying folders.
+- **Drag and drop within the tree, into a folder**: in Entities by
+  Folder, drop files or folders (several selected) onto a folder to move
+  them there: on disk in an attached crate (asking first, as it changes
+  the user's files; Replace, Keep Both or Skip for names taken), and their
+  `@id`s renamed with the links to them, and the parts moved to that
+  folder's Dataset (`hasPart`). For files not yet in the crate, only on
+  disk. In a detached crate, only the `@id`s. In Entities by Part, drop
+  onto a Dataset to make them its parts instead (no files moved).
+  Undoable as one step, though moving files back on disk would need its
+  own undo.
 
 ### File formats beyond media types
 
