@@ -85,12 +85,6 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   offers ActiveActionStatus, CompletedActionStatus, FailedActionStatus and
   PotentialActionStatus. Other values must still be allowed, as users may
   extend an enumeration.
-- **Markdown descriptions in the Preview tab**: the saved HTML preview
-  now renders `description` as Markdown when `Markdown.looksLike` it
-  (headings, fenced code, links, bold, inline code, tables, lists); do
-  the same in the Preview tab if the heuristics work well there (see
-  PLAN.md, HTML preview). ROHub's and COMPSs' crates write Markdown
-  descriptions.
 - **Find entities (Edit > Find…, Ctrl+F)**: a dialog to search the
   crate's entities by their values and `@id`s, with tick-boxes for what
   to search (names, other values, `@id`s, nested objects; match case,
@@ -143,7 +137,9 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
     (Dublin Core: title, creator, description, subject, keywords, created,
     modified), `docProps/app.xml` (application, pages, words) and
     `docProps/custom.xml` (custom properties, where a licence may be).
-    OpenDocument (`.odt`, `.ods`, `.odp`) likewise with `meta.xml`.
+    LibreOffice and OpenOffice's OpenDocument files (`.odt`, `.ods`,
+    `.odp`, `.odg`, and the older `.sxw` and friends) likewise: a ZIP with
+    `meta.xml` (Dublin Core and `meta:` statistics such as page count).
 - **Licences from embedded metadata**, across images and documents:
   XMP (in JPEG, PNG and PDF) has `cc:license` (Creative Commons' schema,
   a URL), `xmpRights:WebStatement` (a URL), `xmpRights:UsageTerms` and

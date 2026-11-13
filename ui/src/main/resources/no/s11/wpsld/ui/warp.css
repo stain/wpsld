@@ -474,3 +474,8 @@
 .help-dialog .help-content > .help-text {
     -fx-fill: -warp-text;
 }
+
+/* A description written in Markdown, in the preview: as its labels */
+.preview-text {
+    -fx-fill: -warp-text;
+}

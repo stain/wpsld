@@ -222,3 +222,8 @@
 .list-view:focused .list-cell.problem:filled:selected, .tree-view:focused .tree-cell.problem:filled:selected {
     -fx-background-color: -fx-selection-bar;
 }
+
+/* A description written in Markdown, in the preview: as its labels */
+.preview-text {
+    -fx-fill: -fx-text-background-color;
+}

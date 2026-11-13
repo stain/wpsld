@@ -44,9 +44,11 @@ import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.TextFlow;
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.Places;
+import no.s11.wpsld.form.Markdown;
 
 /**
  * A read-only preview of one entity of the crate, like an RO-Crate's
@@ -131,9 +133,20 @@ public class EntityPreview extends ScrollPane {
 		List<String> descriptions = entity.getAll("description").stream().filter(JsonNode::isValueNode)
 				.map(JsonNode::asText).toList();
 		if (!descriptions.isEmpty()) {
-			Label description = new Label(String.join("\n\n", descriptions));
+			String text = String.join("\n\n", descriptions);
+			// Formatted when written in Markdown, as the HTML preview does
+			Node description;
+			if (Markdown.looksLike(text)) {
+				TextFlow flow = new TextFlow();
+				flow.setMinWidth(0);
+				HelpMarkdown.description(flow, text, browse);
+				description = flow;
+			} else {
+				Label label = new Label(text);
+				label.setWrapText(true);
+				description = label;
+			}
 			description.setId("previewDescription");
-			description.setWrapText(true);
 			content.getChildren().add(description);
 		}
 		if (entity != current.getRoot()) {

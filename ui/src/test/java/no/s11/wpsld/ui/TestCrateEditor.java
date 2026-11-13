@@ -1165,6 +1165,40 @@ public class TestCrateEditor extends ApplicationTest {
 		assertEquals("http://schema.org/ActiveActionStatus", opened.get(1));
 	}
 
+	/** A description written in Markdown is formatted in the preview; others are plain text */
+	@Test
+	public void previewMarkdownDescription() throws Exception {
+		entities();
+		Path dir = Files.createTempDirectory("crate");
+		Files.writeString(dir.resolve("ro-crate-metadata.json"), """
+				{"@context": "https://w3id.org/ro/crate/1.3/context",
+				 "@graph": [
+				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.3"}},
+				  {"@id": "./", "@type": "Dataset", "name": "A crate",
+				   "description": "# Workshop\\n\\nUse **DuckDB**, see [the site](https://duckdb.org/).\\n\\n| a | b |\\n|---|---|\\n| 1 | 2 |",
+				   "mentions": {"@id": "#p"}},
+				  {"@id": "#p", "@type": "Person", "name": "P", "description": "Line one\\nline two"}]}""");
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir)).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		List<String> opened = new java.util.ArrayList<>();
+		interact(() -> app.browse = opened::add);
+		interact(() -> entities().getSelectionModel().clearAndSelect(0));
+		javafx.scene.text.TextFlow flow = lookup("#previewDescription").queryAs(javafx.scene.text.TextFlow.class);
+		assertTrue(flow.getChildren().stream().anyMatch(n -> n instanceof javafx.scene.text.Text t
+				&& t.getText().equals("DuckDB") && t.getStyle().contains("bold")));
+		assertTrue(flow.getAccessibleText(), flow.getAccessibleText().contains("Workshop"));
+		Hyperlink site = flow.getChildren().stream().filter(Hyperlink.class::isInstance).map(Hyperlink.class::cast)
+				.findFirst().orElseThrow();
+		assertEquals("the site", site.getText());
+		interact(site::fire);
+		assertEquals(List.of("https://duckdb.org/"), opened);
+		Entity person = entities().getItems().stream().filter(e -> e.getId().equals("#p")).findFirst().orElseThrow();
+		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().indexOf(person)));
+		assertEquals("Line one\nline two", lookup("#previewDescription").queryAs(Label.class).getText());
+	}
+
 	/**
 	 * A place, as RO-Crate 1.3 describes it: its geo a Geometry with
 	 * Well-Known Text, shown on a map from the preview, and new geometries

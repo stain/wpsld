@@ -1150,7 +1150,10 @@ extension. Next:
   choice (or a temporary one, read-only), then opens it as an attached
   crate. Big zips in a window of their own, as copying files is. Check
   zip entries' names for `..` and absolute paths (zip slip), and sizes
-  (zip bombs).
+  (zip bombs). With the JDK's zip file system (`jdk.zipfs`,
+  `FileSystems.newFileSystem(path)`), which reading Office documents'
+  metadata would use too (see BUGS.md); the runtime image must include
+  it, as it is a service provider.
 - **BagIt**: a crate packaged as a BagIt bag (RFC 8493), as RO-Crate
   describes in its implementation notes: `bagit.txt`, the payload in
   `data/` with `ro-crate-metadata.json` there (or at the top, as some
@@ -1226,11 +1229,10 @@ not in hasPart). Next: a preference to not write it; the generator as a
 SoftwareApplication with a CreateAction (object the metadata, result the
 preview), as the spec's example; images and maps for files and places;
 "Referenced by" as in the editor's preview; anchors that stay the same
-across saves (by @id rather than position). Markdown in the Preview
-tab too, with the same heuristics (`Markdown.looksLike`), if they work
-well in the HTML preview: JavaFX has no HTML view without WebView, so
-render commonmark's tree to JavaFX nodes (TextFlow, as the help viewer
-does for its Markdown). For a richer preview, investigate which existing previewer
+across saves (by @id rather than position). The Preview tab renders
+Markdown descriptions too, by the same heuristics, as JavaFX nodes
+(`HelpMarkdown.description`, as the help viewer's pages). For a richer
+preview, investigate which existing previewer
 is easiest to reuse without running JavaScript or Python inside the Java
 application (no GraalJS, Jython or a bundled Node):
 - Previewers whose template could run in Java as it is: e.g. ro-crate-py's

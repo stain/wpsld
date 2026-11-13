@@ -22,6 +22,7 @@ module no.s11.wpsld.ui {
     requires no.s11.wpsld;
     requires com.fasterxml.jackson.databind;
     requires org.commonmark;
+    requires org.commonmark.ext.gfm.tables;
     requires org.kordamp.ikonli.javafx;
     requires org.kordamp.ikonli.fluentui;
     // JavaFX creates the Application by reflection

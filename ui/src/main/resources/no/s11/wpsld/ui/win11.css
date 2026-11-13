@@ -614,3 +614,8 @@
 .help-dialog .help-content > .help-text {
     -fx-fill: -win-text;
 }
+
+/* A description written in Markdown, in the preview: as its labels */
+.preview-text {
+    -fx-fill: -win-text;
+}
