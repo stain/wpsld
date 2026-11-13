@@ -135,8 +135,8 @@ dependencies {
 
     implementation project(':lib')
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.4'
-    implementation 'org.commonmark:commonmark:0.24.0'
-    implementation 'org.commonmark:commonmark-ext-gfm-tables:0.24.0'
+    implementation 'org.commonmark:commonmark:0.31.0'
+    implementation 'org.commonmark:commonmark-ext-gfm-tables:0.31.0'
     // PDFs' own metadata (PdfMetadata); here, as PDFBox needs java.desktop
     implementation 'org.apache.pdfbox:pdfbox:3.0.8'
     // Tika (in lib) logs through SLF4J: quietly, rather than warn of no logger

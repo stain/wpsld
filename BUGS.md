@@ -156,6 +156,19 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   - JPEG 2000: not planned (no library reads its metadata but
     jai-imageio-jpeg2000, whose JJ2000 licence is a problem).
 
+- **Upgrade dependencies, one at a time**, e.g. for security fixes:
+  PDFBox, metadata-extractor and Tika parse files from anywhere, so keep
+  them current. One dependency per commit: bump it, run all the tests,
+  check the app image (`podman build`) and its THIRD-PARTY-NOTICES.txt
+  (version, and NOTICE or licence changes), and watch for one pulling in
+  another's newer version (as Tika 4.2.0 did commonmark 0.31.0 over our
+  0.24.0, now aligned). Newer than ours (13 November 2026): Jackson
+  2.23.0 (2.22.4), commonmark 0.32.0 (0.31.0, but Tika's choice), JUnit
+  4.13.2 (4.13; or JUnit 5); not yet: SLF4J 2.1.0-alpha1, JavaFX 28 (early
+  access). Current: Tika 4.2.0, PDFBox 3.0.8, metadata-extractor 2.22.0,
+  Ikonli 12.4.0, TestFX 4.0.18. Perhaps Dependabot or Renovate to say so,
+  still merged one at a time.
+
 ## To check on Windows and macOS
 
 Built and tested on Linux only so far; the tests that need another system

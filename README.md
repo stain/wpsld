@@ -197,8 +197,8 @@ comes from [`gradle.properties`](gradle.properties).
 
 | Module | Contents |
 |--------|----------|
-| [`lib`](lib) (`no.s11.wpsld`) | No JavaFX. The schema.org model, form fields, the RO-Crate model, reading and retrieving crates, JSON-LD contexts, MASP profiles and registries, and settings. The lookups of RO-Crate's recommended identifiers are in `no.s11.wpsld.lookup` (`GeoNames`, `ORCID`, `ROR`, `DOI`, and the bundled `SPDXLicenses` and `PRONOMFormats`), which uses the crate model but not the other way round. Its only dependency is Jackson. |
-| [`ui`](ui) (`no.s11.wpsld.ui`) | The JavaFX editor: the crate window (`CrateEditor`), the entity form (`EntityEditor`), the preview, the type chooser, the preferences, the lookup dialogs (`PlaceFinder`, `PersonFinder`, `OrganizationFinder`, `WorkFinder`, `LicenseFinder`, `FormatFinder`), and its styles (`Theme`). Besides JavaFX, it uses [Ikonli](https://kordamp.org/ikonli/) for the Fluent icons of the Windows 11 style and [commonmark-java](https://github.com/commonmark/commonmark-java) for help. |
+| [`lib`](lib) (`no.s11.wpsld`) | No JavaFX. The schema.org model, form fields, the RO-Crate model, reading and retrieving crates, JSON-LD contexts, MASP profiles and registries, and settings. The lookups of RO-Crate's recommended identifiers are in `no.s11.wpsld.lookup` (`GeoNames`, `ORCID`, `ROR`, `DOI`, and the bundled `SPDXLicenses` and `PRONOMFormats`), which uses the crate model but not the other way round; and files' own metadata (`EmbeddedMetadata`). No JavaFX nor AWT: its dependencies are Jackson, Apache Tika (core, for file formats), commonmark-java (Markdown in the HTML preview) and metadata-extractor (images' metadata). |
+| [`ui`](ui) (`no.s11.wpsld.ui`) | The JavaFX editor: the crate window (`CrateEditor`), the entity form (`EntityEditor`), the preview, the type chooser, the preferences, the lookup dialogs (`PlaceFinder`, `PersonFinder`, `OrganizationFinder`, `WorkFinder`, `LicenseFinder`, `FormatFinder`), and its styles (`Theme`). Besides JavaFX, it uses [Ikonli](https://kordamp.org/ikonli/) for the Fluent icons of the Windows 11 style, [commonmark-java](https://github.com/commonmark/commonmark-java) for help and Markdown descriptions, and [Apache PDFBox](https://pdfbox.apache.org/) for PDFs' metadata (`PdfMetadata`; here, as it needs AWT). |
 
 ## Licence
 
@@ -206,7 +206,9 @@ The source code in this repository is under the
 [Apache License 2.0](LICENSE.txt).
 
 The built application also includes third-party software: Jackson,
-commonmark-java, Ikonli, and Microsoft's Fluent UI System Icons, plus a
+commonmark-java, Ikonli, Microsoft's Fluent UI System Icons, Apache Tika,
+Apache PDFBox and FontBox, metadata-extractor, Adobe XMPCore, Apache
+Commons (IO, Logging, Secure XML) and SLF4J, plus a
 Java runtime and JavaFX in the zips for a platform. Their licences and notices are in
 [`ui/src/notices/THIRD-PARTY-NOTICES.txt`](ui/src/notices/THIRD-PARTY-NOTICES.txt),
 which the build puts in every zip and which Help > About wpsld shows. That
