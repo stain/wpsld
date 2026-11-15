@@ -13,7 +13,7 @@ as `ZipException: invalid LOC header`, or tests of half-edited files). So:
 
 - For a full build (`./gradlew build`), the container image or any other
   long build run in the background, use a separate clone of the last
-  commit, e.g. `git clone --local . <scratch>/wpsld-build` (or `git
+  commit, e.g. `git clone --no-hardlinks . <scratch>/wpsld-build` (or `git
   archive HEAD` for the image), and go on working in this tree. Commit
   first what the build is to include.
 - Don't run a second Gradle build in this tree while one runs here.
