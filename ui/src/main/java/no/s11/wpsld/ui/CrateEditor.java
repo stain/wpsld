@@ -3064,10 +3064,25 @@ public class CrateEditor extends Application {
 	}
 
 	/**
+	 * An identifier as the crate writes it: an ORCID iD, ROR identifier or
+	 * DOI in another form (e.g. a bare <code>0000-0002-1825-0097</code>,
+	 * <code>http://orcid.org/…</code> or <code>doi:10.…</code>) as its
+	 * <code>https://</code> address, so that one typed so is the same as one
+	 * imported (and merged with it); others as they are
+	 */
+	static String canonicalId(String id) {
+		return ORCID.idOf(id).map(i -> ORCID.NAMESPACE + i)
+				// A bare ROR identifier could be a local name
+				.or(() -> ROR.idOf(id).filter(i -> id.contains("ror.org")).map(i -> ROR.NAMESPACE + i))
+				.or(() -> DOI.doiOf(id).filter(d -> id.contains("doi") || id.equals(d)).map(DOI::iri)).orElse(id);
+	}
+
+	/**
 	 * Change an entity's @id, updating references to it. If another entity
 	 * already has that identifier, offer to merge the two.
 	 */
-	private void rename(Entity entity, String newId) {
+	private void rename(Entity entity, String typed) {
+		String newId = canonicalId(typed.strip());
 		Optional<Entity> existing = crate.get(newId);
 		Entity edited = entity;
 		// Named, as its difference looks like removing an entity
