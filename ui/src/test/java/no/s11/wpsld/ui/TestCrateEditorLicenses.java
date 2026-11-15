@@ -162,4 +162,30 @@ public class TestCrateEditorLicenses extends UiTest {
 		assertEquals("Apache License 2.0", apache.getLabel());
 		assertTrue(entity("#spdx-Apache-2.0").isPresent());
 	}
+
+	/**
+	 * Crate > Repair Crate writes types given as IRIs by their names, and
+	 * a member of a schema.org list as a reference to it, saying so; the
+	 * member is not added as a Thing
+	 */
+	@Test
+	public void repairTerms() throws Exception {
+		Entity root = entities().getItems().get(0);
+		interact(() -> {
+			root.setTypes(List.of("Dataset", "http://schema.org/CreativeWork"));
+			root.set("actionStatus", Optional.of(TextNode.valueOf("PotentialActionStatus")));
+		});
+		MenuBar bar = lookup("#menuBar").queryAs(MenuBar.class);
+		MenuItem repair = bar.getMenus().stream().flatMap(m -> m.getItems().stream())
+				.filter(i -> "menuRepair".equals(i.getId())).findFirst().orElseThrow();
+		WaitForAsyncUtils.asyncFx(repair::fire);
+		WaitForAsyncUtils.waitForFxEvents();
+		String report = lookup(".dialog-pane").queryAs(DialogPane.class).getContentText();
+		assertTrue(report, report.contains("Types written by their names:\n• ./: http://schema.org/CreativeWork → CreativeWork"));
+		assertTrue(report, report.contains("as references to them:\n• ./: actionStatus PotentialActionStatus"));
+		assertFalse(report, report.contains("Added as Thing"));
+		clickOn("OK");
+		assertEquals(List.of("Dataset", "CreativeWork"), root.getTypes());
+		assertEquals("http://schema.org/PotentialActionStatus", root.get("actionStatus").orElseThrow().path("@id").asText());
+	}
 }

@@ -137,6 +137,7 @@ import no.s11.wpsld.lookup.WebAvailability;
 import no.s11.wpsld.lookup.EmbeddedMetadata;
 import no.s11.wpsld.lookup.FileMetadata;
 import no.s11.wpsld.lookup.SPDXLicenses;
+import no.s11.wpsld.crate.TermRepairs;
 import no.s11.wpsld.crate.UndoHistory;
 import no.s11.wpsld.crate.UndoHistory.Place;
 import no.s11.wpsld.crate.UndoHistory.Step;
@@ -3355,10 +3356,15 @@ public class CrateEditor extends Application {
 	 * for a media type that only one format has (see
 	 * {@link PRONOMFormats#repair}), and ORCID iDs, ROR identifiers and DOIs
 	 * written otherwise (see {@link ORCID#repair}, {@link ROR#repair} and
-	 * {@link DOI#repair}). One undoable step, then tells what was
-	 * done.
+	 * {@link DOI#repair}). Types written as IRIs get the names the RO-Crate
+	 * context gives them, and members of Enumerations written as text become
+	 * references to them (see {@link TermRepairs}), before references to
+	 * entities not in the crate are added. One undoable step, then tells
+	 * what was done.
 	 */
 	void repair(Stage stage) {
+		List<String> types = TermRepairs.typeNames(crate, terms);
+		List<String> members = TermRepairs.enumerationMembers(crate, terms);
 		List<String> licences = SPDXLicenses.bundled().repair(crate);
 		List<String> formats = PRONOMFormats.bundled().repair(crate);
 		List<String> people = ORCID.repair(crate);
@@ -3368,6 +3374,16 @@ public class CrateEditor extends Application {
 		List<Entity> unmentioned = crate.unmentionLinked();
 		List<Entity> mentioned = crate.mentionUnlinked();
 		List<String> done = new ArrayList<>();
+		if (!types.isEmpty()) {
+			done.add("Types written by their names:\n" + types.stream().limit(LISTED).map(t -> "• " + t)
+					.collect(Collectors.joining("\n"))
+					+ (types.size() > LISTED ? "\n• and " + (types.size() - LISTED) + " more" : ""));
+		}
+		if (!members.isEmpty()) {
+			done.add("Values of schema.org's lists (Enumerations), as references to them:\n"
+					+ members.stream().limit(LISTED).map(m -> "• " + m).collect(Collectors.joining("\n"))
+					+ (members.size() > LISTED ? "\n• and " + (members.size() - LISTED) + " more" : ""));
+		}
 		if (!licences.isEmpty()) {
 			done.add("Licences of the SPDX License List:\n" + licences.stream().limit(LISTED).map(l -> "• " + l)
 					.collect(Collectors.joining("\n"))

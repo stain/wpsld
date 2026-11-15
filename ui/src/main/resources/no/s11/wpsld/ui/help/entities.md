@@ -30,7 +30,11 @@ other descriptions: check and remove or replace those references as needed.
 **Crate > Repair Crate** can add placeholder Things for references to
 entities not described in the crate, and update the root's mentions for
 otherwise unlinked entities. It also tidies licences from the SPDX License
-List, file formats from PRONOM, ORCID iDs, ROR identifiers and DOIs, see [Properties and links](properties.md). It reports what it changed. Give any
+List, file formats from PRONOM, ORCID iDs, ROR identifiers and DOIs, see [Properties and links](properties.md). Types written as web
+addresses, such as `http://schema.org/Person`, get their names
+(`Person`), and values from schema.org's lists, such as an action's
+status written as the text `PotentialActionStatus`, become links to that
+value. It reports what it changed. Give any
 placeholders appropriate types and names, or correct mistaken identifiers.
 Use **Edit > Undo** if needed.
 

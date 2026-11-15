@@ -67,6 +67,7 @@ public class SchemaFromJsonLd {
 	private static final URI S_IS_PART_OF = URI.create(S + "isPartOf");
 	private static final URI ATTIC = URI.create("http://attic.schema.org");
 	private static final URI S_DATA_TYPE = URI.create(S + "DataType");
+	private static final URI S_ENUMERATION = URI.create(S + "Enumeration");
 
 	/**
 	 * The parsed JSON-LD, only kept while loading. Once every class and
@@ -85,6 +86,8 @@ public class SchemaFromJsonLd {
 	private final Map<URI, URI> supersededBy;
 	/** Classes typed directly as schema:DataType */
 	private final Set<URI> dataTypes;
+	/** The members of each Enumeration, e.g. ActionStatusType's */
+	private final Map<URI, List<URI>> members;
 
 	public SchemaFromJsonLd() {
 		jsonld = new JsonLdGraph(List.of(read(SCHEMAORG_JSONLD), read(RO_CRATE_TERMS_JSONLD)));
@@ -103,6 +106,11 @@ public class SchemaFromJsonLd {
 				.collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
 		this.dataTypes = jsonld.subjects(RDF_TYPE, S_DATA_TYPE).collect(Collectors.toUnmodifiableSet());
 		link();
+		this.members = classes.values().stream()
+				.filter(c -> !c.getID().equals(S_ENUMERATION)
+						&& c.getSelfAndSuperClasses().stream().map(ClassDef::getID).anyMatch(S_ENUMERATION::equals))
+				.collect(Collectors.toUnmodifiableMap(ClassDef::getID,
+						c -> jsonld.subjects(RDF_TYPE, c.getID()).sorted().toList()));
 		this.subclasses = reverse(classes.values(), ClassDef::getSubClassOf);
 		this.domainProperties = reverse(properties.values(), PropertyDef::getDomainIncludes);
 		qualityCheck();
@@ -211,6 +219,23 @@ public class SchemaFromJsonLd {
 	 */
 	public boolean isDataType(ClassDef classDef) {
 		return classDef.getSelfAndSuperClasses().stream().map(ClassDef::getID).anyMatch(dataTypes::contains);
+	}
+
+	/**
+	 * Whether the class is an Enumeration (a subclass of schema:Enumeration),
+	 * whose values are its members, e.g. ActionStatusType
+	 */
+	public boolean isEnumeration(ClassDef classDef) {
+		return members.containsKey(classDef.getID());
+	}
+
+	/**
+	 * The members of an Enumeration, e.g. ActionStatusType's
+	 * <code>http://schema.org/ActiveActionStatus</code>, …; none if it is
+	 * not one
+	 */
+	public List<URI> members(ClassDef classDef) {
+		return members.getOrDefault(classDef.getID(), List.of());
 	}
 
 	private void qualityCheck() {

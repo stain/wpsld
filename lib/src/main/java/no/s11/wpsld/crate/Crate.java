@@ -269,7 +269,7 @@ public class Crate {
 		Set<String> ambiguous = new LinkedHashSet<>();
 		Map<String, Entity> byId = byId();
 		pasted.stream().flatMap(e -> e.getValues().keySet().stream().flatMap(p -> references(e, p)))
-				.filter(id -> !copiedIds.contains(id) && !renamed.containsValue(id) && !isDescriptor(id))
+				.filter(id -> !copiedIds.contains(id) && !renamed.containsValue(id) && !isDescriptor(id) && !isTerm(id))
 				.forEach(id -> {
 					Entity entity = byId.get(id);
 					if (entity == null) {
@@ -305,6 +305,15 @@ public class Crate {
 	 */
 	public static boolean isBlankNode(String id) {
 		return id.startsWith("_:");
+	}
+
+	/**
+	 * Whether an <code>@id</code> is a schema.org term, e.g.
+	 * <code>http://schema.org/PotentialActionStatus</code> (a member of an
+	 * Enumeration), which a crate refers to without describing it
+	 */
+	public static boolean isTerm(String id) {
+		return id.startsWith("http://schema.org/") || id.startsWith("https://schema.org/");
 	}
 
 	private boolean isDescriptor(String id) {
@@ -515,7 +524,8 @@ public class Crate {
 	 * that is not an entity in the crate, e.g. an external IRI, a local
 	 * identifier of an entity removed or not yet added, or a typo, so that it
 	 * can be given a name and type, or renamed to the <code>@id</code> meant
-	 * (see {@link #merge}). Not for the metadata descriptor.
+	 * (see {@link #merge}). Not for the metadata descriptor, nor schema.org
+	 * terms, e.g. an Enumeration's member (see {@link #isTerm}).
 	 *
 	 * @return The entities added, in the order first referred to
 	 */
@@ -525,7 +535,7 @@ public class Crate {
 		for (Entity entity : List.copyOf(entities)) {
 			for (String property : entity.getValues().keySet()) {
 				references(entity, property)
-						.filter(id -> !byId.containsKey(id) && !isDescriptor(id))
+						.filter(id -> !byId.containsKey(id) && !isDescriptor(id) && !isTerm(id))
 						.forEach(id -> {
 							Entity thing = new Entity(id, "Thing");
 							byId.put(id, thing);
