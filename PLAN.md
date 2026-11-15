@@ -1466,7 +1466,9 @@ crate above, a ROHub crate, and generated ones with 1 000, 10 000 and
   pulse show it first), and the slow parts move to a job (see `Jobs`)
   where they don't touch the scene. *Measured*: pasting 2000 took 7.3 s
   into a large crate, now 1 s (0.2 s into a new one), as they are
-  selected at once with no form; the busy pointer is still to do.
+  selected at once with no form. Pasting or adding as parts more than
+  200 now shows the busy pointer first (`CrateEditor.busy`); moving the
+  slow parts to a job is left.
 
 ### Internationalisation (i18n)
 

@@ -1998,8 +1998,44 @@ public class CrateEditor extends Application {
 		showListed(added);
 	}
 
+	/**
+	 * At most how many entities to add or paste at once without first
+	 * showing the busy pointer (see {@link #busy})
+	 */
+	static final int QUICK = 200;
+
+	/**
+	 * Work on the crate that may take a while on the JavaFX thread, e.g.
+	 * pasting thousands of entities: when large, the busy pointer shown
+	 * first (the scene draws it on the next pulse), and the work done
+	 * after, as the next event (where dialogs may wait); otherwise done now
+	 */
+	private void busy(boolean large, Runnable work) {
+		if (!large) {
+			work.run();
+			return;
+		}
+		Scene scene = stage.getScene();
+		javafx.scene.Cursor was = scene.getCursor();
+		scene.setCursor(javafx.scene.Cursor.WAIT);
+		javafx.animation.PauseTransition shown = new javafx.animation.PauseTransition(
+				javafx.util.Duration.millis(50));
+		shown.setOnFinished(e -> Platform.runLater(() -> {
+			try {
+				work.run();
+			} finally {
+				scene.setCursor(was);
+			}
+		}));
+		shown.play();
+	}
+
 	/** The entities selected as parts of the datasets of their folders */
 	private void addParts() {
+		busy(selectedFileIds().size() + selection.size() > QUICK, this::addSelectedParts);
+	}
+
+	private void addSelectedParts() {
 		List<Entity> files = addSelectedFiles();
 		List<Entity> selected = new ArrayList<>(selection);
 		selected.addAll(files);
@@ -2378,8 +2414,12 @@ public class CrateEditor extends Application {
 			alert.showAndWait();
 			return;
 		}
-		boolean sameCrate = clip.get().crate().filter(crateFile.base()::equals).isPresent();
-		Crate.Pasted pasted = crate.paste(clip.get().entities(), clip.get().referenced(), sameCrate);
+		busy(clip.get().entities().size() > QUICK, () -> paste(stage, clip.get()));
+	}
+
+	private void paste(Stage stage, EntityClipboard.Clip clip) {
+		boolean sameCrate = clip.crate().filter(crateFile.base()::equals).isPresent();
+		Crate.Pasted pasted = crate.paste(clip.entities(), clip.referenced(), sameCrate);
 		List<Entity> shown = new ArrayList<>(pasted.added());
 		List<Entity> merged = new ArrayList<>();
 		List<Entity> kept = new ArrayList<>();

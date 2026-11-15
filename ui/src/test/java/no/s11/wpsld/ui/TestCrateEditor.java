@@ -698,6 +698,38 @@ public class TestCrateEditor extends UiTest {
 	}
 
 	/**
+	 * Pasting many entities shows the busy pointer first, as it takes a
+	 * while on the JavaFX thread, then pastes them
+	 */
+	@Test
+	public void pasteManyShowsBusy() throws Exception {
+		StringBuilder graph = new StringBuilder();
+		for (int i = 0; i <= CrateEditor.QUICK; i++) {
+			graph.append(i == 0 ? "" : ", ").append("{\"@id\": \"#pv-").append(i)
+					.append("\", \"@type\": \"PropertyValue\", \"name\": \"v").append(i).append("\"}");
+		}
+		String document = "{\"@context\": \"https://w3id.org/ro/crate/1.3/context\", \"@graph\": [" + graph + "]}";
+		interact(() -> {
+			ClipboardContent ldJson = new ClipboardContent();
+			ldJson.put(EntityClipboard.LD_JSON, document);
+			Clipboard.getSystemClipboard().setContent(ldJson);
+		});
+		int before = entities().getItems().size();
+		clickOn("#entities");
+		javafx.scene.Scene scene = entities().getScene();
+		javafx.scene.Cursor[] busy = new javafx.scene.Cursor[1];
+		interact(() -> {
+			menuItem("menuPaste").fire();
+			busy[0] = scene.getCursor();
+		});
+		assertEquals(javafx.scene.Cursor.WAIT, busy[0]);
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> entities().getItems().size() > before);
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals(before + CrateEditor.QUICK + 1, entities().getItems().size());
+		assertNotEquals(javafx.scene.Cursor.WAIT, scene.getCursor());
+	}
+
+	/**
 	 * Several entities copied, with the one they refer to: pasted into the
 	 * same crate, references to the one not copied are right; from another
 	 * crate, they may not be, which is reported.
