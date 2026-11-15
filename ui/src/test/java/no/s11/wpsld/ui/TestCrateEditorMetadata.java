@@ -165,7 +165,7 @@ public class TestCrateEditorMetadata extends UiTest {
 				.filter(e -> e.getId().equals("workshop.docx")).findFirst().map(entities().getItems()::indexOf)
 				.orElseThrow()));
 		fromFile(stage);
-		assertTrue(lookup("Nothing new in “Week 8 workshop”").tryQuery().isPresent());
+		assertTrue(lookup("Everything in “Week 8 workshop” is in the crate").tryQuery().isPresent());
 		clickDialogButton("OK");
 	}
 
@@ -500,5 +500,20 @@ public class TestCrateEditorMetadata extends UiTest {
 		// Selecting one edits it again
 		interact(() -> entities().getSelectionModel().clearAndSelect(0));
 		assertEquals("./", lookup("#entityId").queryTextInputControl().getText());
+	}
+
+	/** A kind of file wpsld reads no metadata from: the kinds it reads, listed */
+	@Test
+	public void kindNotRead() throws Exception {
+		entities();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		Path dir = crateWithPhotos(stage);
+		Files.writeString(dir.resolve("notes.txt"), "Nothing to say");
+		interact(() -> app.insertFiles(stage, List.of(dir.resolve("notes.txt"))));
+		fromFile(stage);
+		assertTrue(lookup("wpsld reads metadata from other kinds of files").tryQuery().isPresent());
+		String text = lookup(".dialog-pane").queryAs(javafx.scene.control.DialogPane.class).getContentText();
+		assertTrue(text, text.startsWith("Kinds of files wpsld reads metadata from:\n• Office"));
+		clickDialogButton("OK");
 	}
 }

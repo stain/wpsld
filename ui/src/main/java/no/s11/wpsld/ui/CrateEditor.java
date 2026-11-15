@@ -1059,20 +1059,30 @@ public class CrateEditor extends Application {
 		return Optional.of(inBackground(stage, "Reading what “" + entity.getLabel() + "” says about itself", task));
 	}
 
+	/** The kinds of files wpsld reads metadata from */
+	private static final String READ_FORMATS = """
+			Kinds of files wpsld reads metadata from:
+			• Office: Word, Excel and PowerPoint (.docx, .xlsx, .pptx)
+			• OpenDocument (.odt, .ods, .odp)
+			• PDF, PostScript and EPS, Photoshop (.psd), InDesign
+			• Images: JPEG, PNG, TIFF, WebP, HEIC, AVIF, GIF, BMP, camera raw
+			• Videos: MP4, MOV
+			• SVG drawings""";
+
 	/** What a file says about itself, read, to choose from and give its entity */
 	private void metadataFromFile(Stage stage, Entity entity, FileMetadata.Reading reading) {
 		// Not what it has already, e.g. the same author or licence
 		List<EmbeddedMetadata.Found> found = reading.found().stream()
 				.filter(f -> !entity.getAll(f.property()).contains(fileValue(f, false, entity))).toList();
 		if (found.isEmpty()) {
+			// A kind of file read, all of it in the crate; or another kind
+			boolean read = !reading.readers().isEmpty();
 			Alert none = new Alert(reading.problems().isEmpty() ? AlertType.INFORMATION : AlertType.WARNING,
-					"Office, OpenDocument and PDF files, photos and images (JPEG, PNG, TIFF, WebP, HEIC, AVIF,"
-							+ " GIF, raw), videos (MP4, MOV), SVGs, EPS and PSD files can say what they are, who"
-							+ " made them, when and under which licence; this one says nothing the crate doesn't."
-							+ problems(reading.problems()),
+					(read ? "Its entity has all that it says." : READ_FORMATS) + problems(reading.problems()),
 					ButtonType.OK);
 			none.initOwner(stage);
-			none.setHeaderText("Nothing new in “" + entity.getLabel() + "”");
+			none.setHeaderText(read ? "Everything in “" + entity.getLabel() + "” is in the crate"
+					: "wpsld reads metadata from other kinds of files");
 			none.setResizable(true);
 			none.showAndWait();
 			return;

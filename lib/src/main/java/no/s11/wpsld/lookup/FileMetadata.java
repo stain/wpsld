@@ -73,11 +73,14 @@ public final class FileMetadata {
 	 * @param found    The values, in the order of the readers
 	 * @param problems What went wrong, e.g. "PDF (PDFBox)
 	 *                 took over 20 s"; none if all went well
+	 * @param readers  The readers that read this kind of file, by name;
+	 *                 none if it is a kind none reads
 	 */
-	public record Reading(List<Found> found, List<String> problems) {
+	public record Reading(List<Found> found, List<String> problems, List<String> readers) {
 		public Reading {
 			found = List.copyOf(found);
 			problems = List.copyOf(problems);
+			readers = List.copyOf(readers);
 		}
 	}
 
@@ -156,7 +159,7 @@ public final class FileMetadata {
 			head = in.readNBytes(MetadataReader.HEAD);
 		} catch (IOException | RuntimeException e) {
 			LOGGER.log(Level.WARNING, "Not read: " + file, e);
-			return new Reading(List.of(), List.of("Not read: " + describe(e)));
+			return new Reading(List.of(), List.of("Not read: " + describe(e)), List.of());
 		}
 		Reading known = remembered.get(key);
 		if (known != null) {
@@ -223,7 +226,8 @@ public final class FileMetadata {
 		}
 		Set<List<String>> seen = new HashSet<>();
 		Reading reading = new Reading(EmbeddedMetadata.withNamedLicences(found).stream()
-				.filter(f -> seen.add(List.of(f.property(), f.value()))).toList(), problems);
+				.filter(f -> seen.add(List.of(f.property(), f.value()))).toList(), problems,
+				running.keySet().stream().map(FileMetadata::name).toList());
 		if (problems.isEmpty()) {
 			remembered.put(key, reading);
 		}
