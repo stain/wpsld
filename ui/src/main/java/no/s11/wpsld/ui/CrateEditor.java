@@ -4074,7 +4074,7 @@ public class CrateEditor extends Application {
 		}
 		jsonError.setText("");
 		jsonEdited.set(false);
-		EntityJson.apply(parsed, entity);
+		EntityJson.Applied applied = EntityJson.apply(parsed, entity, crate);
 		if (!canonicalId(parsed.id().strip()).equals(entity.getId())) {
 			// Shows it, or the one merged into
 			rename(entity, parsed.id(), Optional.of("Edit JSON-LD"));
@@ -4088,6 +4088,17 @@ public class CrateEditor extends Application {
 		checkpoint(placeOf(null), Optional.of("Edit JSON-LD"));
 		jsonShown = false;
 		showJson();
+		// Entities written in it, now of their own
+		List<String> said = new ArrayList<>();
+		if (!applied.added().isEmpty()) {
+			said.add("added " + counted(applied.added().size()) + " written in it: " + names(applied.added()));
+		}
+		if (!applied.merged().isEmpty()) {
+			said.add("merged some written in it into " + names(applied.merged()) + ", of the same @id");
+		}
+		if (!said.isEmpty()) {
+			showNotice("Applied, and " + String.join("; ", said) + ". Edit > Undo undoes it all.", null, null);
+		}
 	}
 
 	/** View > Crate JSON-LD, while open */

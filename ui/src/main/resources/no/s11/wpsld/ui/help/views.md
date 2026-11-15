@@ -10,9 +10,13 @@ You can also edit the entity's JSON-LD in its tab, or paste an entity's
 JSON-LD over it: **Apply**, or leaving the text, puts it in place of the
 entity's types and values, and changing `@id` renames it, updating links
 to it (or offers to merge it with another of that `@id`). It must be one
-object with an `@id` and `@type`; values refer to other entities by
-`{"@id": "..."}` alone. If something is wrong, wpsld says what below the
-text and changes nothing. **Revert** goes back to the entity as it is.
+object with an `@id` and `@type`. Values usually refer to other entities
+by `{"@id": "..."}` alone; entities written out in full in a value (as
+some repositories write a dataset's parts) become entities of their own,
+added, or merged into the crate's of the same `@id`, and those without
+an `@id` get a new one, as when opening such a crate. A notice says
+which. If something is wrong, wpsld says what below the text and changes
+nothing. **Revert** goes back to the entity as it is.
 **Edit > Undo** undoes an edit applied. Selecting a link to another described entity in Preview
 opens it in the editor. Web addresses open in the browser, and files
 beside the crate as your system opens them, also from the values of

@@ -999,6 +999,41 @@ public class TestCrateEditor extends UiTest {
 	}
 
 	/**
+	 * Entities written in the JSON-LD edited, as ROHub writes a dataset's
+	 * parts: added as entities of their own, said in a notice, and undone
+	 * with the edit
+	 */
+	@Test
+	public void jsonNestedFlattened() throws Exception {
+		entities();
+		interact(() -> entities().getSelectionModel().clearAndSelect(0));
+		clickOn("#jsonTab");
+		TextInputControl json = lookup("#preview").queryTextInputControl();
+		int before = entities().getItems().size();
+		interact(() -> json.setText("""
+				{"@id": "./", "@type": "Dataset", "name": "Survey",
+				 "hasPart": {"@id": "https://w3id.org/ro-id/x/folders/a", "@type": "Dataset", "name": "Folder A"},
+				 "variableMeasured": {"@type": "PropertyValue", "name": "depth"}}"""));
+		interact(lookup("#jsonApply").queryButton()::fire);
+		assertEquals("", lookup("#jsonError").queryLabeled().getText());
+		assertEquals(before + 2, entities().getItems().size());
+		Entity folder = entities().getItems().stream().filter(e -> e.getId().equals("https://w3id.org/ro-id/x/folders/a"))
+				.findFirst().orElseThrow();
+		assertEquals("Folder A", folder.getLabel());
+		assertTrue(entities().getItems().stream().anyMatch(e -> e.getTypes().equals(List.of("PropertyValue"))
+				&& e.getLabel().equals("depth") && e.getId().startsWith("#propertyvalue-")));
+		String notice = lookup("#noticeText").queryLabeled().getText();
+		assertTrue(notice, notice.contains("added 2 entities written in it"));
+		// The root shown again, as the crate writes it: references only
+		assertTrue(json.getText(), json.getText().contains("\"@id\" : \"https://w3id.org/ro-id/x/folders/a\""));
+		assertFalse(json.getText(), json.getText().contains("Folder A"));
+
+		clickOn("#entities");
+		interact(menuItem("menuUndo")::fire);
+		assertEquals(before, entities().getItems().size());
+	}
+
+	/**
 	 * The JSON-LD tab shows the entity selected, as it changes; View > Crate
 	 * JSON-LD the whole crate's, made again with Refresh
 	 */

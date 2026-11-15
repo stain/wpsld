@@ -61,24 +61,71 @@ public class TestEntityJson {
 		assertTrue(refused("{\"@id\": \" \", \"@type\": \"Thing\"}").startsWith("Needs an @id"));
 		assertTrue(refused("{\"@id\": \"#a\"}").startsWith("Needs one or more @type"));
 		assertTrue(refused("{\"@id\": \"#a\", \"@type\": []}").startsWith("Needs one or more @type"));
-		assertTrue(refused("{\"@id\": \"#a\", \"@type\": [1]}").startsWith("Needs one or more @type"));
+		assertTrue(refused("{\"@id\": \"#a\", \"@type\": [1]}").contains("@type should be text"));
 		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"@reverse\": {}}").contains("@reverse"));
 		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"name\": null}").contains("null"));
 		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"name\": [[\"x\"]]}").contains("array in an array"));
-		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"author\": {\"@id\": \"#b\", \"name\": \"B\"}}")
-				.contains("entity of its own"));
-		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"author\": {\"name\": \"B\"}}")
-				.contains("neither a reference"));
+		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"author\": {}}").contains("empty object"));
+		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"author\": {\"@id\": 3}}").contains("isn't text"));
+		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"author\": {\"name\": {\"@reverse\": {}}}}")
+				.contains("@reverse"));
+		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"d\": {\"@value\": \"x\", \"name\": \"y\"}}")
+				.contains("more than @language or @type"));
+		// Written ever deeper in each other
+		String deep = "{\"@id\": \"#a\", \"@type\": \"Thing\", \"p\": ".repeat(EntityJson.DEPTH + 2) + "1"
+				+ "}".repeat(EntityJson.DEPTH + 2);
+		assertTrue(refused(deep).contains("more than " + EntityJson.DEPTH + " deep"));
+	}
+
+	/**
+	 * Entities written in values, as ROHub writes a dataset's parts: referred
+	 * to by their @id, added, or merged into the crate's; those without an
+	 * @id added with a new one
+	 */
+	@Test
+	public void nestedFlattened() {
+		Crate crate = new Crate();
+		Entity existing = crate.add("Dataset", "folders/a/");
+		existing.set("name", Optional.of(TextNode.valueOf("Folder A")));
+		Entity entity = crate.add("Dataset", "#data");
+		EntityJson.Parsed parsed = EntityJson.parse("""
+				{"@id": "#data", "@type": "Dataset",
+				 "hasPart": [{"@id": "folders/a/", "@type": "Dataset", "description": "The first"},
+				             {"@id": "folders/b/", "@type": "Dataset",
+				              "author": {"@type": "Person", "name": "Bob"}},
+				             {"@id": "data.csv"}],
+				 "variableMeasured": {"@type": "PropertyValue", "name": "depth", "unitText": "m"}}""");
+		assertEquals(4, parsed.nested().size());
+		EntityJson.Applied applied = EntityJson.apply(parsed, entity, crate);
+		assertEquals(List.of(existing), applied.merged());
+		// Merged: its own values kept, the new added
+		assertEquals("Folder A", existing.getLabel());
+		assertEquals(Optional.of(TextNode.valueOf("The first")), existing.get("description"));
+		Entity b = crate.get("folders/b/").orElseThrow();
+		Entity bob = crate.get(b.getAll("author").get(0).get("@id").asText()).orElseThrow();
+		assertEquals("Bob", bob.getLabel());
+		assertEquals(List.of("Person"), bob.getTypes());
+		assertTrue(bob.getId(), bob.getId().startsWith("#person-"));
+		Entity depth = crate.get(entity.getAll("variableMeasured").get(0).get("@id").asText()).orElseThrow();
+		assertEquals(List.of("PropertyValue"), depth.getTypes());
+		assertEquals(Optional.of(TextNode.valueOf("m")), depth.get("unitText"));
+		assertTrue(applied.added().containsAll(List.of(b, bob, depth)));
+		assertEquals(3, applied.added().size());
+		// A reference alone stays one, to an entity not (yet) in the crate
+		assertEquals(List.of("folders/a/", "folders/b/", "data.csv"),
+				entity.getAll("hasPart").stream().map(v -> v.get("@id").asText()).toList());
+		assertTrue(crate.get("data.csv").isEmpty());
 	}
 
 	@Test
 	public void applied() {
-		Entity entity = new Entity("#alice", "Person");
+		Crate crate = new Crate();
+		Entity entity = crate.add("Person", "#alice");
 		entity.set("name", Optional.of(TextNode.valueOf("Alice")));
 		entity.set("email", Optional.of(TextNode.valueOf("alice@example.org")));
 		EntityJson.apply(EntityJson.parse("""
 				{"@id": "#renamed", "@type": ["Person", "Author"], "name": "Alice Smith",
-				 "knows": [{"@id": "#bob"}], "keywords": ["a", "b"]}"""), entity);
+				 "knows": [{"@id": "#bob"}], "keywords": ["a", "b"]}"""), entity, crate);
 		// Not renamed, which is up to the crate
 		assertEquals("#alice", entity.getId());
 		assertEquals(List.of("Person", "Author"), entity.getTypes());
