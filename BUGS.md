@@ -53,6 +53,16 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   preview is made again once typing pauses, its values added at once,
   and at most 100 of a property shown, with Show all; opening ICE-AUS
   also went from 3.9 s to 1.75 s.
+- **Selecting an entity slow in large crates** (*faster*): most of the
+  time was JavaFX making and styling the form's controls: an open "From
+  CreativeWork" group made all 109 of its fields, each empty reference
+  with a drop-down, buttons and a New menu (some 6000 of a form's 8000
+  nodes). Now a vocabulary group opened because the entity uses some of
+  its properties shows only those, with Show all for the rest (the search
+  still finds them all), and each field's description is made when its ?
+  is pressed. Selecting a file of the COMPSs crate went from 0.7 to
+  0.27 s, an ICE-AUS entity from 0.76 to 0.2 s, a root of 3000 parts
+  from 1 to 0.3 s.
 - **Adding several entities edited each in turn** (*done*): adding files
   or pasting entities selected them one by one, so that the form and
   preview were made for each (thousands in a large crate); now they are

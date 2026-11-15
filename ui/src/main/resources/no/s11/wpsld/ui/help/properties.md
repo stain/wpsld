@@ -8,6 +8,9 @@ definition.
 
 In the list-style form, type a property name or label in **Search
 properties** to find it; clear the search to see the other groups again.
+A group of a type's properties, such as **From CreativeWork**, opens when
+the entity uses any of them, showing only those; **Show all** below them
+lists the rest.
 In the OS/2 Warp notebook, browse the type tabs and their pages instead.
 Enter a value in the field. Use **+** to add another value and **×** or
 **−** to remove a value, where available.

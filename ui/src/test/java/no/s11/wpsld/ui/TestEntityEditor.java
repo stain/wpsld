@@ -326,9 +326,10 @@ public class TestEntityEditor extends UiTest {
 		Label label = lookup("#label-datePublished").queryAs(Label.class);
 		assertEquals("Date published", label.getText());
 		assertEquals("datePublished", label.getTooltip().getText());
-		Node description = lookup("#description-datePublished").query();
-		assertFalse(description.isVisible());
+		// Made when asked for
+		assertTrue(lookup("#description-datePublished").tryQuery().isEmpty());
 		clickOn("#help-datePublished");
+		Node description = lookup("#description-datePublished").query();
 		assertTrue(description.isVisible());
 		// As plain text, without schema.org's [[CreativeWork]] markup
 		String text = from(description).lookup(".label").queryAs(Label.class).getText();
@@ -336,6 +337,8 @@ public class TestEntityEditor extends UiTest {
 		assertFalse(text, text.contains("[["));
 		Hyperlink definition = lookup("#definition-datePublished").queryAs(Hyperlink.class);
 		assertEquals("schema.org/datePublished", definition.getText());
+		clickOn("#help-datePublished");
+		assertTrue(lookup("#description-datePublished").tryQuery().isEmpty());
 	}
 
 	/**
@@ -422,6 +425,33 @@ public class TestEntityEditor extends UiTest {
 	 * they are when a row is changed, and a reference row offers the crate's
 	 * entities only once opened
 	 */
+	/**
+	 * A vocabulary's group of properties, opened as the entity uses some of
+	 * them, shows only those until asked for all; the search finds the
+	 * others
+	 */
+	@Test
+	public void groupInUseShowsThoseFirst() {
+		interact(() -> crate.getRoot().set("isBasedOn", Optional.of(ref("https://example.org/earlier"))));
+		edit(crate.getRoot());
+		assertTrue(visibleProperties().contains("isBasedOn"));
+		// Another of CreativeWork's, not made yet
+		assertTrue(lookup("#value-abstract-0").tryQuery().isEmpty());
+		Hyperlink all = lookup("#showAll-From_CreativeWork").queryAs(Hyperlink.class);
+		assertTrue(all.getText(), all.getText().matches("Show all \\d+ properties"));
+		interact(all::fire);
+		assertTrue(lookup("#value-abstract-0").tryQuery().isPresent());
+		assertTrue(visibleProperties().containsAll(List.of("isBasedOn", "abstract")));
+		assertTrue(lookup("#showAll-From_CreativeWork").tryQuery().isEmpty());
+
+		// Searching makes them all too
+		edit(crate.getRoot());
+		assertTrue(lookup("#value-abstract-0").tryQuery().isEmpty());
+		clickOn("#propertySearch").write("abstract");
+		assertTrue(visibleProperties().contains("abstract"));
+		assertFalse(visibleProperties().contains("isBasedOn"));
+	}
+
 	@Test
 	public void manyValuesShownOnAsking() {
 		int many = EntityEditor.ROWS + 10;

@@ -275,7 +275,8 @@ public class ReadmeScreenshots extends UiTest {
 			MenuButton parts = lookup("#headerNew-hasPart").queryAs(MenuButton.class);
 			parts.getItems().stream().filter(i -> i.getText().equals("File")).findFirst().orElseThrow().fire();
 		});
-		select("#file-1");
+		// The File just added: #file-2, as data.csv was #file-1
+		selectNewest("#file-");
 		interact(() -> {
 			TextField id = lookup("#entityId").queryAs(TextField.class);
 			id.setText("photo.jpg");
@@ -518,10 +519,18 @@ public class ReadmeScreenshots extends UiTest {
 		WaitForAsyncUtils.waitForFxEvents();
 	}
 
+	/** The entity of the highest number with this prefix, e.g. #file-2 */
+	private void selectNewest(String prefix) {
+		ListView<Entity> entities = lookup("#entities").queryListView();
+		select(entities.getItems().stream().map(Entity::getId).filter(id -> id.matches(java.util.regex.Pattern.quote(prefix) + "\\d+"))
+				.max(java.util.Comparator.comparingInt(id -> Integer.parseInt(id.substring(prefix.length()))))
+				.orElseThrow());
+	}
+
 	private void select(String id) {
 		ListView<Entity> entities = lookup("#entities").queryListView();
 		interact(() -> {
-			Entity entity = entities.getItems().stream().filter(e -> e.getId().equals(id)).findFirst().orElseThrow();
+			Entity entity = entities.getItems().stream().filter(e -> e.getId().equals(id)).findFirst().orElseThrow(() -> new AssertionError(id + " not in " + entities.getItems().stream().map(Entity::getId).toList()));
 			entities.getSelectionModel().clearAndSelect(entities.getItems().indexOf(entity));
 		});
 		WaitForAsyncUtils.waitForFxEvents();

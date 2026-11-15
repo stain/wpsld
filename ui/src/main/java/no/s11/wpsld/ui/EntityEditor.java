@@ -663,8 +663,11 @@ public class EntityEditor extends ScrollPane {
 			boolean other = groupFields.get(0).tier() == FieldTier.OTHER;
 			String title = (other ? "From " + group.getKey() : group.getKey() + " by " + formFields.getName())
 					+ " (" + groupFields.size() + ")";
-			FieldGroup fieldGroup = new FieldGroup(title, groupFields,
-					!other || hasValues || (first && !profileGroups));
+			// The vocabulary's other groups open, if in use, with only those
+			// in use until asked for all (e.g. CreativeWork's hundred)
+			FieldGroup fieldGroup = other && hasValues && !(first && !profileGroups)
+					? new FieldGroup(title, groupFields, f -> entity.get(f.name()).isPresent())
+					: new FieldGroup(title, groupFields, !other || hasValues || (first && !profileGroups));
 			if (other) {
 				first = false;
 			}
@@ -1081,13 +1084,29 @@ public class EntityEditor extends ScrollPane {
 		private final Node before;
 		/** Whether the group was open before the search started, to restore it */
 		private boolean expandedBeforeSearch;
+		/**
+		 * The fields in use, if only those are to be made until asked for
+		 * all (or searched), as a group may have a hundred
+		 */
+		private Optional<Predicate<FormField>> brief = Optional.empty();
 
 		FieldGroup(String title, List<FormField> fields, boolean expanded) {
 			this(title, fields, expanded, field -> false, null);
 		}
 
+		/** A group open with only its fields in use, until asked for all */
+		FieldGroup(String title, List<FormField> fields, Predicate<FormField> inUse) {
+			this(title, fields, true, field -> false, null, Optional.of(inUse));
+		}
+
 		FieldGroup(String title, List<FormField> fields, boolean expanded, Predicate<FormField> onlyWhenNamed,
 				Node before) {
+			this(title, fields, expanded, onlyWhenNamed, before, Optional.empty());
+		}
+
+		private FieldGroup(String title, List<FormField> fields, boolean expanded,
+				Predicate<FormField> onlyWhenNamed, Node before, Optional<Predicate<FormField>> brief) {
+			this.brief = brief.filter(inUse -> fields.stream().anyMatch(inUse.negate()));
 			this.fields = fields;
 			this.onlyWhenNamed = onlyWhenNamed;
 			this.before = before;
@@ -1110,9 +1129,28 @@ public class EntityEditor extends ScrollPane {
 		}
 
 		private void build() {
-			if (pane.getContent() == null) {
+			if (pane.getContent() != null) {
+				return;
+			}
+			if (brief.isEmpty()) {
 				GridPane grid = fieldsGrid(fields, rows);
 				pane.setContent(before == null ? grid : new VBox(8, before, grid));
+				return;
+			}
+			GridPane grid = fieldsGrid(fields.stream().filter(brief.get()).toList(), rows);
+			Hyperlink all = new Hyperlink("Show all " + fields.size() + " properties");
+			all.setId(id("showAll", pane.getText().replaceAll(" \\(\\d+\\)$", "")));
+			all.setOnAction(e -> buildAll());
+			pane.setContent(before == null ? new VBox(8, grid, all) : new VBox(8, before, grid, all));
+		}
+
+		/** Every field made, after only those in use were */
+		private void buildAll() {
+			if (brief.isPresent()) {
+				brief = Optional.empty();
+				rows.clear();
+				pane.setContent(null);
+				build();
 			}
 		}
 
@@ -1159,6 +1197,8 @@ public class EntityEditor extends ScrollPane {
 				return;
 			}
 			build();
+			// Not only those in use, as it may be one of the others
+			buildAll();
 			rows.forEach((field, nodes) -> show(nodes, matches(field, query)));
 			pane.setExpanded(true);
 			showIfAny();
@@ -1186,36 +1226,42 @@ public class EntityEditor extends ScrollPane {
 			VBox editor = new VBox(4, new FieldEditor(field).node());
 			retiredNote(field.name()).ifPresent(editor.getChildren()::add);
 			field.comment().ifPresent(comment -> {
-				Label text = new Label(Labels.plainText(comment));
-				text.setWrapText(true);
-				text.getStyleClass().add("dim-text");
-				VBox description = new VBox(2, text);
-				description.setId(id("description", field.name()));
-				// The full definition, e.g. https://schema.org/datePublished
-				String address = field.property().toString();
-				if (address.startsWith("http://schema.org/") || address.startsWith("https://schema.org/")) {
-					String page = "https://schema.org/" + address.substring(address.indexOf("schema.org/") + 11);
-					Hyperlink link = new Hyperlink(page.substring("https://".length()));
-					link.setId(id("definition", field.name()));
-					link.setTooltip(new Tooltip("Open in the browser"));
-					link.setOnAction(e -> browse.accept(page));
-					description.getChildren().add(link);
-				}
+				// Made on asking, as a form has a hundred or more of them
+				Supplier<VBox> describe = () -> {
+					Label text = new Label(Labels.plainText(comment));
+					text.setWrapText(true);
+					text.getStyleClass().add("dim-text");
+					VBox description = new VBox(2, text);
+					description.setId(id("description", field.name()));
+					// The full definition, e.g. https://schema.org/datePublished
+					String address = field.property().toString();
+					if (address.startsWith("http://schema.org/") || address.startsWith("https://schema.org/")) {
+						String page = "https://schema.org/" + address.substring(address.indexOf("schema.org/") + 11);
+						Hyperlink link = new Hyperlink(page.substring("https://".length()));
+						link.setId(id("definition", field.name()));
+						link.setTooltip(new Tooltip("Open in the browser"));
+						link.setOnAction(e -> browse.accept(page));
+						description.getChildren().add(link);
+					}
+					return description;
+				};
 				Button help;
 				if (layout.popoverHelp()) {
 					// ⓘ, as on macOS ? opens the app's help
 					help = iconButton("i", FluentUiRegularAL.INFO_16);
 					help.getStyleClass().add("info-button");
-					help.setOnAction(e -> showPopover(help, description));
+					help.setOnAction(e -> showPopover(help, describe.get()));
 				} else {
-					description.setVisible(false);
-					description.setManaged(false);
 					help = iconButton("?", FluentUiRegularMZ.QUESTION_CIRCLE_16);
 					help.setOnAction(e -> {
-						description.setVisible(!description.isVisible());
-						description.setManaged(description.isVisible());
+						Optional<Node> shown = editor.getChildren().stream()
+								.filter(n -> id("description", field.name()).equals(n.getId())).findFirst();
+						if (shown.isPresent()) {
+							editor.getChildren().remove(shown.get());
+						} else {
+							editor.getChildren().add(describe.get());
+						}
 					});
-					editor.getChildren().add(description);
 				}
 				help.getStyleClass().add("help-button");
 				help.setId(id("help", field.name()));
