@@ -84,18 +84,20 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   Collapse and Collapse All are on the right-click menu of Entities by
   Folder and by Part, for all the rows selected; Collapse All was
   missing (`/`, also on the keypad, as `+ * -`).
-- **Dangling `#propertyvalue-N` references**: a crate seen in testing
-  had thousands of references to `#propertyvalue-N` entities not in the
-  crate. Find out how: copying entities without the PropertyValues they
-  refer to (Paste keeps such references dangling), or the crate as
-  received. If ours, Copy could offer to take the entities referred to
-  that only these refer to (see Paste Special in PLAN.md).
-- **Adding many files as parts is slow**: in an attached crate's folder of
-  many files, selecting several (grey, not yet in the crate) subfolders
-  and choosing Add to hasPart from the context menu takes a while, with
-  no progress. Time it (as the paste of 2000 entities was), make it one
-  pass, and show progress for many (a job, see `Jobs`) or at least the
-  busy pointer. (Renamed Add File(s) to Has Part, done.) Perhaps a third
+- **Dangling `#propertyvalue-N` references** (*explained*): a crate seen
+  in testing had thousands of references to `#propertyvalue-N` entities
+  not in the crate. Made on purpose, as a stress test, by copying and
+  pasting PropertyValues over and over; not a bug.
+- **Adding many files as parts is slow** (*faster*): in an attached
+  crate's folder of many files, selecting several (grey, not yet in the
+  crate) subfolders and choosing Add to hasPart from the context menu
+  took a while, with no progress. 3000 files in 30 folders took 8.9 s,
+  now 1.1 s: each file added with its `@id` rather than renamed (which
+  looked through every reference), each dataset's `hasPart` set once,
+  PRONOM's formats found by extension, and the tree selecting them all
+  in one walk. Most of the rest is reading each file's start for its
+  format; for more, show the busy pointer, or progress (a job, see
+  `Jobs`). (Renamed Add File(s) to Has Part, done.) Perhaps a third
   action, **Add Folder with Its Contents**: a Dataset for the folder and
   each folder in it, and all their files as parts, recursively; it needs
   the speed and progress above first, as a folder may have thousands. In
