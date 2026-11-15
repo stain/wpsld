@@ -498,7 +498,7 @@ public class CrateEditor extends Application {
 					icon.set(EntityIcons.DOCUMENT);
 					setGraphic(icon);
 					getStyleClass().add("not-data");
-					setTooltip(new Tooltip("In the crate's folder, but not in the crate: Add to Has Part to add it"));
+					setTooltip(new Tooltip("In the crate's folder, but not in the crate: Add File(s) to Has Part to add it"));
 				} else if (problems.containsKey(entity)) {
 					icon.set(EntityIcons.problem(entity, listing));
 					setGraphic(icon);
@@ -891,14 +891,14 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * Add Dataset for Folder and Add to Has Part, for the Crate menu and the
+	 * Add Dataset for Folder and Add File(s) to Has Part, for the Crate menu and the
 	 * entities' right-click menu, with ids starting with this prefix
 	 */
 	private List<MenuItem> partItems(String prefix) {
 		MenuItem addDataset = new MenuItem("Add _Dataset for Folder");
 		addDataset.setId(prefix + "AddDataset");
 		addDataset.setOnAction(e -> addDatasets());
-		MenuItem addPart = new MenuItem("Add to Has _Part");
+		MenuItem addPart = new MenuItem("Add _File(s) to Has Part");
 		addPart.setId(prefix + "AddPart");
 		addPart.setOnAction(e -> addParts());
 		return List.of(addDataset, addPart);

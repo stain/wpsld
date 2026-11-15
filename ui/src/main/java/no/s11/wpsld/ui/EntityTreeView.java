@@ -191,7 +191,7 @@ class EntityTreeView extends TreeView<Node> {
 	private static Optional<String> tip(Node node) {
 		String state = switch (node.kind()) {
 		case FOLDER, FILE -> node.entity().isEmpty()
-				? node.kind() == Kind.FILE ? "In the crate's folder, but not in the crate: Add to Has Part to add it"
+				? node.kind() == Kind.FILE ? "In the crate's folder, but not in the crate: Add File(s) to Has Part to add it"
 						: "A folder with no Dataset entity"
 				: node.data() ? "" : "Not a data entity: not a part (hasPart) of the crate or its datasets";
 		default -> "";

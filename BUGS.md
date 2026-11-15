@@ -63,7 +63,11 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   and choosing Add to hasPart from the context menu takes a while, with
   no progress. Time it (as the paste of 2000 entities was), make it one
   pass, and show progress for many (a job, see `Jobs`) or at least the
-  busy pointer.
+  busy pointer. (Renamed Add File(s) to Has Part, done.) Perhaps a third
+  action, **Add Folder with Its Contents**: a Dataset for the folder and
+  each folder in it, and all their files as parts, recursively; it needs
+  the speed and progress above first, as a folder may have thousands. In
+  the Crate menu as well as the right-click menu, as the other two are.
 - **Copying files in asks for the folder with the system's folder
   chooser**: Insert > Files from outside the crate's folder opens a
   second, similar-looking dialog, the platform's folder chooser, to

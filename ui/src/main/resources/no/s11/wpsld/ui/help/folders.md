@@ -14,7 +14,7 @@ which is saved in it as `ro-crate-metadata.json` without asking where.
 Opening a folder shows **View > Entities by Folder**. Its files are not
 added by themselves: those the crate doesn't describe are listed greyed
 out (see **View > Show Files Not in Crate** in [Views and
-styles](views.md)), to add with **Crate > Add to Has Part**, or **Add
+styles](views.md)), to add with **Crate > Add File(s) to Has Part**, or **Add
 Dataset for Folder** for a folder, also several at once. Opening a
 crate's `ro-crate-metadata.json` with **File > Open...** works the same.
 

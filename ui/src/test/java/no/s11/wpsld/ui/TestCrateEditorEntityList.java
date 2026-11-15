@@ -333,7 +333,7 @@ public class TestCrateEditorEntityList extends UiTest {
 	}
 
 	/**
-	 * Crate > Add Dataset for Folder and Add to Has Part bring greyed out
+	 * Crate > Add Dataset for Folder and Add File(s) to Has Part bring greyed out
 	 * folders and files into the crate's hasPart
 	 */
 	@Test

@@ -39,16 +39,16 @@ is under both. Parts are named by their path from their dataset's
 folder. The other entities follow in a folder for each type, as by folder.
 
 To bring a greyed out folder or file into the crate, select it (or
-several) and choose **Crate > Add Dataset for Folder** or **Add to Has
-Part**, also on the right-click menu. A folder gets a Dataset, and a file
+several) and choose **Crate > Add Dataset for Folder** or **Add File(s)
+to Has Part**, also on the right-click menu. A folder gets a Dataset, and a file
 becomes a part, of the Dataset of the folder above it, or of the crate
 itself if that folder has none; select the outer folders too to add them
-all at once. Add to Has Part also makes a File or Dataset on the web a
+all at once. Add File(s) to Has Part also makes a File or Dataset on the web a
 part of the crate, under **External resources**.
 
 **View > Show Files Not in Crate** shows the files in an attached
 crate's folder that it doesn't describe yet, greyed out, to add with
-**Add to Has Part**: by folder at their places (on at first), by type at
+**Add File(s) to Has Part**: by folder at their places (on at first), by type at
 the end of the list, and by part in a folder **(Not in crate)** (both off
 at first). Each view keeps its own choice.
 
