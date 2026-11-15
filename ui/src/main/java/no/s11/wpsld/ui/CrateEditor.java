@@ -486,8 +486,8 @@ public class CrateEditor extends Application {
 			private final EntityIcons.Icon icon = EntityIcons.forCell(this);
 			{
 				labels.addListener(new WeakInvalidationListener(relabel));
-				// As wide as the list, long names cut off with … (their tooltip
-				// says the rest): each cell its own width, the list measured
+				// As wide as the list, long names cut off with … (the sidebar
+				// can be widened): each cell its own width, the list measured
 				// more of its thousands each frame and resized them all again,
 				// laying out every frame, never done
 				setPrefWidth(0);
