@@ -2,7 +2,9 @@
 
 Select an entity on the left to edit its form in the middle. On the right,
 **Preview** shows the selected entity and its links; **JSON-LD** shows the
-crate's metadata. Selecting a link to another described entity in Preview
+selected entity's metadata as JSON-LD. **View > Crate JSON-LD...** shows
+the whole crate's, as it would be saved, in a window of its own; press
+**Refresh** there after changes. Selecting a link to another described entity in Preview
 opens it in the editor. Web addresses open in the browser, and files
 beside the crate as your system opens them, also from the values of
 properties that take a URL, such as **URL**. A compact `@id` such as

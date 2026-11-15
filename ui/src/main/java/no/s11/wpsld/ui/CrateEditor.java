@@ -111,6 +111,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
@@ -485,30 +486,61 @@ public class CrateEditor extends Application {
 			private final EntityIcons.Icon icon = EntityIcons.forCell(this);
 			{
 				labels.addListener(new WeakInvalidationListener(relabel));
+				// As wide as the list, long names cut off with … (their tooltip
+				// says the rest): each cell its own width, the list measured
+				// more of its thousands each frame and resized them all again,
+				// laying out every frame, never done
+				setPrefWidth(0);
 			}
+
+			private final Tooltip tip = new Tooltip();
 
 			@Override
 			protected void updateItem(Entity entity, boolean empty) {
 				super.updateItem(entity, empty);
 				label(empty ? null : entity);
-				getStyleClass().removeAll("problem", "not-data");
+				// Changing only what differs: the list measures rows with a
+				// cell of its own, and each change made it lay out again on
+				// the next frame, every frame (in a crate of many problems)
 				if (empty || entity == null) {
 					setGraphic(null);
-					setTooltip(null);
+					show(null, null);
 				} else if (isNotInCrate(entity)) {
 					icon.set(EntityIcons.DOCUMENT);
 					setGraphic(icon);
-					getStyleClass().add("not-data");
-					setTooltip(new Tooltip("In the crate's folder, but not in the crate: Add File(s) to Has Part to add it"));
+					show("not-data", "In the crate's folder, but not in the crate: Add File(s) to Has Part to add it");
 				} else if (problems.containsKey(entity)) {
 					icon.set(EntityIcons.problem(entity, listing));
 					setGraphic(icon);
-					getStyleClass().add("problem");
-					setTooltip(new Tooltip(problems.get(entity)));
+					show("problem", problems.get(entity));
 				} else {
 					icon.set(EntityIcons.of(entity, listing));
 					setGraphic(icon);
-					setTooltip(null);
+					show(null, null);
+				}
+			}
+
+			/** The style class of a problem or a file not in the crate, if any, and the tooltip saying so */
+			private void show(String styleClass, String tooltip) {
+				for (String each : List.of("problem", "not-data")) {
+					boolean has = getStyleClass().contains(each);
+					if (each.equals(styleClass) && !has) {
+						getStyleClass().add(each);
+					} else if (!each.equals(styleClass) && has) {
+						getStyleClass().removeAll(each);
+					}
+				}
+				if (tooltip == null) {
+					if (getTooltip() != null) {
+						setTooltip(null);
+					}
+				} else {
+					if (!tooltip.equals(tip.getText())) {
+						tip.setText(tooltip);
+					}
+					if (getTooltip() != tip) {
+						setTooltip(tip);
+					}
 				}
 			}
 
@@ -587,13 +619,20 @@ public class CrateEditor extends Application {
 		preview.setStyle("-fx-font-family: monospace;");
 
 		// On the right, a preview of the entity (with links to the entities it
-		// refers to, which open them) and the crate's JSON-LD
+		// refers to, which open them) and its JSON-LD
 		entityPreview = new EntityPreview(() -> crate, this::show,
 				address -> browse.accept(address), property -> entityEditor.label(property));
 		// Only an attached crate's relative @ids are files
 		entityPreview.setFolder(crateFile::folder);
 		// Text of properties that take URLs as links, by the form's fields
 		entityPreview.setTakesUrl(property -> entityEditor.takesUrl(property));
+		// The JSON-LD tab shows the entity shown
+		entityPreview.setOnShow(() -> {
+			jsonShown = false;
+			if (jsonTab != null && jsonTab.isSelected()) {
+				showJson();
+			}
+		});
 		// Beside the form's references and @id: show the entity, or open the address
 		entityEditor.setShow(this::show);
 		entityEditor.setAddress(entityPreview::address);
@@ -872,6 +911,10 @@ public class CrateEditor extends Application {
 		edit.setId("menuEdit");
 		Menu view = new Menu("_View", null, sidebarItem(), new SeparatorMenuItem());
 		view.getItems().addAll(listings());
+		MenuItem crateJson = new MenuItem("Crate _JSON-LD…");
+		crateJson.setId("menuCrateJson");
+		crateJson.setOnAction(e -> showCrateJson(stage));
+		view.getItems().addAll(new SeparatorMenuItem(), crateJson);
 		view.getItems().addAll(new SeparatorMenuItem(), styles(stage), colours(stage));
 		view.setId("menuView");
 
@@ -3927,16 +3970,70 @@ public class CrateEditor extends Application {
 		jsonLater.setOnFinished(e -> showJson());
 	}
 
-	/** The crate's JSON-LD in its tab, if not shown already */
+	/**
+	 * The JSON-LD of the entity shown in its tab, if not shown already: not
+	 * the whole crate's, which may be megabytes to lay out again as each
+	 * pause in typing (see View > Crate JSON-LD)
+	 */
 	void showJson() {
 		if (jsonShown) {
 			return;
 		}
 		jsonShown = true;
+		Entity shown = entityPreview.getEntity();
+		if (shown == null || !crate.getEntities().contains(shown)) {
+			preview.setText("");
+			return;
+		}
 		try {
-			preview.setText(Crate.WRITER.writeValueAsString(crate.toJson()));
+			preview.setText(Crate.WRITER.writeValueAsString(shown.toJson()));
 		} catch (JsonProcessingException e) {
 			preview.setText(e.toString());
+		}
+	}
+
+	/** View > Crate JSON-LD, while open */
+	private Stage crateJsonWindow;
+
+	/**
+	 * View > Crate JSON-LD: the whole crate's JSON-LD, as it would be saved,
+	 * in a window of its own, made again with Refresh (not on each change,
+	 * as it may be megabytes)
+	 */
+	void showCrateJson(Stage stage) {
+		if (crateJsonWindow == null) {
+			TextArea text = new TextArea();
+			text.setId("crateJson");
+			text.setEditable(false);
+			text.setStyle("-fx-font-family: monospace;");
+			Button refresh = new Button("_Refresh");
+			refresh.setId("crateJsonRefresh");
+			refresh.setOnAction(e -> fillCrateJson(text));
+			Button close = new Button("Close");
+			close.setCancelButton(true);
+			Region space = new Region();
+			HBox.setHgrow(space, Priority.ALWAYS);
+			HBox buttons = new HBox(8, space, refresh, close);
+			VBox.setVgrow(text, Priority.ALWAYS);
+			VBox box = new VBox(8, text, buttons);
+			box.setPadding(new Insets(8));
+			crateJsonWindow = new Stage();
+			crateJsonWindow.initOwner(stage);
+			crateJsonWindow.setScene(new Scene(box, 700, 600));
+			close.setOnAction(e -> crateJsonWindow.hide());
+			crateJsonWindow.setOnHidden(e -> crateJsonWindow = null);
+		}
+		crateJsonWindow.setTitle("JSON-LD of " + crateFile.title(crate.toJson(), false));
+		fillCrateJson((TextArea) crateJsonWindow.getScene().lookup("#crateJson"));
+		crateJsonWindow.show();
+		crateJsonWindow.toFront();
+	}
+
+	private void fillCrateJson(TextArea text) {
+		try {
+			text.setText(Crate.WRITER.writeValueAsString(crate.toJson()));
+		} catch (JsonProcessingException e) {
+			text.setText(e.toString());
 		}
 	}
 

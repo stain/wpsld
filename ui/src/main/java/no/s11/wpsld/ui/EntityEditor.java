@@ -664,9 +664,11 @@ public class EntityEditor extends ScrollPane {
 			String title = (other ? "From " + group.getKey() : group.getKey() + " by " + formFields.getName())
 					+ " (" + groupFields.size() + ")";
 			// The vocabulary's other groups open, if in use, with only those
-			// in use until asked for all (e.g. CreativeWork's hundred)
+			// in use until asked for all (e.g. CreativeWork's hundred), other
+			// than those the header shows (e.g. the root's thousands of parts)
 			FieldGroup fieldGroup = other && hasValues && !(first && !profileGroups)
-					? new FieldGroup(title, groupFields, f -> entity.get(f.name()).isPresent())
+					? new FieldGroup(title, groupFields, f -> entity.get(f.name()).isPresent()
+							&& !HEADER.contains(f.name()) && !headerLinks.contains(f.name()))
 					: new FieldGroup(title, groupFields, !other || hasValues || (first && !profileGroups));
 			if (other) {
 				first = false;

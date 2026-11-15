@@ -23,8 +23,10 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -109,110 +111,223 @@ public class EntityPreview extends ScrollPane {
 	public void show(Entity entity) {
 		this.entity = entity;
 		refresh();
+		onShow.run();
+	}
+
+	/** Run after another entity (or none) is shown */
+	private Runnable onShow = () -> {
+	};
+
+	public void setOnShow(Runnable onShow) {
+		this.onShow = Objects.requireNonNull(onShow);
+	}
+
+	/** The entity shown, if any */
+	public Entity getEntity() {
+		return entity;
 	}
 
 	/**
-	 * Show the entity again, e.g. after it or other entities changed.
+	 * A part of the preview: what it shows (compared to tell whether it
+	 * changed) and how to make its node
+	 */
+	private record Part(String key, Object shows, Supplier<Node> make) {
+	}
+
+	/** The entity whose parts are shown, and what each shows, by key */
+	private Entity shown;
+	private final Map<String, Object> shows = new HashMap<>();
+	private final Map<String, Node> nodes = new HashMap<>();
+	private List<String> topKeys = List.of();
+	private List<String> rowKeys = List.of();
+	private GridPane properties;
+
+	/**
+	 * Show the entity again, e.g. after it or other entities changed: of
+	 * the same entity, only the parts that changed are made again (typing
+	 * in a large entity, the others' layout took most of the time)
 	 */
 	public void refresh() {
-		content.getChildren().clear();
 		if (entity == null || !crate.get().getEntities().contains(entity)) {
+			content.getChildren().clear();
+			shown = null;
 			return;
 		}
 		Crate current = crate.get();
-		Label name = new Label(entity.getLabel());
-		name.setId("previewName");
-		name.setWrapText(true);
-		name.setStyle("-fx-font-size: 1.6em; -fx-font-weight: bold;");
-		Label types = new Label(String.join(", ", entity.getTypes()));
-		types.setId("previewTypes");
-		types.setWrapText(true);
-		types.getStyleClass().add("dim-text");
+		List<Part> top = new ArrayList<>();
+		top.add(new Part("name", entity.getLabel(), () -> {
+			Label name = new Label(entity.getLabel());
+			name.setId("previewName");
+			name.setWrapText(true);
+			name.setStyle("-fx-font-size: 1.6em; -fx-font-weight: bold;");
+			return name;
+		}));
+		top.add(new Part("types", List.copyOf(entity.getTypes()), () -> {
+			Label types = new Label(String.join(", ", entity.getTypes()));
+			types.setId("previewTypes");
+			types.setWrapText(true);
+			types.getStyleClass().add("dim-text");
+			return types;
+		}));
 		// On its own line, as several types may take the whole width
-		Node id = identifier(entity.getId());
-		id.setId("previewId");
-		content.getChildren().addAll(name, types, id);
+		top.add(new Part("id", entity.getId(), () -> {
+			Node id = identifier(entity.getId());
+			id.setId("previewId");
+			return id;
+		}));
 		// The description as a paragraph under the name, not in the table
 		List<String> descriptions = entity.getAll("description").stream().filter(JsonNode::isValueNode)
 				.map(JsonNode::asText).toList();
 		if (!descriptions.isEmpty()) {
-			String text = String.join("\n\n", descriptions);
-			// Formatted when written in Markdown, as the HTML preview does
-			Node description;
-			if (Markdown.looksLike(text)) {
-				TextFlow flow = new TextFlow();
-				flow.setMinWidth(0);
-				HelpMarkdown.description(flow, text, browse);
-				description = flow;
-			} else {
-				Label label = new Label(text);
-				label.setWrapText(true);
-				description = label;
-			}
-			description.setId("previewDescription");
-			content.getChildren().add(description);
+			top.add(new Part("description", descriptions, () -> description(String.join("\n\n", descriptions))));
 		}
 		if (entity != current.getRoot()) {
-			Hyperlink root = link("Go to the crate: " + current.getRoot().getLabel(), current.getRoot());
-			root.setId("previewRoot");
-			content.getChildren().add(root);
+			top.add(new Part("root", current.getRoot().getLabel(), () -> {
+				Hyperlink root = link("Go to the crate: " + current.getRoot().getLabel(), current.getRoot());
+				root.setId("previewRoot");
+				return root;
+			}));
 		}
 		// Where a place, its geometry or coordinates are
-		Places.of(entity, current).ifPresent(area -> {
+		Places.of(entity, current).ifPresent(area -> top.add(new Part("map", area, () -> {
 			Hyperlink map = new Hyperlink(area.isPoint() ? "Show on OpenStreetMap"
 					: "Show the area on OpenStreetMap");
 			map.setId("previewMap");
 			map.setTooltip(new Tooltip(String.format(Locale.ROOT, "Latitude %.6f, longitude %.6f",
 					area.latitude(), area.longitude())));
 			map.setOnAction(e -> browse.accept(area.openStreetMap()));
-			content.getChildren().add(map);
-		});
+			return map;
+		})));
+		top.add(new Part("properties", "", () -> properties));
 
-		GridPane properties = table();
-		properties.setId("previewProperties");
-		int row = 0;
+		List<Part> rows = new ArrayList<>();
 		for (String property : entity.getValues().keySet()) {
 			if (property.equals("name") || property.equals("description") && !descriptions.isEmpty()) {
 				// Shown above
 				continue;
 			}
-			VBox values = new VBox(2);
 			List<JsonNode> all = entity.getAll(property);
-			// All at once, as each child added is checked against all the others
-			values.getChildren().setAll(all.stream().limit(SHOWN).map(v -> value(property, v, current)).toList());
-			if (all.size() > SHOWN) {
-				// e.g. a root's thousands of parts: the others on asking
-				Hyperlink more = new Hyperlink("Show all " + all.size());
-				more.setId("previewMore-" + property);
-				more.setOnAction(e -> values.getChildren().setAll(
-						all.stream().map(v -> value(property, v, current)).toList()));
-				values.getChildren().add(more);
-			}
-			properties.addRow(row++, propertyLabel(property), values);
+			// Copies, as values may be changed in place
+			rows.add(new Part(property, List.of(all.stream().map(JsonNode::deepCopy).toList(), targets(all, current)),
+					() -> values(property, all, current)));
 		}
-		content.getChildren().add(properties);
 
 		// The entities referring to this one, as the preview's reverse links
-		List<Node> referredBy = new ArrayList<>();
+		List<List<Object>> referring = new ArrayList<>();
 		for (Entity other : current.getEntities()) {
 			for (String property : other.getValues().keySet()) {
 				boolean refers = other.getAll(property).stream()
 						.anyMatch(v -> v.isObject() && entity.getId().equals(v.path("@id").asText(null)));
 				if (refers) {
-					Hyperlink link = link(other.getLabel(), other);
-					link.setText(other.getLabel() + " (" + property + ")");
-					referredBy.add(link);
+					referring.add(List.of(other, other.getLabel(), property));
 				}
 			}
 		}
-		if (!referredBy.isEmpty()) {
-			Label heading = new Label("Referenced by");
-			heading.setStyle("-fx-font-weight: bold;");
-			VBox links = new VBox(2);
-			links.setId("previewReferencedBy");
-			links.getChildren().addAll(referredBy);
-			content.getChildren().addAll(heading, links);
+		if (!referring.isEmpty()) {
+			top.add(new Part("referencedBy", referring, () -> {
+				Label heading = new Label("Referenced by");
+				heading.setStyle("-fx-font-weight: bold;");
+				VBox links = new VBox(2);
+				links.setId("previewReferencedBy");
+				for (List<Object> refer : referring) {
+					Hyperlink link = link((String) refer.get(1), (Entity) refer.get(0));
+					link.setText(refer.get(1) + " (" + refer.get(2) + ")");
+					links.getChildren().add(link);
+				}
+				return new VBox(8, heading, links);
+			}));
 		}
+
+		List<String> newTop = top.stream().map(Part::key).toList();
+		List<String> newRows = rows.stream().map(Part::key).toList();
+		if (entity != shown || !newTop.equals(topKeys) || !newRows.equals(rowKeys)) {
+			// Made anew
+			shown = entity;
+			topKeys = newTop;
+			rowKeys = newRows;
+			shows.clear();
+			nodes.clear();
+			properties = table();
+			properties.setId("previewProperties");
+			int row = 0;
+			for (Part part : rows) {
+				Node values = part.make().get();
+				properties.addRow(row++, propertyLabel(part.key()), values);
+				shows.put("row:" + part.key(), part.shows());
+				nodes.put("row:" + part.key(), values);
+			}
+			List<Node> made = new ArrayList<>();
+			for (Part part : top) {
+				Node node = part.make().get();
+				made.add(node);
+				shows.put(part.key(), part.shows());
+				nodes.put(part.key(), node);
+			}
+			// All at once, as each child added is checked against all the others
+			content.getChildren().setAll(made);
+			return;
+		}
+		for (Part part : top) {
+			if (!part.shows().equals(shows.get(part.key()))) {
+				Node node = part.make().get();
+				content.getChildren().set(content.getChildren().indexOf(nodes.get(part.key())), node);
+				shows.put(part.key(), part.shows());
+				nodes.put(part.key(), node);
+			}
+		}
+		for (Part part : rows) {
+			String key = "row:" + part.key();
+			if (!part.shows().equals(shows.get(key))) {
+				Node old = nodes.get(key);
+				Node values = part.make().get();
+				GridPane.setConstraints(values, 1, GridPane.getRowIndex(old));
+				properties.getChildren().set(properties.getChildren().indexOf(old), values);
+				shows.put(key, part.shows());
+				nodes.put(key, values);
+			}
+		}
+	}
+
+	/** The description, formatted when written in Markdown, as the HTML preview does */
+	private Node description(String text) {
+		Node description;
+		if (Markdown.looksLike(text)) {
+			TextFlow flow = new TextFlow();
+			flow.setMinWidth(0);
+			HelpMarkdown.description(flow, text, browse);
+			description = flow;
+		} else {
+			Label label = new Label(text);
+			label.setWrapText(true);
+			description = label;
+		}
+		description.setId("previewDescription");
+		return description;
+	}
+
+	/**
+	 * The labels of the entities the first values shown refer to, as their
+	 * links show them
+	 */
+	private static List<String> targets(List<JsonNode> values, Crate current) {
+		return values.stream().limit(SHOWN).filter(v -> v.isObject() && v.path("@id").isTextual())
+				.map(v -> current.get(v.get("@id").asText()).map(Entity::getLabel).orElse("")).toList();
+	}
+
+	/** A property's values, at most {@link #SHOWN} until asked for all */
+	private VBox values(String property, List<JsonNode> all, Crate current) {
+		VBox values = new VBox(2);
+		// All at once, as each child added is checked against all the others
+		values.getChildren().setAll(all.stream().limit(SHOWN).map(v -> value(property, v, current)).toList());
+		if (all.size() > SHOWN) {
+			// e.g. a root's thousands of parts: the others on asking
+			Hyperlink more = new Hyperlink("Show all " + all.size());
+			more.setId("previewMore-" + property);
+			more.setOnAction(e -> values.getChildren().setAll(
+					all.stream().map(v -> value(property, v, current)).toList()));
+			values.getChildren().add(more);
+		}
+		return values;
 	}
 
 	private static GridPane table() {

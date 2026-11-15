@@ -53,6 +53,7 @@ import javafx.scene.control.MenuBar;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputControl;
 import javafx.scene.control.skin.VirtualFlow;
 import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
@@ -922,10 +923,42 @@ public class TestCrateEditor extends UiTest {
 		WaitForAsyncUtils.waitForFxEvents();
 	}
 
-	/** The crate's JSON-LD, as its tab shows it (filled once shown, after typing pauses) */
+	/** The crate's JSON-LD, as View > Crate JSON-LD shows it (closed again) */
 	private String json() {
-		interact(app::showJson);
-		return lookup("#preview").queryTextInputControl().getText();
+		interact(menuItem("menuCrateJson")::fire);
+		TextInputControl text = lookup("#crateJson").queryTextInputControl();
+		String json = text.getText();
+		interact(() -> text.getScene().getWindow().hide());
+		return json;
+	}
+
+	/**
+	 * The JSON-LD tab shows the entity selected, as it changes; View > Crate
+	 * JSON-LD the whole crate's, made again with Refresh
+	 */
+	@Test
+	public void jsonOfEntityAndCrate() throws Exception {
+		addEntity("person");
+		Entity person = entities().getSelectionModel().getSelectedItem();
+		clickOn("#jsonTab");
+		TextInputControl tab = lookup("#preview").queryTextInputControl();
+		assertTrue(tab.getText(), tab.getText().contains("\"@id\" : \"" + person.getId() + "\""));
+		assertFalse(tab.getText(), tab.getText().contains("ro-crate-metadata.json"));
+		clickOn(lookup("#header-name").queryAs(TextField.class)).write("Alice");
+		WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> tab.getText().contains("Alice"));
+		interact(() -> entities().getSelectionModel().clearAndSelect(0));
+		assertTrue(tab.getText(), tab.getText().contains("\"@id\" : \"./\""));
+		assertFalse(tab.getText(), tab.getText().contains("Alice"));
+
+		interact(menuItem("menuCrateJson")::fire);
+		TextInputControl crate = lookup("#crateJson").queryTextInputControl();
+		assertTrue(crate.getText().contains("ro-crate-metadata.json"));
+		assertTrue(crate.getText().contains("Alice"));
+		interact(() -> person.set("name", Optional.of(JsonNodeFactory.instance.textNode("Bob"))));
+		assertFalse(crate.getText().contains("Bob"));
+		interact(lookup("#crateJsonRefresh").queryButton()::fire);
+		assertTrue(crate.getText().contains("Bob"));
+		interact(() -> crate.getScene().getWindow().hide());
 	}
 
 	/**

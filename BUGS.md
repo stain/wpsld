@@ -63,6 +63,21 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   is pressed. Selecting a file of the COMPSs crate went from 0.7 to
   0.27 s, an ICE-AUS entity from 0.76 to 0.2 s, a root of 3000 parts
   from 1 to 0.3 s.
+- **Typing slow in a large crate, letter by letter** (*done*): typing
+  with pauses, as people do, cost 120 to 330 ms of the JavaFX thread a
+  letter in ICE-AUS's and COMPSs' root description (an empty crate's: 13
+  ms). Mostly not the typing: the entity list laid itself out again on
+  every frame (about 60 a second) while a field had the caret, as its
+  cells were each as wide as their text, and measuring more of its
+  thousands of rows changed their width again, never done; now its cells
+  are as wide as the list, long names cut off with … Also: the JSON-LD tab
+  shows the selected entity's JSON-LD rather than the whole crate's
+  (megabytes laid out again at each pause), the whole crate's in View >
+  Crate JSON-LD…; the preview makes again only its parts that changed;
+  a vocabulary group shown briefly leaves out the header's properties
+  (the root's parts were shown twice). Now about 19 ms a letter with the
+  preview, 40 to 50 ms with JSON-LD, and 3 ms of every 600 idle (was 80
+  to 190).
 - **Adding several entities edited each in turn** (*done*): adding files
   or pasting entities selected them one by one, so that the form and
   preview were made for each (thousands in a large crate); now they are
