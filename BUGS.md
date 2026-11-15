@@ -169,9 +169,25 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   background with progress and Cancel in both); damaged-input tests (cut
   short, garbage after the start bytes, huge lengths, deep nesting,
   oversized parts) as integration tests in their own GitHub workflow, as
-  the online tests are (*done*, `./gradlew damagedTest`). `exifData` as PropertyValues rather than one
+  the online tests are (*done*, `./gradlew damagedTest`, a job of
+  `integration-tests.yml` with the online tests). `exifData` as PropertyValues rather than one
   text; and JPEG 2000 is not planned (no library reads its metadata but
   jai-imageio-jpeg2000, whose JJ2000 licence is a problem).
+
+- **A log for the app**: the Windows launcher has no console, and
+  slf4j-nop dropped what Tika logged. *Done*: Java's own logging
+  (`java.util.logging`) to the user's log folder (XDG state, Windows'
+  `LOCALAPPDATA`, macOS `~/Library/Logs`), rotated at 20 MB, a set of
+  logs for each wpsld running at once; SLF4J through slf4j-jdk14, PDFBox's
+  Commons Logging and `System.Logger` (wpsld, JavaFX, the JDK's HTTP
+  client errors) all to it; Preferences > Logs for the level, the folder
+  and clearing (by truncating, as another wpsld may be writing); failures
+  shown only as messages (readers, web searches, tiles) logged with their
+  causes. Log4j 2 was considered: none of the dependencies needs it (only
+  Commons Logging would use it if present), and it adds 2.4 MB to the
+  image; `log4j-jpl` and `log4j-slf4j2-impl` could take over later without
+  changes to wpsld's code. Not yet: a Help > Report a problem that
+  attaches the log.
 
 - **Metadata readers as modules (proto-plugins)**: *done* for images
   (`readers-image`) and PDF (`readers-pdf`): lib's `MetadataReader`
