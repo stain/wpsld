@@ -188,4 +188,31 @@ public class TestCrateEditorLicenses extends UiTest {
 		assertEquals(List.of("Dataset", "CreativeWork"), root.getTypes());
 		assertEquals("http://schema.org/PotentialActionStatus", root.get("actionStatus").orElseThrow().path("@id").asText());
 	}
+
+	/**
+	 * A long report, of many repairs, scrolls in a text area that can be
+	 * copied from, listing them all, so that the dialog fits on the screen
+	 */
+	@Test
+	public void longRepairReportScrolls() throws Exception {
+		Entity root = entities().getItems().get(0);
+		interact(() -> {
+			List<com.fasterxml.jackson.databind.JsonNode> authors = new java.util.ArrayList<>();
+			for (int i = 0; i < 30; i++) {
+				authors.add(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("@id",
+						"#missing-" + i));
+			}
+			root.setAll("author", authors);
+		});
+		MenuBar bar = lookup("#menuBar").queryAs(MenuBar.class);
+		MenuItem repair = bar.getMenus().stream().flatMap(m -> m.getItems().stream())
+				.filter(i -> "menuRepair".equals(i.getId())).findFirst().orElseThrow();
+		WaitForAsyncUtils.asyncFx(repair::fire);
+		WaitForAsyncUtils.waitForFxEvents();
+		javafx.scene.control.TextArea report = lookup("#report").queryAs(javafx.scene.control.TextArea.class);
+		assertFalse(report.isEditable());
+		assertTrue(report.getText(), report.getText().contains("• #missing-29"));
+		assertFalse(report.getText(), report.getText().contains("more"));
+		clickOn("OK");
+	}
 }

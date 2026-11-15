@@ -648,6 +648,13 @@ Styles:
          merge dialogue), *merge all*, *keep the existing ones*, *paste as
          copies with new `@id`s* (which Edit > Duplicate is, step 6).
        - Later, how to treat the `@context` (step 4).
+       - **Files between attached crates**: pasting File entities copied
+         from another attached crate (another window) now leaves them
+         missing here, as their files stay in the other crate's folder
+         (reported). Offer to copy their files too, into a folder of this
+         crate (as Insert > Files does, in the background with progress,
+         Replace, Keep Both or Skip for names taken), with their `@id`s
+         following the folder chosen; and Datasets with their folders.
      - Enabled whenever Paste is, in the entity list.
   3. **Merge Entities**: select two or more entities in the list and merge
      them with the dialogue of renaming to an existing `@id` (`Crate.merge`,

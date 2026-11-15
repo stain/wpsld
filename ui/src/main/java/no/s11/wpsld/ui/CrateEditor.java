@@ -1323,18 +1323,12 @@ public class CrateEditor extends Application {
 
 	/** Tell what Update File Details or Fill in updated, and what files couldn't be read */
 	private void showUpdated(Stage stage, List<String> done, List<String> problems) {
-		Alert alert = new Alert(problems.isEmpty() ? AlertType.INFORMATION : AlertType.WARNING,
-				(done.isEmpty() ? "The files' details were up to date."
-						: String.join("\n", done.stream().limit(30).toList()) + (done.size() > 30 ? "\n…" : ""))
+		report(stage, problems.isEmpty() ? AlertType.INFORMATION : AlertType.WARNING,
+				done.isEmpty() ? "Nothing to update"
+						: done.size() + (done.size() == 1 ? " file updated" : " files updated"),
+				(done.isEmpty() ? "The files' details were up to date." : String.join("\n", done))
 						+ (problems.isEmpty() ? "" : "\n\nNot all of what the files say could be read:\n"
-								+ String.join("\n", problems.stream().limit(30).toList())
-								+ (problems.size() > 30 ? "\n…" : "")),
-				ButtonType.OK);
-		alert.initOwner(stage);
-		alert.setHeaderText(done.isEmpty() ? "Nothing to update"
-				: done.size() + (done.size() == 1 ? " file updated" : " files updated"));
-		alert.setResizable(true);
-		alert.show();
+								+ String.join("\n", problems))).show();
 	}
 
 	/**
@@ -2293,11 +2287,8 @@ public class CrateEditor extends Application {
 			header += ", with " + references + (references == 1 ? " reference" : " references")
 					+ " to an entity not copied";
 		}
-		Alert alert = new Alert(references > 0 ? AlertType.WARNING : AlertType.INFORMATION,
-				String.join("\n\n", notes), ButtonType.OK);
-		alert.initOwner(stage);
-		alert.setHeaderText(header);
-		alert.setResizable(true);
+		Alert alert = report(stage, references > 0 ? AlertType.WARNING : AlertType.INFORMATION, header,
+				String.join("\n\n", notes));
 		alert.initModality(javafx.stage.Modality.NONE);
 		alert.show();
 	}
@@ -3435,39 +3426,32 @@ public class CrateEditor extends Application {
 		List<Entity> mentioned = crate.mentionUnlinked();
 		List<String> done = new ArrayList<>();
 		if (!types.isEmpty()) {
-			done.add("Types written by their names:\n" + types.stream().limit(LISTED).map(t -> "• " + t)
-					.collect(Collectors.joining("\n"))
-					+ (types.size() > LISTED ? "\n• and " + (types.size() - LISTED) + " more" : ""));
+			done.add("Types written by their names:\n" + types.stream().map(t -> "• " + t)
+					.collect(Collectors.joining("\n")));
 		}
 		if (!members.isEmpty()) {
 			done.add("Values of schema.org's lists (Enumerations), as references to them:\n"
-					+ members.stream().limit(LISTED).map(m -> "• " + m).collect(Collectors.joining("\n"))
-					+ (members.size() > LISTED ? "\n• and " + (members.size() - LISTED) + " more" : ""));
+					+ members.stream().map(m -> "• " + m).collect(Collectors.joining("\n")));
 		}
 		if (!licences.isEmpty()) {
-			done.add("Licences of the SPDX License List:\n" + licences.stream().limit(LISTED).map(l -> "• " + l)
-					.collect(Collectors.joining("\n"))
-					+ (licences.size() > LISTED ? "\n• and " + (licences.size() - LISTED) + " more" : ""));
+			done.add("Licences of the SPDX License List:\n" + licences.stream().map(l -> "• " + l)
+					.collect(Collectors.joining("\n")));
 		}
 		if (!dois.isEmpty()) {
-			done.add("DOIs:\n" + dois.stream().limit(LISTED).map(f -> "• " + f)
-					.collect(Collectors.joining("\n"))
-					+ (dois.size() > LISTED ? "\n• and " + (dois.size() - LISTED) + " more" : ""));
+			done.add("DOIs:\n" + dois.stream().map(f -> "• " + f)
+					.collect(Collectors.joining("\n")));
 		}
 		if (!people.isEmpty()) {
-			done.add("ORCID iDs:\n" + people.stream().limit(LISTED).map(f -> "• " + f)
-					.collect(Collectors.joining("\n"))
-					+ (people.size() > LISTED ? "\n• and " + (people.size() - LISTED) + " more" : ""));
+			done.add("ORCID iDs:\n" + people.stream().map(f -> "• " + f)
+					.collect(Collectors.joining("\n")));
 		}
 		if (!organizations.isEmpty()) {
-			done.add("ROR identifiers:\n" + organizations.stream().limit(LISTED).map(f -> "• " + f)
-					.collect(Collectors.joining("\n"))
-					+ (organizations.size() > LISTED ? "\n• and " + (organizations.size() - LISTED) + " more" : ""));
+			done.add("ROR identifiers:\n" + organizations.stream().map(f -> "• " + f)
+					.collect(Collectors.joining("\n")));
 		}
 		if (!formats.isEmpty()) {
-			done.add("File formats of PRONOM:\n" + formats.stream().limit(LISTED).map(f -> "• " + f)
-					.collect(Collectors.joining("\n"))
-					+ (formats.size() > LISTED ? "\n• and " + (formats.size() - LISTED) + " more" : ""));
+			done.add("File formats of PRONOM:\n" + formats.stream().map(f -> "• " + f)
+					.collect(Collectors.joining("\n")));
 		}
 		if (!added.isEmpty()) {
 			done.add("Added as Thing, referred to but not in the crate:\n" + list(added)
@@ -3490,25 +3474,45 @@ public class CrateEditor extends Application {
 			refresh();
 			checkpoint(placeOf(null), Optional.of("Repair"));
 		}
-		Alert report = new Alert(AlertType.INFORMATION,
-				done.isEmpty() ? "Nothing to repair." : String.join("\n\n", done), ButtonType.OK);
-		report.initOwner(stage);
-		report.setHeaderText("Repair Crate");
-		report.showAndWait();
+		report(stage, AlertType.INFORMATION, "Repair Crate",
+				done.isEmpty() ? "Nothing to repair." : String.join("\n\n", done)).showAndWait();
 	}
 
 	/**
-	 * The entities, one per line, the first {@value #LISTED} of them.
+	 * The entities, one per line, all of them (in a report that scrolls,
+	 * see {@link #report})
 	 */
 	private static String list(List<Entity> listed) {
-		String list = listed.stream().limit(LISTED)
+		return listed.stream()
 				.map(e -> "• " + (e.getLabel().equals(e.getId()) ? e.getId() : e.getLabel() + " (" + e.getId() + ")"))
 				.collect(Collectors.joining("\n"));
-		return listed.size() > LISTED ? list + "\n… and " + (listed.size() - LISTED) + " more" : list;
 	}
 
-	/** How many entities {@link #repair} lists of each change */
-	private static final int LISTED = 10;
+	/** How many lines a report shows as text; more in a text area that scrolls */
+	private static final int REPORT_LINES = 15;
+
+	/**
+	 * A dialog reporting what was done, e.g. by Repair Crate: a long report
+	 * in a read-only text area that scrolls (and can be copied, e.g. to
+	 * check each change), so that the dialog fits on the screen
+	 */
+	static Alert report(Window owner, AlertType type, String header, String text) {
+		Alert alert = new Alert(type, text, ButtonType.OK);
+		alert.initOwner(owner);
+		alert.setHeaderText(header);
+		alert.setResizable(true);
+		long lines = text.lines().count();
+		if (lines > REPORT_LINES) {
+			TextArea area = new TextArea(text);
+			area.setId("report");
+			area.setEditable(false);
+			area.setWrapText(true);
+			area.setPrefColumnCount(70);
+			area.setPrefRowCount(REPORT_LINES + 5);
+			alert.getDialogPane().setContent(area);
+		}
+		return alert;
+	}
 
 	/**
 	 * Add the entities not linked from the root data entity to its

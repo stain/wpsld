@@ -53,6 +53,17 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   edit it"), as after removing the entity edited, which used to stay in
   the form. A type chosen above the list that hides the entity edited
   still keeps its form, as it is selected again when listed again.
+- **Long reports didn't fit on the screen** (*done*): Repair Crate's
+  report of thousands of changes grew taller than the screen, its OK
+  button out of reach. Long reports (Repair Crate, Update File Details,
+  Paste) now scroll in a text area that can be copied from, listing every
+  change rather than the first ten.
+- **Adding many files as parts is slow**: in an attached crate's folder of
+  many files, selecting several (grey, not yet in the crate) subfolders
+  and choosing Add to hasPart from the context menu takes a while, with
+  no progress. Time it (as the paste of 2000 entities was), make it one
+  pass, and show progress for many (a job, see `Jobs`) or at least the
+  busy pointer.
 - **Copying files in asks for the folder with the system's folder
   chooser**: Insert > Files from outside the crate's folder opens a
   second, similar-looking dialog, the platform's folder chooser, to
@@ -151,6 +162,12 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   and the About box need), inspired by the RO-Crate logo and the OS/2
   logo: for the window, the app image's launchers (jpackage) and the
   README.
+- **File > Save as Attached Crate…**: choose a folder (empty or new;
+  otherwise a warning, as it would mix with what is there), write the
+  crate there as `ro-crate-metadata.json` (now the name has to be typed
+  in Save As to attach it), and offer to copy the crate's files there
+  too, if they are in another folder (in the background, as copying files
+  in is), so that the crate becomes attached to that folder.
 - **File > Recent**: the last 6 crates opened or saved, kept in the
   settings. A preference turns it off (and forgets the list), as the
   names and places of crates can be private.
