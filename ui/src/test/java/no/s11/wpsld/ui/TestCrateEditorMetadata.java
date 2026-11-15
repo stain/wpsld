@@ -465,8 +465,10 @@ public class TestCrateEditorMetadata extends UiTest {
 		assertFalse(lookup("#jobsStrip").query().isVisible());
 		Task<Map<String, FileMetadata.Reading>> job = WaitForAsyncUtils
 				.asyncFx(() -> app.inBackground(stage, "Reading slowly", slowJob())).get();
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#jobsStrip").query().isVisible()
-				&& lookup("#jobsLatest").queryLabeled().getText().equals("Reading slowly: 0 of 1000 files read"));
+		// Looked up on the JavaFX thread, as the scene changes meanwhile
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils.asyncFx(
+				() -> lookup("#jobsStrip").query().isVisible() && lookup("#jobsLatest").queryLabeled().getText()
+						.equals("Reading slowly: 0 of 1000 files read")).get());
 		// Shown by itself after a moment, as the user asked for it
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#jobsHide").tryQuery().isPresent());
 		// Pressed rather than clicked, as a window just shown may not be on screen yet

@@ -254,7 +254,9 @@ public class TestCrateEditorPeople extends UiTest {
 				() -> lookup("#mergeKeep").tryQuery().isPresent());
 		assertEquals("https://orcid.org/0000-0002-1825-0097",
 				((Entity) lookup("#mergeKeep").queryAs(javafx.scene.control.ChoiceBox.class).getValue()).getId());
-		clickOn("Merge");
+		// The dialog's button, pressed: "Merge" is in its title too
+		interact(() -> lookup(".dialog-pane .button").queryAllAs(javafx.scene.control.Button.class).stream()
+				.filter(b -> b.getText().equals("Merge")).findFirst().orElseThrow().fire());
 		WaitForAsyncUtils.waitForFxEvents();
 		assertTrue(entity("#j").isEmpty());
 		Entity merged = entity("https://orcid.org/0000-0002-1825-0097").orElseThrow();
