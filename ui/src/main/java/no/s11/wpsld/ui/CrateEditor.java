@@ -523,20 +523,33 @@ public class CrateEditor extends Application {
 			}
 		});
 		entities.getSelectionModel().selectedItemProperty().addListener((obs, old, entity) -> {
-			// A file not in the crate is selected, but the form stays
-			if (entity != null && !relisting && !selectingSeveral && !isNotInCrate(entity)) {
+			if (entity == null || relisting || selectingSeveral) {
+				return;
+			}
+			if (isNotInCrate(entity)) {
+				// A file not in the crate: what to do with it, rather than a form
+				notInCrate(CrateFolder.decode(entity.getId()), false);
+			} else {
 				entityEditor.edit(entity);
 				entityPreview.show(entity);
 			}
 		});
-		// A folder without an entity is selected, but the form stays
+		// A folder of entities (e.g. of a type) is selected, but the form stays
 		tree.getSelectionModel().selectedItemProperty().addListener((obs, old, item) -> {
-			if (item != null && !relisting && !selectingSeveral) {
+			if (item == null || relisting || selectingSeveral) {
+				return;
+			}
+			EntityTree.Node node = item.getValue();
+			if (node.entity().isPresent()) {
 				// Not again for another place of the entity edited
-				item.getValue().entity().filter(entity -> entity != entityEditor.getEntity()).ifPresent(entity -> {
+				node.entity().filter(entity -> entity != entityEditor.getEntity()).ifPresent(entity -> {
 					entityEditor.edit(entity);
 					entityPreview.show(entity);
 				});
+			} else if (EntityTree.fileId(node).isPresent()) {
+				notInCrate(node.name(), false);
+			} else if (node.kind() == EntityTree.Kind.FOLDER) {
+				notInCrate(node.name(), true);
 			}
 		});
 		// Several to copy or remove; the last selected is edited
@@ -1066,6 +1079,25 @@ public class CrateEditor extends Application {
 			}
 		});
 		return Optional.of(inBackground(stage, "Reading what “" + entity.getLabel() + "” says about itself", task));
+	}
+
+	/**
+	 * A file or folder in the crate's folder but not in the crate is
+	 * selected: no form nor preview, but what it is and the actions adding
+	 * it (as on the right-click menu), acting on the selection
+	 */
+	private void notInCrate(String name, boolean folder) {
+		Button add = new Button(folder ? "Add Dataset for Folder" : "Add File(s) to Has Part");
+		add.setId("addNotInCrate");
+		add.setOnAction(e -> {
+			if (folder) {
+				addDatasets();
+			} else {
+				addParts();
+			}
+		});
+		entityEditor.editNone("“" + name + "” is in the crate's folder, but not in the crate.", add);
+		entityPreview.show(null);
 	}
 
 	/**

@@ -163,6 +163,15 @@ class EntityTreeView extends TreeView<Node> {
 		});
 	}
 
+	/** Whether a row is shown now, not to scroll to it (e.g. after adding what was right-clicked) */
+	private boolean visible(int row) {
+		if (lookup(".virtual-flow") instanceof javafx.scene.control.skin.VirtualFlow<?> flow
+				&& flow.getFirstVisibleCell() != null && flow.getLastVisibleCell() != null) {
+			return row > flow.getFirstVisibleCell().getIndex() && row < flow.getLastVisibleCell().getIndex();
+		}
+		return false;
+	}
+
 	/**
 	 * Open the folders selected (all the top ones if none are), and with
 	 * all, every folder within them too (Expand All, *)
@@ -366,7 +375,7 @@ class EntityTreeView extends TreeView<Node> {
 			selectingAlso = false;
 		}
 		int last = getSelectionModel().getSelectedIndex();
-		if (last >= 0) {
+		if (last >= 0 && !visible(last)) {
 			scrollTo(Math.max(0, last - 3));
 		}
 		return all;

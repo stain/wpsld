@@ -656,10 +656,24 @@ Styles:
          Replace, Keep Both or Skip for names taken), with their `@id`s
          following the folder chosen; and Datasets with their folders.
      - Enabled whenever Paste is, in the entity list.
-  3. **Merge Entities**: select two or more entities in the list and merge
-     them with the dialogue of renaming to an existing `@id` (`Crate.merge`,
-     one undo step), choosing which `@id` stays. For duplicates found
-     later, e.g. a pasted person who was already there under another `@id`.
+  3. **Merge Entities** (Edit > Merge… and the right-click menu): select
+     two or more entities in the list or a tree and merge them with the
+     dialogue of renaming to an existing `@id` (`Crate.merge`, one undo
+     step), choosing which `@id` stays. For duplicates found later, e.g. a
+     pasted person who was already there under another `@id`. Two of
+     different types may be merged (their types combined); not offered
+     for more than two whose types differ, as one of them is likely
+     selected by accident.
+  3b. **Pasting into a type's folder** (Entities by Folder or by Part):
+     pasting one entity with an absolute `@id` (e.g. `https://…`) copied
+     from this crate onto a type's folder, e.g. Person, adds that type to
+     it, rather than pasting a copy; several only if they all have that
+     type as an explicit shared type already (else it is likely a
+     mistake). After Cut rather than Copy, the type of the folder it was
+     cut from is replaced by this one: a change of type rather than an
+     added one. Consider whether this belongs in Paste Special instead,
+     and what to do for `#` and `_:` entities, which a plain paste copies
+     with new identifiers.
   4. **Context merging.** When the pasted document's `@context` differs
      from the crate's (another RO-Crate version, e.g. Bioschemas IRIs of
      1.2 against 1.3, or extra terms such as `ldac:` or a custom `@vocab`),

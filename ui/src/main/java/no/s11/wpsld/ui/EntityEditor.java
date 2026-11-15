@@ -266,17 +266,21 @@ public class EntityEditor extends ScrollPane {
 	 * while several just added are selected, so that a form isn't made for
 	 * each
 	 *
-	 * @param why What to say instead, e.g. "No entity selected"
+	 * @param why     What to say instead, e.g. "No entity selected"
+	 * @param actions What can be done, e.g. a button adding the file
+	 *                selected to the crate
 	 */
-	public void editNone(String why) {
+	public void editNone(String why, javafx.scene.Node... actions) {
 		entity = null;
 		propertyQuery = "";
 		Label none = new Label(why);
 		none.setId("noEntity");
 		none.setWrapText(true);
 		none.getStyleClass().add("dim-text");
-		none.setPadding(new Insets(12));
-		form.getChildren().setAll(none);
+		VBox box = new VBox(8, none);
+		box.getChildren().addAll(actions);
+		box.setPadding(new Insets(12));
+		form.getChildren().setAll(box);
 	}
 
 	/**

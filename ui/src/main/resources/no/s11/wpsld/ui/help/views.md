@@ -43,8 +43,9 @@ selected, or with **Expand All** and **Collapse All** every folder within
 them too; with nothing selected, the top folders. The keys do the same:
 **+**, **-**, **\*** and **/**.
 
-To bring a greyed out folder or file into the crate, select it (or
-several) and choose **Crate > Add Dataset for Folder** or **Add File(s)
+Selecting a greyed out folder or file shows no form, but what it is and a
+button to add it. To bring a greyed out folder or file into the crate,
+select it (or several) and choose **Crate > Add Dataset for Folder** or **Add File(s)
 to Has Part**, also on the right-click menu. A folder gets a Dataset, and a file
 becomes a part, of the Dataset of the folder above it, or of the crate
 itself if that folder has none; select the outer folders too to add them
