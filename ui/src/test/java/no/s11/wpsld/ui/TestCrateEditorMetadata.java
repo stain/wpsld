@@ -247,4 +247,104 @@ public class TestCrateEditorMetadata extends UiTest {
 		assertTrue(lookup("Nothing to update").tryQuery().isPresent());
 		clickDialogButton("OK");
 	}
+
+	/** An empty crate in a folder of its own, with photos in it not yet described, opened */
+	private Path crateWithPhotos(Stage stage, String... photos) throws Exception {
+		Path dir = Files.createTempDirectory("crate");
+		for (String photo : photos) {
+			try (var in = getClass().getResourceAsStream("/no/s11/wpsld/lookup/photo.jpg")) {
+				Files.copy(in, dir.resolve(photo));
+			}
+		}
+		Files.writeString(dir.resolve("ro-crate-metadata.json"), """
+				{"@context": "https://w3id.org/ro/crate/1.3/context",
+				 "@graph": [
+				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.3"}},
+				  {"@id": "./", "@type": "Dataset", "name": "A crate"}]}""");
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir)).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		return dir;
+	}
+
+	/**
+	 * A file inserted is read in the background, and a notice offers what
+	 * it says, to review in the dialog
+	 */
+	@Test
+	public void fileAddedOffered() throws Exception {
+		entities();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		Path dir = crateWithPhotos(stage, "photo.jpg");
+		interact(() -> app.insertFiles(stage, List.of(dir.resolve("photo.jpg"))));
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> app.notice().isPresent());
+		WaitForAsyncUtils.waitForFxEvents();
+		String notice = app.notice().orElseThrow();
+		assertTrue(notice, notice.startsWith("“photo.jpg” has its own description, author"));
+		assertTrue(notice, notice.contains("licence"));
+		// Not where it was taken, nor the camera
+		assertFalse(notice, notice.contains("contentLocation") || notice.contains("exifData"));
+		clickOn("#noticeAction");
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#fileMetadata").tryQuery().isPresent());
+		clickDialogButton("OK");
+		Entity photo = listed("photo.jpg").orElseThrow();
+		assertEquals("Bus stop on Oxford Road", photo.get("description").orElseThrow().asText());
+		assertTrue(app.notice().isEmpty());
+	}
+
+	/** Several files added that say something: filled in where their entities have nothing, at once */
+	@Test
+	public void filesAddedFilledIn() throws Exception {
+		entities();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		Path dir = crateWithPhotos(stage, "one.jpg", "two.jpg");
+		interact(() -> app.insertFiles(stage, List.of(dir.resolve("one.jpg"), dir.resolve("two.jpg"))));
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> app.notice().isPresent());
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(app.notice().orElseThrow(), app.notice().orElseThrow().startsWith("2 of the files added have"));
+		clickOn("#noticeAction");
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup("2 files updated").tryQuery().isPresent());
+		clickDialogButton("OK");
+		for (String id : List.of("one.jpg", "two.jpg")) {
+			Entity photo = listed(id).orElseThrow();
+			assertEquals(id, "Bus stop on Oxford Road", photo.get("description").orElseThrow().asText());
+			assertTrue(id, photo.get("contentLocation").isEmpty());
+		}
+	}
+
+	/** More files than are read at once: offered, not read, and read with progress if asked */
+	@Test
+	public void manyFilesAddedOffered() throws Exception {
+		entities();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		String[] photos = java.util.stream.IntStream.rangeClosed(1, CrateEditor.READ_AT_ONCE + 1)
+				.mapToObj(i -> "photo" + i + ".jpg").toArray(String[]::new);
+		Path dir = crateWithPhotos(stage, photos);
+		interact(() -> app.insertFiles(stage, java.util.Arrays.stream(photos).map(dir::resolve).toList()));
+		assertEquals(Optional.of("Added " + photos.length + " files. Files can say who made them, when and under which"
+				+ " licence."), app.notice());
+		clickOn("#noticeAction");
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS,
+				() -> lookup(photos.length + " files updated").tryQuery().isPresent());
+		clickDialogButton("OK");
+		assertEquals("Bus stop on Oxford Road", listed("photo1.jpg").orElseThrow().get("description").orElseThrow()
+				.asText());
+	}
+
+	/** A file added that says nothing its entity lacks: no notice */
+	@Test
+	public void fileAddedSayingNothing() throws Exception {
+		entities();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		Path dir = crateWithPhotos(stage);
+		Files.writeString(dir.resolve("notes.txt"), "Nothing to say");
+		interact(() -> app.insertFiles(stage, List.of(dir.resolve("notes.txt"))));
+		Entity notes = listed("notes.txt").orElseThrow();
+		Task<?> task = WaitForAsyncUtils.asyncFx(() -> app.offerWhatFilesSay(stage, List.of(notes))).get()
+				.orElseThrow();
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, task::isDone);
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals(Optional.empty(), app.notice());
+	}
 }

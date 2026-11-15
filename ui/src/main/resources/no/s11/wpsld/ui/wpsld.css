@@ -27,6 +27,12 @@
     -fx-text-fill: -wpsld-error-text;
 }
 
+/* At the foot of the window, e.g. that files added say something about themselves */
+.notice {
+    -fx-background-color: -fx-box-border, derive(-fx-base, 4%);
+    -fx-background-insets: 0, 1 0 0 0;
+}
+
 /*
  * Buttons for small actions (EntityEditor.iconButton): their text, e.g.
  * "×", unless a style shows their icon instead

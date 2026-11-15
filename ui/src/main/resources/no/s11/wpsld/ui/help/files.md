@@ -95,6 +95,15 @@ photo was taken a new Place with its point on the map. **Edit > Undo**
 takes it all back at once. To fill in many files at once, where they have
 no value yet, use **Crate > Update File Details...**.
 
+When you add files (**Insert > Files...**, or adding files of the crate's
+folder as parts), up to five of them are read in the background while you
+work. If they say something their entities lack, a notice at the foot of
+the window offers it: **Review...** opens the dialog above for one file,
+and **Fill in** gives several files what they say where they have no
+value yet (not where or the camera), as one **Undo**. More files, or very
+large ones, are not read at once: the notice offers **Read what they
+say...** instead.
+
 Files are read in the background; a large one shows its progress, with
 **Cancel**. A file that is damaged, or that a reader takes too long over
 (20 seconds), says what could be read, and which reader failed.

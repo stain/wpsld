@@ -154,13 +154,14 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   for a movie's sample description's entry count, running out of memory
   on a damaged one; `MovieBoxes` refuses such movies first (to report
   upstream). MP4's own location (`©xyz`) is not read by
-  metadata-extractor. Still to do: offering it when adding files (Insert >
-  Files, dropping files in), never blocking the window: for one or a few
-  files (up to about 5), read in the background and, if they say
-  anything new, a non-modal notice ("photo.jpg says who made it, when and
-  its licence: Review…") opening the dialog; for many (10 or more) or
-  large ones, not read at once but offered ("Added 37 files. Read what
-  they say…"), as Crate > Update File Details does: one background job
+  metadata-extractor. Offering it when adding files (*done*, for Insert >
+  Files and adding files of the folder as parts; dropping files in is
+  not there yet): up to 5 files (200 MB together) read in the
+  background, and if they say what their entities lack, a notice at the
+  foot of the window ("“photo.jpg” has its own description, author…":
+  Review…, or for several Fill in, as one undo); more or larger ones not
+  read but offered ("Added 37 files… Read what they say…"), as Crate >
+  Update File Details does: one background job
   with progress and Cancel (as copying files has), two files at a time
   each with its time limit, filling in only what entities lack (never
   where or the camera), a summary with the files that failed or took too
