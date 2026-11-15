@@ -42,6 +42,7 @@ import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -1515,7 +1516,7 @@ public class EntityEditor extends ScrollPane {
 		text.setPromptText("Text");
 		Runnable show = () -> {
 			List<JsonNode> values = entity.getAll(field.name());
-			boolean editable = values.isEmpty() || values.get(0).isTextual();
+			boolean editable = values.isEmpty() || values.get(0).isTextual() || isLiteral(values.get(0));
 			String current = values.isEmpty() ? "" : text(values.get(0));
 			if (!text.getText().equals(current)) {
 				text.setText(current);
@@ -1536,7 +1537,9 @@ public class EntityEditor extends ScrollPane {
 				updated.remove(0);
 			}
 			if (!typed.isBlank()) {
-				updated.add(0, JsonNodeFactory.instance.textNode(typed));
+				// Text in a language stays in it
+				updated.add(0, !values.isEmpty() && isLiteral(values.get(0)) ? edited(values.get(0), typed)
+						: JsonNodeFactory.instance.textNode(typed));
 			}
 			entity.setAll(field.name(), updated);
 			reloadOthers(field.name(), text);
@@ -1605,8 +1608,23 @@ public class EntityEditor extends ScrollPane {
 		private final List<JsonNode> hidden = new ArrayList<>();
 		private final Button showMore = new Button();
 
-		/** A value row: its control and how to get the text typed in it */
-		private record Row(HBox node, Supplier<String> text) {
+		/**
+		 * A value row: its control, how to get the text typed in it, and the
+		 * value it shows, if any, kept as it is while its text is (e.g. one
+		 * of a language, or an object the form has no field for)
+		 */
+		private record Row(HBox node, Supplier<String> text, JsonNode original) {
+			/** The value as typed: the one shown if unchanged, a literal keeping its language or datatype */
+			Optional<JsonNode> value(FormField field) {
+				String typed = text.get();
+				if (original != null && typed.equals(EntityEditor.text(original))) {
+					return Optional.of(original);
+				}
+				if (original != null && isLiteral(original) && !typed.isBlank()) {
+					return Optional.of(edited(original, typed));
+				}
+				return EntityEditor.value(field, typed);
+			}
 		}
 
 		FieldEditor(FormField field) {
@@ -1700,7 +1718,7 @@ public class EntityEditor extends ScrollPane {
 			if (values.isEmpty()) {
 				addRow("");
 			} else {
-				values.stream().limit(ROWS).forEach(v -> addRow(text(v)));
+				values.stream().limit(ROWS).forEach(this::addRow);
 				hidden.addAll(values.subList(Math.min(ROWS, values.size()), values.size()));
 			}
 			showMoreButton();
@@ -1710,7 +1728,7 @@ public class EntityEditor extends ScrollPane {
 		private void showMore() {
 			List<JsonNode> next = List.copyOf(hidden.subList(0, Math.min(MORE, hidden.size())));
 			hidden.subList(0, next.size()).clear();
-			next.forEach(v -> addRow(text(v)));
+			next.forEach(this::addRow);
 			showMoreButton();
 		}
 
@@ -1788,10 +1806,20 @@ public class EntityEditor extends ScrollPane {
 			addRow(current, rows.size());
 		}
 
-		/**
-		 * Add a row for a value at this position among the rows.
-		 */
+		/** A row showing a value of the entity's */
+		private void addRow(JsonNode value) {
+			addRow(text(value), rows.size(), value);
+		}
+
 		private void addRow(String current, int position) {
+			addRow(current, position, null);
+		}
+
+		/**
+		 * Add a row for a value at this position among the rows: the text
+		 * shown, and the value it shows, if any.
+		 */
+		private void addRow(String current, int position, JsonNode original) {
 			String rangeNames = field.range().stream().map(terms::name).collect(Collectors.joining(" or "));
 			Control control;
 			Supplier<String> text;
@@ -1848,8 +1876,9 @@ public class EntityEditor extends ScrollPane {
 				open.setOnAction(e -> crateEntity(combo.getEditor().getText().strip()).ifPresent(show));
 				rowNode.getChildren().add(1, open);
 			}
+			literalTag(original).ifPresent(tag -> rowNode.getChildren().add(1, tag));
 			rowNode.setAlignment(Pos.CENTER_LEFT);
-			Row row = new Row(rowNode, text);
+			Row row = new Row(rowNode, text, original);
 			remove.setOnAction(e -> {
 				rows.remove(row);
 				rowsBox.getChildren().remove(rowNode);
@@ -2033,7 +2062,7 @@ public class EntityEditor extends ScrollPane {
 		 * Set all the field's values on the entity, skipping empty rows.
 		 */
 		private void update() {
-			List<JsonNode> values = new ArrayList<>(rows.stream().map(r -> value(field, r.text().get()))
+			List<JsonNode> values = new ArrayList<>(rows.stream().map(r -> r.value(field))
 					.flatMap(Optional::stream).toList());
 			values.addAll(hidden);
 			entity.setAll(field.name(), values);
@@ -2050,10 +2079,43 @@ public class EntityEditor extends ScrollPane {
 		if (value.isValueNode()) {
 			return value.asText();
 		}
+		if (isLiteral(value)) {
+			return value.get("@value").asText();
+		}
 		if (value.isObject() && value.size() == 1 && value.has("@id")) {
 			return value.get("@id").asText();
 		}
 		return value.toString();
+	}
+
+	/**
+	 * Whether a value is a JSON-LD literal object, e.g. text in a language,
+	 * <code>{"@value": "Hei", "@language": "no"}</code>, or of a datatype
+	 */
+	static boolean isLiteral(JsonNode value) {
+		return value.isObject() && value.path("@value").isValueNode() && !value.path("@value").isNull();
+	}
+
+	/** A literal with the text typed, keeping its language or datatype */
+	static JsonNode edited(JsonNode literal, String typed) {
+		return ((ObjectNode) literal.deepCopy()).put("@value", typed);
+	}
+
+	/**
+	 * Beside a literal of a language or datatype, which it keeps when its
+	 * text is edited: e.g. "no", or "xsd:date"
+	 */
+	private static Optional<Label> literalTag(JsonNode value) {
+		if (value == null || !isLiteral(value) || !(value.has("@language") || value.has("@type"))) {
+			return Optional.empty();
+		}
+		String language = value.path("@language").asText("");
+		String type = value.path("@type").asText("");
+		Label tag = new Label(!language.isEmpty() ? language : type.replaceFirst("^.*[#/]", ""));
+		tag.getStyleClass().add("dim-text");
+		tag.setTooltip(new Tooltip(!language.isEmpty() ? "In the language " + language + ", kept when edited"
+				: "Of the datatype " + type + ", kept when edited"));
+		return Optional.of(tag);
 	}
 
 	/**

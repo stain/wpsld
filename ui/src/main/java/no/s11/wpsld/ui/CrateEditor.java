@@ -4096,6 +4096,9 @@ public class CrateEditor extends Application {
 		if (!applied.merged().isEmpty()) {
 			said.add("merged some written in it into " + names(applied.merged()) + ", of the same @id");
 		}
+		if (!applied.linked().isEmpty()) {
+			said.add("linked " + names(applied.linked()) + " to it, as written with @reverse");
+		}
 		if (!said.isEmpty()) {
 			showNotice("Applied, and " + String.join("; ", said) + ". Edit > Undo undoes it all.", null, null);
 		}

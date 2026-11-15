@@ -27,6 +27,7 @@ import org.junit.Test;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -450,6 +451,45 @@ public class TestEntityEditor extends UiTest {
 		clickOn("#propertySearch").write("abstract");
 		assertTrue(visibleProperties().contains("abstract"));
 		assertFalse(visibleProperties().contains("isBasedOn"));
+	}
+
+	/**
+	 * Text in a language (or of a datatype) shows its text, with the
+	 * language beside it, kept when edited, and when another value of the
+	 * property is: it used to be saved as its JSON, as text
+	 */
+	@Test
+	public void literalsKeptWhenEdited() {
+		ObjectNode norwegian = JSON.objectNode().put("@value", "Et datasett").put("@language", "no");
+		ObjectNode dated = JSON.objectNode().put("@value", "2026").put("@type", "http://www.w3.org/2001/XMLSchema#gYear");
+		interact(() -> {
+			crate.getRoot().setAll("alternateName", List.of(norwegian, JSON.textNode("A dataset")));
+			crate.getRoot().set("name", Optional.of(JSON.objectNode().put("@value", "Navn").put("@language", "no")));
+			crate.getRoot().set("temporalCoverage", Optional.of(dated));
+		});
+		edit(crate.getRoot());
+		clickOn("#propertySearch").write("alternate");
+		assertEquals("Et datasett", value("alternateName", 0).getText());
+		assertTrue(lookup(".label").queryAllAs(Label.class).stream().anyMatch(l -> l.getText().equals("no")));
+		// Another value edited: this one kept as it is
+		interact(() -> value("alternateName", 1).setText("A data set"));
+		assertEquals(List.of(norwegian, JSON.textNode("A data set")), crate.getRoot().getAll("alternateName"));
+		// Edited: still in Norwegian
+		interact(() -> value("alternateName", 0).setText("Eit datasett"));
+		assertEquals(JSON.objectNode().put("@value", "Eit datasett").put("@language", "no"),
+				crate.getRoot().getAll("alternateName").get(0));
+		// The header's name too
+		TextField name = lookup("#header-name").queryAs(TextField.class);
+		assertTrue(name.isEditable());
+		assertEquals("Navn", name.getText());
+		interact(() -> name.setText("Namn"));
+		assertEquals(Optional.of(JSON.objectNode().put("@value", "Namn").put("@language", "no")),
+				crate.getRoot().get("name"));
+		// Of a datatype, kept
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("temporalCoverage"));
+		assertEquals("2026", value("temporalCoverage", 0).getText());
+		interact(() -> value("temporalCoverage", 0).setText("2025"));
+		assertEquals(Optional.of(dated.deepCopy().put("@value", "2025")), crate.getRoot().get("temporalCoverage"));
 	}
 
 	@Test

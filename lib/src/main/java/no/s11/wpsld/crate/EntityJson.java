@@ -39,7 +39,8 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
  * are flattened as opening a crate does: referred to by their
  * <code>@id</code>, and added as entities of their own, or merged into the
  * crate's of that <code>@id</code>; those without one are added with a new
- * one. The text is untrusted: what doesn't fit is refused, saying why,
+ * one. Links written with <code>@reverse</code> are made links of the
+ * entities they come from, as flattening does. The text is untrusted: what doesn't fit is refused, saying why,
  * rather than guessed at.
  */
 public final class EntityJson {
@@ -65,7 +66,15 @@ public final class EntityJson {
 	 * @param nested The entities written in its values (and in theirs), in
 	 *               the order written
 	 */
-	public record Parsed(String id, List<String> types, Map<String, JsonNode> values, List<Nested> nested) {
+	public record Parsed(String id, List<String> types, Map<String, JsonNode> values, List<Nested> nested,
+			List<Reverse> reverse) {
+	}
+
+	/**
+	 * A link written with <code>@reverse</code>: from the entity of the
+	 * <code>@id</code> from, by the property, to the one it was written in
+	 */
+	public record Reverse(String from, String property, String to) {
 	}
 
 	/**
@@ -115,8 +124,9 @@ public final class EntityJson {
 					"Needs one or more @type, as text, e.g. \"@type\": \"Person\" or \"@type\": [\"File\", \"Dataset\"]");
 		}
 		List<Nested> nested = new ArrayList<>();
-		Map<String, JsonNode> values = values(json, nested, 0);
-		return new Parsed(id.asText(), types, values, List.copyOf(nested));
+		List<Reverse> reverse = new ArrayList<>();
+		Map<String, JsonNode> values = values(json, id.asText(), nested, reverse, 0);
+		return new Parsed(id.asText(), types, values, List.copyOf(nested), List.copyOf(reverse));
 	}
 
 	/** An object's @type, as text, if any */
@@ -134,12 +144,33 @@ public final class EntityJson {
 		return List.copyOf(types);
 	}
 
-	/** An object's properties other than @id and @type, entities in them flattened into nested */
-	private static Map<String, JsonNode> values(JsonNode object, List<Nested> nested, int depth) {
+	/**
+	 * An object's properties other than @id and @type, entities in them
+	 * flattened into nested, and links written with @reverse into reverse
+	 */
+	private static Map<String, JsonNode> values(JsonNode object, String id, List<Nested> nested,
+			List<Reverse> reverse, int depth) {
 		Map<String, JsonNode> values = new LinkedHashMap<>();
 		for (Map.Entry<String, JsonNode> property : object.properties()) {
 			String name = property.getKey();
 			if (name.equals("@id") || name.equals("@type")) {
+				continue;
+			}
+			if (name.equals("@reverse") && property.getValue().isObject()) {
+				for (Map.Entry<String, JsonNode> link : property.getValue().properties()) {
+					if (link.getKey().startsWith("@") || link.getKey().isBlank()) {
+						throw new IllegalArgumentException("@reverse has " + link.getKey() + ", not a property");
+					}
+					JsonNode from = link.getValue();
+					for (JsonNode each : from.isArray() ? from : List.of(from)) {
+						JsonNode ref = value("@reverse " + link.getKey(), each, nested, reverse, depth);
+						if (!ref.isObject() || !ref.has("@id")) {
+							throw new IllegalArgumentException("@reverse " + link.getKey()
+									+ " should link from entities, {\"@id\": \"…\"}");
+						}
+						reverse.add(new Reverse(ref.get("@id").asText(), link.getKey(), id));
+					}
+				}
 				continue;
 			}
 			if (name.startsWith("@") || name.isBlank()) {
@@ -148,10 +179,10 @@ public final class EntityJson {
 			JsonNode value = property.getValue();
 			if (value.isArray()) {
 				ArrayNode flat = JsonNodeFactory.instance.arrayNode();
-				value.forEach(each -> flat.add(value(name, each, nested, depth)));
+				value.forEach(each -> flat.add(value(name, each, nested, reverse, depth)));
 				values.put(name, flat);
 			} else {
-				values.put(name, value(name, value, nested, depth));
+				values.put(name, value(name, value, nested, reverse, depth));
 			}
 		}
 		return values;
@@ -161,7 +192,8 @@ public final class EntityJson {
 	 * A value: text, a number or true/false, a reference, a literal of a
 	 * language or datatype, or an entity, as a reference to it
 	 */
-	private static JsonNode value(String property, JsonNode value, List<Nested> nested, int depth) {
+	private static JsonNode value(String property, JsonNode value, List<Nested> nested, List<Reverse> reverse,
+			int depth) {
 		if (value.isNull()) {
 			throw new IllegalArgumentException(property + " has null: leave the property out instead");
 		}
@@ -197,7 +229,7 @@ public final class EntityJson {
 		// Its place kept, as entities written in it come after it
 		int at = nested.size();
 		nested.add(null);
-		nested.set(at, new Nested(nestedId, types, values(value, nested, depth + 1)));
+		nested.set(at, new Nested(nestedId, types, values(value, nestedId, nested, reverse, depth + 1)));
 		return JsonNodeFactory.instance.objectNode().put("@id", nestedId);
 	}
 
@@ -213,8 +245,10 @@ public final class EntityJson {
 	 * @param added  Entities written in it, added to the crate
 	 * @param merged Entities of the crate that some written in it were
 	 *               merged into
+	 * @param linked Entities of the crate linked to it by links written
+	 *               with <code>@reverse</code>
 	 */
-	public record Applied(List<Entity> added, List<Entity> merged) {
+	public record Applied(List<Entity> added, List<Entity> merged, List<Entity> linked) {
 	}
 
 	/**
@@ -268,7 +302,27 @@ public final class EntityJson {
 				added.add(add);
 			}
 		}
-		return new Applied(List.copyOf(added), List.copyOf(merged));
+		Set<Entity> linked = new LinkedHashSet<>();
+		for (Reverse link : parsed.reverse()) {
+			String fromId = given.getOrDefault(link.from(), link.from());
+			// To the entity edited by its @id now, renamed after with its references
+			String toId = link.to().equals(parsed.id()) ? entity.getId() : given.getOrDefault(link.to(), link.to());
+			Entity from = crate.get(fromId).orElseGet(() -> {
+				Entity thing = crate.add("Thing", fromId);
+				added.add(thing);
+				return thing;
+			});
+			JsonNode to = JsonNodeFactory.instance.objectNode().put("@id", toId);
+			List<JsonNode> values = new ArrayList<>(from.getAll(link.property()));
+			if (!values.contains(to)) {
+				values.add(to);
+				from.setAll(link.property(), values);
+			}
+			if (!added.contains(from) && from != entity) {
+				linked.add(from);
+			}
+		}
+		return new Applied(List.copyOf(added), List.copyOf(merged), List.copyOf(linked));
 	}
 
 	/** A property's values, references to stand-ins to the @ids given */

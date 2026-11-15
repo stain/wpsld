@@ -78,6 +78,19 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   (the root's parts were shown twice). Now about 19 ms a letter with the
   preview, 40 to 50 ms with JSON-LD, and 3 ms of every 600 idle (was 80
   to 190).
+- **Text in a language saved as its JSON** (*done*): a value such as
+  `{"@value": "Hei", "@language": "no"}` showed in its field as that JSON,
+  and typing in any field of the property saved it back as text,
+  `"{\"@value\": …}"`. Now the field shows its text with the language
+  (or datatype) beside it, kept when edited, and values not edited are
+  kept as they are, whatever they are; the preview shows "Hei (no)".
+- **`@reverse` dropped on opening** (*done*): links written with
+  `@reverse` (allowed in JSON-LD, not in flattened RO-Crate JSON-LD) were
+  ignored with a warning, so lost on saving; now made links of the
+  entities they come from, as JSON-LD flattening does, with a warning.
+  Likewise in the JSON-LD tab. The RO-Crate specification (1.2, 1.3) says
+  nothing of `@reverse`, `@language` or typed values, only that its
+  JSON-LD is flattened, with references as `{"@id": …}` alone.
 - **Adding several entities edited each in turn** (*done*): adding files
   or pasting entities selected them one by one, so that the form and
   preview were made for each (thousands in a large crate); now they are

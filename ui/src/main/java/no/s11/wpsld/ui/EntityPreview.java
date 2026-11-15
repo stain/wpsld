@@ -384,6 +384,18 @@ public class EntityPreview extends ScrollPane {
 				return to.get().equals(text) ? webLink(text) : fileLink(text, to.get());
 			}
 		}
+		if (EntityEditor.isLiteral(value)) {
+			// Text in a language, or of a datatype, saying which
+			String language = value.path("@language").asText("");
+			String type = value.path("@type").asText("");
+			Label text = new Label(value.get("@value").asText() + (!language.isEmpty() ? " (" + language + ")"
+					: !type.isEmpty() ? " (" + type.replaceFirst("^.*[#/]", "") + ")" : ""));
+			text.setWrapText(true);
+			if (!type.isEmpty()) {
+				text.setTooltip(new Tooltip(type));
+			}
+			return text;
+		}
 		Label text = new Label(value.isValueNode() ? value.asText() : value.toString());
 		text.setWrapText(true);
 		return text;

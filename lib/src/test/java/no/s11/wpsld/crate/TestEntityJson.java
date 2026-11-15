@@ -24,6 +24,7 @@ import java.util.Optional;
 
 import org.junit.Test;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.TextNode;
 
@@ -62,13 +63,17 @@ public class TestEntityJson {
 		assertTrue(refused("{\"@id\": \"#a\"}").startsWith("Needs one or more @type"));
 		assertTrue(refused("{\"@id\": \"#a\", \"@type\": []}").startsWith("Needs one or more @type"));
 		assertTrue(refused("{\"@id\": \"#a\", \"@type\": [1]}").contains("@type should be text"));
-		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"@reverse\": {}}").contains("@reverse"));
+		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"@reverse\": {\"isPartOf\": \"x\"}}")
+				.contains("should link from entities"));
+		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"@reverse\": {\"@id\": \"x\"}}")
+				.contains("not a property"));
+		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"@reverse\": \"x\"}").contains("@reverse"));
 		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"name\": null}").contains("null"));
 		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"name\": [[\"x\"]]}").contains("array in an array"));
 		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"author\": {}}").contains("empty object"));
 		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"author\": {\"@id\": 3}}").contains("isn't text"));
-		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"author\": {\"name\": {\"@reverse\": {}}}}")
-				.contains("@reverse"));
+		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"author\": {\"name\": {\"@list\": []}}}")
+				.contains("@list"));
 		assertTrue(refused("{\"@id\": \"#a\", \"@type\": \"Thing\", \"d\": {\"@value\": \"x\", \"name\": \"y\"}}")
 				.contains("more than @language or @type"));
 		// Written ever deeper in each other
@@ -115,6 +120,28 @@ public class TestEntityJson {
 		assertEquals(List.of("folders/a/", "folders/b/", "data.csv"),
 				entity.getAll("hasPart").stream().map(v -> v.get("@id").asText()).toList());
 		assertTrue(crate.get("data.csv").isEmpty());
+	}
+
+	/** Links written with @reverse made links of the entities they come from */
+	@Test
+	public void reverseLinked() {
+		Crate crate = new Crate();
+		Entity data = crate.add("Dataset", "data/");
+		Entity a = crate.add("File", "data/a.csv");
+		EntityJson.Applied applied = EntityJson.apply(EntityJson.parse("""
+				{"@id": "data/", "@type": "Dataset",
+				 "@reverse": {"isPartOf": [{"@id": "data/a.csv"},
+				                           {"@id": "data/b.csv", "@type": "File", "name": "B"},
+				                           {"@id": "data/c.csv"}]}}"""), data, crate);
+		JsonNode toData = JsonNodeFactory.instance.objectNode().put("@id", "data/");
+		assertEquals(Optional.of(toData), a.get("isPartOf"));
+		Entity b = crate.get("data/b.csv").orElseThrow();
+		assertEquals(Optional.of(toData), b.get("isPartOf"));
+		Entity c = crate.get("data/c.csv").orElseThrow();
+		assertEquals(List.of("Thing"), c.getTypes());
+		assertEquals(List.of(b, c), applied.added());
+		assertEquals(List.of(a), applied.linked());
+		assertTrue(data.get("@reverse").isEmpty());
 	}
 
 	@Test

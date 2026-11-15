@@ -13,7 +13,10 @@ the entity uses any of them, showing only those; **Show all** below them
 lists the rest.
 In the OS/2 Warp notebook, browse the type tabs and their pages instead.
 Enter a value in the field. Use **+** to add another value and **×** or
-**−** to remove a value, where available.
+**−** to remove a value, where available. Text in a language, as some
+crates have (JSON-LD's `{"@value": "...", "@language": "no"}`), shows the
+language beside it, and keeps it when you edit the text; likewise a
+value's datatype.
 
 ## Link to an entity
 
