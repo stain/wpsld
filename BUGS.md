@@ -34,13 +34,15 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
 ## Repair Crate
 
 - **Types written as IRIs**, e.g. ROHub's `http://schema.org/Person` and
-  `http://schema.org/DefinedTerm`, could be written by the names the
-  context gives them (`Person`). The entity list already shows them by
-  name; the type chips and the preview still show the IRIs.
+  `http://schema.org/DefinedTerm`, written by the names the context gives
+  them (`Person`) (*done*, `TermRepairs.typeNames`, also `https:` and
+  `schema:`).
 - **Enumeration members written as text**, e.g. `"actionStatus":
-  "PotentialActionStatus"`, should be references, `{"@id":
-  "http://schema.org/PotentialActionStatus"}`, to be valid JSON-LD (see
-  Enumerations below).
+  "PotentialActionStatus"`, as references, `{"@id":
+  "http://schema.org/PotentialActionStatus"}`, where the property's range
+  is that Enumeration (*done*, `TermRepairs.enumerationMembers`; the
+  schema model now knows each Enumeration's members, for the drop-downs
+  below). References to schema.org terms are no longer added as Things.
 
 ## Requests
 

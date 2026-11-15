@@ -97,6 +97,27 @@ public class CrateTerms {
 	}
 
 	/**
+	 * The name to write for a type written as an IRI, e.g.
+	 * <code>Person</code> for <code>http://schema.org/Person</code> (also
+	 * <code>https://schema.org/Person</code> and <code>schema:Person</code>),
+	 * if the RO-Crate context names it; none for a type written as a name
+	 * already, or one the context doesn't name.
+	 */
+	public Optional<String> typeName(String written) {
+		if (!written.contains(":")) {
+			return Optional.empty();
+		}
+		String iri = written.startsWith("schema:") ? "http://schema.org/" + written.substring("schema:".length())
+				: written.replaceFirst("^https://schema\\.org/", "http://schema.org/");
+		iri = context.expandTerm(iri).orElse(iri);
+		String name = PREFERRED.getOrDefault(iri, context.compact(iri));
+		String expanded = iri;
+		return name.contains(":") || name.equals(written)
+				|| !context.expandTerm(name).filter(expanded::equals).isPresent() ? Optional.empty()
+						: Optional.of(name);
+	}
+
+	/**
 	 * The IRI of a type or property name as written in a crate, through the
 	 * RO-Crate context, also for terms outside schema.org (e.g. Profile).
 	 */

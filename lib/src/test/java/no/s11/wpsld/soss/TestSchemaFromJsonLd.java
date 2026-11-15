@@ -215,4 +215,17 @@ public class TestSchemaFromJsonLd {
 		assertProperty("email", List.of("ContactPoint", "Organization", "Person"), List.of("Text"));
 		assertProperty("givenName", List.of("Person"), List.of("Text"));
 	}
+
+	/** Enumerations and their members, e.g. ActionStatusType's */
+	@Test
+	public void enumerations() {
+		ClassDef status = schema.getClasses().get(URI.create("http://schema.org/ActionStatusType"));
+		assertTrue(schema.isEnumeration(status));
+		assertTrue(schema.members(status).contains(URI.create("http://schema.org/PotentialActionStatus")));
+		assertEquals(4, schema.members(status).size());
+		ClassDef person = schema.getClasses().get(URI.create("http://schema.org/Person"));
+		assertFalse(schema.isEnumeration(person));
+		assertEquals(List.of(), schema.members(person));
+		assertFalse(schema.isEnumeration(schema.getClasses().get(URI.create("http://schema.org/Enumeration"))));
+	}
 }
