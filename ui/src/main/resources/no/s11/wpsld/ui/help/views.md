@@ -38,6 +38,11 @@ Dataset its own parts, wherever their files are: a part of two datasets
 is under both. Parts are named by their path from their dataset's
 folder. The other entities follow in a folder for each type, as by folder.
 
+In both trees, right-click to **Expand** or **Collapse** the folders
+selected, or with **Expand All** and **Collapse All** every folder within
+them too; with nothing selected, the top folders. The keys do the same:
+**+**, **-**, **\*** and **/**.
+
 To bring a greyed out folder or file into the crate, select it (or
 several) and choose **Crate > Add Dataset for Folder** or **Add File(s)
 to Has Part**, also on the right-click menu. A folder gets a Dataset, and a file

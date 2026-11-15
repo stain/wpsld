@@ -546,7 +546,13 @@ public class CrateEditor extends Application {
 				.addListener((ListChangeListener<TreeItem<EntityTree.Node>>) c -> select());
 		// Copy and paste entities, as Edit > Copy and Paste do in the list
 		entities.setContextMenu(entityMenu(stage));
-		tree.setContextMenu(entityMenu(stage));
+		// The tree's own too: open and close the folders selected
+		ContextMenu treeMenu = entityMenu(stage);
+		treeMenu.getItems().addAll(new SeparatorMenuItem(), treeItem("Expand", "contextExpand", () -> tree.expand(false)),
+				treeItem("Expand All", "contextExpandAll", () -> tree.expand(true)),
+				treeItem("Collapse", "contextCollapse", () -> tree.collapse(false)),
+				treeItem("Collapse All", "contextCollapseAll", () -> tree.collapse(true)));
+		tree.setContextMenu(treeMenu);
 
 		Button add = new Button("Add entity");
 		add.setId("addEntity");
@@ -619,6 +625,13 @@ public class CrateEditor extends Application {
 		}
 		relist();
 		changed();
+	}
+
+	private static MenuItem treeItem(String text, String id, Runnable action) {
+		MenuItem item = new MenuItem(text);
+		item.setId(id);
+		item.setOnAction(e -> action.run());
+		return item;
 	}
 
 	private ContextMenu entityMenu(Stage stage) {

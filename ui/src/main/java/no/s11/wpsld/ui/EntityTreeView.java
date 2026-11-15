@@ -37,6 +37,8 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.form.EntityListing;
 import no.s11.wpsld.form.EntityTree;
@@ -132,12 +134,73 @@ class EntityTreeView extends TreeView<Node> {
 				Platform.runLater(() -> selectAlso(added, removed));
 			}
 		});
+		// + - * / open and close the folders selected, all of them (JavaFX's
+		// own keys act on the one focused), and * and / all within them too
+		addEventFilter(KeyEvent.KEY_PRESSED, e -> {
+			if (e.getCode() == KeyCode.ADD || e.getCode() == KeyCode.SUBTRACT || e.getCode() == KeyCode.MULTIPLY
+					|| e.getCode() == KeyCode.DIVIDE) {
+				// Acted on as typed, below
+				e.consume();
+			}
+		});
+		addEventFilter(KeyEvent.KEY_TYPED, e -> {
+			switch (e.getCharacter()) {
+			case "+" -> expand(false);
+			case "*" -> expand(true);
+			case "-" -> collapse(false);
+			case "/" -> collapse(true);
+			default -> {
+				return;
+			}
+			}
+			e.consume();
+		});
 		// Places of the entities selected in a folder opened
 		expandedItemCountProperty().addListener((obs, old, count) -> {
 			if (!selectingAlso && count.intValue() > old.intValue()) {
 				Platform.runLater(() -> selectAlso(Set.copyOf(selectedEntities()), Set.of()));
 			}
 		});
+	}
+
+	/**
+	 * Open the folders selected (all the top ones if none are), and with
+	 * all, every folder within them too (Expand All, *)
+	 */
+	void expand(boolean all) {
+		chosen().forEach(item -> open(item, true, all));
+	}
+
+	/**
+	 * Close the folders selected (all the top ones if none are), and with
+	 * all, every folder within them too, so that they open closed (Collapse
+	 * All, /)
+	 */
+	void collapse(boolean all) {
+		chosen().forEach(item -> open(item, false, all));
+	}
+
+	private static void open(TreeItem<Node> item, boolean open, boolean all) {
+		if (!item.isLeaf()) {
+			item.setExpanded(open);
+		}
+		if (all) {
+			item.getChildren().forEach(child -> open(child, open, true));
+		}
+	}
+
+	/**
+	 * The items selected, each row asked (the selection model's list counts
+	 * from its start for each item), else the top ones
+	 */
+	private List<TreeItem<Node>> chosen() {
+		List<TreeItem<Node>> selected = new ArrayList<>();
+		for (int row = 0; row < getExpandedItemCount(); row++) {
+			if (getSelectionModel().isSelected(row)) {
+				selected.add(getTreeItem(row));
+			}
+		}
+		return selected.isEmpty() ? List.copyOf(getRoot().getChildren()) : selected;
 	}
 
 	/**

@@ -849,4 +849,75 @@ public class TestCrateEditorEntityList extends UiTest {
 		assertEquals("    cited.pdf", rows(tree).get(3));
 		assertEquals("docs/cited.pdf", tree.selectedEntities().get(0).getId());
 	}
+
+	/**
+	 * Expand, Expand All, Collapse and Collapse All, from the tree's
+	 * right-click menu and its keys + * - /, act on all the folders selected
+	 */
+	@Test
+	public void expandAndCollapseSelected() throws Exception {
+		Path folder = Files.createDirectories(temp.resolve("study"));
+		for (String file : List.of("a/x/1.csv", "a/y/2.csv", "b/z/3.csv", "c/4.csv")) {
+			Path path = folder.resolve(file);
+			Files.createDirectories(path.getParent());
+			Files.writeString(path, "");
+		}
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.openFolder(stage, folder)).get());
+		EntityTreeView tree = lookup("#entityTree").queryAs(EntityTreeView.class);
+		WaitForAsyncUtils.waitForFxEvents();
+		java.util.function.Function<String, javafx.scene.control.MenuItem> item = id -> tree.getContextMenu()
+				.getItems().stream().filter(i -> id.equals(i.getId())).findFirst().orElseThrow();
+		java.util.function.Function<String, Integer> row = name -> {
+			for (int i = 0; i < tree.getExpandedItemCount(); i++) {
+				if (tree.getTreeItem(i).getValue().name().equals(name)) {
+					return i;
+				}
+			}
+			throw new AssertionError(name + " not shown: " + rows(tree));
+		};
+		// Folders a and b selected: Expand All opens them and theirs, not c
+		// All closed (nothing selected: the top, the crate's folder), then
+		// the crate's folder opened, one level
+		interact(() -> {
+			tree.getSelectionModel().clearSelection();
+			tree.collapse(true);
+			tree.expand(false);
+		});
+		assertEquals(List.of("study", "  a ~", "  b ~", "  c ~"), rows(tree));
+		interact(() -> {
+			tree.getSelectionModel().select(row.apply("a"));
+			tree.getSelectionModel().select(row.apply("b"));
+		});
+		interact(() -> item.apply("contextExpandAll").fire());
+		List<String> shown = rows(tree);
+		assertTrue(shown.toString(), shown.containsAll(List.of("1.csv ~", "2.csv ~", "3.csv ~")
+				.stream().map(n -> "      " + n).toList()));
+		assertFalse(shown.toString(), shown.stream().anyMatch(r -> r.strip().startsWith("4.csv")));
+		// Collapse closes both; Expand opens both, one level
+		interact(() -> item.apply("contextCollapse").fire());
+		assertFalse(rows(tree).toString(), rows(tree).stream().anyMatch(r -> r.strip().startsWith("x")));
+		interact(() -> item.apply("contextExpand").fire());
+		assertTrue(rows(tree).toString(), rows(tree).stream().anyMatch(r -> r.strip().startsWith("x")));
+		assertTrue(rows(tree).toString(), rows(tree).stream().anyMatch(r -> r.strip().startsWith("z")));
+		// Their folders opened before stay open within: / closes all within
+		clickOn(tree);
+		interact(() -> {
+			tree.getSelectionModel().clearSelection();
+			tree.getSelectionModel().select(row.apply("a"));
+			tree.getSelectionModel().select(row.apply("b"));
+		});
+		type(KeyCode.SLASH);
+		assertFalse(rows(tree).toString(), rows(tree).stream().anyMatch(r -> r.strip().startsWith("x")));
+		interact(() -> {
+			tree.getSelectionModel().clearSelection();
+			tree.getSelectionModel().select(row.apply("a"));
+			tree.getSelectionModel().select(row.apply("b"));
+		});
+		write("*");
+		assertTrue(rows(tree).toString(), rows(tree).stream().anyMatch(r -> r.strip().startsWith("1.csv")));
+		assertTrue(rows(tree).toString(), rows(tree).stream().anyMatch(r -> r.strip().startsWith("3.csv")));
+		write("/");
+		assertFalse(rows(tree).toString(), rows(tree).stream().anyMatch(r -> r.strip().startsWith("x")));
+	}
 }
