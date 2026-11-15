@@ -186,12 +186,11 @@ The portable zip, without JavaFX, is `./gradlew :ui:distZip`, written to
 runs its tests, the headless GUI tests too, for every pull request: they must
 pass on Linux, and are reported for Windows and macOS. The release workflow
 also runs them on each platform before making a release.
-[`.github/workflows/online-tests.yml`](.github/workflows/online-tests.yml)
-runs the online tests once a month, when run by hand, and on each release
+[`.github/workflows/integration-tests.yml`](.github/workflows/integration-tests.yml)
+runs the online tests and the damaged-file tests (with 200 rounds), each as
+a job of its own, once a month, when run by hand, and on each release
 (reported, without holding the release up). GeoNames' test needs the
 repository secret `GEONAMES_USERNAME`, and is skipped without it.
-[`.github/workflows/damaged-input-tests.yml`](.github/workflows/damaged-input-tests.yml)
-runs the damaged-file tests likewise, with 200 rounds.
 
 ### Releases
 
