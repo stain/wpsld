@@ -4,7 +4,16 @@ Select an entity on the left to edit its form in the middle. On the right,
 **Preview** shows the selected entity and its links; **JSON-LD** shows the
 selected entity's metadata as JSON-LD. **View > Crate JSON-LD...** shows
 the whole crate's, as it would be saved, in a window of its own; press
-**Refresh** there after changes. Selecting a link to another described entity in Preview
+**Refresh** there after changes.
+
+You can also edit the entity's JSON-LD in its tab, or paste an entity's
+JSON-LD over it: **Apply**, or leaving the text, puts it in place of the
+entity's types and values, and changing `@id` renames it, updating links
+to it (or offers to merge it with another of that `@id`). It must be one
+object with an `@id` and `@type`; values refer to other entities by
+`{"@id": "..."}` alone. If something is wrong, wpsld says what below the
+text and changes nothing. **Revert** goes back to the entity as it is.
+**Edit > Undo** undoes an edit applied. Selecting a link to another described entity in Preview
 opens it in the editor. Web addresses open in the browser, and files
 beside the crate as your system opens them, also from the values of
 properties that take a URL, such as **URL**. A compact `@id` such as

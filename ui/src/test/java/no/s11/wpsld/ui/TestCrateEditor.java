@@ -933,11 +933,78 @@ public class TestCrateEditor extends UiTest {
 	}
 
 	/**
+	 * The entity's JSON-LD edited in its tab: applied as one undo step, its
+	 * @id renamed with the references to it; refused saying why, changing
+	 * nothing; reverted; and pasted in, applied on leaving it
+	 */
+	@Test
+	public void jsonEdited() throws Exception {
+		entities();
+		addEntity("person");
+		Entity person = entities().getSelectionModel().getSelectedItem();
+		Entity root = entities().getItems().get(0);
+		clickOn("#jsonTab");
+		TextInputControl json = lookup("#preview").queryTextInputControl();
+		Button apply = lookup("#jsonApply").queryButton();
+		assertTrue(apply.isDisable());
+		String before = json.getText();
+
+		// Not right: says why, and changes nothing
+		interact(() -> json.setText("{\"@id\": \"#alice\""));
+		assertFalse(apply.isDisable());
+		interact(apply::fire);
+		assertTrue(lookup("#jsonError").queryLabeled().getText(), lookup("#jsonError").queryLabeled().getText().startsWith("Not JSON"));
+		assertEquals(List.of("Person"), person.getTypes());
+		interact(lookup("#jsonRevert").queryButton()::fire);
+		assertEquals(before, json.getText());
+		assertEquals("", lookup("#jsonError").queryLabeled().getText());
+		assertTrue(apply.isDisable());
+
+		interact(() -> json.setText("{\"@id\": \"#alice\", \"@type\": [\"Person\", \"Author\"], "
+				+ "\"name\": \"Alice\", \"email\": \"alice@example.org\"}"));
+		interact(apply::fire);
+		assertEquals("#alice", person.getId());
+		assertEquals(List.of("Person", "Author"), person.getTypes());
+		assertEquals("Alice", person.getLabel());
+		assertEquals("Alice", lookup("#header-name").queryAs(TextField.class).getText());
+		// The root's mention of it follows
+		assertTrue(root.getAll("mentions").stream().anyMatch(v -> v.path("@id").asText().equals("#alice")));
+		// Shown again as the crate writes it
+		assertTrue(json.getText(), json.getText().contains("\"email\" : \"alice@example.org\""));
+		assertTrue(apply.isDisable());
+		Stage stage = (Stage) entities().getScene().getWindow();
+		MenuItem undo = menuItem("menuUndo");
+		assertEquals("_Undo Edit JSON-LD", WaitForAsyncUtils.asyncFx(() -> {
+			app.nameUndo(stage, undo, menuItem("menuRedo"));
+			return undo.getText();
+		}).get());
+
+		// Pasted in, applied on leaving it
+		interact(() -> {
+			ClipboardContent text = new ClipboardContent();
+			text.putString("{\"@id\": \"#alice\", \"@type\": \"Person\", \"name\": \"Alice Smith\"}");
+			Clipboard.getSystemClipboard().setContent(text);
+		});
+		clickOn(json);
+		push(KeyCode.SHORTCUT, KeyCode.A);
+		push(KeyCode.SHORTCUT, KeyCode.V);
+		clickOn("#entities");
+		assertEquals("Alice Smith", person.getLabel());
+		assertEquals(List.of("Person"), person.getTypes());
+		assertTrue(person.get("email").isEmpty());
+
+		interact(undo::fire);
+		Entity undone = entities().getItems().stream().filter(e -> e.getId().equals("#alice")).findFirst().orElseThrow();
+		assertEquals("Alice", undone.getLabel());
+	}
+
+	/**
 	 * The JSON-LD tab shows the entity selected, as it changes; View > Crate
 	 * JSON-LD the whole crate's, made again with Refresh
 	 */
 	@Test
 	public void jsonOfEntityAndCrate() throws Exception {
+		entities();
 		addEntity("person");
 		Entity person = entities().getSelectionModel().getSelectedItem();
 		clickOn("#jsonTab");

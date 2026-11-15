@@ -131,6 +131,7 @@ import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.lookup.DOI;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.crate.EntityJson;
 import no.s11.wpsld.crate.Places;
 import no.s11.wpsld.lookup.GeoNames;
 import no.s11.wpsld.lookup.ORCID;
@@ -615,8 +616,18 @@ public class CrateEditor extends Application {
 		sidebar = new VBox(new Label(" Entities"), entityType, entities, buttons);
 
 		preview.setId("preview");
-		preview.setEditable(false);
 		preview.setStyle("-fx-font-family: monospace;");
+		// Edited by hand (or pasted into), applied on leaving it or with Apply
+		preview.textProperty().addListener((obs, old, text) -> {
+			if (!settingJson) {
+				jsonEdited.set(true);
+			}
+		});
+		preview.focusedProperty().addListener((obs, was, focused) -> {
+			if (!focused) {
+				applyJson();
+			}
+		});
 
 		// On the right, a preview of the entity (with links to the entities it
 		// refers to, which open them) and its JSON-LD
@@ -628,6 +639,12 @@ public class CrateEditor extends Application {
 		entityPreview.setTakesUrl(property -> entityEditor.takesUrl(property));
 		// The JSON-LD tab shows the entity shown
 		entityPreview.setOnShow(() -> {
+			if (jsonEdited.get() && jsonEntity != entityPreview.getEntity()) {
+				// Not applied, as it wasn't right
+				showNotice("Your changes to the JSON-LD of " + jsonEntity.getLabel() + " were not applied: "
+						+ jsonError.getText(), null, null);
+				jsonEdited.set(false);
+			}
 			jsonShown = false;
 			if (jsonTab != null && jsonTab.isSelected()) {
 				showJson();
@@ -638,7 +655,31 @@ public class CrateEditor extends Application {
 		entityEditor.setAddress(entityPreview::address);
 		Tab previewTab = new Tab("Preview", entityPreview);
 		previewTab.setId("previewTab");
-		Tab jsonTab = new Tab("JSON-LD", preview);
+		jsonError.setId("jsonError");
+		jsonError.setWrapText(true);
+		jsonError.getStyleClass().add("error-text");
+		Button apply = new Button("Apply");
+		apply.setId("jsonApply");
+		// Not taking the focus, which would apply the changes, also on Revert
+		apply.setFocusTraversable(false);
+		apply.disableProperty().bind(jsonEdited.not());
+		apply.setOnAction(e -> applyJson());
+		Button revert = new Button("Revert");
+		revert.setId("jsonRevert");
+		revert.setFocusTraversable(false);
+		revert.disableProperty().bind(jsonEdited.not());
+		revert.setOnAction(e -> {
+			jsonEdited.set(false);
+			jsonShown = false;
+			showJson();
+		});
+		Region jsonSpace = new Region();
+		HBox.setHgrow(jsonSpace, Priority.ALWAYS);
+		HBox jsonButtons = new HBox(8, jsonError, jsonSpace, revert, apply);
+		jsonButtons.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+		jsonButtons.setPadding(new Insets(4));
+		VBox.setVgrow(preview, Priority.ALWAYS);
+		Tab jsonTab = new Tab("JSON-LD", new VBox(preview, jsonButtons));
 		jsonTab.setId("jsonTab");
 		this.jsonTab = jsonTab;
 		jsonTab.selectedProperty().addListener((o, was, selected) -> {
@@ -3243,11 +3284,19 @@ public class CrateEditor extends Application {
 	 * already has that identifier, offer to merge the two.
 	 */
 	private void rename(Entity entity, String typed) {
+		rename(entity, typed, Optional.empty());
+	}
+
+	/**
+	 * Rename, as {@link #rename(Entity, String)}, as part of a change of this
+	 * name, e.g. Edit JSON-LD, unless merging
+	 */
+	private void rename(Entity entity, String typed, Optional<String> name) {
 		String newId = canonicalId(typed.strip());
 		Optional<Entity> existing = crate.get(newId);
 		Entity edited = entity;
 		// Named, as its difference looks like removing an entity
-		Optional<String> change = Optional.empty();
+		Optional<String> change = name;
 		if (existing.isEmpty()) {
 			crate.rename(entity, newId);
 		} else {
@@ -3976,20 +4025,69 @@ public class CrateEditor extends Application {
 	 * pause in typing (see View > Crate JSON-LD)
 	 */
 	void showJson() {
-		if (jsonShown) {
+		Entity shown = entityPreview.getEntity();
+		if (jsonShown || jsonEdited.get() && jsonEntity == shown) {
+			// Not over changes being made to it
 			return;
 		}
 		jsonShown = true;
-		Entity shown = entityPreview.getEntity();
-		if (shown == null || !crate.getEntities().contains(shown)) {
-			preview.setText("");
-			return;
-		}
+		jsonEntity = shown;
+		jsonEdited.set(false);
+		jsonError.setText("");
+		settingJson = true;
 		try {
-			preview.setText(Crate.WRITER.writeValueAsString(shown.toJson()));
+			preview.setEditable(shown != null && crate.getEntities().contains(shown));
+			preview.setText(!preview.isEditable() ? "" : Crate.WRITER.writeValueAsString(shown.toJson()));
 		} catch (JsonProcessingException e) {
 			preview.setText(e.toString());
+		} finally {
+			settingJson = false;
 		}
+	}
+
+	/** The entity whose JSON-LD the tab shows */
+	private Entity jsonEntity;
+	/** Whether its JSON-LD was changed in the tab, not yet applied */
+	private final BooleanProperty jsonEdited = new SimpleBooleanProperty();
+	/** Whether the text is being set, not edited */
+	private boolean settingJson;
+	/** What is wrong with the JSON-LD typed, if anything */
+	private final Label jsonError = new Label();
+
+	/**
+	 * The entity's JSON-LD as changed in its tab, in place of its types and
+	 * values, and its @id renamed (with its references, or merged into
+	 * another of that @id), as one undo step; if not right, saying why
+	 * below it, and changing nothing
+	 */
+	private void applyJson() {
+		Entity entity = jsonEntity;
+		if (!jsonEdited.get() || entity == null || !crate.getEntities().contains(entity)) {
+			return;
+		}
+		EntityJson.Parsed parsed;
+		try {
+			parsed = EntityJson.parse(preview.getText());
+		} catch (IllegalArgumentException e) {
+			jsonError.setText(e.getMessage());
+			return;
+		}
+		jsonError.setText("");
+		jsonEdited.set(false);
+		EntityJson.apply(parsed, entity);
+		if (!canonicalId(parsed.id().strip()).equals(entity.getId())) {
+			// Shows it, or the one merged into
+			rename(entity, parsed.id(), Optional.of("Edit JSON-LD"));
+			// Also if not, as merging was cancelled
+			refresh();
+		} else {
+			show(entity);
+			entityEditor.edit(entity);
+			refresh();
+		}
+		checkpoint(placeOf(null), Optional.of("Edit JSON-LD"));
+		jsonShown = false;
+		showJson();
 	}
 
 	/** View > Crate JSON-LD, while open */
