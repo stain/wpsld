@@ -2531,6 +2531,7 @@ public class CrateEditor extends Application {
 				address -> getHostServices().showDocument(address)).showAndWait().ifPresent(changed -> {
 			settings = changed;
 			profileCache.setDisabledRegistries(changed.disabledRegistries());
+			Logs.level(changed.logLevel());
 			saveSettings(stage);
 		});
 	}
@@ -3413,6 +3414,7 @@ public class CrateEditor extends Application {
 	}
 
 	public static void main(String[] args) {
+		Logs.setUp();
 		launch(args);
 	}
 }

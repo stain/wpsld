@@ -39,10 +39,12 @@ import java.util.Optional;
  * @param config   The user's settings
  * @param state    State to keep between runs that is not worth backing up,
  *                 like recent files
+ * @param logs     The application's log files, for when something went
+ *                 wrong
  * @param dataDirs Folders to look for data in, most important first: the
  *                 user's {@link #data()}, then those installed for all users
  */
-public record AppDirectories(Path cache, Path data, Path config, Path state, List<Path> dataDirs) {
+public record AppDirectories(Path cache, Path data, Path config, Path state, Path logs, List<Path> dataDirs) {
 	public static final String APP = "wpsld";
 
 	public AppDirectories {
@@ -80,7 +82,8 @@ public record AppDirectories(Path cache, Path data, Path config, Path state, Lis
 	 * <code>~/.cache</code>), <code>$XDG_DATA_HOME</code> (else
 	 * <code>~/.local/share</code>), <code>$XDG_CONFIG_HOME</code> (else
 	 * <code>~/.config</code>), <code>$XDG_STATE_HOME</code> (else
-	 * <code>~/.local/state</code>), and the search path
+	 * <code>~/.local/state</code>), with logs in its <code>logs</code> folder,
+	 * as the specification counts logs as state, and the search path
 	 * <code>$XDG_DATA_DIRS</code> (else <code>/usr/local/share/:/usr/share/</code>).
 	 * Values that are not absolute paths are ignored, as the specification says.
 	 */
@@ -90,9 +93,9 @@ public record AppDirectories(Path cache, Path data, Path config, Path state, Lis
 		String value = env.getOrDefault("XDG_DATA_DIRS", "");
 		List<String> system = value.isBlank() ? List.of("/usr/local/share/", "/usr/share/") : List.of(value.split(":"));
 		system.stream().filter(p -> p.startsWith("/")).map(p -> Path.of(p, APP)).forEach(dataDirs::add);
+		Path state = xdgHome(env, "XDG_STATE_HOME", home, ".local/state");
 		return new AppDirectories(xdgHome(env, "XDG_CACHE_HOME", home, ".cache"), data,
-				xdgHome(env, "XDG_CONFIG_HOME", home, ".config"), xdgHome(env, "XDG_STATE_HOME", home, ".local/state"),
-				dataDirs);
+				xdgHome(env, "XDG_CONFIG_HOME", home, ".config"), state, state.resolve("logs"), dataDirs);
 	}
 
 	private static Path xdgHome(Map<String, String> env, String variable, String home, String fallback) {
@@ -102,7 +105,8 @@ public record AppDirectories(Path cache, Path data, Path config, Path state, Lis
 	}
 
 	/**
-	 * Windows: <code>%LOCALAPPDATA%\wpsld\Cache</code> and <code>...\State</code>,
+	 * Windows: <code>%LOCALAPPDATA%\wpsld\Cache</code>, <code>...\State</code>
+	 * and <code>...\Logs</code>,
 	 * <code>%APPDATA%\wpsld</code> for data and settings (roaming with the user),
 	 * and <code>%PROGRAMDATA%\wpsld</code> for data installed for all users.
 	 * Paths are built as strings, so they can be tested on any platform.
@@ -113,7 +117,7 @@ public record AppDirectories(Path cache, Path data, Path config, Path state, Lis
 		List<Path> dataDirs = new ArrayList<>(List.of(Path.of(roaming)));
 		windowsVariable(env, "PROGRAMDATA").ifPresent(p -> dataDirs.add(Path.of(p + "\\" + APP)));
 		return new AppDirectories(Path.of(local + "\\Cache"), Path.of(roaming), Path.of(roaming),
-				Path.of(local + "\\State"), dataDirs);
+				Path.of(local + "\\State"), Path.of(local + "\\Logs"), dataDirs);
 	}
 
 	/**
@@ -131,14 +135,15 @@ public record AppDirectories(Path cache, Path data, Path config, Path state, Lis
 	/**
 	 * macOS: <code>~/Library/Caches/wpsld</code>, and
 	 * <code>~/Library/Application Support/wpsld</code> for data, settings and
-	 * state (<code>~/Library/Preferences</code> is for property lists), and
+	 * state (<code>~/Library/Preferences</code> is for property lists),
+	 * <code>~/Library/Logs/wpsld</code> for logs, where Console finds them, and
 	 * <code>/Library/Application Support/wpsld</code> for data installed for
 	 * all users.
 	 */
 	public static AppDirectories macOS(String home) {
 		Path support = Path.of(home, "Library", "Application Support", APP);
 		return new AppDirectories(Path.of(home, "Library", "Caches", APP), support, support, support.resolve("State"),
-				List.of(support, Path.of("/Library", "Application Support", APP)));
+				Path.of(home, "Library", "Logs", APP), List.of(support, Path.of("/Library", "Application Support", APP)));
 	}
 
 	/**

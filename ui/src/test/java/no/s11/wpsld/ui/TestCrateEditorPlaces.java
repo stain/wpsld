@@ -187,4 +187,34 @@ public class TestCrateEditorPlaces extends UiTest {
 		clickOn("OK");
 		assertEquals("someone", Settings.load(settingsFile).geonamesUsername());
 	}
+
+	/**
+	 * Edit > Preferences > Logs keeps how much to log, and logs that much.
+	 */
+	@Test
+	public void logLevelInPreferences() throws Exception {
+		java.util.logging.Logger root = java.util.logging.Logger.getLogger("");
+		java.util.logging.Level was = root.getLevel();
+		try {
+			entities();
+			Platform.runLater(() -> app.showPreferences(stage));
+			waitFor("#keptProfiles");
+			Tab logs = lookup(".tab-pane").queryAllAs(TabPane.class).stream().flatMap(t -> t.getTabs().stream())
+					.filter(t -> "logsTab".equals(t.getId())).findFirst().orElseThrow();
+			interact(() -> logs.getTabPane().getSelectionModel().select(logs));
+			@SuppressWarnings("unchecked")
+			javafx.scene.control.ChoiceBox<String> level = lookup("#logLevel")
+					.queryAs(javafx.scene.control.ChoiceBox.class);
+			assertEquals("INFO", level.getValue());
+			// Not logging to a file in tests
+			assertEquals("Not logged to a file", lookup("#logsFolder").queryLabeled().getText());
+			assertTrue(lookup("#clearLogs").queryButton().isDisabled());
+			interact(() -> level.setValue("FINE"));
+			clickOn("OK");
+			assertEquals("FINE", Settings.load(settingsFile).logLevel());
+			assertEquals(java.util.logging.Level.FINE, root.getLevel());
+		} finally {
+			root.setLevel(was);
+		}
+	}
 }

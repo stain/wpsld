@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -43,11 +44,19 @@ import no.s11.wpsld.util.AppDirectories;
  * @param colours            The name of its colours, e.g. <code>dark</code>
  * @param geonamesUsername   The user's GeoNames account, to look up places
  *                           with; empty if none
+ * @param logLevel           How much to log, as a level of
+ *                           <code>java.util.logging</code>: one of
+ *                           {@link #LOG_LEVELS}, by default
+ *                           {@link #DEFAULT_LOG_LEVEL}
  */
-public record Settings(Set<String> disabledRegistries, String style, String colours, String geonamesUsername) {
+public record Settings(Set<String> disabledRegistries, String style, String colours, String geonamesUsername,
+		String logLevel) {
 	public static final String FILE = "settings.json";
 	public static final String DEFAULT_STYLE = "classic";
 	public static final String DEFAULT_COLOURS = "light";
+	/** The levels offered, least logged first */
+	public static final List<String> LOG_LEVELS = List.of("SEVERE", "WARNING", "INFO", "FINE", "ALL");
+	public static final String DEFAULT_LOG_LEVEL = "INFO";
 	public static final Settings DEFAULT = new Settings(Set.of());
 	private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -56,6 +65,11 @@ public record Settings(Set<String> disabledRegistries, String style, String colo
 		style = style == null || style.isBlank() ? DEFAULT_STYLE : style;
 		colours = colours == null || colours.isBlank() ? DEFAULT_COLOURS : colours;
 		geonamesUsername = geonamesUsername == null ? "" : geonamesUsername.strip();
+		logLevel = LOG_LEVELS.contains(logLevel) ? logLevel : DEFAULT_LOG_LEVEL;
+	}
+
+	public Settings(Set<String> disabledRegistries, String style, String colours, String geonamesUsername) {
+		this(disabledRegistries, style, colours, geonamesUsername, DEFAULT_LOG_LEVEL);
 	}
 
 	public Settings(Set<String> disabledRegistries, String style, String colours) {
@@ -67,19 +81,23 @@ public record Settings(Set<String> disabledRegistries, String style, String colo
 	}
 
 	public Settings withDisabledRegistries(Set<String> disabledRegistries) {
-		return new Settings(disabledRegistries, style, colours, geonamesUsername);
+		return new Settings(disabledRegistries, style, colours, geonamesUsername, logLevel);
 	}
 
 	public Settings withStyle(String style) {
-		return new Settings(disabledRegistries, style, colours, geonamesUsername);
+		return new Settings(disabledRegistries, style, colours, geonamesUsername, logLevel);
 	}
 
 	public Settings withColours(String colours) {
-		return new Settings(disabledRegistries, style, colours, geonamesUsername);
+		return new Settings(disabledRegistries, style, colours, geonamesUsername, logLevel);
 	}
 
 	public Settings withGeonamesUsername(String geonamesUsername) {
-		return new Settings(disabledRegistries, style, colours, geonamesUsername);
+		return new Settings(disabledRegistries, style, colours, geonamesUsername, logLevel);
+	}
+
+	public Settings withLogLevel(String logLevel) {
+		return new Settings(disabledRegistries, style, colours, geonamesUsername, logLevel);
 	}
 
 	/**
@@ -102,7 +120,8 @@ public record Settings(Set<String> disabledRegistries, String style, String colo
 			Set<String> disabled = new TreeSet<>();
 			json.path("disabledRegistries").forEach(n -> disabled.add(n.asText()));
 			return new Settings(disabled, json.path("style").asText(DEFAULT_STYLE),
-					json.path("colours").asText(DEFAULT_COLOURS), json.path("geonamesUsername").asText(""));
+					json.path("colours").asText(DEFAULT_COLOURS), json.path("geonamesUsername").asText(""),
+					json.path("logLevel").asText(DEFAULT_LOG_LEVEL));
 		} catch (IOException e) {
 			return DEFAULT;
 		}
@@ -119,6 +138,9 @@ public record Settings(Set<String> disabledRegistries, String style, String colo
 		json.put("colours", colours);
 		if (!geonamesUsername.isEmpty()) {
 			json.put("geonamesUsername", geonamesUsername);
+		}
+		if (!logLevel.equals(DEFAULT_LOG_LEVEL)) {
+			json.put("logLevel", logLevel);
 		}
 		Path temp = Files.createTempFile(dir, "settings-", ".tmp");
 		MAPPER.writer(SerializationFeature.INDENT_OUTPUT).writeValue(temp.toFile(), json);

@@ -50,6 +50,7 @@ public class TestAppDirectories {
 		assertEquals(Path.of("/home/alice/.local/share/wpsld"), dirs.data());
 		assertEquals(Path.of("/home/alice/.config/wpsld"), dirs.config());
 		assertEquals(Path.of("/home/alice/.local/state/wpsld"), dirs.state());
+		assertEquals(Path.of("/home/alice/.local/state/wpsld/logs"), dirs.logs());
 		assertEquals(paths("/home/alice/.local/share/wpsld", "/usr/local/share/wpsld", "/usr/share/wpsld"),
 				dirs.dataDirs());
 	}
@@ -63,6 +64,7 @@ public class TestAppDirectories {
 		assertEquals(Path.of("/data/wpsld"), dirs.data());
 		assertEquals(Path.of("/cfg/wpsld"), dirs.config());
 		assertEquals(Path.of("/state/wpsld"), dirs.state());
+		assertEquals(Path.of("/state/wpsld/logs"), dirs.logs());
 		assertEquals(paths("/data/wpsld", "/opt/share/wpsld", "/usr/share/wpsld"), dirs.dataDirs());
 	}
 
@@ -86,6 +88,7 @@ public class TestAppDirectories {
 				"C:\\Users\\alice");
 		assertEquals("C:\\Users\\alice\\AppData\\Local\\wpsld\\Cache", dirs.cache().toString());
 		assertEquals("C:\\Users\\alice\\AppData\\Local\\wpsld\\State", dirs.state().toString());
+		assertEquals("C:\\Users\\alice\\AppData\\Local\\wpsld\\Logs", dirs.logs().toString());
 		assertEquals("C:\\Users\\alice\\AppData\\Roaming\\wpsld", dirs.data().toString());
 		assertEquals("C:\\Users\\alice\\AppData\\Roaming\\wpsld", dirs.config().toString());
 		assertEquals(List.of("C:\\Users\\alice\\AppData\\Roaming\\wpsld", "C:\\ProgramData\\wpsld"),
@@ -113,6 +116,7 @@ public class TestAppDirectories {
 		assertEquals(Path.of("/Users/alice/Library/Application Support/wpsld"), dirs.data());
 		assertEquals(dirs.data(), dirs.config());
 		assertEquals(Path.of("/Users/alice/Library/Application Support/wpsld/State"), dirs.state());
+		assertEquals(Path.of("/Users/alice/Library/Logs/wpsld"), dirs.logs());
 		assertEquals(paths("/Users/alice/Library/Application Support/wpsld", "/Library/Application Support/wpsld"),
 				dirs.dataDirs());
 	}

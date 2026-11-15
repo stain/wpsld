@@ -112,14 +112,23 @@ The portable zip leaves out JavaFX. Either:
 wpsld keeps profiles you have loaded, and its settings (Edit > Preferences,
 and the style and colours from the View menu), in these places:
 
-| | Profiles | Settings |
-|-|----------|----------|
-| Linux | `~/.local/share/wpsld/profiles/` | `~/.config/wpsld/settings.json` |
-| macOS | `~/Library/Application Support/wpsld/profiles/` | `~/Library/Application Support/wpsld/settings.json` |
-| Windows | `%APPDATA%\wpsld\profiles\` | `%APPDATA%\wpsld\settings.json` |
+| | Profiles | Settings | Logs |
+|-|----------|----------|------|
+| Linux | `~/.local/share/wpsld/profiles/` | `~/.config/wpsld/settings.json` | `~/.local/state/wpsld/logs/` |
+| macOS | `~/Library/Application Support/wpsld/profiles/` | `~/Library/Application Support/wpsld/settings.json` | `~/Library/Logs/wpsld/` |
+| Windows | `%APPDATA%\wpsld\profiles\` | `%APPDATA%\wpsld\settings.json` | `%LOCALAPPDATA%\wpsld\Logs\` |
 
-On Linux, `$XDG_DATA_HOME` and `$XDG_CONFIG_HOME` are used instead if set.
-You can remove kept profiles under Edit > Preferences > Kept profiles.
+On Linux, `$XDG_DATA_HOME`, `$XDG_CONFIG_HOME` and `$XDG_STATE_HOME` are
+used instead if set. You can remove kept profiles under Edit > Preferences
+> Kept profiles, and set how much to log and clear the logs under Logs.
+
+wpsld logs with Java's own logging (`java.util.logging`), as do the
+libraries it uses: Tika's SLF4J through `slf4j-jdk14`, PDFBox's Commons
+Logging by itself, and JavaFX and the JDK through `System.Logger`. It logs
+to `wpsld.0.log`, starting anew at 20 MB and keeping three, and to the
+console when started from one. A second wpsld running at the same time
+logs to `wpsld.0.log.1` and so on. To log otherwise, give your own
+configuration with `-Djava.util.logging.config.file=<file>`.
 
 ## Building
 

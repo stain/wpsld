@@ -37,4 +37,6 @@ module no.s11.wpsld {
     exports no.s11.wpsld.lookup;
     exports no.s11.wpsld.jsonld;
     exports no.s11.wpsld.masp;
+    // Where the user interface keeps its log (AppDirectories)
+    exports no.s11.wpsld.util to no.s11.wpsld.ui;
 }
