@@ -56,11 +56,20 @@ public abstract class UiTest extends ApplicationTest {
 						.evaluate();
 			} catch (TestTimedOutException e) {
 				AssertionError error = new AssertionError(description.getMethodName() + " took over "
-						+ timeoutSeconds() + " s" + openDialogs(), e);
+						+ timeoutSeconds() + " s" + openDialogs() + fxThread(), e);
 				throw error;
 			}
 		}
 	};
+
+	/** Where the JavaFX thread is, as it may be stuck or busy */
+	private static String fxThread() {
+		return Thread.getAllStackTraces().entrySet().stream()
+				.filter(e -> e.getKey().getName().equals("JavaFX Application Thread")).findFirst()
+				.map(e -> ", with the JavaFX thread at:\n" + java.util.Arrays.stream(e.getValue()).limit(60)
+						.map(f -> "\tat " + f).collect(Collectors.joining("\n")))
+				.orElse("");
+	}
 
 	/** The dialogs open now, by their headers and texts; read off the FX thread, as it may be stuck */
 	private static String openDialogs() {
