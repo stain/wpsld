@@ -310,6 +310,9 @@ public class TestCrateEditorMetadata extends UiTest {
 		Stage stage = (Stage) entities().getScene().getWindow();
 		Path dir = crateWithPhotos(stage, "one.jpg", "two.jpg");
 		interact(() -> app.insertFiles(stage, List.of(dir.resolve("one.jpg"), dir.resolve("two.jpg"))));
+		// Both selected, neither edited: no form for each in turn
+		assertEquals(2, entities().getSelectionModel().getSelectedItems().size());
+		assertEquals("2 entities selected: select one to edit it.", lookup("#noEntity").queryLabeled().getText());
 		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> app.notice().isPresent());
 		WaitForAsyncUtils.waitForFxEvents();
 		assertTrue(app.notice().orElseThrow(), app.notice().orElseThrow().startsWith("2 of the files added have"));
@@ -466,16 +469,36 @@ public class TestCrateEditorMetadata extends UiTest {
 				&& lookup("#jobsLatest").queryLabeled().getText().equals("Reading slowly: 0 of 1000 files read"));
 		// Shown by itself after a moment, as the user asked for it
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#jobsHide").tryQuery().isPresent());
-		clickOn("#jobsHide");
+		// Pressed rather than clicked, as a window just shown may not be on screen yet
+		interact(() -> lookup("#jobsHide").queryButton().fire());
 		WaitForAsyncUtils.waitForFxEvents();
 		assertTrue(lookup("#jobsHide").tryQuery().isEmpty());
 		assertTrue(WaitForAsyncUtils.asyncFx(job::isRunning).get());
 		clickOn("#jobsShow");
-		WaitForAsyncUtils.waitForFxEvents();
-		clickOn("#jobCancel");
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#jobCancel").tryQuery().isPresent());
+		interact(() -> lookup("#jobCancel").queryButton().fire());
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils.asyncFx(job::isCancelled).get());
 		WaitForAsyncUtils.waitForFxEvents();
 		assertFalse(lookup("#jobsStrip").query().isVisible());
 		assertTrue(lookup("#jobsHide").tryQuery().isEmpty());
+	}
+
+	/** Removing the entity edited leaves no form, rather than the removed one's */
+	@Test
+	public void removedNotEdited() throws Exception {
+		entities();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		Path dir = crateWithPhotos(stage, "photo.jpg");
+		interact(() -> app.insertFiles(stage, List.of(dir.resolve("photo.jpg"))));
+		assertEquals("photo.jpg", lookup("#entityId").queryTextInputControl().getText());
+		clickOn("#removeEntity");
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(listed("photo.jpg").isEmpty());
+		assertTrue(lookup("#entityId").tryQuery().isEmpty());
+		assertEquals("No entity selected: select one in the list to edit it.",
+				lookup("#noEntity").queryLabeled().getText());
+		// Selecting one edits it again
+		interact(() -> entities().getSelectionModel().clearAndSelect(0));
+		assertEquals("./", lookup("#entityId").queryTextInputControl().getText());
 	}
 }

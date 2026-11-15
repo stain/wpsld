@@ -25,7 +25,10 @@ the **Edit** menu or by right-clicking, or press **Del**, to remove their
 descriptions from the crate. The root dataset cannot be removed. This does not delete
 files from your computer. References to removed entities may remain in
 other descriptions: check and remove or replace those references as needed.
-**Edit > Undo** can restore an accidental removal.
+**Edit > Undo** can restore an accidental removal. Once the entity you
+were editing is removed, no form shows until you select another. When you
+add or paste several entities at once, they are all selected, and no form
+shows either: select one to edit it.
 
 **Crate > Repair Crate** can add placeholder Things for references to
 entities not described in the crate, and update the root's mentions for

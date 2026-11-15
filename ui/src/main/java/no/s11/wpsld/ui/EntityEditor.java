@@ -262,6 +262,24 @@ public class EntityEditor extends ScrollPane {
 	}
 
 	/**
+	 * Show no form, as no entity is edited: e.g. after it was removed, or
+	 * while several just added are selected, so that a form isn't made for
+	 * each
+	 *
+	 * @param why What to say instead, e.g. "No entity selected"
+	 */
+	public void editNone(String why) {
+		entity = null;
+		propertyQuery = "";
+		Label none = new Label(why);
+		none.setId("noEntity");
+		none.setWrapText(true);
+		none.getStyleClass().add("dim-text");
+		none.setPadding(new Insets(12));
+		form.getChildren().setAll(none);
+	}
+
+	/**
 	 * Let the user choose a type to add to the entity, e.g. for a new entity.
 	 */
 	public void chooseType() {

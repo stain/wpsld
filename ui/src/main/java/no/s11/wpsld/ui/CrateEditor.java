@@ -28,6 +28,7 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -522,14 +523,14 @@ public class CrateEditor extends Application {
 		});
 		entities.getSelectionModel().selectedItemProperty().addListener((obs, old, entity) -> {
 			// A file not in the crate is selected, but the form stays
-			if (entity != null && !relisting && !isNotInCrate(entity)) {
+			if (entity != null && !relisting && !selectingSeveral && !isNotInCrate(entity)) {
 				entityEditor.edit(entity);
 				entityPreview.show(entity);
 			}
 		});
 		// A folder without an entity is selected, but the form stays
 		tree.getSelectionModel().selectedItemProperty().addListener((obs, old, item) -> {
-			if (item != null && !relisting) {
+			if (item != null && !relisting && !selectingSeveral) {
 				// Not again for another place of the entity edited
 				item.getValue().entity().filter(entity -> entity != entityEditor.getEntity()).ifPresent(entity -> {
 					entityEditor.edit(entity);
@@ -611,6 +612,10 @@ public class CrateEditor extends Application {
 		removed.forEach(crate::remove);
 		// The entities only they linked to the root are now mentioned
 		crate.mentionUnlinked();
+		if (removed.contains(entityEditor.getEntity())) {
+			entityEditor.editNone("No entity selected: select one in the list to edit it.");
+			entityPreview.show(null);
+		}
 		relist();
 		changed();
 	}
@@ -2064,16 +2069,39 @@ public class CrateEditor extends Application {
 	 */
 	private void showListed(List<Entity> shown) {
 		relist();
-		if (byFolder) {
-			tree.select(shown);
-			return;
+		if (shown.size() > 1) {
+			// Several, e.g. files added or entities pasted: selected at once,
+			// not each edited in turn (a form each, thousands in a large crate)
+			entityEditor.editNone(shown.size() + " entities selected: select one to edit it.");
+			entityPreview.show(null);
 		}
-		if (!entities.getItems().containsAll(shown)) {
-			entityType.setValue(null);
+		selectingSeveral = shown.size() > 1;
+		try {
+			if (byFolder) {
+				tree.select(shown);
+				return;
+			}
+			if (!new HashSet<>(entities.getItems()).containsAll(shown)) {
+				entityType.setValue(null);
+			}
+			Map<Entity, Integer> index = new HashMap<>();
+			List<Entity> items = entities.getItems();
+			for (int i = 0; i < items.size(); i++) {
+				index.putIfAbsent(items.get(i), i);
+			}
+			int[] indices = shown.stream().map(index::get).filter(Objects::nonNull).mapToInt(Integer::intValue)
+					.toArray();
+			entities.getSelectionModel().clearSelection();
+			if (indices.length > 0) {
+				entities.getSelectionModel().selectIndices(indices[0], Arrays.copyOfRange(indices, 1, indices.length));
+			}
+		} finally {
+			selectingSeveral = false;
 		}
-		entities.getSelectionModel().clearSelection();
-		shown.stream().map(entities.getItems()::indexOf).forEach(entities.getSelectionModel()::select);
 	}
+
+	/** Whether several entities are being selected at once, none of them to edit */
+	private boolean selectingSeveral;
 
 	/**
 	 * List the crate's entities again, root first, then by type, name and
