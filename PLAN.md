@@ -1244,6 +1244,48 @@ extension. Next:
   export zips; open and check a bag; make a bag (last, as it moves the
   user's files into `data/`).
 
+### Attached and detached crates
+
+- **Attached to detached** (Crate > Make Detached…), as the RO-Crate
+  specification suggests: the crate's files go "elsewhere", typically
+  published on the web (e.g. GitHub Pages, a repository, an institutional
+  web server). The user gives the base URI where they say the files now
+  are; wpsld checks that each file is there (in the background, as a job,
+  as Check Web Availability does: HEAD, sizes, perhaps checksums where
+  the server gives them) before rewriting each relative `@id` against it
+  (the root's `@id` the base URI itself, or a persistent identifier if
+  the user has one), and says which files were not found, leaving those
+  unchanged until they are. One undo step; the descriptor's `about` and
+  every reference follow the renamed `@id`s.
+- **Detached to attached** (Crate > Make Attached…): choose a folder; the
+  `@id`s under a base URI (the root's, or one the user gives) become
+  relative paths in it, and files there are offered to download (each
+  checked against `contentSize` and any checksum, as a job). Files not
+  downloaded keep their absolute `@id`s, as RO-Crate allows web-based
+  data entities in an attached crate.
+- **Attached to Folder** (the Crate menu's toggle) stays for crates
+  merely opened from elsewhere, e.g. downloaded on their own.
+
+### Publishing
+
+- **Crate > Publish To…**: deposit the crate in a repository or on the
+  web, as plugins (see "Plugins" above, a module layer of their own), one
+  for each service: ROHub, Zenodo (and InvenioRDM), WorkflowHub, GitHub
+  Pages (a repository's Pages branch, with the HTML preview as its
+  index), Dataverse. Each says what crates it takes, checked before
+  anything is uploaded: WorkflowHub a Workflow RO-Crate (a main workflow
+  and its language), ROHub a research object, Zenodo and Dataverse any
+  crate (as a zip, with their own metadata from the crate's: title,
+  creators with ORCIDs, licence, keywords), GitHub Pages an attached crate
+  of files small enough for Pages. Each shows what it would send and its
+  metadata to confirm, uploads as a job (sandbox first where the service
+  has one, e.g. Zenodo's), and leaves publishing (minting a DOI) to the
+  user on the service's own page unless asked. The identifier given back
+  (DOI, URL) is offered as the root's `identifier` and `cite-as`, and for
+  GitHub Pages as the base URI of a detached crate (above).
+- Accounts and tokens per service, kept in the platform's credential
+  store where there is one (not in settings.json), and never logged.
+
 ### Nested RO-Crates
 
 A crate may contain other crates: a folder of an attached crate with its
