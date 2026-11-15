@@ -208,4 +208,58 @@ public class TestCrateEditorPeople extends UiTest {
 		assertEquals("#person-3", CrateEditor.canonicalId("#person-3"));
 		assertEquals("data/counts.csv", CrateEditor.canonicalId("data/counts.csv"));
 	}
+
+	private javafx.scene.control.MenuItem menuItem(String id) {
+		javafx.scene.control.MenuBar bar = lookup("#menuBar").queryAs(javafx.scene.control.MenuBar.class);
+		return bar.getMenus().stream().flatMap(m -> m.getItems().stream()).filter(i -> id.equals(i.getId()))
+				.findFirst().orElseThrow();
+	}
+
+	/**
+	 * Edit > Merge Entities…: two selected, of any types, merged into the
+	 * one whose @id is chosen (an ORCID iD before a local one); not more
+	 * than two of different types, as likely selected by accident
+	 */
+	@Test
+	public void mergeSelected() throws Exception {
+		entities();
+		java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("merge");
+		java.nio.file.Files.writeString(dir.resolve("ro-crate-metadata.json"), """
+				{"@context": "https://w3id.org/ro/crate/1.3/context",
+				 "@graph": [
+				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.3"}},
+				  {"@id": "./", "@type": "Dataset", "name": "People",
+				   "author": [{"@id": "#j"}, {"@id": "https://orcid.org/0000-0002-1825-0097"}],
+				   "publisher": {"@id": "#uni"}},
+				  {"@id": "#j", "@type": "Person", "name": "J. Carberry", "email": "j@example.org"},
+				  {"@id": "https://orcid.org/0000-0002-1825-0097", "@type": "Person", "name": "Josiah Carberry"},
+				  {"@id": "#uni", "@type": "Organization", "name": "Brown University"}]}""");
+		javafx.stage.Stage stage = (javafx.stage.Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir.resolve("ro-crate-metadata.json"))).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		java.util.function.Consumer<List<String>> select = ids -> interact(() -> {
+			entities().getSelectionModel().clearSelection();
+			ids.forEach(id -> entities().getSelectionModel().select(entity(id).orElseThrow()));
+		});
+		// Three of different types: not offered
+		select.accept(List.of("#j", "https://orcid.org/0000-0002-1825-0097", "#uni"));
+		assertTrue(menuItem("menuMerge").isDisable());
+		// Two
+		select.accept(List.of("#j", "https://orcid.org/0000-0002-1825-0097"));
+		assertFalse(menuItem("menuMerge").isDisable());
+		// Not in interact(), which would wait for the dialog's answer
+		javafx.application.Platform.runLater(menuItem("menuMerge")::fire);
+		WaitForAsyncUtils.waitFor(10, java.util.concurrent.TimeUnit.SECONDS,
+				() -> lookup("#mergeKeep").tryQuery().isPresent());
+		assertEquals("https://orcid.org/0000-0002-1825-0097",
+				((Entity) lookup("#mergeKeep").queryAs(javafx.scene.control.ChoiceBox.class).getValue()).getId());
+		clickOn("Merge");
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(entity("#j").isEmpty());
+		Entity merged = entity("https://orcid.org/0000-0002-1825-0097").orElseThrow();
+		assertEquals("j@example.org", merged.get("email").orElseThrow().asText());
+		assertEquals(List.of("https://orcid.org/0000-0002-1825-0097"), entities().getItems().get(0).getAll("author")
+				.stream().map(v -> v.path("@id").asText()).toList());
+	}
 }

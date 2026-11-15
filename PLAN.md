@@ -656,7 +656,8 @@ Styles:
          Replace, Keep Both or Skip for names taken), with their `@id`s
          following the folder chosen; and Datasets with their folders.
      - Enabled whenever Paste is, in the entity list.
-  3. **Merge Entities** (Edit > Merge… and the right-click menu): select
+  3. **Merge Entities** (*done*: Edit > Merge Entities… and Merge… on the
+     right-click menu): select
      two or more entities in the list or a tree and merge them with the
      dialogue of renaming to an existing `@id` (`Crate.merge`, one undo
      step), choosing which `@id` stays. For duplicates found later, e.g. a

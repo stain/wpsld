@@ -59,4 +59,10 @@ that identifier, wpsld asks whether to merge them. Choose **Merge** only
 when both descriptions really refer to the same thing: their types and
 values are combined and references point to the merged entity. **Cancel**
 keeps them separate. Review the combined values; use **Edit > Undo** if
-the merge was a mistake.
+the merge was a mistake. An ORCID iD, ROR identifier or DOI typed in
+another form (e.g. `0000-0002-1825-0097`) counts as its web address.
+
+To merge entities without renaming, select them (two, or more of the same
+types) and choose **Edit > Merge Entities...** or **Merge...** on the
+right-click menu, then which `@id` to keep: one with a web address, such
+as an ORCID iD, is offered first, and the crate's own root stays itself.

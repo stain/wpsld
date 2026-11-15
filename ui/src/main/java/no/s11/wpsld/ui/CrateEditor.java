@@ -75,6 +75,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
@@ -663,6 +664,9 @@ public class CrateEditor extends Application {
 		MenuItem showFiles = new MenuItem(FileManager.label(FileManager.System.current()));
 		showFiles.setId("contextShowInFiles");
 		showFiles.setOnAction(e -> selectedPath().ifPresent(path -> showInFiles(stage, path)));
+		MenuItem merge = new MenuItem("Merge…");
+		merge.setId("contextMerge");
+		merge.setOnAction(e -> mergeEntities(stage));
 		MenuItem fileMetadata = new MenuItem("Metadata from the File…");
 		fileMetadata.setId("contextFileMetadata");
 		fileMetadata.setOnAction(e -> {
@@ -675,10 +679,11 @@ public class CrateEditor extends Application {
 		});
 		ContextMenu menu = new ContextMenu(copyEntity, pasteEntity, new SeparatorMenuItem());
 		menu.getItems().addAll(parts);
-		menu.getItems().addAll(new SeparatorMenuItem(), showFiles, fileMetadata, new SeparatorMenuItem(),
+		menu.getItems().addAll(new SeparatorMenuItem(), showFiles, fileMetadata, new SeparatorMenuItem(), merge,
 				removeEntity);
 		menu.setOnShowing(e -> {
 			enableParts(parts);
+			merge.setDisable(!canMerge());
 			showFiles.setDisable(selectedPath().isEmpty());
 			int files = selectedFiles().size();
 			fileMetadata.setText(files > 1 ? "Metadata from the " + files + " Files…" : "Metadata from the File…");
@@ -2109,7 +2114,81 @@ public class CrateEditor extends Application {
 		remove.setOnAction(e -> removeEntities());
 		// After Cut, Copy and Paste
 		items.add(3, remove);
+		MenuItem merge = new MenuItem("Mer_ge Entities…");
+		merge.setId("menuMerge");
+		merge.disableProperty().bind(Bindings.createBooleanBinding(() -> !canMerge(), selection));
+		merge.setOnAction(e -> mergeEntities(stage));
+		items.add(4, merge);
 		return items;
+	}
+
+	/**
+	 * Whether the entities selected can be merged: two or more; more than
+	 * two only of the same types, as one of others is likely selected by
+	 * accident (two of different types may be, e.g. a Person and a Thing
+	 * added for a reference)
+	 */
+	boolean canMerge() {
+		List<Entity> selected = selection.stream().filter(Objects::nonNull).toList();
+		return selected.size() == 2 || selected.size() > 2
+				&& selected.stream().map(e -> Set.copyOf(e.getTypes())).distinct().count() == 1;
+	}
+
+	/**
+	 * Edit > Merge Entities… (and Merge… on the right-click menu): merge
+	 * the entities selected into one, whose @id the user chooses (the root,
+	 * if it is one of them, as it stays; else one with an address, e.g. an
+	 * ORCID iD, rather than a local one): their types and values combined,
+	 * references to any of them pointing to it, as one undo step
+	 */
+	void mergeEntities(Stage stage) {
+		if (!canMerge()) {
+			return;
+		}
+		List<Entity> selected = crate.getEntities().stream().filter(selection::contains).toList();
+		ChoiceBox<Entity> keep = new ChoiceBox<>(FXCollections.observableArrayList(selected));
+		keep.setId("mergeKeep");
+		keep.setConverter(new javafx.util.StringConverter<>() {
+			@Override
+			public String toString(Entity e) {
+				return e == null ? "" : e.getLabel().equals(e.getId()) ? e.getId() : e.getId() + "  (" + e.getLabel() + ")";
+			}
+
+			@Override
+			public Entity fromString(String text) {
+				return null;
+			}
+		});
+		Entity edited = entityEditor.getEntity();
+		keep.setValue(selected.contains(crate.getRoot()) ? crate.getRoot()
+				: selected.stream().filter(e -> Crate.isAbsolute(e.getId())).findFirst()
+						.orElse(selected.contains(edited) ? edited : selected.get(0)));
+		keep.setDisable(selected.contains(crate.getRoot()));
+		Label about = new Label("Their types and values are combined into one entity, and references to any of"
+				+ " them point to it. Keep the @id of:");
+		about.setWrapText(true);
+		Dialog<ButtonType> dialog = new Dialog<>();
+		dialog.initOwner(stage);
+		dialog.setTitle("Merge Entities");
+		dialog.setHeaderText("Merge " + selected.size() + " entities into one?");
+		dialog.getDialogPane().setContent(new VBox(8, about, keep));
+		dialog.getDialogPane().setPrefWidth(480);
+		ButtonType merge = new ButtonType("Merge", ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().setAll(merge, ButtonType.CANCEL);
+		if (dialog.showAndWait().orElse(ButtonType.CANCEL) != merge) {
+			return;
+		}
+		// What was typed before is an undo step of its own
+		checkpoint();
+		Entity kept = keep.getValue();
+		selected.stream().filter(e -> e != kept).forEach(other -> crate.merge(kept, other));
+		// e.g. DataDownload and Thing become DataDownload
+		kept.setTypes(entityTypes.simplify(kept.getTypes()));
+		crate.mentionUnlinked();
+		show(kept);
+		entityEditor.edit(kept);
+		refresh();
+		checkpoint(placeOf(null), Optional.of("Merge Entities"));
 	}
 
 	/**
