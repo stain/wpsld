@@ -1437,6 +1437,16 @@ crate above, a ROHub crate, and generated ones with 1 000, 10 000 and
   entities, and an index of references (who refers to each `@id`) for the
   preview's "Referenced by", kept as the `@id` index is; time both on
   ICE-AUS.
+- *Considered*: keeping each set of types' form and reusing it for the
+  next entity of those types, its values cleared and filled again. Left
+  for now, as selecting takes 0.2 to 0.3 s since the groups show only the
+  properties in use: the form's handlers hold on to the entity they were
+  made for (lookups, Fill in, Find…, the map), so reusing them risks
+  writing to the previous entity, and a value left over is shown as the
+  new one's. If done: one cache per window's editor (nodes can't be in two
+  scenes, and several windows may come), cleared on opening another crate
+  and on changing style or profile, and each handler reading the entity
+  edited now.
 - *Measured and done (November 2026)*, by a test timing each step and
   sampling the JavaFX thread's stack (kept outside the repository, as it
   read downloaded crates): the COMPSs crate (WorkflowHub workflow 780,
