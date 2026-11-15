@@ -22,8 +22,10 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -88,9 +90,16 @@ public final class PRONOMFormats {
 	private final String version;
 	private final List<Format> formats;
 
+	private final Map<String, List<Format>> byExtension = new HashMap<>();
+
 	public PRONOMFormats(String version, List<Format> formats) {
 		this.version = Objects.requireNonNull(version);
 		this.formats = List.copyOf(formats);
+		// By lower-case extension, in the formats' order, as each file added looks up its own
+		for (Format format : this.formats) {
+			format.extensions().stream().map(e -> e.toLowerCase(Locale.ROOT)).distinct()
+					.forEach(e -> byExtension.computeIfAbsent(e, k -> new ArrayList<>()).add(format));
+		}
 	}
 
 	/**
@@ -209,7 +218,7 @@ public final class PRONOMFormats {
 			return List.of();
 		}
 		String extension = name.substring(dot + 1);
-		return formats.stream().filter(f -> f.extensions().stream().anyMatch(extension::equalsIgnoreCase)).toList();
+		return List.copyOf(byExtension.getOrDefault(extension.toLowerCase(Locale.ROOT), List.of()));
 	}
 
 	/**

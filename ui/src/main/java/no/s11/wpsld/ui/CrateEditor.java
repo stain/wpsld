@@ -1817,8 +1817,7 @@ public class CrateEditor extends Application {
 			if (crate.get(id).isPresent()) {
 				continue;
 			}
-			Entity file = crate.add("File");
-			crate.rename(file, id);
+			Entity file = crate.add("File", id);
 			crateFile.folder().map(folder -> folder.resolve(CrateFolder.decode(id))).ifPresent(path -> {
 				CrateFolder.describe(file, path);
 				// By its content, then its name

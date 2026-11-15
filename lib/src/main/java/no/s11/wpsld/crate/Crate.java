@@ -226,6 +226,22 @@ public class Crate {
 	}
 
 	/**
+	 * Add an entity with this identifier, e.g. a file's path, which no
+	 * entity of the crate has: as {@link #add(String)} and renaming it, but
+	 * without looking through all references for the new one's
+	 *
+	 * @throws IllegalArgumentException if another entity has it
+	 */
+	public Entity add(String type, String id) {
+		if (get(id).isPresent()) {
+			throw new IllegalArgumentException("Another entity already has @id " + id);
+		}
+		Entity entity = new Entity(id, type);
+		append(entity);
+		return entity;
+	}
+
+	/**
 	 * What {@link #paste(List, Map, boolean)} did.
 	 *
 	 * @param added     The entities added, in the order pasted
@@ -464,17 +480,25 @@ public class Crate {
 	 * <code>data/raw/a.csv</code>, else the root data entity.
 	 */
 	public Entity partOf(String id) {
-		Set<Entity> data = Set.copyOf(dataEntities());
+		return partOf(id, dataFolders());
+	}
+
+	/** The data entities by their paths without ./, e.g. data/ */
+	private Map<String, Entity> dataFolders() {
+		Map<String, Entity> folders = new HashMap<>();
+		dataEntities().forEach(e -> folders.putIfAbsent(withoutDot(e.getId()), e));
+		return folders;
+	}
+
+	private Entity partOf(String id, Map<String, Entity> folders) {
 		String path = withoutDot(id);
 		if (path.endsWith("/")) {
 			path = path.substring(0, path.length() - 1);
 		}
 		for (int slash = path.lastIndexOf('/'); slash > 0; slash = path.lastIndexOf('/', slash - 1)) {
-			String folder = path.substring(0, slash + 1);
-			Optional<Entity> dataset = entities.stream()
-					.filter(e -> data.contains(e) && withoutDot(e.getId()).equals(folder)).findFirst();
-			if (dataset.isPresent()) {
-				return dataset.get();
+			Entity dataset = folders.get(path.substring(0, slash + 1));
+			if (dataset != null) {
+				return dataset;
 			}
 		}
 		return getRoot();
@@ -497,16 +521,21 @@ public class Crate {
 		List<Entity> sorted = parts.stream().filter(e -> e != getRoot())
 				.sorted(Comparator.comparing((Entity e) -> withoutDot(e.getId()).replaceAll("/$", "").split("/").length))
 				.toList();
+		// Each dataset's parts set once, as there may be thousands
+		Set<Entity> data = new HashSet<>(dataEntities());
+		Map<String, Entity> folders = dataFolders();
+		Map<Entity, List<JsonNode>> hasParts = new LinkedHashMap<>();
 		for (Entity part : sorted) {
-			if (dataEntities().contains(part)) {
+			if (!data.add(part)) {
 				continue;
 			}
-			Entity dataset = partOf(part.getId());
-			List<JsonNode> hasPart = new ArrayList<>(dataset.getAll("hasPart"));
-			hasPart.add(JsonNodeFactory.instance.objectNode().put("@id", part.getId()));
-			dataset.setAll("hasPart", hasPart);
+			Entity dataset = partOf(part.getId(), folders);
+			hasParts.computeIfAbsent(dataset, d -> new ArrayList<>(d.getAll("hasPart")))
+					.add(JsonNodeFactory.instance.objectNode().put("@id", part.getId()));
+			folders.putIfAbsent(withoutDot(part.getId()), part);
 			added.add(part);
 		}
+		hasParts.forEach((dataset, values) -> dataset.setAll("hasPart", values));
 		return added;
 	}
 
