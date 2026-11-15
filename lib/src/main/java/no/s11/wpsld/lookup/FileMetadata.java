@@ -50,7 +50,10 @@ import no.s11.wpsld.lookup.EmbeddedMetadata.Found;
  * {@link LinkageError}, {@link StackOverflowError} or
  * {@link OutOfMemoryError}) is a problem to report rather than thrown; a
  * reader that takes too long is interrupted and left behind (on a daemon
- * thread). Problems are logged, with what was thrown, to find the fault.
+ * thread). A reader left behind on two files that is still at them is
+ * skipped for further files until it ends (a file it hangs on is likely
+ * not the only one of its kind), so that threads stuck in a library don't
+ * add up. Problems are logged, with what was thrown, to find the fault.
  * Readings without problems are remembered by the file's path,
  * size and date modified, so that a file is not read twice. Not to be
  * called on the JavaFX thread: a reading may take up to the time limit.
@@ -61,6 +64,8 @@ public final class FileMetadata {
 	public static final Duration LIMIT = Duration.ofSeconds(20);
 	/** How many readings to remember */
 	private static final int REMEMBERED = 1000;
+	/** How many threads of a reader may be left behind, still running, before it is skipped */
+	static final int STUCK = 2;
 
 	/**
 	 * What a file says about itself, by all readers, each value once
@@ -83,6 +88,8 @@ public final class FileMetadata {
 
 	private final List<MetadataReader> readers;
 	private final Duration limit;
+	/** Each reader's threads left behind, as it took too long */
+	private final Map<MetadataReader, Set<Thread>> stuck = new java.util.concurrent.ConcurrentHashMap<>();
 	private final Map<Key, Reading> remembered = Collections
 			.synchronizedMap(new LinkedHashMap<>(16, 0.75f, true) {
 				@Override
@@ -168,6 +175,13 @@ public final class FileMetadata {
 				problems.add(name(reader) + " failed: " + describe(e));
 				continue;
 			}
+			int busy = stillStuck(reader);
+			if (busy >= STUCK) {
+				LOGGER.log(Level.WARNING, () -> name(reader) + " skipped for " + file + ": still at " + busy
+						+ " files it took too long over");
+				problems.add(name(reader) + " skipped: still at " + busy + " earlier files it took too long over");
+				continue;
+			}
 			CompletableFuture<List<Found>> result = new CompletableFuture<>();
 			Thread thread = Thread.ofPlatform().daemon().name("Metadata: " + name(reader)).unstarted(() -> {
 				try {
@@ -189,6 +203,8 @@ public final class FileMetadata {
 				found.addAll(entry.getValue().get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS));
 			} catch (TimeoutException e) {
 				threads.get(reader).interrupt();
+				stuck.computeIfAbsent(reader, r -> java.util.concurrent.ConcurrentHashMap.newKeySet())
+						.add(threads.get(reader));
 				LOGGER.log(Level.WARNING, () -> name(reader) + " took over " + limit.toSeconds() + " s on " + file
 						+ ", at " + stack(threads.get(reader)));
 				problems.add(name(reader) + " took over " + limit.toSeconds() + " s");
@@ -212,6 +228,16 @@ public final class FileMetadata {
 			remembered.put(key, reading);
 		}
 		return reading;
+	}
+
+	/** How many of a reader's threads left behind are still running */
+	private int stillStuck(MetadataReader reader) {
+		Set<Thread> left = stuck.get(reader);
+		if (left == null) {
+			return 0;
+		}
+		left.removeIf(t -> !t.isAlive());
+		return left.size();
 	}
 
 	private static String name(MetadataReader reader) {

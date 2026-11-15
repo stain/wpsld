@@ -161,7 +161,17 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   foot of the window ("“photo.jpg” has its own description, author…":
   Review…, or for several Fill in, as one undo); more or larger ones not
   read but offered ("Added 37 files… Read what they say…"), as Crate >
-  Update File Details does: one background job
+  Update File Details does. Nothing read is given until clicked (Fill
+  in, an undo step of its own, "Metadata from Files"; Update File
+  Details' sizes and formats at once, "Update File Details"), so that a
+  read finishing never changes what is being typed; stopping offers what
+  was read so far; jobs belong to the crate opened (not the Crate object,
+  which undo replaces), and opening another cancels them, asking about
+  those the user started (`FileJobs`, one pool of two threads for all);
+  a reader left behind on two files still running is skipped until they
+  end. Next: a status strip of jobs with a window for each (progress,
+  status lines, Cancel, Run in background), also for Check Web
+  Availability and copying files in. As first planned: one background job
   with progress and Cancel (as copying files has), two files at a time
   each with its time limit, filling in only what entities lack (never
   where or the camera), a summary with the files that failed or took too

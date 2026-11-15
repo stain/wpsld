@@ -128,6 +128,42 @@ public class TestFileMetadata {
 		assertEquals(List.of("Slow cancelled"), reading.problems());
 	}
 
+	/**
+	 * A reader stuck on files, not even stopping when interrupted, is
+	 * skipped once two of its threads are left behind, until they end
+	 */
+	@Test
+	public void stuckSkipped() throws Exception {
+		java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+		FileMetadata metadata = new FileMetadata(List.of(new Reader("Stuck", () -> {
+			// As a library looping, not seeing interrupts
+			while (release.getCount() > 0) {
+				Thread.onSpinWait();
+			}
+			return List.of(new Found("name", "At last", Kind.TEXT, "test"));
+		})), Duration.ofMillis(200));
+		for (int i = 0; i < FileMetadata.STUCK; i++) {
+			Path file = Files.writeString(Files.createTempFile("file", ".txt"), "text " + i);
+			assertEquals(List.of("Stuck took over 0 s"), metadata.read(file).problems());
+		}
+		Path next = Files.writeString(Files.createTempFile("file", ".txt"), "next");
+		long start = System.nanoTime();
+		assertEquals(List.of("Stuck skipped: still at 2 earlier files it took too long over"),
+				metadata.read(next).problems());
+		// At once, not after the limit
+		assertTrue(Duration.ofNanos(System.nanoTime() - start).toMillis() < 150);
+		// Once they end, it reads again
+		release.countDown();
+		long until = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+		FileMetadata.Reading reading;
+		do {
+			Thread.sleep(20);
+			reading = metadata.read(next);
+		} while (!reading.problems().isEmpty() && System.nanoTime() < until);
+		assertEquals(List.of(), reading.problems());
+		assertEquals("At last", reading.found().get(0).value());
+	}
+
 	/** The built-in readers, and no others in lib */
 	@Test
 	public void installed() {

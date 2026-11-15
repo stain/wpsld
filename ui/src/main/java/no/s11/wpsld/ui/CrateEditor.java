@@ -941,10 +941,11 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * Run a background task, showing a window with its progress and Cancel
-	 * if it takes more than a moment; the window closes when it is done
+	 * Run a job reading files the user asked for (see {@link FileJobs}),
+	 * showing a window with its progress and Cancel if it takes more than a
+	 * moment; the window closes when it is done
 	 */
-	private <T> Task<T> inBackground(Stage stage, String header, Task<T> task) {
+	<T> Task<T> inBackground(Stage stage, String header, Task<T> task) {
 		ProgressBar bar = new ProgressBar();
 		bar.setMaxWidth(Double.MAX_VALUE);
 		bar.progressProperty().bind(task.progressProperty());
@@ -973,11 +974,16 @@ public class CrateEditor extends Application {
 			}
 		});
 		moment.play();
-		Thread thread = new Thread(task, header);
-		thread.setDaemon(true);
-		thread.start();
-		return task;
+		return fileJobs.start(task, opened, Optional.of(header), header);
 	}
+
+	/** Jobs reading files of the crate opened */
+	private final FileJobs fileJobs = new FileJobs();
+	/**
+	 * The crate opened (or new), until another is: not changed by undo,
+	 * which makes a new {@link Crate} of the same
+	 */
+	private Object opened = new Object();
 
 	/**
 	 * Give an entity what its file says about itself, where it has no value
@@ -1027,8 +1033,9 @@ public class CrateEditor extends Application {
 			return Optional.empty();
 		}
 		Entity entity = selected.get().getKey();
+		String id = entity.getId();
 		Path file = selected.get().getValue();
-		Crate readingFor = crate;
+		Object readingFor = opened;
 		Task<FileMetadata.Reading> task = new Task<>() {
 			@Override
 			protected FileMetadata.Reading call() {
@@ -1037,8 +1044,8 @@ public class CrateEditor extends Application {
 			}
 		};
 		task.setOnSucceeded(e -> {
-			if (crate == readingFor && crate.getEntities().contains(entity)) {
-				metadataFromFile(stage, entity, task.getValue());
+			if (opened == readingFor) {
+				crate.get(id).ifPresent(now -> metadataFromFile(stage, now, task.getValue()));
 			}
 		});
 		return Optional.of(inBackground(stage, "Reading what “" + entity.getLabel() + "” says about itself", task));
@@ -1070,6 +1077,8 @@ public class CrateEditor extends Application {
 		if (chosen.isEmpty()) {
 			return;
 		}
+		// What was typed before is an undo step of its own
+		checkpoint();
 		Set<String> replaced = new HashSet<>();
 		for (EmbeddedMetadata.Found f : chosen) {
 			JsonNode value = fileValue(f, true, entity);
@@ -1308,14 +1317,16 @@ public class CrateEditor extends Application {
 		if (dialog.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) {
 			return;
 		}
+		List<String> done = updateFiles(sizes.isSelected(), formats.isSelected());
 		if (embedded.isSelected()) {
-			updateFilesFromThem(stage, sizes.isSelected(), formats.isSelected());
+			readWhatFilesSay(stage, crateFiles(), done.isEmpty() ? ""
+					: done.size() + (done.size() == 1 ? " file's" : " files'") + " size or format updated. ", false);
 		} else {
-			showUpdated(stage, updateFiles(sizes.isSelected(), formats.isSelected()), List.of());
+			showUpdated(stage, done, List.of());
 		}
 	}
 
-	/** Tell what Update File Details updated, and what files couldn't be read */
+	/** Tell what Update File Details or Fill in updated, and what files couldn't be read */
 	private void showUpdated(Stage stage, List<String> done, List<String> problems) {
 		Alert alert = new Alert(problems.isEmpty() ? AlertType.INFORMATION : AlertType.WARNING,
 				(done.isEmpty() ? "The files' details were up to date."
@@ -1332,85 +1343,19 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * Crate > Update File Details with what the files say about themselves:
-	 * read in the background, two files at a time, with progress and
-	 * Cancel; then all updated at once (see {@link #updateFiles}), and told
-	 * what was, with the files that couldn't be read
-	 *
-	 * @return The reading, by @id
+	 * Crate > Update File Details with what the files say about themselves,
+	 * as {@link #askToUpdateFiles} does after updating sizes and formats:
+	 * read in the background (see {@link #readWhatFilesSay})
 	 */
-	Task<Map<String, FileMetadata.Reading>> updateFilesFromThem(Stage stage, boolean sizes, boolean formats) {
-		return updateFilesFromThem(stage, sizes, formats, crateFiles().keySet());
-	}
-
-	/**
-	 * As {@link #updateFilesFromThem(Stage, boolean, boolean)}, reading only
-	 * these files, by @id
-	 */
-	Task<Map<String, FileMetadata.Reading>> updateFilesFromThem(Stage stage, boolean sizes, boolean formats,
-			Set<String> only) {
-		Map<String, Path> files = new LinkedHashMap<>(crateFiles());
-		files.keySet().retainAll(only);
-		Crate readingFor = crate;
-		Task<Map<String, FileMetadata.Reading>> task = reading(files);
-		task.setOnSucceeded(e -> {
-			if (crate != readingFor) {
-				return;
-			}
-			Map<String, List<EmbeddedMetadata.Found>> found = new LinkedHashMap<>();
-			List<String> problems = new ArrayList<>();
-			files.keySet().forEach(id -> Optional.ofNullable(task.getValue().get(id)).ifPresent(reading -> {
-				found.put(id, reading.found());
-				reading.problems().forEach(problem -> problems.add(id + ": " + problem));
-			}));
-			showUpdated(stage, updateFiles(sizes, formats, found), problems);
-		});
-		task.setOnFailed(e -> {
-			System.getLogger(CrateEditor.class.getName()).log(System.Logger.Level.WARNING,
-					"Reading files' metadata failed", task.getException());
-			showUpdated(stage, List.of(), List.of(String.valueOf(task.getException())));
-		});
-		return inBackground(stage, "Reading what the files say about themselves", task);
-	}
-
-	/**
-	 * Read what files say about themselves, two at a time, with progress
-	 *
-	 * @param files By @id
-	 * @return The readings, by @id
-	 */
-	private static Task<Map<String, FileMetadata.Reading>> reading(Map<String, Path> files) {
-		return new Task<>() {
-			@Override
-			protected Map<String, FileMetadata.Reading> call() throws InterruptedException {
-				Map<String, FileMetadata.Reading> read = new LinkedHashMap<>();
-				java.util.concurrent.ExecutorService readers = java.util.concurrent.Executors.newFixedThreadPool(2,
-						r -> Thread.ofPlatform().daemon().name("Reading files").unstarted(r));
-				try {
-					java.util.concurrent.CompletionService<Map.Entry<String, FileMetadata.Reading>> done = new java.util.concurrent.ExecutorCompletionService<>(
-							readers);
-					files.forEach((id, path) -> done.submit(() -> Map.entry(id, FileMetadata.installed().read(path))));
-					for (int i = 0; i < files.size(); i++) {
-						updateProgress(i, files.size());
-						updateMessage(i + " of " + files.size() + " files read");
-						Map.Entry<String, FileMetadata.Reading> reading = done.take().get();
-						read.put(reading.getKey(), reading.getValue());
-					}
-				} catch (java.util.concurrent.ExecutionException e) {
-					throw new IllegalStateException(e.getCause());
-				} finally {
-					readers.shutdownNow();
-				}
-				return read;
-			}
-		};
+	Task<Map<String, FileMetadata.Reading>> updateFilesFromThem(Stage stage) {
+		return readWhatFilesSay(stage, crateFiles(), "", false);
 	}
 
 	/** Up to how many files added are read at once (quietly, in the background); more are offered */
 	static final int READ_AT_ONCE = 5;
 	/** Files added larger than this together are offered rather than read at once */
 	private static final long READ_AT_ONCE_BYTES = 200L << 20;
-	/** What the notice of files added calls properties */
+	/** What the notice of files read calls properties */
 	private static final Map<String, String> SAID = Map.ofEntries(Map.entry("name", "title"),
 			Map.entry("description", "description"), Map.entry("author", "author"),
 			Map.entry("dateCreated", "date created"), Map.entry("dateModified", "date modified"),
@@ -1421,10 +1366,8 @@ public class CrateEditor extends Application {
 	/**
 	 * Files just added: what they say about themselves, offered without
 	 * blocking the window. A few ({@link #READ_AT_ONCE}, not too large) are
-	 * read in the background, and if they say what their entities lack
-	 * (not where or the camera), a notice offers it: to review, for one
-	 * file, or to fill in, for several. More are not read, but offered, as
-	 * Crate > Update File Details reads them.
+	 * read in the background at once, quietly (see
+	 * {@link #readWhatFilesSay}); more are not read, but offered.
 	 *
 	 * @return The reading, if the files are read at once
 	 */
@@ -1445,88 +1388,212 @@ public class CrateEditor extends Application {
 		if (files.size() > READ_AT_ONCE || bytes > READ_AT_ONCE_BYTES) {
 			showNotice("Added " + files.size() + (files.size() == 1 ? " file" : " files")
 					+ ". Files can say who made them, when and under which licence.", "Read what they say…",
-					() -> updateFilesFromThem(stage, false, false, files.keySet()));
+					() -> readWhatFilesSay(stage, files, "", false));
 			return Optional.empty();
 		}
-		Crate readingFor = crate;
-		Task<Map<String, FileMetadata.Reading>> task = reading(files);
-		task.setOnSucceeded(e -> {
-			if (crate == readingFor) {
-				offerWhatFilesSaid(stage, task.getValue());
-			}
-		});
-		task.setOnFailed(e -> System.getLogger(CrateEditor.class.getName()).log(System.Logger.Level.WARNING,
-				"Reading files added failed", task.getException()));
-		Thread.ofPlatform().daemon().name("Reading files added").start(task);
-		return Optional.of(task);
+		return Optional.of(readWhatFilesSay(stage, files, "", true));
 	}
 
-	/** A notice of what files added say that their entities lack, if anything */
-	private void offerWhatFilesSaid(Stage stage, Map<String, FileMetadata.Reading> read) {
-		Map<Entity, FileMetadata.Reading> saying = new LinkedHashMap<>();
-		Set<String> said = new java.util.LinkedHashSet<>();
-		read.forEach((id, reading) -> crate.get(id).ifPresent(entity -> {
-			List<String> lacking = reading.found().stream().filter(f -> !f.onPurpose())
-					.map(EmbeddedMetadata.Found::property).filter(p -> entity.getAll(p).isEmpty()).distinct().toList();
-			if (!lacking.isEmpty()) {
-				saying.put(entity, reading);
-				lacking.forEach(p -> said.add(SAID.getOrDefault(p, p)));
+	/**
+	 * Read what files say about themselves in the background, then offer in
+	 * a notice what they say that their entities lack, to give them on a
+	 * click as one undo step: never while the user may be typing. Quietly,
+	 * a notice says the files are being read, and closing it cancels;
+	 * otherwise a window shows the progress, with Cancel, after which what
+	 * was read is offered.
+	 *
+	 * @param files  By @id
+	 * @param before What to tell first, e.g. that sizes were updated
+	 * @param quiet  Without a progress window (files just added): a file
+	 *               saying something is offered to review
+	 * @return The reading
+	 */
+	private Task<Map<String, FileMetadata.Reading>> readWhatFilesSay(Stage stage, Map<String, Path> files,
+			String before, boolean quiet) {
+		Map<String, FileMetadata.Reading> read = java.util.Collections.synchronizedMap(new LinkedHashMap<>());
+		Task<Map<String, FileMetadata.Reading>> task = fileJobs.reading(files, read);
+		Object readingFor = opened;
+		task.setOnSucceeded(e -> {
+			if (opened == readingFor) {
+				offerWhatFilesSaid(stage, task.getValue(), files.size(), before, false, quiet);
 			}
-		}));
+		});
+		task.setOnCancelled(e -> {
+			if (opened == readingFor && !quiet) {
+				Map<String, FileMetadata.Reading> sofar;
+				synchronized (read) {
+					sofar = new LinkedHashMap<>(read);
+				}
+				offerWhatFilesSaid(stage, sofar, files.size(), before, true, false);
+			}
+		});
+		task.setOnFailed(e -> {
+			System.getLogger(CrateEditor.class.getName()).log(System.Logger.Level.WARNING,
+					"Reading what files say failed", task.getException());
+			if (opened == readingFor) {
+				showNotice(before + "Reading what the files say failed: " + task.getException(), null, null);
+			}
+		});
+		if (!quiet) {
+			return inBackground(stage, "Reading what the files say about themselves", task);
+		}
+		showNotice("Reading " + (files.size() == 1 ? "the file" : "the " + files.size() + " files") + " added…",
+				null, null);
+		Runnable close = () -> task.cancel(true);
+		noticeClosed = close;
+		task.runningProperty().addListener((o, was, running) -> {
+			if (!running && noticeClosed == close) {
+				noticeClosed = null;
+			}
+		});
+		return fileJobs.start(task, opened, Optional.empty(), "Reading files added");
+	}
+
+	/**
+	 * A notice of what files read say that their entities lack, if anything,
+	 * to give them on a click (looked up by @id then, as undo makes new
+	 * entities): to review in the dialog, for a file just added, else to
+	 * fill in where they have nothing, as one undo step
+	 *
+	 * @param read      By @id
+	 * @param of        How many files there were to read
+	 * @param before    What to tell first
+	 * @param cancelled Whether reading was cancelled, after those read
+	 * @param quiet     Whether files just added, read without asking
+	 */
+	private void offerWhatFilesSaid(Stage stage, Map<String, FileMetadata.Reading> read, int of, String before,
+			boolean cancelled, boolean quiet) {
+		Map<String, FileMetadata.Reading> saying = new LinkedHashMap<>();
+		Set<String> said = new java.util.LinkedHashSet<>();
+		List<String> problems = new ArrayList<>();
+		read.forEach((id, reading) -> {
+			reading.problems().forEach(problem -> problems.add(id + ": " + problem));
+			crate.get(id).ifPresent(entity -> {
+				List<String> lacking = lacking(entity, reading);
+				if (!lacking.isEmpty()) {
+					saying.put(id, reading);
+					lacking.forEach(p -> said.add(SAID.getOrDefault(p, p)));
+				}
+			});
+		});
+		String head = before + (cancelled ? "Stopped after " + read.size() + " of " + of + " files. "
+				: quiet ? "" : "Read " + of + (of == 1 ? " file. " : " files. "));
+		String unread = problems.isEmpty() ? "" : " Not all could be read.";
 		if (saying.isEmpty()) {
+			if (quiet && problems.isEmpty()) {
+				hideNotice();
+			} else {
+				showNotice(head + "Nothing their entities lack." + unread, problems.isEmpty() ? null : "Details…",
+						() -> showUpdated(stage, List.of(), problems));
+			}
 			return;
 		}
 		List<String> what = List.copyOf(said);
 		String listed = what.size() == 1 ? what.get(0)
 				: String.join(", ", what.subList(0, what.size() - 1)) + " and " + what.get(what.size() - 1);
-		if (saying.size() == 1) {
-			Entity entity = saying.keySet().iterator().next();
-			showNotice("“" + entity.getLabel() + "” has its own " + listed + ".", "Review…", () -> {
-				if (crate.getEntities().contains(entity)) {
-					metadataFromFile(stage, entity, saying.get(entity));
-				}
-			});
+		Object readFor = opened;
+		if (quiet && saying.size() == 1) {
+			String id = saying.keySet().iterator().next();
+			showNotice("“" + crate.get(id).map(Entity::getLabel).orElse(id) + "” has its own " + listed + ".",
+					"Review…", () -> {
+						if (opened == readFor) {
+							crate.get(id).ifPresent(entity -> metadataFromFile(stage, entity, saying.get(id)));
+						}
+					});
 			return;
 		}
-		Crate readFor = crate;
-		showNotice(saying.size() + " of the files added have their own " + listed
-				+ ", to fill in where their entities have none.", "Fill in", () -> {
-					if (crate != readFor) {
-						return;
+		// e.g. "2 of the files added have their own", "It has its own"
+		boolean one = saying.size() == 1;
+		String who = quiet ? saying.size() + " of the files added"
+				: read.size() == 1 ? "It" : one ? "1 of them" : saying.size() == read.size() ? "All " + read.size()
+						: saying.size() + " of them";
+		showNotice(head + who + (one ? " has its own " : " have their own ") + listed + ", to fill in where "
+				+ (one ? "its entity has" : "their entities have") + " none." + unread, "Fill in", () -> {
+					if (opened == readFor) {
+						fillIn(stage, saying, problems);
 					}
-					Map<String, List<EmbeddedMetadata.Found>> found = new LinkedHashMap<>();
-					saying.forEach((entity, reading) -> found.put(entity.getId(), reading.found()));
-					showUpdated(stage, updateFiles(false, false, found), List.of());
 				});
+	}
+
+	/** What a file says that its entity lacks: its properties, not those to give only on purpose */
+	private static List<String> lacking(Entity entity, FileMetadata.Reading reading) {
+		return reading.found().stream().filter(f -> !f.onPurpose()).map(EmbeddedMetadata.Found::property)
+				.filter(p -> entity.getAll(p).isEmpty()).distinct().toList();
+	}
+
+	/**
+	 * Give files' entities what the files say where they have nothing (see
+	 * {@link #fillFromFile}), as they are now, as one undo step, "Metadata
+	 * from Files"; and tell what was, with the files that couldn't be read
+	 *
+	 * @param read By @id
+	 */
+	List<String> fillIn(Stage stage, Map<String, FileMetadata.Reading> read, List<String> problems) {
+		// What was typed before is an undo step of its own
+		checkpoint();
+		List<String> done = new ArrayList<>();
+		read.forEach((id, reading) -> crate.get(id).ifPresent(entity -> {
+			List<String> given = fillFromFile(entity, reading.found());
+			if (!given.isEmpty()) {
+				done.add(id + ": " + String.join("; ", given));
+			}
+		}));
+		if (!done.isEmpty()) {
+			crate.mentionUnlinked();
+			relist();
+			refresh();
+			// Its fields show the values given
+			Optional.ofNullable(entityEditor.getEntity()).ifPresent(entityEditor::edit);
+			checkpoint(placeOf(null), Optional.of("Metadata from Files"));
+		}
+		showUpdated(stage, done, problems);
+		return done;
 	}
 
 	/** At the foot of the window: e.g. that files added say something about themselves */
 	private final HBox notice = new HBox(8);
 
-	/** Show a notice, with what to do about it, until closed, done or replaced */
+	/** What closing the notice does besides, e.g. cancel reading files */
+	private Runnable noticeClosed;
+
+	/**
+	 * Show a notice, with what to do about it if anything, until closed,
+	 * done or replaced
+	 */
 	private void showNotice(String text, String action, Runnable onAction) {
+		hideNotice();
 		Label label = new Label(text);
 		label.setId("noticeText");
 		label.setWrapText(true);
 		label.setMaxWidth(Double.MAX_VALUE);
 		HBox.setHgrow(label, Priority.ALWAYS);
-		Button act = new Button(action);
-		act.setId("noticeAction");
-		act.setOnAction(e -> {
-			hideNotice();
-			onAction.run();
-		});
+		notice.getChildren().setAll(label);
+		if (action != null) {
+			Button act = new Button(action);
+			act.setId("noticeAction");
+			act.setOnAction(e -> {
+				hideNotice();
+				onAction.run();
+			});
+			notice.getChildren().add(act);
+		}
 		Button close = new Button("×");
 		close.setId("noticeClose");
 		close.setAccessibleText("Close");
 		close.setTooltip(new Tooltip("Close"));
 		close.setOnAction(e -> hideNotice());
-		notice.getChildren().setAll(label, act, close);
+		notice.getChildren().add(close);
 		notice.setVisible(true);
 		notice.setManaged(true);
 	}
 
+	/** Hide the notice, doing what closing it does, e.g. cancel reading files */
 	private void hideNotice() {
+		Runnable closed = noticeClosed;
+		noticeClosed = null;
+		if (closed != null) {
+			closed.run();
+		}
 		notice.getChildren().clear();
 		notice.setVisible(false);
 		notice.setManaged(false);
@@ -1571,17 +1638,11 @@ public class CrateEditor extends Application {
 	 * @return What was changed, a line for each file
 	 */
 	List<String> updateFiles(boolean sizes, boolean formats) {
-		return updateFiles(sizes, formats, Map.of());
-	}
-
-	/**
-	 * As {@link #updateFiles(boolean, boolean)}, and what each file says
-	 * about itself where its entity has no value (see {@link #fillFromFile})
-	 *
-	 * @param embedded What the files say, read already, by @id
-	 */
-	List<String> updateFiles(boolean sizes, boolean formats, Map<String, List<EmbeddedMetadata.Found>> embedded) {
 		List<String> done = new ArrayList<>();
+		if (!sizes && !formats) {
+			return done;
+		}
+		checkpoint();
 		for (Map.Entry<String, Path> part : crateFiles().entrySet()) {
 			String id = part.getKey();
 			Path file = part.getValue();
@@ -1595,17 +1656,16 @@ public class CrateEditor extends Application {
 							.map(v -> v.isTextual() ? v.asText() : v.path("@id").asText()).collect(Collectors.joining(", ")));
 				}
 			}
-			if (embedded.containsKey(id)) {
-				changed.addAll(fillFromFile(entity, embedded.get(id)));
-			}
 			if (!changed.isEmpty()) {
 				done.add(id + ": " + String.join("; ", changed));
 			}
 		}
 		if (!done.isEmpty()) {
-			changed();
+			relist();
+			refresh();
 			// Its fields show the values updated
 			Optional.ofNullable(entityEditor.getEntity()).ifPresent(entityEditor::edit);
+			checkpoint(placeOf(null), Optional.of("Update File Details"));
 		}
 		return done;
 	}
@@ -2408,6 +2468,17 @@ public class CrateEditor extends Application {
 	 * saves them or chooses not to.
 	 */
 	private boolean mayClose(Stage stage) {
+		List<String> reading = fileJobs.asked();
+		if (!reading.isEmpty()) {
+			ButtonType stop = new ButtonType("Stop Reading", ButtonData.YES);
+			Alert alert = new Alert(AlertType.CONFIRMATION, String.join("\n", reading)
+					+ "\n\nWhat was read so far won't be offered.", stop, ButtonType.CANCEL);
+			alert.initOwner(stage);
+			alert.setHeaderText("Still reading what files say about themselves");
+			if (alert.showAndWait().orElse(ButtonType.CANCEL) != stop) {
+				return false;
+			}
+		}
 		if (!crateFile.isModified(crate.toJson())) {
 			return true;
 		}
@@ -2426,6 +2497,10 @@ public class CrateEditor extends Application {
 	 * saved to a file, or a new one.
 	 */
 	private void edit(Crate other, Optional<Path> path) {
+		// Another crate: its jobs reading files stop, and what they read is
+		// not given to this one
+		fileJobs.cancelAll();
+		opened = new Object();
 		crate = other;
 		hideNotice();
 		unavailable = Map.of();

@@ -23,23 +23,28 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
 import org.testfx.util.WaitForAsyncUtils;
 
+import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
+import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuItem;
 import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
 import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.lookup.FileMetadata;
 import no.s11.wpsld.masp.ProfileCache;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
@@ -226,11 +231,18 @@ public class TestCrateEditorMetadata extends UiTest {
 		Stage stage = (Stage) entities().getScene().getWindow();
 		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir)).get());
 		WaitForAsyncUtils.waitForFxEvents();
-		Task<?> task = WaitForAsyncUtils.asyncFx(() -> app.updateFilesFromThem(stage, false, false)).get();
+		Task<?> task = WaitForAsyncUtils.asyncFx(() -> app.updateFilesFromThem(stage)).get();
 		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, task::isDone);
+		WaitForAsyncUtils.waitForFxEvents();
+		// Read, but given only on a click
+		assertTrue(listed("photo.jpg").orElseThrow().get("description").isEmpty());
+		String notice = app.notice().orElseThrow();
+		assertTrue(notice, notice.startsWith("Read 1 file. It has its own description"));
+		clickOn("#noticeAction");
 		WaitForAsyncUtils.waitForFxEvents();
 		assertTrue(lookup("1 file updated").tryQuery().isPresent());
 		clickDialogButton("OK");
+		assertEquals("_Undo Metadata from Files", undoName(stage));
 		Entity photo = listed("photo.jpg").orElseThrow();
 		assertEquals("Bus stop", photo.getLabel());
 		assertEquals("Bus stop on Oxford Road", photo.get("description").orElseThrow().asText());
@@ -241,11 +253,10 @@ public class TestCrateEditorMetadata extends UiTest {
 		assertTrue(photo.get("contentLocation").isEmpty());
 		assertTrue(photo.get("exifData").isEmpty());
 		// Again: nothing new
-		Task<?> again = WaitForAsyncUtils.asyncFx(() -> app.updateFilesFromThem(stage, false, false)).get();
+		Task<?> again = WaitForAsyncUtils.asyncFx(() -> app.updateFilesFromThem(stage)).get();
 		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, again::isDone);
 		WaitForAsyncUtils.waitForFxEvents();
-		assertTrue(lookup("Nothing to update").tryQuery().isPresent());
-		clickDialogButton("OK");
+		assertEquals(Optional.of("Read 1 file. Nothing their entities lack."), app.notice());
 	}
 
 	/** An empty crate in a folder of its own, with photos in it not yet described, opened */
@@ -302,15 +313,26 @@ public class TestCrateEditorMetadata extends UiTest {
 		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> app.notice().isPresent());
 		WaitForAsyncUtils.waitForFxEvents();
 		assertTrue(app.notice().orElseThrow(), app.notice().orElseThrow().startsWith("2 of the files added have"));
+		// Typed meanwhile: kept, and an undo step of its own
+		Entity one = listed("one.jpg").orElseThrow();
+		interact(() -> one.set("description", Optional.of(com.fasterxml.jackson.databind.node.TextNode.valueOf("Mine"))));
 		clickOn("#noticeAction");
 		WaitForAsyncUtils.waitForFxEvents();
 		assertTrue(lookup("2 files updated").tryQuery().isPresent());
 		clickDialogButton("OK");
-		for (String id : List.of("one.jpg", "two.jpg")) {
-			Entity photo = listed(id).orElseThrow();
-			assertEquals(id, "Bus stop on Oxford Road", photo.get("description").orElseThrow().asText());
-			assertTrue(id, photo.get("contentLocation").isEmpty());
-		}
+		assertEquals("Mine", listed("one.jpg").orElseThrow().get("description").orElseThrow().asText());
+		Entity two = listed("two.jpg").orElseThrow();
+		assertEquals("Bus stop on Oxford Road", two.get("description").orElseThrow().asText());
+		assertTrue(two.get("contentLocation").isEmpty());
+		assertEquals("Josiah Carberry",
+				listed(listed("one.jpg").orElseThrow().get("author").orElseThrow().get("@id").asText()).orElseThrow()
+						.getLabel());
+		// Undone at once, as one step, leaving what was typed
+		assertEquals("_Undo Metadata from Files", undoName(stage));
+		interact(menuItem("menuUndo")::fire);
+		assertTrue(listed("two.jpg").orElseThrow().get("description").isEmpty());
+		assertTrue(listed("one.jpg").orElseThrow().get("author").isEmpty());
+		assertEquals("Mine", listed("one.jpg").orElseThrow().get("description").orElseThrow().asText());
 	}
 
 	/** More files than are read at once: offered, not read, and read with progress if asked */
@@ -326,7 +348,10 @@ public class TestCrateEditorMetadata extends UiTest {
 				+ " licence."), app.notice());
 		clickOn("#noticeAction");
 		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS,
-				() -> lookup(photos.length + " files updated").tryQuery().isPresent());
+				() -> app.notice().filter(n -> n.startsWith("Read " + photos.length + " files. All")).isPresent());
+		clickOn("#noticeAction");
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup(photos.length + " files updated").tryQuery().isPresent());
 		clickDialogButton("OK");
 		assertEquals("Bus stop on Oxford Road", listed("photo1.jpg").orElseThrow().get("description").orElseThrow()
 				.asText());
@@ -346,5 +371,82 @@ public class TestCrateEditorMetadata extends UiTest {
 		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, task::isDone);
 		WaitForAsyncUtils.waitForFxEvents();
 		assertEquals(Optional.empty(), app.notice());
+	}
+
+	private MenuItem menuItem(String id) {
+		MenuBar bar = lookup("#menuBar").queryAs(MenuBar.class);
+		return bar.getMenus().stream().flatMap(m -> m.getItems().stream()).filter(i -> id.equals(i.getId()))
+				.findFirst().orElseThrow();
+	}
+
+	/** The Undo menu item's text, as the Edit menu names it when shown */
+	private String undoName(Stage stage) throws Exception {
+		MenuItem undo = menuItem("menuUndo");
+		return WaitForAsyncUtils.asyncFx(() -> {
+			app.nameUndo(stage, undo, menuItem("menuRedo"));
+			return undo.getText();
+		}).get();
+	}
+
+	/** A job reading files that runs until cancelled, as one taking long */
+	private static Task<Map<String, FileMetadata.Reading>> slowJob() {
+		return new Task<>() {
+			@Override
+			protected Map<String, FileMetadata.Reading> call() throws InterruptedException {
+				updateMessage("0 of 1000 files read");
+				new java.util.concurrent.CountDownLatch(1).await();
+				return Map.of();
+			}
+		};
+	}
+
+	/**
+	 * Opening another crate while reading files the user asked to: asked
+	 * whether to stop; if not, the crate stays; if so, it is cancelled
+	 */
+	@Test
+	public void switchingCrateStopsReading() throws Exception {
+		entities();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		crateWithPhotos(stage, "photo.jpg");
+		Task<Map<String, FileMetadata.Reading>> job = WaitForAsyncUtils
+				.asyncFx(() -> app.inBackground(stage, "Reading slowly", slowJob())).get();
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils.asyncFx(job::isRunning).get());
+		Platform.runLater(() -> app.newCrate(stage));
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
+				() -> lookup("Still reading what files say about themselves").tryQuery().isPresent());
+		assertTrue(lookup(".dialog-pane .content").queryLabeled().getText().contains("Reading slowly (0 of 1000 files read)"));
+		clickDialogButton("Cancel");
+		assertTrue(WaitForAsyncUtils.asyncFx(job::isRunning).get());
+		Platform.runLater(() -> app.newCrate(stage));
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
+				() -> lookup("Still reading what files say about themselves").tryQuery().isPresent());
+		clickDialogButton("Stop Reading");
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils.asyncFx(job::isCancelled).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(listed("photo.jpg").isEmpty());
+	}
+
+	/**
+	 * Files added are read quietly; opening another crate meanwhile stops
+	 * that without asking, and nothing read is offered for, nor given to,
+	 * the new crate
+	 */
+	@Test
+	public void switchingCrateDropsQuietReading() throws Exception {
+		entities();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		Path dir = crateWithPhotos(stage, "photo.jpg");
+		Path other = crateWithPhotos(stage, "photo.jpg");
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, dir)).get());
+		interact(() -> {
+			app.insertFiles(stage, List.of(dir.resolve("photo.jpg")));
+			// Not asked: files added are read without asking
+			assertTrue(app.open(stage, other));
+		});
+		Thread.sleep(1000);
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals(Optional.empty(), app.notice());
+		assertTrue(listed("photo.jpg").isEmpty());
 	}
 }

@@ -97,16 +97,23 @@ no value yet, use **Crate > Update File Details...**.
 
 When you add files (**Insert > Files...**, or adding files of the crate's
 folder as parts), up to five of them are read in the background while you
-work. If they say something their entities lack, a notice at the foot of
-the window offers it: **Review...** opens the dialog above for one file,
-and **Fill in** gives several files what they say where they have no
-value yet (not where or the camera), as one **Undo**. More files, or very
-large ones, are not read at once: the notice offers **Read what they
-say...** instead.
+work; close the notice "Reading the files added..." to stop. If they say
+something their entities lack, a notice at the foot of the window offers
+it: **Review...** opens the dialog above for one file, and **Fill in**
+gives several files what they say where they have no value yet (not
+where or the camera). More files, or very large ones, are not read at
+once: the notice offers **Read what they say...** instead.
+
+Nothing a file says is given to its entity until you click: what you type
+meanwhile is kept, and **Edit > Undo Metadata from Files** takes back
+just what was filled in. If you stop reading, what was read so far is
+offered. Opening another crate stops reading the files of this one,
+asking first if you asked for it.
 
 Files are read in the background; a large one shows its progress, with
 **Cancel**. A file that is damaged, or that a reader takes too long over
-(20 seconds), says what could be read, and which reader failed.
+(20 seconds), says what could be read, and which reader failed. A reader
+still busy with two such files is skipped for others until it is done.
 
 ## HTML preview
 

@@ -80,8 +80,8 @@ about themselves (titles, authors, dates, licences, sizes; see
 have no value yet. Where a photo was taken and the camera are left out:
 choose those for one file with **Metadata from the File...**. The files
 are read in the background, two at a time, with progress and **Cancel**;
-then all is updated at once (one **Undo**), and you are told which files
-couldn't be read.
+then a notice at the foot of the window offers what they say, to **Fill
+in** at once (one **Undo**), telling which files couldn't be read.
 
 ## Show in Explorer or Finder
 
