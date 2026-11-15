@@ -179,6 +179,14 @@ test {
     // A test JVM short of memory thrashes rather than fails (seen when a
     // class had too many tests): fail instead. All take 8 to 11 minutes.
     timeout = java.time.Duration.ofMinutes(20)
+    // Each failure in the log as it happens, with its stack (and UiTest's
+    // JavaFX thread stack on a time-out), as the report of a class still
+    // running is lost when the task's time-out ends it (as on macOS in CI)
+    testLogging {
+        events 'failed'
+        exceptionFormat 'full'
+        showStackTraces = true
+    }
 }
 
 application {
