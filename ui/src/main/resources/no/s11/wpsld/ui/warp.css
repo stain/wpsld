@@ -26,6 +26,8 @@
     -warp-menu-select-text: #ffffff;
     -warp-link: #2400a8;
     -warp-groove: #b8b8b8;
+    -warp-ribbon: #0000aa;
+    -warp-status: #000080;
 
     -fx-font-size: 12px;
 
@@ -478,4 +480,47 @@
 /* A description written in Markdown, in the preview: as its labels */
 .preview-text {
     -fx-fill: -warp-text;
+}
+
+/*
+ * Progress as Warp 4's installers showed it: a solid ribbon in a square
+ * sunken slot, over a scale from 0 to 100 (in the jobs' window); status in
+ * navy; each job in a sunken panel, with its buttons from the left.
+ */
+.progress-bar > .track {
+    -fx-background-color: -warp-light, -warp-dark, -warp-face, -warp-ink, -warp-face;
+    -fx-background-insets: 0, 0 1 1 0, 1, 1 2 2 1, 2;
+    -fx-background-radius: 0;
+}
+
+.progress-bar > .bar {
+    -fx-background-color: -warp-ribbon;
+    -fx-background-insets: 3;
+    -fx-background-radius: 0;
+}
+
+.progress-scale {
+    visibility: visible;
+    -fx-tick-label-fill: -warp-status;
+    -fx-tick-label-font-size: 11px;
+    -fx-tick-length: 7;
+    -fx-minor-tick-length: 4;
+}
+
+.progress-scale > .axis-tick-mark, .progress-scale > .axis-minor-tick-mark {
+    -fx-stroke: -warp-text;
+}
+
+.jobs-window .job-message {
+    -fx-text-fill: -warp-status;
+}
+
+.jobs-window .job {
+    -fx-background-color: -warp-dark, -warp-light, -warp-face;
+    -fx-background-insets: 0, 1 0 0 1, 1;
+    -fx-padding: 8;
+}
+
+.jobs-window .job-buttons {
+    -fx-alignment: center-left;
 }

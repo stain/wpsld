@@ -1210,6 +1210,20 @@ extension. Next:
   detached crate, fetching nothing. Manifests checked: SHA-512 (as
   RFC 8493 recommends) and SHA-256 (common); others reported as not
   checked.
+- **Open URL/PID defensively** (many ways to fail): repositories such as
+  Zenodo, a common home of crates, link their files with
+  `rel="item"` Signposting but without the RO-Crate profile, and a record
+  may have several items (zips, JSON, other files): offer them for the
+  user to pick, those most likely a crate first (`.crate.zip`, a zip, a
+  `ro-crate-metadata.json`), saying what each is (name, type, size). A
+  JSON item is hopefully `ro-crate-metadata.json`, but crates are also
+  deposited under other names: read it (within limits) and check it is a
+  crate (its `@graph` has a metadata descriptor `about` a root dataset)
+  before opening it, else say what it is. Every failure says what was
+  tried, in the order of "Retrieving an RO-Crate" (`Retrieved.steps`):
+  no network, not found, HTTP errors, redirect loops, too large, not
+  JSON, JSON but not a crate, a zip without a crate, rate limits, login
+  pages.
 - **A zip by FAIR Signposting**: `CrateRetriever` also follows
   `rel="item"` links to an RO-Crate zip (`type="application/zip"`, with
   the RO-Crate profile), as "Retrieving an RO-Crate" allows: downloaded

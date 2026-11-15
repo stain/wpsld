@@ -112,8 +112,9 @@ asking first if you asked for it.
 
 Files are read in the background. While they are, the foot of the
 window shows the progress; **Show...** brings up the window of the jobs
-running, with **Cancel** and **Run in Background**, which also opens by
-itself for reading you asked for that takes more than a moment. A file that is damaged, or that a reader takes too long over
+running, with **Cancel**, **Run in Background** and **Help**, which also
+opens by itself for reading you asked for that takes more than a moment.
+It shows what each job is at, and the files that couldn't be read. A file that is damaged, or that a reader takes too long over
 (20 seconds), says what could be read, and which reader failed. A reader
 still busy with two such files is skipped for others until it is done.
 

@@ -27,6 +27,19 @@
     -fx-text-fill: -wpsld-error-text;
 }
 
+/*
+ * A scale under a job's progress, shown only where a style asks (OS/2
+ * Warp); a job's buttons on the right, unless a style asks otherwise. Set
+ * here, so that switching from a style that changes them changes them back.
+ */
+.progress-scale {
+    visibility: hidden;
+}
+
+.jobs-window .job-buttons {
+    -fx-alignment: center-right;
+}
+
 /* At the foot of the window, e.g. that files added say something about themselves */
 .notice {
     -fx-background-color: -fx-box-border, derive(-fx-base, 4%);

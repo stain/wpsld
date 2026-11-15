@@ -64,6 +64,7 @@ final class Jobs {
 		private final Object opened;
 		private final boolean asked;
 		private final ObservableList<String> lines = FXCollections.observableArrayList();
+		private final javafx.beans.property.StringProperty item = new javafx.beans.property.SimpleStringProperty("");
 		private Task<?> task;
 		private Runnable cancel;
 		private Optional<Runnable> show = Optional.empty();
@@ -91,6 +92,16 @@ final class Jobs {
 		/** Bring up its own window, if it has one rather than the jobs' window */
 		Optional<Runnable> show() {
 			return show;
+		}
+
+		/** What it is at, e.g. the file being read; empty if nothing in particular */
+		javafx.beans.property.ReadOnlyStringProperty item() {
+			return item;
+		}
+
+		/** Say what it is at, from any thread */
+		void at(String what) {
+			Platform.runLater(() -> item.set(what));
 		}
 
 		/** Add a status line, from any thread */
@@ -186,8 +197,10 @@ final class Jobs {
 				CompletionService<Map.Entry<String, FileMetadata.Reading>> done = new ExecutorCompletionService<>(pool);
 				List<Future<Map.Entry<String, FileMetadata.Reading>>> reads = new ArrayList<>();
 				try {
-					files.forEach((id, path) -> reads
-							.add(done.submit(() -> Map.entry(id, FileMetadata.installed().read(path)))));
+					files.forEach((id, path) -> reads.add(done.submit(() -> {
+						job.at(id);
+						return Map.entry(id, FileMetadata.installed().read(path));
+					})));
 					for (int i = 0; i < files.size(); i++) {
 						updateProgress(i, files.size());
 						updateMessage(i + " of " + files.size() + " files read");

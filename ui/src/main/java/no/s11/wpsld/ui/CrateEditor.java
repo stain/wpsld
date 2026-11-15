@@ -299,7 +299,7 @@ public class CrateEditor extends Application {
 		notice.setPadding(new Insets(6, 12, 6, 12));
 		HBox.setHgrow(notice, Priority.ALWAYS);
 		hideNotice();
-		jobsView = new JobsView(jobs, stage);
+		jobsView = new JobsView(jobs, stage, owner -> showHelp(HelpDialog.Topic.FILES, owner));
 		// The notice and the jobs running, at the foot of the window
 		HBox foot = new HBox(notice, jobsView.strip());
 		foot.getStyleClass().add("notice");
