@@ -66,7 +66,7 @@ public final class FileMetadata {
 	 * What a file says about itself, by all readers, each value once
 	 *
 	 * @param found    The values, in the order of the readers
-	 * @param problems What went wrong, e.g. "Images (metadata-extractor)
+	 * @param problems What went wrong, e.g. "PDF (PDFBox)
 	 *                 took over 20 s"; none if all went well
 	 */
 	public record Reading(List<Found> found, List<String> problems) {

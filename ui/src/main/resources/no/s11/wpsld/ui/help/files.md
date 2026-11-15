@@ -70,10 +70,15 @@ the File…** to see what it says:
   dates) and their XMP metadata.
 - EPS and PostScript (also older Illustrator `.ai`), Photoshop (`.psd`)
   and InDesign files: their XMP metadata.
-- Photos and images (JPEG, PNG, TIFF, WebP): description, artist,
-  copyright, keywords, when taken and changed, a licence in their XMP,
-  their size in pixels, the camera and its settings, and where the photo
-  was taken, if the camera recorded it.
+- Photos and images (JPEG, PNG, TIFF, WebP, HEIC and HEIF, AVIF, GIF,
+  BMP, and camera raw files: DNG, CR2, CR3, NEF, ARW, ORF, RW2, RAF):
+  description, artist, copyright, keywords, when taken and changed, a
+  licence in their XMP, their size in pixels, the camera and its
+  settings, and where the photo was taken, if the camera recorded it.
+- Videos (MP4, QuickTime `.mov`): title, description, author, when
+  made, how long, their size in pixels, and from phones the phone and
+  where the video was taken. A phone's own time includes its time zone;
+  otherwise the time is in UTC.
 - SVG drawings: their title, description and size, and the metadata
   Inkscape writes (creator, date, rights, keywords, licence).
 
@@ -81,8 +86,8 @@ A licence named in a copyright notice, e.g. "© 2026 Ada Lovelace, CC BY
 4.0", is offered as the licence too.
 
 Tick what to give the file's entity. Those it has no value for yet are
-ticked to start with, except where a photo was taken and the camera: a
-photo can tell more than meant, such as where someone lives, so give
+ticked to start with, except where a photo or video was taken and the
+camera or phone: a photo can tell more than meant, such as where someone lives, so give
 those only on purpose. Hover over a value to see where in the file it is, and the
 entity's value now. Authors become links to a Person of that name, added
 if the crate has none; a licence known to SPDX a link to it; and where a

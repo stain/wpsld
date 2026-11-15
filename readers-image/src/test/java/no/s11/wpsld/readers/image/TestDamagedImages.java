@@ -17,7 +17,6 @@
  */
 package no.s11.wpsld.readers.image;
 
-import java.io.InputStream;
 import java.util.List;
 
 import org.junit.Test;
@@ -30,9 +29,7 @@ import no.s11.wpsld.test.Damaged;
 @Category(Damaged.class)
 public class TestDamagedImages {
 	private static byte[] resource(String name) throws Exception {
-		try (InputStream in = TestDamagedImages.class.getResourceAsStream("/no/s11/wpsld/lookup/" + name)) {
-			return in.readAllBytes();
-		}
+		return java.nio.file.Files.readAllBytes(TestImageMetadata.resource(name));
 	}
 
 	@Test
@@ -43,5 +40,25 @@ public class TestDamagedImages {
 	@Test
 	public void png() throws Exception {
 		Damage.readAll(List.of(new ImageMetadata()), "picture.png", resource("picture.png"), 2);
+	}
+
+	@Test
+	public void heic() throws Exception {
+		Damage.readAll(List.of(new ImageMetadata()), "photo.heic", resource("photo.heic"), 3);
+	}
+
+	@Test
+	public void gif() throws Exception {
+		Damage.readAll(List.of(new ImageMetadata()), "picture.gif", resource("picture.gif"), 4);
+	}
+
+	@Test
+	public void mp4() throws Exception {
+		Damage.readAll(List.of(new ImageMetadata()), "clip.mp4", resource("clip.mp4"), 5);
+	}
+
+	@Test
+	public void mov() throws Exception {
+		Damage.readAll(List.of(new ImageMetadata()), "clip.mov", resource("clip.mov"), 6);
 	}
 }

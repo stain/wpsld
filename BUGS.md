@@ -143,15 +143,18 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   TIFF, WebP and SVG files: names, descriptions, authors, keywords, dates,
   copyright, licences (also named in text, `SPDXLicenses.named`), sizes,
   the camera and where a photo was taken (`EmbeddedMetadata`,
-  `PdfMetadata`). Next: more formats with no new dependency, as
-  metadata-extractor reads them already: decide by its
-  `FileTypeDetector` rather than our own start bytes, to read HEIC/HEIF,
-  AVIF, DNG and other raw formats (CR2, CR3, NEF, ARW, ORF, RW2, RAF),
-  PSD, EPS and old PostScript `.ai` (newer `.ai` are PDFs, read already),
-  GIF, and videos (MP4, MOV); map videos' own metadata: QuickTime's and
-  MP4's creation date, `duration` (ISO 8601), the phone's make and model
-  and GPS (ISO 6709). Test files from temporary tools (ffmpeg, libheif,
-  libavif). Still to do: offering it when adding files (Insert >
+  `PdfMetadata`). More formats with no new dependency (*done*, by
+  metadata-extractor's `FileTypeDetector`: HEIC/HEIF, AVIF, GIF, BMP,
+  PSD, EPS, raw formats, MP4 and MOV, with videos' title, author,
+  creation date (QuickTime's with its offset, else the movie header's
+  UTC), `duration`, size, phone and ISO 6709 place; test files made with
+  ffmpeg, libheif, libavif, ImageMagick and exiftool). HEIF's own size
+  is not used: it is the coded image's, before cropping and rotation.
+  Found by the damaged-input tests: metadata-extractor 2.22.0 allocates
+  for a movie's sample description's entry count, running out of memory
+  on a damaged one; `MovieBoxes` refuses such movies first (to report
+  upstream). MP4's own location (`©xyz`) is not read by
+  metadata-extractor. Still to do: offering it when adding files (Insert >
   Files, dropping files in), never blocking the window: for one or a few
   files (up to about 5), read in the background and, if they say
   anything new, a non-modal notice ("photo.jpg says who made it, when and
