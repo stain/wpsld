@@ -88,6 +88,7 @@ import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Control;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.MultipleSelectionModel;
 import javafx.scene.control.Separator;
 import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.SeparatorMenuItem;
@@ -659,8 +660,7 @@ public class CrateEditor extends Application {
 	/** Keep up with the entities selected in the list or tree shown */
 	private void select() {
 		List<Entity> selected = byFolder ? tree.selectedEntities()
-				: new ArrayList<>(entities.getSelectionModel().getSelectedItems().stream()
-						.filter(e -> e != null && !isNotInCrate(e)).toList());
+				: new ArrayList<>(selectedInList().stream().filter(e -> !isNotInCrate(e)).toList());
 		if (!byFolder) {
 			Entity last = entities.getSelectionModel().getSelectedItem();
 			if (last != null && selected.remove(last)) {
@@ -2084,19 +2084,44 @@ public class CrateEditor extends Application {
 			if (!new HashSet<>(entities.getItems()).containsAll(shown)) {
 				entityType.setValue(null);
 			}
-			Map<Entity, Integer> index = new HashMap<>();
-			List<Entity> items = entities.getItems();
-			for (int i = 0; i < items.size(); i++) {
-				index.putIfAbsent(items.get(i), i);
-			}
-			int[] indices = shown.stream().map(index::get).filter(Objects::nonNull).mapToInt(Integer::intValue)
-					.toArray();
 			entities.getSelectionModel().clearSelection();
-			if (indices.length > 0) {
-				entities.getSelectionModel().selectIndices(indices[0], Arrays.copyOfRange(indices, 1, indices.length));
-			}
+			selectInList(shown);
 		} finally {
 			selectingSeveral = false;
+		}
+	}
+
+	/**
+	 * The entities selected in the list, in its order: each row asked
+	 * whether it is, as the selection model's own lists count from their
+	 * start for each item, too slow with thousands selected (e.g. pasted)
+	 */
+	private List<Entity> selectedInList() {
+		MultipleSelectionModel<Entity> model = entities.getSelectionModel();
+		List<Entity> items = entities.getItems();
+		List<Entity> selected = new ArrayList<>();
+		for (int i = 0; i < items.size(); i++) {
+			if (model.isSelected(i) && items.get(i) != null) {
+				selected.add(items.get(i));
+			}
+		}
+		return selected;
+	}
+
+	/**
+	 * Select these entities in the list too, at once (one change, not one
+	 * for each), the last as the selected item; those not listed are left out
+	 */
+	private void selectInList(List<Entity> chosen) {
+		Map<Entity, Integer> index = new HashMap<>();
+		List<Entity> items = entities.getItems();
+		for (int i = 0; i < items.size(); i++) {
+			index.putIfAbsent(items.get(i), i);
+		}
+		int[] indices = chosen.stream().map(index::get).filter(Objects::nonNull).mapToInt(Integer::intValue)
+				.toArray();
+		if (indices.length > 0) {
+			entities.getSelectionModel().selectIndices(indices[0], Arrays.copyOfRange(indices, 1, indices.length));
 		}
 	}
 
@@ -2121,7 +2146,7 @@ public class CrateEditor extends Application {
 	 *                     no longer of the type chosen, not when choosing it
 	 */
 	private void relist(boolean followEdited) {
-		List<Entity> selected = List.copyOf(entities.getSelectionModel().getSelectedItems());
+		List<Entity> selected = selectedInList();
 		Entity edited = entityEditor.getEntity();
 		relisting = true;
 		try {
@@ -2147,9 +2172,10 @@ public class CrateEditor extends Application {
 				entities.getSelectionModel().clearSelection();
 				// Not others than the entity edited, unless it is listed too
 				if (edited != null && listed.contains(edited)) {
-					selected.stream().filter(e -> e != edited).map(listed::indexOf).filter(i -> i >= 0)
-							.forEach(entities.getSelectionModel()::select);
-					entities.getSelectionModel().select(edited);
+					List<Entity> again = new ArrayList<>(selected.stream().filter(e -> e != edited).toList());
+					// The one edited last, as the selected item
+					again.add(edited);
+					selectInList(again);
 				}
 			}
 			// The attached crate's folder, as it changes

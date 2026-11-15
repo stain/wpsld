@@ -1433,7 +1433,12 @@ crate above, a ROHub crate, and generated ones with 1 000, 10 000 and
   one: the paste itself (`Crate.paste`, renaming clashing `#` ids, the
   references checked), selecting them (now at once, with no form), the
   undo step, relisting and the preview; and Paste's report, which lists
-  what was merged or kept.
+  what was merged or kept. Reported: pasting thousands freezes the window
+  for seconds, without even a busy (hourglass) pointer. Work that may
+  take long on the JavaFX thread should at least show the busy pointer
+  (`Cursor.WAIT` on the scene, set before and cleared after, letting a
+  pulse show it first), and the slow parts move to a job (see `Jobs`)
+  where they don't touch the scene.
 
 ### Internationalisation (i18n)
 

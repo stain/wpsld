@@ -44,10 +44,12 @@ public class Entity {
 
 	private String id;
 	private List<String> types;
+	/** Whether it is in a crate, whose index by @id a new @id changes */
+	boolean inCrate;
 	private final Map<String, JsonNode> values = new LinkedHashMap<>();
 
 	public Entity(String id, String... types) {
-		setId(id);
+		this.id = Objects.requireNonNull(id);
 		setTypes(List.of(types));
 	}
 
@@ -57,7 +59,9 @@ public class Entity {
 
 	public void setId(String id) {
 		this.id = Objects.requireNonNull(id);
-		ID_CHANGES.incrementAndGet();
+		if (inCrate) {
+			ID_CHANGES.incrementAndGet();
+		}
 	}
 
 	/** How many times any entity's @id was set, e.g. to know when an index by @id is out of date */

@@ -112,14 +112,14 @@ public class Crate {
 	private JsonLdContext processed;
 
 	public Crate() {
-		entities.add(new Entity(ROOT_ID, "Dataset"));
+		append(new Entity(ROOT_ID, "Dataset"));
 		context = TextNode.valueOf(RO_CRATE_1_3_CONTEXT);
 		descriptor = Optional.empty();
 	}
 
 	private Crate(Entity root, List<Entity> others, JsonNode context, Optional<Entity> descriptor) {
-		entities.add(root);
-		entities.addAll(others);
+		append(root);
+		others.forEach(this::append);
 		this.context = context.deepCopy();
 		this.descriptor = descriptor;
 	}
@@ -181,7 +181,7 @@ public class Crate {
 	}
 
 	public Optional<Entity> get(String id) {
-		if (index == null || indexedChanges != entities.changes() || indexedIds != Entity.idChanges()) {
+		if (!indexed()) {
 			indexedIds = Entity.idChanges();
 			indexedChanges = entities.changes();
 			index = byId();
@@ -189,12 +189,39 @@ public class Crate {
 		return Optional.ofNullable(index.get(id));
 	}
 
+	private boolean indexed() {
+		return index != null && indexedChanges == entities.changes() && indexedIds == Entity.idChanges();
+	}
+
+	/** Add an entity, to the index by @id too if it is up to date (pasting thousands looks up as it adds) */
+	private void append(Entity entity) {
+		boolean was = indexed();
+		entities.add(entity);
+		entity.inCrate = true;
+		if (was) {
+			index.putIfAbsent(entity.getId(), entity);
+			indexedChanges = entities.changes();
+		}
+	}
+
+	/**
+	 * The last number of each prefix of new identifiers, counting on from
+	 * it, rather than from 1 for each new entity (thousands, when pasting)
+	 */
+	private final Map<String, Integer> last = new HashMap<>();
+
+	/** The entities by @id, the first of each, up to date (see {@link #get}); not to change */
+	private Map<String, Entity> index() {
+		get("");
+		return index;
+	}
+
 	/**
 	 * Add an entity with a new local identifier like <code>#person-1</code>.
 	 */
 	public Entity add(String type) {
 		Entity entity = new Entity(newId(type), type);
-		entities.add(entity);
+		append(entity);
 		return entity;
 	}
 
@@ -280,7 +307,7 @@ public class Crate {
 				continue;
 			}
 			// Added straight away, so that newId sees it
-			entities.add(entity);
+			append(entity);
 			added.add(entity);
 		}
 		List<Entity> pasted = new ArrayList<>(added);
@@ -289,7 +316,7 @@ public class Crate {
 
 		Set<String> dangling = new LinkedHashSet<>();
 		Set<String> ambiguous = new LinkedHashSet<>();
-		Map<String, Entity> byId = byId();
+		Map<String, Entity> byId = index();
 		pasted.stream().flatMap(e -> e.getValues().keySet().stream().flatMap(p -> references(e, p)))
 				.filter(id -> !copiedIds.contains(id) && !renamed.containsValue(id) && !isDescriptor(id) && !isTerm(id))
 				.forEach(id -> {
@@ -349,10 +376,11 @@ public class Crate {
 	 */
 	private String newId(String type) {
 		String prefix = "#" + type.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-") + "-";
-		int n = 1;
+		int n = last.getOrDefault(prefix, 0) + 1;
 		while (get(prefix + n).isPresent()) {
 			n++;
 		}
+		last.put(prefix, n);
 		return prefix + n;
 	}
 
@@ -420,7 +448,7 @@ public class Crate {
 	 * as a <code>citation</code>, is a contextual entity.
 	 */
 	public List<Entity> dataEntities() {
-		Map<String, Entity> byId = byId();
+		Map<String, Entity> byId = index();
 		Set<Entity> parts = new LinkedHashSet<>();
 		Deque<Entity> queue = new ArrayDeque<>(List.of(getRoot()));
 		while (!queue.isEmpty()) {
@@ -496,7 +524,7 @@ public class Crate {
 				continue;
 			}
 			Entity dataset = new Entity(id, "Dataset");
-			entities.add(dataset);
+			append(dataset);
 			added.add(dataset);
 		}
 		addParts(added);
@@ -554,7 +582,7 @@ public class Crate {
 	 * @return The entities added, in the order first referred to
 	 */
 	public List<Entity> addReferenced() {
-		Map<String, Entity> byId = byId();
+		Map<String, Entity> byId = index();
 		List<Entity> added = new ArrayList<>();
 		for (Entity entity : List.copyOf(entities)) {
 			for (String property : entity.getValues().keySet()) {
@@ -563,7 +591,7 @@ public class Crate {
 						.forEach(id -> {
 							Entity thing = new Entity(id, "Thing");
 							byId.put(id, thing);
-							entities.add(thing);
+							append(thing);
 							added.add(thing);
 						});
 			}
@@ -584,7 +612,7 @@ public class Crate {
 		Entity root = getRoot();
 		List<String> properties = root.getValues().keySet().stream().filter(p -> !p.equals("mentions")).toList();
 		Set<Entity> linked = linkedFrom(root.getId(), properties, new HashSet<>());
-		Map<String, Entity> byId = byId();
+		Map<String, Entity> byId = index();
 		List<Entity> unmentioned = new ArrayList<>();
 		List<JsonNode> mentions = new ArrayList<>();
 		for (JsonNode mention : root.getAll("mentions")) {
@@ -607,7 +635,7 @@ public class Crate {
 	 * properties.
 	 */
 	private Set<Entity> linkedFrom(String id, List<String> properties, Set<Entity> linked) {
-		Map<String, Entity> byId = byId();
+		Map<String, Entity> byId = index();
 		Deque<Entity> queue = new ArrayDeque<>();
 		Entity start = byId.get(id);
 		for (String property : properties) {

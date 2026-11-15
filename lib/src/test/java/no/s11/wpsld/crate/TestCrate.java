@@ -51,8 +51,8 @@ public class TestCrate {
 		assertEquals("#person-1", alice.getId());
 		assertEquals("#person-2", bob.getId());
 		assertTrue(crate.remove(alice));
-		// Identifier not reused while #person-2 exists, but #person-1 is free
-		assertEquals("#person-1", crate.add("Person").getId());
+		// Counting on from the last given, not reusing #person-1
+		assertEquals("#person-3", crate.add("Person").getId());
 		assertEquals(Optional.of(bob), crate.get("#person-2"));
 	}
 
@@ -202,26 +202,26 @@ public class TestCrate {
 		crate.rename(uppsala, "#uom");
 		crate.add("Organization");
 		Crate.Pasted pasted = crate.paste(aliceBobAndUom(), Map.of(), false);
-		// #organization-1 is taken too
-		assertEquals(Map.of("#uom", "#organization-2"), pasted.renamed());
+		// Counting on from #organization-2, the last given
+		assertEquals(Map.of("#uom", "#organization-3"), pasted.renamed());
 		Entity alice = crate.get("https://orcid.org/0000-0002-1825-0097").orElseThrow();
 		Entity bob = crate.get("#bob").orElseThrow();
-		assertEquals(ref("#organization-2"), alice.get("affiliation").orElseThrow());
-		assertEquals(ref("#organization-2"), bob.get("affiliation").orElseThrow());
-		assertEquals("University of Manchester", crate.get("#organization-2").orElseThrow().getLabel());
+		assertEquals(ref("#organization-3"), alice.get("affiliation").orElseThrow());
+		assertEquals(ref("#organization-3"), bob.get("affiliation").orElseThrow());
+		assertEquals("University of Manchester", crate.get("#organization-3").orElseThrow().getLabel());
 		// The crate's own #uom is left alone
 		assertEquals("#uom", uppsala.getId());
 
 		// Pasted again: the local ones are copies, the absolute one is there
 		List<Entity> again = aliceBobAndUom();
 		Crate.Pasted second = crate.paste(again, Map.of(), false);
-		assertEquals(List.of("#person-1", "#organization-3"), second.added().stream().map(Entity::getId).toList());
-		assertEquals(ref("#organization-3"), second.added().get(0).get("affiliation").orElseThrow());
+		assertEquals(List.of("#person-1", "#organization-4"), second.added().stream().map(Entity::getId).toList());
+		assertEquals(ref("#organization-4"), second.added().get(0).get("affiliation").orElseThrow());
 		// Alice there, but with another affiliation: to merge
 		assertEquals(1, second.existing().size());
 		Map.Entry<Entity, Entity> merge = second.existing().entrySet().iterator().next();
 		assertSame(alice, merge.getValue());
-		assertEquals(ref("#organization-3"), merge.getKey().get("affiliation").orElseThrow());
+		assertEquals(ref("#organization-4"), merge.getKey().get("affiliation").orElseThrow());
 		// Copies left as they were
 		assertEquals(ref("#uom"), again.get(1).get("affiliation").orElseThrow());
 	}
@@ -231,13 +231,14 @@ public class TestCrate {
 		Crate crate = new Crate();
 		crate.rename(crate.add("Organization"), "#a");
 		crate.rename(crate.add("Organization"), "#organization-1");
-		// #a becomes #organization-2: a later copy's rename doesn't take it on
+		// #a becomes #organization-3 (after the last given, 2): a later copy's
+		// rename doesn't take it on
 		Entity a = new Entity("#a", "Organization");
 		Entity org = new Entity("#organization-1", "Organization");
 		Entity x = new Entity("#x", "Person");
 		x.setAll("affiliation", List.of(ref("#a"), ref("#organization-1")));
 		crate.paste(List.of(a, org, x), Map.of(), false);
-		assertEquals(List.of(ref("#organization-2"), ref("#organization-3")),
+		assertEquals(List.of(ref("#organization-3"), ref("#organization-4")),
 				crate.get("#x").orElseThrow().getAll("affiliation"));
 	}
 
