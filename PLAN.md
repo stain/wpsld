@@ -1205,7 +1205,31 @@ extension. Next:
   (from the crate's name, description, dates, creator) and the
   manifests; and update the manifests on save. Check
   https://github.com/LibraryOfCongress/bagit-java (archived) or write the
-  little BagIt needs (it is simple: text files and checksums).
+  little BagIt needs (it is simple: text files and checksums). A bag
+  whose payload is listed in `fetch.txt` (a "holey" bag) is opened as a
+  detached crate, fetching nothing. Manifests checked: SHA-512 (as
+  RFC 8493 recommends) and SHA-256 (common); others reported as not
+  checked.
+- **A zip by FAIR Signposting**: `CrateRetriever` also follows
+  `rel="item"` links to an RO-Crate zip (`type="application/zip"`, with
+  the RO-Crate profile), as "Retrieving an RO-Crate" allows: downloaded
+  in the background within the same limits, then opened as a zip (above).
+- **Keep the persistent identifier**: a crate opened by its DOI or other
+  PID gets it as the root's `identifier` and `cite-as`, where it has none,
+  from Signposting's `cite-as` (and its `license` link where the crate has
+  no licence), so that a local copy still says where it came from.
+- **Open a zip without unpacking**: browse a zip read-only through the zip
+  file system, with Crate > Extract to Folder… to edit it, rather than
+  always unpacking; so that large `.eln` exports open at once, and files'
+  own metadata is read from zip paths as they are.
+- **Background jobs first**: downloading, unpacking, checking manifests
+  and Check Web Availability are slow and cancellable, so they use the
+  status strip of jobs (see BUGS.md: a strip at the foot of the window,
+  a window for each job with progress, status lines, Cancel and Run in
+  background), done before them.
+- **Order**: the jobs strip; Open URL/PID (read-only, Save As); open and
+  export zips; open and check a bag; make a bag (last, as it moves the
+  user's files into `data/`).
 
 ### Nested RO-Crates
 
