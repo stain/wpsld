@@ -3,8 +3,10 @@
 # (jpackage: wpsld.exe, wpsld.app, bin/wpsld) and Java and JavaFX included,
 # plus a portable zip without JavaFX for any platform (see ui/src/dist).
 #
-# A tag v<version> (e.g. v0.2.0) builds that version and makes a draft
-# GitHub release with the zips, to review and publish by hand. Run from
+# A tag v<version> (e.g. v0.2.0), made with scripts/release.sh so that
+# gradle.properties has that version, builds it and makes a draft GitHub
+# release with the zips (or adds them to the tag's release, if one was
+# made already), to review and publish by hand. Run from
 # Actions -> Run workflow, it only keeps the zips as workflow artifacts.
 #
 # Not built: Windows on Arm, as JavaFX 27 has no windows-aarch64 jmods.
@@ -58,13 +60,17 @@ jobs:
           java-version: '25'
           cache: gradle
 
+      # The version committed in gradle.properties (see scripts/release.sh);
+      # a tag must name the same, so that a build of the tagged commit
+      # anywhere says the version released
       - name: Version
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
-          else
-            echo "VERSION=$(sed -n 's/^version=//p' gradle.properties)" >> "$GITHUB_ENV"
+          VERSION=$(sed -n 's/^version=//p' gradle.properties)
+          if [[ "$GITHUB_REF" == refs/tags/v* && "$VERSION" != "${GITHUB_REF_NAME#v}" ]]; then
+            echo "::error::gradle.properties has version=$VERSION, but the tag is $GITHUB_REF_NAME: release with scripts/release.sh"
+            exit 1
           fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       # The jmods, so that jlink installs JavaFX's native libraries in the image
       - name: Download JavaFX jmods
@@ -132,5 +138,11 @@ jobs:
           # The artifacts keep their folders under ui/build: image-zip/ and distributions/
           mv */*.zip .
           sha256sum *.zip > SHA256SUMS
-          gh release create "$GITHUB_REF_NAME" *.zip SHA256SUMS --repo "$GITHUB_REPOSITORY" \
-            --draft --verify-tag --title "wpsld ${GITHUB_REF_NAME#v}" --generate-notes
+          # A release of this tag made already (e.g. on GitHub's website)
+          # gets the zips, rather than a second one for the same tag
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" *.zip SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" *.zip SHA256SUMS --repo "$GITHUB_REPOSITORY" \
+              --draft --verify-tag --title "wpsld ${GITHUB_REF_NAME#v}" --generate-notes
+          fi
