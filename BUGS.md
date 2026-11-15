@@ -46,6 +46,13 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   try with LDaCA's larger collections (see PLAN.md), as integration
   tests reading them from the web, as their licences don't allow
   bundling them.
+- **Typing slow in a large entity** (*done*): typing in the root's
+  description of ICE-AUS (hundreds of parts) took 0.2 s a key, as the
+  Preview tab was made again for each, adding each part's link one at a
+  time (JavaFX checks each child added against all the others). Now the
+  preview is made again once typing pauses, its values added at once,
+  and at most 100 of a property shown, with Show all; opening ICE-AUS
+  also went from 3.9 s to 1.75 s.
 - **Adding several entities edited each in turn** (*done*): adding files
   or pasting entities selected them one by one, so that the form and
   preview were made for each (thousands in a large crate); now they are

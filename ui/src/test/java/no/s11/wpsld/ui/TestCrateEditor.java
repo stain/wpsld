@@ -1254,10 +1254,19 @@ public class TestCrateEditor extends UiTest {
 		clickOn("#propertySearch").write("name");
 		TextField name = lookup("#header-name").queryAs(TextField.class);
 		clickOn(name).write("My crate");
-		assertEquals("My crate", lookup("#previewName").queryAs(Label.class).getText());
+		// Once typing pauses
+		waitForPreview("My crate");
 		clickOn("#propertySearch").eraseText(4).write("license");
 		clickOn(lookup("#value-license-0").queryAs(ComboBox.class).getEditor())
 				.write("http://spdx.org/licenses/CC0-1.0");
+		try {
+			WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> lookup("#previewProperties").tryQuery().isPresent()
+					&& from(lookup("#previewProperties").queryAs(Node.class)).lookup(".hyperlink")
+							.queryAllAs(Hyperlink.class).stream()
+							.anyMatch(l -> l.getText().equals("http://spdx.org/licenses/CC0-1.0")));
+		} catch (java.util.concurrent.TimeoutException e) {
+			throw new AssertionError("Preview not updated", e);
+		}
 		// Human readable labels of the properties
 		assertTrue(from(lookup("#previewProperties").queryAs(Node.class)).lookup(".label").queryAllAs(Label.class)
 				.stream().anyMatch(l -> l.getText().equals("License")));
@@ -1319,5 +1328,15 @@ public class TestCrateEditor extends UiTest {
 			assertFalse("Root cell's item changed while typing", itemChanged[0]);
 			assertTrue(after.getText().startsWith("My crate\n"));
 		}).get();
+	}
+
+	/** Wait for the preview to show this name, as it is made again once typing pauses */
+	private void waitForPreview(String name) {
+		try {
+			WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> lookup("#previewName").tryQuery()
+					.map(n -> ((Label) n).getText().equals(name)).orElse(false));
+		} catch (java.util.concurrent.TimeoutException e) {
+			throw new AssertionError("Preview not showing " + name, e);
+		}
 	}
 }

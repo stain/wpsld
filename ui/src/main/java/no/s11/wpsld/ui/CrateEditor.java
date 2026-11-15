@@ -933,7 +933,7 @@ public class CrateEditor extends Application {
 		MenuItem addDataset = new MenuItem("Add _Dataset for Folder");
 		addDataset.setId(prefix + "AddDataset");
 		addDataset.setOnAction(e -> addDatasets());
-		MenuItem addPart = new MenuItem("Add _File(s) to Has Part");
+		MenuItem addPart = new MenuItem("Add File(s) to Has _Part");
 		addPart.setId(prefix + "AddPart");
 		addPart.setOnAction(e -> addParts());
 		return List.of(addDataset, addPart);
@@ -3775,7 +3775,14 @@ public class CrateEditor extends Application {
 	private void refresh() {
 		labels.set(labels.get() + 1);
 		if (entityPreview != null) {
-			entityPreview.refresh();
+			Node focused = stage == null || stage.getScene() == null ? null : stage.getScene().getFocusOwner();
+			if (focused instanceof TextInputControl) {
+				// While typing, once it pauses: a large entity's preview takes long
+				previewLater.playFromStart();
+			} else {
+				previewLater.stop();
+				entityPreview.refresh();
+			}
 		}
 		jsonShown = false;
 		if (jsonTab == null || jsonTab.isSelected()) {
@@ -3785,6 +3792,12 @@ public class CrateEditor extends Application {
 		if (stage != null) {
 			stage.setTitle(crateFile.title(crate.toJson(), CrateFile.onMac()));
 		}
+	}
+
+	private final javafx.animation.PauseTransition previewLater = new javafx.animation.PauseTransition(
+			javafx.util.Duration.millis(300));
+	{
+		previewLater.setOnFinished(e -> entityPreview.refresh());
 	}
 
 	private Tab jsonTab;

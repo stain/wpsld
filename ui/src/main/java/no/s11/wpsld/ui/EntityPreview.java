@@ -100,6 +100,9 @@ public class EntityPreview extends ScrollPane {
 		this.takesUrl = Objects.requireNonNull(takesUrl);
 	}
 
+	/** How many values of a property are shown at first */
+	static final int SHOWN = 100;
+
 	/**
 	 * Show an entity.
 	 */
@@ -174,7 +177,17 @@ public class EntityPreview extends ScrollPane {
 				continue;
 			}
 			VBox values = new VBox(2);
-			entity.getAll(property).forEach(v -> values.getChildren().add(value(property, v, current)));
+			List<JsonNode> all = entity.getAll(property);
+			// All at once, as each child added is checked against all the others
+			values.getChildren().setAll(all.stream().limit(SHOWN).map(v -> value(property, v, current)).toList());
+			if (all.size() > SHOWN) {
+				// e.g. a root's thousands of parts: the others on asking
+				Hyperlink more = new Hyperlink("Show all " + all.size());
+				more.setId("previewMore-" + property);
+				more.setOnAction(e -> values.getChildren().setAll(
+						all.stream().map(v -> value(property, v, current)).toList()));
+				values.getChildren().add(more);
+			}
 			properties.addRow(row++, propertyLabel(property), values);
 		}
 		content.getChildren().add(properties);
