@@ -279,6 +279,12 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   tried 13 November 2026, it works as an automatic module in a module
   layer of its own with java.desktop in the boot layer), and packets in
   other formats (MP4/MOV's `uuid` box, by FileTypeDetector, above).
+- **Which formats real crates have**: survey the files of LDaCA's
+  collections (their `encodingFormat`s, PRONOM ids and extensions, from
+  the members' crates, e.g. Mitchell and Delbridge's WAV recordings,
+  `fmt/141`, and ICE-AUS's transcripts) and of ROHub's research objects,
+  to see which our metadata readers read, which they could (and with
+  which library), and which matter most next.
 - **Metadata of scientific formats**: global attributes by the CF and
   ACDD conventions map onto the file's or dataset's properties: `title`
   (name), `summary` (description), `creator_name`/`creator_email`

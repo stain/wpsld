@@ -556,6 +556,15 @@ Styles:
 
 ### Entities
 
+- **Choosing a type that hides the entity edited** *(to investigate,
+  undecided)*: now the form keeps showing it, and it is selected again
+  when listed again. Perhaps the form should empty instead ("No entity
+  selected"), as after removing it: why would the user choose another
+  type unless to go to another entity? But they may be looking for the
+  entity to link from the one edited (e.g. which Person to give as its
+  author), and lose their place. Watch what users do; perhaps keep the
+  form while the type is chosen from a reference field, or offer
+  "Back to …".
 - **Copy and paste entities.** In the entity list, Edit > Copy (and the
   list's own menu) puts the selected entities on the clipboard as their
   JSON-LD (`EntityClipboard`): as text for text editors (an object, or
@@ -1224,6 +1233,15 @@ extension. Next:
   no network, not found, HTTP errors, redirect loops, too large, not
   JSON, JSON but not a crate, a zip without a crate, rate limits, login
   pages.
+- **Repositories without Signposting**: LDaCA's collection pages are a
+  JavaScript application whose server answers HTTP 404 with an empty page,
+  whatever is asked for, and no `Link` headers; the crate is in its API:
+  `https://data.ldaca.edu.au/api/object/<arcp id, URL-encoded>?meta=original`
+  (an object's own crate; `/api/object/meta?id=` redirects there). Know
+  such repositories by their addresses (a small plugin each, as for
+  Publish): LDaCA and other Oni repositories, and others found (ROHub,
+  WorkflowHub's `/ro_crate` zips), each turning a page's address into its
+  crate's.
 - **A zip by FAIR Signposting**: `CrateRetriever` also follows
   `rel="item"` links to an RO-Crate zip (`type="application/zip"`, with
   the RO-Crate profile), as "Retrieving an RO-Crate" allows: downloaded
@@ -1305,6 +1323,17 @@ RO-Crates" in the spec's data entities). Recognise them:
 - Checks: files of a nested crate shouldn't be the outer crate's parts
   directly; the nested crate's own metadata file and preview are not
   data of the outer one.
+- **Collections of crates in a repository**, as LDaCA's (an Oni
+  repository): a collection is a crate of its own (a
+  `RepositoryCollection`, with no `hasPart` or `hasMember`), and each of
+  its members another crate (`RepositoryObject`, with its files), linking
+  up with `memberOf`. Mitchell and Delbridge has 7733 members, each about
+  13 entities and 1 s to fetch. Open the collection's crate, list its
+  members from the repository's API as they are asked for (paged:
+  `/api/objects?memberOf=<id>`, 100 in 2.4 s), and open a member as a
+  crate of its own; never put them all together (LDaCA's `?meta=all`
+  times out). Their files are on the web (`/api/stream?id=…&path=…`),
+  so members open as detached crates.
 
 ### Licences, defaults and the metadata descriptor
 
@@ -1382,6 +1411,22 @@ crate above, a ROHub crate, and generated ones with 1 000, 10 000 and
   (undo, the title's "modified"), `dataEntities()` and `byId()` built
   again in loops, the tree made again from scratch, and the preview's
   "Referenced by" scanning all entities.
+- *Measured and done (November 2026)*, by a test timing each step and
+  sampling the JavaFX thread's stack (kept outside the repository, as it
+  read downloaded crates): the COMPSs crate (WorkflowHub workflow 780,
+  1835 entities) opened in 174 s, now 2.2 s; see BUGS.md for what
+  changed. LDaCA's ICE-AUS collection (2374 entities, 1.3 MB): opening
+  3.9 s, selecting an entity 0.9 to 1.4 s, undo 1.2 s, mostly JavaFX
+  laying out the form, next to look at (fewer controls made at once,
+  e.g. groups built when opened, as folded ones already are).
+- A larger real one: LDaCA's Mitchell and Delbridge collection, 7733
+  member crates of about 13 entities each (about 43 MB of JSON-LD if put
+  together, some 35 000 to 50 000 entities); LDaCA's own API times out
+  (after 2 minutes) putting it together (`?meta=all`). As a stress test,
+  generate a crate of that size from a sample of its members rather than
+  fetching them all (an hour or two, one by one).
+- These crates' licences (CC BY, CC BY-NC) allow using them but not
+  bundling them: as online integration tests, downloading them when run.
 
 ### Internationalisation (i18n)
 
