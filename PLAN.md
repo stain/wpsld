@@ -1427,6 +1427,13 @@ crate above, a ROHub crate, and generated ones with 1 000, 10 000 and
   fetching them all (an hour or two, one by one).
 - These crates' licences (CC BY, CC BY-NC) allow using them but not
   bundling them: as online integration tests, downloading them when run.
+- **Pasting many small entities**: time copying and pasting 500 fairly
+  simple PropertyValue objects (e.g. a table's variables, as
+  `variableMeasured` would make), into an empty crate and into a large
+  one: the paste itself (`Crate.paste`, renaming clashing `#` ids, the
+  references checked), selecting them (now at once, with no form), the
+  undo step, relisting and the preview; and Paste's report, which lists
+  what was merged or kept.
 
 ### Internationalisation (i18n)
 
