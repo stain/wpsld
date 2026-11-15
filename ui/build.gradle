@@ -183,7 +183,8 @@ test {
 
 application {
   applicationName = 'wpsld'
-  mainClass = 'no.s11.wpsld.ui.CrateEditor'
+  // Not the CrateEditor itself, so that its log is set up before JavaFX starts
+  mainClass = 'no.s11.wpsld.ui.Main'
   mainModule = 'no.s11.wpsld.ui'
 }
 

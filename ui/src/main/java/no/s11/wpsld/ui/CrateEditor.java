@@ -3582,7 +3582,6 @@ public class CrateEditor extends Application {
 	}
 
 	public static void main(String[] args) {
-		Logs.setUp();
-		launch(args);
+		Main.main(args);
 	}
 }

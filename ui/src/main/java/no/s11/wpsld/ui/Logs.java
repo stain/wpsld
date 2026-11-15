@@ -73,17 +73,22 @@ final class Logs {
 	/** The folder logged to, if any */
 	private static Path folder;
 	private static FileHandler file;
+	private static boolean setUp;
 
 	private Logs() {
 	}
 
 	/**
 	 * Log to the user's log folder, if it can be made, and log what is
-	 * thrown and not caught. Called first, before anything logs.
+	 * thrown and not caught. Called first, before anything logs; once.
 	 *
 	 * @return The log folder, if logged to
 	 */
-	static Optional<Path> setUp() {
+	static synchronized Optional<Path> setUp() {
+		if (setUp) {
+			return folder();
+		}
+		setUp = true;
 		// What the JDK's HTTP client logs (through System.Logger): its
 		// errors, not each request, as their addresses may carry searches
 		// and GeoNames' username
