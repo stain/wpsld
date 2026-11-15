@@ -652,7 +652,14 @@ public class CrateEditor extends Application {
 		showFiles.setOnAction(e -> selectedPath().ifPresent(path -> showInFiles(stage, path)));
 		MenuItem fileMetadata = new MenuItem("Metadata from the File…");
 		fileMetadata.setId("contextFileMetadata");
-		fileMetadata.setOnAction(e -> metadataFromFile(stage));
+		fileMetadata.setOnAction(e -> {
+			Map<String, Path> files = selectedFiles();
+			if (files.size() > 1) {
+				metadataFromFiles(stage, files);
+			} else {
+				metadataFromFile(stage);
+			}
+		});
 		ContextMenu menu = new ContextMenu(copyEntity, pasteEntity, new SeparatorMenuItem());
 		menu.getItems().addAll(parts);
 		menu.getItems().addAll(new SeparatorMenuItem(), showFiles, fileMetadata, new SeparatorMenuItem(),
@@ -660,7 +667,9 @@ public class CrateEditor extends Application {
 		menu.setOnShowing(e -> {
 			enableParts(parts);
 			showFiles.setDisable(selectedPath().isEmpty());
-			fileMetadata.setDisable(selectedFile().isEmpty());
+			int files = selectedFiles().size();
+			fileMetadata.setText(files > 1 ? "Metadata from the " + files + " Files…" : "Metadata from the File…");
+			fileMetadata.setDisable(files == 0);
 		});
 		return menu;
 	}
@@ -1057,6 +1066,27 @@ public class CrateEditor extends Application {
 			}
 		});
 		return Optional.of(inBackground(stage, "Reading what “" + entity.getLabel() + "” says about itself", task));
+	}
+
+	/**
+	 * The files selected that the crate describes and that are in its
+	 * folder, by @id
+	 */
+	private Map<String, Path> selectedFiles() {
+		Map<String, Path> all = crateFiles();
+		Map<String, Path> files = new LinkedHashMap<>();
+		selection.forEach(e -> Optional.ofNullable(all.get(e.getId())).ifPresent(f -> files.put(e.getId(), f)));
+		return files;
+	}
+
+	/**
+	 * Metadata from the Files… for several selected: read in the background
+	 * as one job, then a notice offers to fill in what their entities lack,
+	 * as one undo step (see {@link #readWhatFilesSay}), rather than a dialog
+	 * for each
+	 */
+	Task<Map<String, FileMetadata.Reading>> metadataFromFiles(Stage stage, Map<String, Path> files) {
+		return readWhatFilesSay(stage, files, "", false);
 	}
 
 	/** The kinds of files wpsld reads metadata from */

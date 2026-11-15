@@ -60,7 +60,10 @@ of that name can stay).
 
 Some files say what they are, who made them, when and under which
 licence. Right-click a file in the entity list and choose **Metadata from
-the File…** to see what it says:
+the File…** to see what it says. With several files selected, **Metadata
+from the Files…** reads them all in the background, then offers to fill
+in what their entities lack, at once (see below), rather than a dialog
+for each. These kinds of files say something:
 
 - Office files (`.docx`, `.xlsx`, `.pptx`) and OpenDocument files from
   LibreOffice or OpenOffice (`.odt`, `.ods`, `.odp`, and the older

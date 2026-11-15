@@ -516,4 +516,40 @@ public class TestCrateEditorMetadata extends UiTest {
 		assertTrue(text, text.startsWith("Kinds of files wpsld reads metadata from:\n• Office"));
 		clickDialogButton("OK");
 	}
+
+	/**
+	 * Several files selected: the right-click menu offers Metadata from the
+	 * Files…, read as one job, offered in one notice to fill in (one undo
+	 * step), not a dialog for each
+	 */
+	@Test
+	public void metadataFromSeveralFiles() throws Exception {
+		entities();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		Path dir = crateWithPhotos(stage, "one.jpg", "two.jpg");
+		interact(() -> app.insertFiles(stage, List.of(dir.resolve("one.jpg"), dir.resolve("two.jpg"))));
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> app.notice().isPresent());
+		clickOn("#noticeClose");
+		// Both selected, as added
+		rightClickOn(lookup("#entities").queryListView().lookupAll(".list-cell").stream()
+				.filter(c -> ((javafx.scene.control.ListCell<?>) c).getItem() != null
+						&& ((Entity) ((javafx.scene.control.ListCell<?>) c).getItem()).getId().equals("two.jpg"))
+				.findFirst().orElseThrow());
+		WaitForAsyncUtils.waitForFxEvents();
+		javafx.scene.control.MenuItem item = entities().getContextMenu().getItems().stream()
+				.filter(i -> "contextFileMetadata".equals(i.getId())).findFirst().orElseThrow();
+		assertEquals("Metadata from the 2 Files…", item.getText());
+		assertFalse(item.isDisable());
+		interact(() -> {
+			item.fire();
+			entities().getContextMenu().hide();
+		});
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS,
+				() -> app.notice().filter(n -> n.startsWith("Read 2 files. All 2 have")).isPresent());
+		clickOn("#noticeAction");
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup("2 files updated").tryQuery().isPresent());
+		clickDialogButton("OK");
+		assertEquals("Bus stop on Oxford Road", listed("two.jpg").orElseThrow().get("description").orElseThrow().asText());
+	}
 }

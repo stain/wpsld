@@ -357,6 +357,15 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   `description`; `propertyID` (an IRI defining it, e.g. a CF standard
   name, chosen by hand otherwise); for numbers `unitText`, `unitCode`
   (an IRI, e.g. QUDT), `minValue`, `maxValue`, `measurementTechnique`.
+  - R's `.RData`/`.rda` (and `.rds`): no title, author or licence, but
+    named objects whose data frames give columns: names, types (numeric,
+    factor with its levels, character, dates), number of rows, and labels
+    where packages keep them (Hmisc's and haven's `label` attributes, as
+    from SPSS, a `comment` attribute). R's serialisation format is
+    documented (R Internals, "Serialization Formats"): XDR, compressed
+    with gzip, bzip2 or xz, starting `RDX2`/`RDX3`; no Java library reads
+    it that isn't GPL (Renjin), so a small reader of our own, in the
+    statistics module, with the damaged-input tests.
   - CSV and TSV: the header row's names, each column's kind (number,
     date, text) and for numbers their minimum and maximum, by reading the
     file (in the background, as files may be large); with CSVW metadata
