@@ -1432,7 +1432,11 @@ crate above, a ROHub crate, and generated ones with 1 000, 10 000 and
 - Likely costs to look at: `crate.toJson()` compared on every change
   (undo, the title's "modified"), `dataEntities()` and `byId()` built
   again in loops, the tree made again from scratch, and the preview's
-  "Referenced by" scanning all entities.
+  "Referenced by" scanning all entities. Next: the form finding
+  references by `Crate.get` (the index) rather than going through the
+  entities, and an index of references (who refers to each `@id`) for the
+  preview's "Referenced by", kept as the `@id` index is; time both on
+  ICE-AUS.
 - *Measured and done (November 2026)*, by a test timing each step and
   sampling the JavaFX thread's stack (kept outside the repository, as it
   read downloaded crates): the COMPSs crate (WorkflowHub workflow 780,
@@ -1460,7 +1464,9 @@ crate above, a ROHub crate, and generated ones with 1 000, 10 000 and
   take long on the JavaFX thread should at least show the busy pointer
   (`Cursor.WAIT` on the scene, set before and cleared after, letting a
   pulse show it first), and the slow parts move to a job (see `Jobs`)
-  where they don't touch the scene.
+  where they don't touch the scene. *Measured*: pasting 2000 took 7.3 s
+  into a large crate, now 1 s (0.2 s into a new one), as they are
+  selected at once with no form; the busy pointer is still to do.
 
 ### Internationalisation (i18n)
 

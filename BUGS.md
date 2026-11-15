@@ -65,6 +65,31 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   button out of reach. Long reports (Repair Crate, Update File Details,
   Paste) now scroll in a text area that can be copied from, listing every
   change rather than the first ten.
+- **The list scrolled after right-clicking a file** (*done*): in a
+  large crate's folder, right-clicking a file not in the crate after
+  scrolling down kept the selection but moved the list; selecting a row
+  already shown no longer scrolls. A file or folder not in the crate,
+  selected, now shows no form or preview but "Not in the crate" with the
+  actions to add it.
+- **Renaming to an ORCID iD in another form didn't merge** (*done*):
+  renaming `#person3` to `0000-0002-…` (or `http://orcid.org/…`) while
+  the person imported from ORCID was in the crate as
+  `https://orcid.org/…` made a second entity; ORCID iDs, ROR identifiers
+  and DOIs are now compared by their `https://` address, and merging is
+  offered as for the same `@id`.
+- **"Nothing new" from Metadata from the File was confusing** (*done*):
+  now one message for a kind of file wpsld reads that said nothing new,
+  and another, listing the kinds it reads, for one it doesn't.
+- **Expand and collapse only by keys** (*done*): Expand, Expand All,
+  Collapse and Collapse All are on the right-click menu of Entities by
+  Folder and by Part, for all the rows selected; Collapse All was
+  missing (`/`, also on the keypad, as `+ * -`).
+- **Dangling `#propertyvalue-N` references**: a crate seen in testing
+  had thousands of references to `#propertyvalue-N` entities not in the
+  crate. Find out how: copying entities without the PropertyValues they
+  refer to (Paste keeps such references dangling), or the crate as
+  received. If ours, Copy could offer to take the entities referred to
+  that only these refer to (see Paste Special in PLAN.md).
 - **Adding many files as parts is slow**: in an attached crate's folder of
   many files, selecting several (grey, not yet in the crate) subfolders
   and choosing Add to hasPart from the context menu takes a while, with
