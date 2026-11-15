@@ -50,7 +50,8 @@ import no.s11.wpsld.lookup.EmbeddedMetadata.Found;
  * {@link LinkageError}, {@link StackOverflowError} or
  * {@link OutOfMemoryError}) is a problem to report rather than thrown; a
  * reader that takes too long is interrupted and left behind (on a daemon
- * thread). Readings without problems are remembered by the file's path,
+ * thread). Problems are logged, with what was thrown, to find the fault.
+ * Readings without problems are remembered by the file's path,
  * size and date modified, so that a file is not read twice. Not to be
  * called on the JavaFX thread: a reading may take up to the time limit.
  */
@@ -147,6 +148,7 @@ public final class FileMetadata {
 			key = new Key(file.toAbsolutePath().normalize(), attributes.size(), attributes.lastModifiedTime());
 			head = in.readNBytes(MetadataReader.HEAD);
 		} catch (IOException | RuntimeException e) {
+			LOGGER.log(Level.WARNING, "Not read: " + file, e);
 			return new Reading(List.of(), List.of("Not read: " + describe(e)));
 		}
 		Reading known = remembered.get(key);
@@ -162,6 +164,7 @@ public final class FileMetadata {
 					continue;
 				}
 			} catch (Throwable e) {
+				LOGGER.log(Level.WARNING, name(reader) + " failed on " + file, e);
 				problems.add(name(reader) + " failed: " + describe(e));
 				continue;
 			}
@@ -186,8 +189,11 @@ public final class FileMetadata {
 				found.addAll(entry.getValue().get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS));
 			} catch (TimeoutException e) {
 				threads.get(reader).interrupt();
+				LOGGER.log(Level.WARNING, () -> name(reader) + " took over " + limit.toSeconds() + " s on " + file
+						+ ", at " + stack(threads.get(reader)));
 				problems.add(name(reader) + " took over " + limit.toSeconds() + " s");
 			} catch (ExecutionException e) {
+				LOGGER.log(Level.WARNING, name(reader) + " failed on " + file, e.getCause());
 				problems.add(name(reader) + " failed: " + describe(e.getCause()));
 			} catch (InterruptedException e) {
 				threads.values().forEach(Thread::interrupt);
@@ -214,6 +220,13 @@ public final class FileMetadata {
 		} catch (RuntimeException e) {
 			return reader.getClass().getName();
 		}
+	}
+
+	/** Where a thread is, to see where a reader got stuck */
+	private static String stack(Thread thread) {
+		StackTraceElement[] stack = thread.getStackTrace();
+		return stack.length == 0 ? "(ended)"
+				: String.join("\n\tat ", java.util.Arrays.stream(stack).limit(20).map(String::valueOf).toList());
 	}
 
 	/** A failure in a line, e.g. "EOFException: Unexpected end of file" */

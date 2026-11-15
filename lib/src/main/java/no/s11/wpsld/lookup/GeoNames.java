@@ -101,6 +101,11 @@ public class GeoNames {
 		public GeoNamesException(String message) {
 			super(message);
 		}
+
+		/** With what it couldn't read, e.g. JSON broken off */
+		public GeoNamesException(String message, Throwable cause) {
+			super(message, cause);
+		}
 	}
 
 	private final HttpClient http;
@@ -160,7 +165,7 @@ public class GeoNames {
 		try {
 			json = MAPPER.readTree(response.body());
 		} catch (IOException e) {
-			throw new GeoNamesException("GeoNames answered " + response.statusCode() + " with no results");
+			throw new GeoNamesException("GeoNames answered " + response.statusCode() + " with no results", e);
 		}
 		return parse(json);
 	}

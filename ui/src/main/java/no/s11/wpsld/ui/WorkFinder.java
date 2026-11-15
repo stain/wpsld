@@ -169,6 +169,7 @@ class WorkFinder extends Dialog<Work> {
 		});
 		task.setOnFailed(e -> {
 			Throwable problem = task.getException();
+			System.getLogger(WorkFinder.class.getName()).log(System.Logger.Level.WARNING, "DOI search failed", problem);
 			status.setText((doi ? "Can't look up the DOI: " : "Can't search: ")
 					+ (problem.getMessage() == null ? problem.toString() : problem.getMessage())
 					+ ". You can still give the DOI as https://doi.org/… by hand.");

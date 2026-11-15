@@ -27,6 +27,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.stream.Stream;
 
 import no.s11.wpsld.lookup.FileMetadata;
 import no.s11.wpsld.lookup.MetadataReader;
@@ -117,15 +120,28 @@ public final class Damage {
 		for (int round = 0; round < rounds(); round++) {
 			copies.addAll(of(original, seed * 1000 + round));
 		}
-		for (int i = 0; i < copies.size(); i++) {
-			Copy copy = copies.get(i);
-			// Each its own file, not taken for one read already
-			Path file = Files.write(dir.resolve(i + "-" + name), copy.bytes());
-			for (String problem : metadata.read(file).problems()) {
-				if (problem.contains(" took over ") || problem.contains("OutOfMemoryError")
-						|| problem.contains("StackOverflowError")) {
-					bad.add(name + ", " + copy.how() + ": " + problem);
+		// Thousands fail, as they should: not each logged (with its stack),
+		// as the test reports would grow to hundreds of MB. Kept here, as
+		// java.util.logging only holds loggers weakly.
+		List<Logger> quiet = Stream.of(FileMetadata.class.getName(), "org.apache.pdfbox", "org.apache.fontbox")
+				.map(Logger::getLogger).toList();
+		List<Level> levels = quiet.stream().map(Logger::getLevel).toList();
+		quiet.forEach(l -> l.setLevel(Level.SEVERE));
+		try {
+			for (int i = 0; i < copies.size(); i++) {
+				Copy copy = copies.get(i);
+				// Each its own file, not taken for one read already
+				Path file = Files.write(dir.resolve(i + "-" + name), copy.bytes());
+				for (String problem : metadata.read(file).problems()) {
+					if (problem.contains(" took over ") || problem.contains("OutOfMemoryError")
+							|| problem.contains("StackOverflowError")) {
+						bad.add(name + ", " + copy.how() + ": " + problem);
+					}
 				}
+			}
+		} finally {
+			for (int i = 0; i < quiet.size(); i++) {
+				quiet.get(i).setLevel(levels.get(i));
 			}
 		}
 		assertTrue(String.join("\n", bad), bad.isEmpty());

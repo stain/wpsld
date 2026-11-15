@@ -1371,7 +1371,11 @@ public class CrateEditor extends Application {
 			}));
 			showUpdated(stage, updateFiles(sizes, formats, found), problems);
 		});
-		task.setOnFailed(e -> showUpdated(stage, List.of(), List.of(String.valueOf(task.getException()))));
+		task.setOnFailed(e -> {
+			System.getLogger(CrateEditor.class.getName()).log(System.Logger.Level.WARNING,
+					"Reading files' metadata failed", task.getException());
+			showUpdated(stage, List.of(), List.of(String.valueOf(task.getException())));
+		});
 		return inBackground(stage, "Reading what the files say about themselves", task);
 	}
 
@@ -1505,6 +1509,8 @@ public class CrateEditor extends Application {
 			done.show();
 		});
 		task.setOnFailed(e -> {
+			System.getLogger(CrateEditor.class.getName()).log(System.Logger.Level.WARNING,
+					"Checking web resources failed", task.getException());
 			progress.setOnHidden(null);
 			progress.close();
 		});

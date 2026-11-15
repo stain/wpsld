@@ -127,6 +127,11 @@ public class DOI {
 		public DoiException(String message) {
 			super(message);
 		}
+
+		/** With what it couldn't read, e.g. JSON broken off */
+		public DoiException(String message, Throwable cause) {
+			super(message, cause);
+		}
 	}
 
 	private final HttpClient http;
@@ -200,7 +205,7 @@ public class DOI {
 		try {
 			return MAPPER.readTree(response.body());
 		} catch (IOException e) {
-			throw new DoiException(address.getHost() + " answered with no data");
+			throw new DoiException(address.getHost() + " answered with no data", e);
 		}
 	}
 

@@ -189,6 +189,7 @@ class PlaceFinder extends Dialog<Place> {
 		});
 		task.setOnFailed(e -> {
 			Throwable problem = task.getException();
+			System.getLogger(PlaceFinder.class.getName()).log(System.Logger.Level.WARNING, "GeoNames search failed", problem);
 			status.setText("Can't search GeoNames: "
 					+ (problem.getMessage() == null ? problem.toString() : problem.getMessage()));
 		});

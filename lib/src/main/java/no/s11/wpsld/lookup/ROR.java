@@ -121,6 +121,11 @@ public class ROR {
 		public RORException(String message) {
 			super(message);
 		}
+
+		/** With what it couldn't read, e.g. JSON broken off */
+		public RORException(String message, Throwable cause) {
+			super(message, cause);
+		}
 	}
 
 	private final HttpClient http;
@@ -189,7 +194,7 @@ public class ROR {
 		try {
 			json = MAPPER.readTree(response.body());
 		} catch (IOException e) {
-			throw new RORException("ROR answered with no results");
+			throw new RORException("ROR answered with no results", e);
 		}
 		return parse(id.isPresent() ? json : json.path("items"));
 	}

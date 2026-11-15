@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -45,6 +46,8 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
+import org.xml.sax.SAXParseException;
+import org.xml.sax.helpers.DefaultHandler;
 
 /**
  * The metadata a file carries in it, to offer for its File entity:
@@ -271,8 +274,18 @@ public final class EmbeddedMetadata {
 			factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
 			factory.setExpandEntityReferences(false);
 			factory.setXIncludeAware(false);
-			return Optional.of(factory.newDocumentBuilder().parse(new ByteArrayInputStream(bytes)));
+			DocumentBuilder builder = factory.newDocumentBuilder();
+			// Thrown, rather than also printed to the console ("[Fatal Error]")
+			builder.setErrorHandler(new DefaultHandler() {
+				@Override
+				public void error(SAXParseException e) throws SAXException {
+					throw e;
+				}
+			});
+			return Optional.of(builder.parse(new ByteArrayInputStream(bytes)));
 		} catch (ParserConfigurationException | SAXException e) {
+			System.getLogger(EmbeddedMetadata.class.getName()).log(System.Logger.Level.DEBUG,
+					"Not XML: {0}", e.getMessage());
 			return Optional.empty();
 		}
 	}
