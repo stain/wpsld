@@ -58,7 +58,8 @@ Files from elsewhere are copied in first, into a folder of the crate you
 choose: if it has files of the same names, choose **Replace**, **Keep
 Both** (copied as e.g. `counts (2).csv`) or **Skip**. Copying happens in
 a window of its own, with its progress and **Cancel**, so you can go on
-editing. Each file is written in full under a hidden name before it gets
+editing; the foot of the editor's window shows it too, and **Show...**
+there brings the window back. Each file is written in full under a hidden name before it gets
 its own, so a full disk or a file that can't be read leaves no half
 copies; what wasn't copied, and why, is told at the end, and the files
 that were copied are added.

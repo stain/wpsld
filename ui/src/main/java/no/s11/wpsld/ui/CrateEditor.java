@@ -87,7 +87,6 @@ import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Control;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
-import javafx.scene.control.ProgressBar;
 import javafx.scene.control.Separator;
 import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.SeparatorMenuItem;
@@ -296,11 +295,17 @@ public class CrateEditor extends Application {
 		this.stage = stage;
 		BorderPane root = new BorderPane(new Label("Loading schema.org " + SchemaFromJsonLd.SCHEMAORG_VERSION + "…"));
 		notice.setId("notice");
-		notice.getStyleClass().add("notice");
 		notice.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 		notice.setPadding(new Insets(6, 12, 6, 12));
+		HBox.setHgrow(notice, Priority.ALWAYS);
 		hideNotice();
-		root.setBottom(notice);
+		jobsView = new JobsView(jobs, stage);
+		// The notice and the jobs running, at the foot of the window
+		HBox foot = new HBox(notice, jobsView.strip());
+		foot.getStyleClass().add("notice");
+		foot.visibleProperty().bind(notice.visibleProperty().or(jobsView.strip().visibleProperty()));
+		foot.managedProperty().bind(foot.visibleProperty());
+		root.setBottom(foot);
 		stage.setScene(new Scene(root, 1400, 800));
 		// For this window and every one opened after it
 		Theme.choose(Theme.named(Theme.Style.class, settings.style()),
@@ -941,44 +946,22 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * Run a job reading files the user asked for (see {@link FileJobs}),
-	 * showing a window with its progress and Cancel if it takes more than a
-	 * moment; the window closes when it is done
+	 * Run a job the user asked for in the background (see {@link Jobs}),
+	 * showing the jobs' window if it takes more than a moment
 	 */
-	<T> Task<T> inBackground(Stage stage, String header, Task<T> task) {
-		ProgressBar bar = new ProgressBar();
-		bar.setMaxWidth(Double.MAX_VALUE);
-		bar.progressProperty().bind(task.progressProperty());
-		Label message = new Label();
-		message.textProperty().bind(task.messageProperty());
-		message.setWrapText(true);
-		Alert progress = new Alert(AlertType.INFORMATION, null, ButtonType.CANCEL);
-		progress.initOwner(stage);
-		progress.initModality(javafx.stage.Modality.NONE);
-		progress.setHeaderText(header);
-		progress.getDialogPane().setContent(new VBox(8, message, bar));
-		progress.getDialogPane().setPrefWidth(420);
-		progress.setOnHidden(e -> task.cancel(true));
-		javafx.animation.PauseTransition moment = new javafx.animation.PauseTransition(
-				javafx.util.Duration.millis(400));
-		moment.setOnFinished(e -> {
-			if (task.isRunning()) {
-				progress.show();
-			}
-		});
-		task.runningProperty().addListener((o, was, running) -> {
-			if (!running) {
-				moment.stop();
-				progress.setOnHidden(null);
-				progress.close();
-			}
-		});
-		moment.play();
-		return fileJobs.start(task, opened, Optional.of(header), header);
+	<T> Task<T> inBackground(Stage stage, String title, Task<T> task) {
+		return inBackground(jobs.job(title, opened, true), task);
 	}
 
-	/** Jobs reading files of the crate opened */
-	private final FileJobs fileJobs = new FileJobs();
+	private <T> Task<T> inBackground(Jobs.Job job, Task<T> task) {
+		jobs.start(job, task);
+		jobsView.showSoon(job);
+		return task;
+	}
+
+	/** Jobs in the background, of the crate opened */
+	private final Jobs jobs = new Jobs();
+	private JobsView jobsView;
 	/**
 	 * The crate opened (or new), until another is: not changed by undo,
 	 * which makes a new {@link Crate} of the same
@@ -1397,10 +1380,10 @@ public class CrateEditor extends Application {
 	/**
 	 * Read what files say about themselves in the background, then offer in
 	 * a notice what they say that their entities lack, to give them on a
-	 * click as one undo step: never while the user may be typing. Quietly,
-	 * a notice says the files are being read, and closing it cancels;
-	 * otherwise a window shows the progress, with Cancel, after which what
-	 * was read is offered.
+	 * click as one undo step: never while the user may be typing. As a job
+	 * (see {@link Jobs}), with its progress at the foot of the window and,
+	 * unless quiet, in the jobs' window, with Cancel, after which what was
+	 * read is offered.
 	 *
 	 * @param files  By @id
 	 * @param before What to tell first, e.g. that sizes were updated
@@ -1411,7 +1394,9 @@ public class CrateEditor extends Application {
 	private Task<Map<String, FileMetadata.Reading>> readWhatFilesSay(Stage stage, Map<String, Path> files,
 			String before, boolean quiet) {
 		Map<String, FileMetadata.Reading> read = java.util.Collections.synchronizedMap(new LinkedHashMap<>());
-		Task<Map<String, FileMetadata.Reading>> task = fileJobs.reading(files, read);
+		Jobs.Job job = jobs.job(quiet ? "Reading the " + (files.size() == 1 ? "file" : files.size() + " files")
+				+ " added" : "Reading what the files say about themselves", opened, !quiet);
+		Task<Map<String, FileMetadata.Reading>> task = jobs.reading(job, files, read);
 		Object readingFor = opened;
 		task.setOnSucceeded(e -> {
 			if (opened == readingFor) {
@@ -1434,19 +1419,7 @@ public class CrateEditor extends Application {
 				showNotice(before + "Reading what the files say failed: " + task.getException(), null, null);
 			}
 		});
-		if (!quiet) {
-			return inBackground(stage, "Reading what the files say about themselves", task);
-		}
-		showNotice("Reading " + (files.size() == 1 ? "the file" : "the " + files.size() + " files") + " added…",
-				null, null);
-		Runnable close = () -> task.cancel(true);
-		noticeClosed = close;
-		task.runningProperty().addListener((o, was, running) -> {
-			if (!running && noticeClosed == close) {
-				noticeClosed = null;
-			}
-		});
-		return fileJobs.start(task, opened, Optional.empty(), "Reading files added");
+		return quiet ? jobs.start(job, task) : inBackground(job, task);
 	}
 
 	/**
@@ -1553,9 +1526,6 @@ public class CrateEditor extends Application {
 	/** At the foot of the window: e.g. that files added say something about themselves */
 	private final HBox notice = new HBox(8);
 
-	/** What closing the notice does besides, e.g. cancel reading files */
-	private Runnable noticeClosed;
-
 	/**
 	 * Show a notice, with what to do about it if anything, until closed,
 	 * done or replaced
@@ -1587,13 +1557,7 @@ public class CrateEditor extends Application {
 		notice.setManaged(true);
 	}
 
-	/** Hide the notice, doing what closing it does, e.g. cancel reading files */
 	private void hideNotice() {
-		Runnable closed = noticeClosed;
-		noticeClosed = null;
-		if (closed != null) {
-			closed.run();
-		}
 		notice.getChildren().clear();
 		notice.setVisible(false);
 		notice.setManaged(false);
@@ -1692,24 +1656,17 @@ public class CrateEditor extends Application {
 			none.show();
 			return Optional.empty();
 		}
-		Crate checked = crate;
+		Object checked = opened;
 		Task<List<WebAvailability.Result>> task = new Task<>() {
 			@Override
 			protected List<WebAvailability.Result> call() throws InterruptedException {
+				updateMessage("Asking " + addresses.size() + (addresses.size() == 1 ? " web address" : " web addresses")
+						+ " whether they are available…");
 				return webAvailability.check(addresses);
 			}
 		};
-		Alert progress = new Alert(AlertType.INFORMATION, "Asking " + addresses.size()
-				+ (addresses.size() == 1 ? " web address" : " web addresses") + " whether they are available…",
-				ButtonType.CANCEL);
-		progress.initOwner(stage);
-		progress.initModality(javafx.stage.Modality.NONE);
-		progress.setHeaderText("Checking web availability");
-		progress.setOnHidden(e -> task.cancel(true));
 		task.setOnSucceeded(e -> {
-			progress.setOnHidden(null);
-			progress.close();
-			if (crate != checked) {
+			if (opened != checked) {
 				return;
 			}
 			List<WebAvailability.Result> results = task.getValue();
@@ -1727,17 +1684,9 @@ public class CrateEditor extends Application {
 			done.setResizable(true);
 			done.show();
 		});
-		task.setOnFailed(e -> {
-			System.getLogger(CrateEditor.class.getName()).log(System.Logger.Level.WARNING,
-					"Checking web resources failed", task.getException());
-			progress.setOnHidden(null);
-			progress.close();
-		});
-		progress.show();
-		Thread thread = new Thread(task, "Web availability");
-		thread.setDaemon(true);
-		thread.start();
-		return Optional.of(task);
+		task.setOnFailed(e -> System.getLogger(CrateEditor.class.getName()).log(System.Logger.Level.WARNING,
+				"Checking web resources failed", task.getException()));
+		return Optional.of(inBackground(stage, "Checking web availability", task));
 	}
 
 	/** Lists the folder's files again soon after they change */
@@ -1844,10 +1793,10 @@ public class CrateEditor extends Application {
 	 * those copied as parts once done, and telling what wasn't
 	 */
 	Task<FileCopy.Result> copyInto(Stage stage, List<Path> files, Path target, FileCopy.Conflict conflict) {
-		Crate copyingFor = crate;
+		Object copyingFor = opened;
 		Path folder = crateFile.folder().map(f -> f.toAbsolutePath().normalize()).orElseThrow();
-		return new CopyWindow(stage, files, target, conflict, result -> {
-			if (crate == copyingFor) {
+		CopyWindow window = new CopyWindow(stage, files, target, conflict, result -> {
+			if (opened == copyingFor) {
 				addFilesAsParts(result.copied().stream().map(c -> relativeId(folder, c.to().toAbsolutePath().normalize()))
 						.toList());
 			}
@@ -1863,7 +1812,10 @@ public class CrateEditor extends Application {
 				alert.setResizable(true);
 				alert.show();
 			}
-		}).start();
+		});
+		Jobs.Job job = jobs.job("Copying " + files.size() + (files.size() == 1 ? " file" : " files") + " to "
+				+ target.getFileName(), opened, true);
+		return jobs.track(job, window.start(), window::cancel, window::toFront);
 	}
 
 	/** The relative @id of a file in the crate's folder, each name percent-encoded */
@@ -2468,13 +2420,13 @@ public class CrateEditor extends Application {
 	 * saves them or chooses not to.
 	 */
 	private boolean mayClose(Stage stage) {
-		List<String> reading = fileJobs.asked();
+		List<String> reading = jobs.asked();
 		if (!reading.isEmpty()) {
-			ButtonType stop = new ButtonType("Stop Reading", ButtonData.YES);
+			ButtonType stop = new ButtonType("Stop", ButtonData.YES);
 			Alert alert = new Alert(AlertType.CONFIRMATION, String.join("\n", reading)
-					+ "\n\nWhat was read so far won't be offered.", stop, ButtonType.CANCEL);
+					+ "\n\nWhat was found so far won't be offered.", stop, ButtonType.CANCEL);
 			alert.initOwner(stage);
-			alert.setHeaderText("Still reading what files say about themselves");
+			alert.setHeaderText("Still working in the background");
 			if (alert.showAndWait().orElse(ButtonType.CANCEL) != stop) {
 				return false;
 			}
@@ -2497,9 +2449,9 @@ public class CrateEditor extends Application {
 	 * saved to a file, or a new one.
 	 */
 	private void edit(Crate other, Optional<Path> path) {
-		// Another crate: its jobs reading files stop, and what they read is
-		// not given to this one
-		fileJobs.cancelAll();
+		// Another crate: its jobs stop, and what they found is not given to
+		// this one
+		jobs.cancelAll();
 		opened = new Object();
 		crate = other;
 		hideNotice();

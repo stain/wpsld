@@ -1222,12 +1222,11 @@ extension. Next:
   file system, with Crate > Extract to Folder… to edit it, rather than
   always unpacking; so that large `.eln` exports open at once, and files'
   own metadata is read from zip paths as they are.
-- **Background jobs first**: downloading, unpacking, checking manifests
-  and Check Web Availability are slow and cancellable, so they use the
-  status strip of jobs (see BUGS.md: a strip at the foot of the window,
-  a window for each job with progress, status lines, Cancel and Run in
-  background), done before them.
-- **Order**: the jobs strip; Open URL/PID (read-only, Save As); open and
+- **Background jobs**: downloading, unpacking and checking manifests are
+  slow and cancellable, so they are jobs (`Jobs`, shown by `JobsView` at
+  the foot of the window, with a window of progress, status lines, Cancel
+  and Run in Background; done).
+- **Order**: Open URL/PID (read-only, Save As); open and
   export zips; open and check a bag; make a bag (last, as it moves the
   user's files into `data/`).
 

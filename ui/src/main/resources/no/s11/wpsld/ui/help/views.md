@@ -62,7 +62,8 @@ crate's files are not looked for.
 web (under **External resources**) whether it is there, following
 redirects, and marks those that are not the same way, saying what they
 answered, until checked again. It needs an internet connection, and asks
-a few addresses at a time.
+a few addresses at a time, in the background: the foot of the window
+shows it, and **Show...** there brings up its progress, with **Cancel**.
 
 Selecting an entity selects it in each place it is shown; **Copy** and
 **Remove** act on it once. Each entity has an icon for its type. **View > Entities by Type** shows the

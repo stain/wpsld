@@ -414,14 +414,14 @@ public class TestCrateEditorMetadata extends UiTest {
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils.asyncFx(job::isRunning).get());
 		Platform.runLater(() -> app.newCrate(stage));
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
-				() -> lookup("Still reading what files say about themselves").tryQuery().isPresent());
+				() -> lookup("Still working in the background").tryQuery().isPresent());
 		assertTrue(lookup(".dialog-pane .content").queryLabeled().getText().contains("Reading slowly (0 of 1000 files read)"));
 		clickDialogButton("Cancel");
 		assertTrue(WaitForAsyncUtils.asyncFx(job::isRunning).get());
 		Platform.runLater(() -> app.newCrate(stage));
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
-				() -> lookup("Still reading what files say about themselves").tryQuery().isPresent());
-		clickDialogButton("Stop Reading");
+				() -> lookup("Still working in the background").tryQuery().isPresent());
+		clickDialogButton("Stop");
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils.asyncFx(job::isCancelled).get());
 		WaitForAsyncUtils.waitForFxEvents();
 		assertTrue(listed("photo.jpg").isEmpty());
@@ -448,5 +448,34 @@ public class TestCrateEditorMetadata extends UiTest {
 		WaitForAsyncUtils.waitForFxEvents();
 		assertEquals(Optional.empty(), app.notice());
 		assertTrue(listed("photo.jpg").isEmpty());
+	}
+
+	/**
+	 * A job in the background shows at the foot of the window; Show… brings
+	 * up the jobs' window, Run in Background hides it, and Cancel there
+	 * cancels it, which ends the strip
+	 */
+	@Test
+	public void jobsStrip() throws Exception {
+		entities();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertFalse(lookup("#jobsStrip").query().isVisible());
+		Task<Map<String, FileMetadata.Reading>> job = WaitForAsyncUtils
+				.asyncFx(() -> app.inBackground(stage, "Reading slowly", slowJob())).get();
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#jobsStrip").query().isVisible()
+				&& lookup("#jobsLatest").queryLabeled().getText().equals("Reading slowly: 0 of 1000 files read"));
+		// Shown by itself after a moment, as the user asked for it
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#jobsHide").tryQuery().isPresent());
+		clickOn("#jobsHide");
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup("#jobsHide").tryQuery().isEmpty());
+		assertTrue(WaitForAsyncUtils.asyncFx(job::isRunning).get());
+		clickOn("#jobsShow");
+		WaitForAsyncUtils.waitForFxEvents();
+		clickOn("#jobCancel");
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils.asyncFx(job::isCancelled).get());
+		WaitForAsyncUtils.waitForFxEvents();
+		assertFalse(lookup("#jobsStrip").query().isVisible());
+		assertTrue(lookup("#jobsHide").tryQuery().isEmpty());
 	}
 }

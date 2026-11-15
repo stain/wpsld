@@ -169,9 +169,12 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   which undo replaces), and opening another cancels them, asking about
   those the user started (`FileJobs`, one pool of two threads for all);
   a reader left behind on two files still running is skipped until they
-  end. Next: a status strip of jobs with a window for each (progress,
-  status lines, Cancel, Run in background), also for Check Web
-  Availability and copying files in. As first planned: one background job
+  end. A status strip of jobs at the foot of the window (*done*, `Jobs`,
+  `JobsView`): the latest's progress and message, how many more, and
+  Show… for a window of them all (progress, status lines such as files
+  that couldn't be read, Cancel, Run in Background), for reading files,
+  Check Web Availability and copying files in (which keeps its own
+  window, brought up by Show…). As first planned: one background job
   with progress and Cancel (as copying files has), two files at a time
   each with its time limit, filling in only what entities lack (never
   where or the camera), a summary with the files that failed or took too
