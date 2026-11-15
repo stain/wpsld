@@ -56,6 +56,8 @@ public class CrateTerms {
 
 	private final SchemaFromJsonLd schema;
 	private final JsonLdContext context;
+	/** The class of each type name asked for, as it is asked for each entity, often */
+	private final Map<String, Optional<ClassDef>> classDefs = new java.util.concurrent.ConcurrentHashMap<>();
 
 	public CrateTerms(SchemaFromJsonLd schema) {
 		this(schema, RO_CRATE_1_3.get());
@@ -130,7 +132,8 @@ public class CrateTerms {
 	 * <code>MediaObject</code> for <code>File</code>.
 	 */
 	public Optional<ClassDef> classDef(String typeName) {
-		return context.expandTerm(typeName).map(URI::create).map(schema.getClasses()::get);
+		return classDefs.computeIfAbsent(typeName,
+				t -> context.expandTerm(t).map(URI::create).map(schema.getClasses()::get));
 	}
 
 	/**

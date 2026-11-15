@@ -86,7 +86,24 @@ public class Crate {
 	 */
 	public static final List<String> ROOT_LINKS = List.of("hasPart", "mentions");
 
-	private final List<Entity> entities = new ArrayList<>();
+	private final Entities entities = new Entities();
+	/**
+	 * The entities by @id, the first of each, for {@link #get}: rebuilt
+	 * when entities were added or removed, or any @id changed (see
+	 * {@link Entity#idChanges()}), as a crate may have thousands
+	 */
+	private Map<String, Entity> index;
+	private int indexedChanges;
+	private long indexedIds;
+
+	/** The entities, counting changes to them (as ArrayList does, for its iterators) */
+	private static final class Entities extends ArrayList<Entity> {
+		private static final long serialVersionUID = 1L;
+
+		int changes() {
+			return modCount;
+		}
+	}
 	/** The <code>@context</code> to write, as read or RO-Crate 1.3's */
 	private final JsonNode context;
 	/** The metadata descriptor as read, to write again; else a new one for 1.3 */
@@ -164,7 +181,12 @@ public class Crate {
 	}
 
 	public Optional<Entity> get(String id) {
-		return entities.stream().filter(e -> e.getId().equals(id)).findFirst();
+		if (index == null || indexedChanges != entities.changes() || indexedIds != Entity.idChanges()) {
+			indexedIds = Entity.idChanges();
+			indexedChanges = entities.changes();
+			index = byId();
+		}
+		return Optional.ofNullable(index.get(id));
 	}
 
 	/**
@@ -383,6 +405,8 @@ public class Crate {
 		if (other == getRoot()) {
 			// The root data entity stays first, now as the merged entity
 			entities.set(0, entity);
+			// Not a change ArrayList counts
+			index = null;
 			entities.remove(entities.lastIndexOf(entity));
 		} else {
 			entities.remove(other);

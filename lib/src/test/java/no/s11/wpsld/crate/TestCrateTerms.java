@@ -135,7 +135,7 @@ public class TestCrateTerms {
 		assertEquals(Optional.of("File"), terms.typeName("http://schema.org/MediaObject"));
 		// Outside schema.org, as the context names it
 		assertEquals(Optional.of("ComputationalWorkflow"),
-				terms.typeName("https://bioschemas.org/ComputationalWorkflow"));
+				terms.typeName("https://bioschemas.org/terms/ComputationalWorkflow"));
 		// Names already, and IRIs the context doesn't name
 		assertEquals(Optional.empty(), terms.typeName("Person"));
 		assertEquals(Optional.empty(), terms.typeName("https://example.org/Thing"));

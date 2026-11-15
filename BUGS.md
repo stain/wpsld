@@ -31,6 +31,30 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   for now; if it needs a workaround of ours, perhaps re-showing the
   stage when its `outputScaleX` changes.
 
+- **Large crates slow** (*done* for the form, typing and undo): a COMPSs
+  workflow run crate from WorkflowHub (workflow 780, 1835 entities, 1813
+  of them files in the root's `hasPart`, 1 MB of JSON-LD) took 174 s to
+  open, 6 s to select a file, 0.6 s a keystroke. Now 2.2 s, 0.7 s and
+  0.1 s: a field shows its first 20 values, and the others 100 at a time
+  on asking (kept as they are meanwhile); a reference's choices of the
+  crate's entities are filled once its list is opened or typed in (a
+  combo box lays out a cell for each item to size itself);
+  `Crate.get` by an index (it went through all entities, for each of the
+  root's parts in the preview); `CrateTerms.classDef` remembered; the
+  JSON-LD tab filled only when shown, once typing pauses. Left: most of
+  the rest is JavaFX laying out the form (a File's has many fields); to
+  try with LDaCA's larger collections (see PLAN.md), as integration
+  tests reading them from the web, as their licences don't allow
+  bundling them.
+- **Copying files in asks for the folder with the system's folder
+  chooser**: Insert > Files from outside the crate's folder opens a
+  second, similar-looking dialog, the platform's folder chooser, to
+  choose where in the crate to copy them, which allows going outside the
+  crate (then asked again) and is confusing right after the file
+  chooser. Choose the target with our own dialog instead: the crate's
+  folders as a tree (as View > Entities by Folder has them), the crate's
+  folder at the top, with New Folder…, and nothing outside it.
+
 ## Repair Crate
 
 - **Types written as IRIs**, e.g. ROHub's `http://schema.org/Person` and
@@ -45,6 +69,21 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   below). References to schema.org terms are no longer added as Things.
 
 ## Requests
+
+- **Crate > Upgrade**: upgrade a crate from RO-Crate 1.1 to 1.2, and 1.2
+  to 1.3 (one step at a time, each its own undo step), changing the
+  descriptor's `conformsTo` and `@context`, and making the changes each
+  version asks for, with the fixes and suggestions that Save's check and
+  Repair Crate give (e.g. Bioschemas' `ComputationalWorkflow`, whose IRI
+  changed between versions: `https://bioschemas.org/ComputationalWorkflow`
+  to `https://bioschemas.org/terms/ComputationalWorkflow`). Likewise for
+  newer versions of the profiles a crate conforms to, e.g. Workflow Run
+  Crate 0.5 to 0.6 (which also meets the ComputationalWorkflow change and
+  newer RO-Crate). Say what changed, as Repair Crate does.
+- **Entities with the same `@id` in `@graph`**: not allowed in flattened,
+  compacted JSON-LD, but crates do have them by accident. Check what
+  opening one does now; offer to merge them (as renaming to a taken @id
+  does), saying which, or merge on opening with a warning.
 
 - **Cut, copy and paste of files into a folder, within a crate**: in the
   entity tree, cutting a File with a relative `@id` and pasting it into a
@@ -95,6 +134,10 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   are all over the place (none, blank nodes, `#` ids relative to the
   page, the page's own URL for several things), so each would need
   checking and renaming before it is added; and the page is untrusted.
+- **An icon for wpsld**, as SVG (and the PNG and ICO sizes the launchers
+  and the About box need), inspired by the RO-Crate logo and the OS/2
+  logo: for the window, the app image's launchers (jpackage) and the
+  README.
 - **File > Recent**: the last 6 crates opened or saved, kept in the
   settings. A preference turns it off (and forgets the list), as the
   names and places of crates can be private.

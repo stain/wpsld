@@ -45,6 +45,7 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.css.PseudoClass;
 import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Bounds;
@@ -1515,6 +1516,10 @@ public class EntityEditor extends ScrollPane {
 	 * another value (up to the field's maximum), and for references, a menu
 	 * to create a new entity of the field's range and link it.
 	 */
+	/** How many of a field's values are shown at first, and how many more each time asked */
+	static final int ROWS = 20;
+	static final int MORE = 100;
+
 	private class FieldEditor {
 		private final FormField field;
 		private final List<Row> rows = new ArrayList<>();
@@ -1523,6 +1528,12 @@ public class EntityEditor extends ScrollPane {
 		private final VBox node;
 		/** Shown under @id rather than in the field's group, with ids of its own */
 		private final boolean header;
+		/**
+		 * Values not shown as rows (yet), as there are many, e.g. a root's
+		 * thousands of parts: kept as they are, after those shown
+		 */
+		private final List<JsonNode> hidden = new ArrayList<>();
+		private final Button showMore = new Button();
 
 		/** A value row: its control and how to get the text typed in it */
 		private record Row(HBox node, Supplier<String> text) {
@@ -1540,9 +1551,12 @@ public class EntityEditor extends ScrollPane {
 				reloads.computeIfAbsent(field.name(), k -> new ArrayList<>()).add(new Reload(this, () -> {
 					rows.clear();
 					rowsBox.getChildren().clear();
+					hidden.clear();
 					showValues();
 				}));
 			}
+			showMore.setId(id(prefix("more"), field.name()));
+			showMore.setOnAction(e -> showMore());
 			addValue.setId(id(prefix("add"), field.name()));
 			addValue.setTooltip(new Tooltip("Add another value"));
 			addValue.setOnAction(e -> addRow(""));
@@ -1595,7 +1609,7 @@ public class EntityEditor extends ScrollPane {
 				}
 				actions.getChildren().add(create);
 			}
-			node = new VBox(4, rowsBox, actions);
+			node = new VBox(4, rowsBox, showMore, actions);
 			node.setId(id(prefix("field"), field.name()));
 		}
 
@@ -1610,17 +1624,35 @@ public class EntityEditor extends ScrollPane {
 			return header ? "header" + Character.toUpperCase(prefix.charAt(0)) + prefix.substring(1) : prefix;
 		}
 
+		/** The values, the first {@value #ROWS} as rows, the others hidden until asked for */
 		private void showValues() {
 			List<JsonNode> values = entity.getAll(field.name());
 			if (values.isEmpty()) {
 				addRow("");
 			} else {
-				values.forEach(v -> addRow(text(v)));
+				values.stream().limit(ROWS).forEach(v -> addRow(text(v)));
+				hidden.addAll(values.subList(Math.min(ROWS, values.size()), values.size()));
 			}
+			showMoreButton();
+		}
+
+		/** Show {@value #MORE} more of the values hidden */
+		private void showMore() {
+			List<JsonNode> next = List.copyOf(hidden.subList(0, Math.min(MORE, hidden.size())));
+			hidden.subList(0, next.size()).clear();
+			next.forEach(v -> addRow(text(v)));
+			showMoreButton();
+		}
+
+		private void showMoreButton() {
+			showMore.setText("Show " + Math.min(MORE, hidden.size()) + " more of " + hidden.size()
+					+ (hidden.size() == 1 ? " value" : " values"));
+			showMore.setVisible(!hidden.isEmpty());
+			showMore.setManaged(showMore.isVisible());
 		}
 
 		private boolean full() {
-			return field.maxCount().isPresent() && rows.size() >= field.maxCount().getAsInt();
+			return field.maxCount().isPresent() && rows.size() + hidden.size() >= field.maxCount().getAsInt();
 		}
 
 		private void linkPlace(GeoNames.Place found) {
@@ -1822,14 +1854,24 @@ public class EntityEditor extends ScrollPane {
 		 * range (like Crate-O), filtered by @id and name while typing.
 		 */
 		private ComboBox<String> referenceCombo(FormField field, String rangeNames, String current) {
-			List<ClassDef> entityRange = field.range().stream().filter(c -> !schema.isDataType(c)).toList();
+			// The entities it may link to, by @id: only once opened or typed
+			// in, as a crate may have thousands, and a combo box lays out a
+			// cell for each item to size itself
 			Map<String, Entity> candidates = new LinkedHashMap<>();
-			crateEntities.get().stream().filter(e -> e != entity)
-					.filter(e -> entityRange.stream().anyMatch(range -> entityTypes.isA(e.getTypes(), range)))
-					.forEach(e -> candidates.put(e.getId(), e));
-			FilteredList<String> suggestions = new FilteredList<>(
-					FXCollections.observableArrayList(candidates.keySet()));
+			ObservableList<String> ids = FXCollections.observableArrayList();
+			Runnable offer = () -> {
+				if (!candidates.isEmpty() || !ids.isEmpty()) {
+					return;
+				}
+				List<ClassDef> entityRange = field.range().stream().filter(c -> !schema.isDataType(c)).toList();
+				crateEntities.get().stream().filter(e -> e != entity)
+						.filter(e -> entityRange.stream().anyMatch(range -> entityTypes.isA(e.getTypes(), range)))
+						.forEach(e -> candidates.put(e.getId(), e));
+				ids.setAll(candidates.keySet());
+			};
+			FilteredList<String> suggestions = new FilteredList<>(ids);
 			ComboBox<String> combo = new ComboBox<>(suggestions);
+			combo.setOnShowing(e -> offer.run());
 			combo.setEditable(true);
 			combo.setPromptText(field.kind() == ValueKind.REFERENCE ? "@id of " + rangeNames
 					: rangeNames + " (text, or @id of an entity)");
@@ -1854,6 +1896,7 @@ public class EntityEditor extends ScrollPane {
 				String query = typed.strip().toLowerCase(Locale.ROOT);
 				// Changing the list while the editor is being updated would reset it
 				Platform.runLater(() -> {
+					offer.run();
 					suggestions.setPredicate(id -> query.isEmpty() || id.toLowerCase(Locale.ROOT).contains(query)
 							|| candidates.get(id).getLabel().toLowerCase(Locale.ROOT).contains(query));
 					if (suggestions.isEmpty()) {
@@ -1864,7 +1907,10 @@ public class EntityEditor extends ScrollPane {
 				});
 			});
 			if (WORK_FIELDS.contains(field.name())) {
-				lookUpTypedDoi(combo, candidates.keySet());
+				lookUpTypedDoi(combo, () -> {
+					offer.run();
+					return candidates.keySet();
+				});
 			}
 			return combo;
 		}
@@ -1876,12 +1922,12 @@ public class EntityEditor extends ScrollPane {
 		 * it has one, else looked up, to describe the work if the user
 		 * chooses it. Each DOI is asked about once.
 		 */
-		private void lookUpTypedDoi(ComboBox<String> combo, Set<String> entityIds) {
+		private void lookUpTypedDoi(ComboBox<String> combo, Supplier<Set<String>> entityIds) {
 			Set<String> asked = new HashSet<>();
 			Runnable lookUp = () -> {
 				String typed = combo.getEditor().getText().strip();
 				Optional<String> doi = DOI.doiOf(typed);
-				if (doi.isEmpty() || entityIds.contains(typed)) {
+				if (doi.isEmpty() || entityIds.get().contains(typed)) {
 					return;
 				}
 				String iri = DOI.iri(doi.get());
@@ -1917,8 +1963,10 @@ public class EntityEditor extends ScrollPane {
 		 * Set all the field's values on the entity, skipping empty rows.
 		 */
 		private void update() {
-			entity.setAll(field.name(), rows.stream().map(r -> value(field, r.text().get()))
+			List<JsonNode> values = new ArrayList<>(rows.stream().map(r -> value(field, r.text().get()))
 					.flatMap(Optional::stream).toList());
+			values.addAll(hidden);
+			entity.setAll(field.name(), values);
 			addValue.setDisable(full());
 			reloadOthers(field.name(), this);
 			onChange.run();

@@ -579,6 +579,12 @@ public class CrateEditor extends Application {
 		previewTab.setId("previewTab");
 		Tab jsonTab = new Tab("JSON-LD", preview);
 		jsonTab.setId("jsonTab");
+		this.jsonTab = jsonTab;
+		jsonTab.selectedProperty().addListener((o, was, selected) -> {
+			if (selected) {
+				showJson();
+			}
+		});
 		TabPane views = new TabPane(previewTab, jsonTab);
 		views.setId("views");
 		views.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
@@ -3613,14 +3619,35 @@ public class CrateEditor extends Application {
 		if (entityPreview != null) {
 			entityPreview.refresh();
 		}
-		JsonNode json = crate.toJson();
-		try {
-			preview.setText(Crate.WRITER.writeValueAsString(json));
-		} catch (JsonProcessingException e) {
-			preview.setText(e.toString());
+		jsonShown = false;
+		if (jsonTab == null || jsonTab.isSelected()) {
+			// Once typing pauses, as a crate's JSON-LD may be megabytes
+			jsonLater.playFromStart();
 		}
 		if (stage != null) {
-			stage.setTitle(crateFile.title(json, CrateFile.onMac()));
+			stage.setTitle(crateFile.title(crate.toJson(), CrateFile.onMac()));
+		}
+	}
+
+	private Tab jsonTab;
+	/** Whether the JSON-LD tab shows the crate as it is */
+	private boolean jsonShown;
+	private final javafx.animation.PauseTransition jsonLater = new javafx.animation.PauseTransition(
+			javafx.util.Duration.millis(300));
+	{
+		jsonLater.setOnFinished(e -> showJson());
+	}
+
+	/** The crate's JSON-LD in its tab, if not shown already */
+	void showJson() {
+		if (jsonShown) {
+			return;
+		}
+		jsonShown = true;
+		try {
+			preview.setText(Crate.WRITER.writeValueAsString(crate.toJson()));
+		} catch (JsonProcessingException e) {
+			preview.setText(e.toString());
 		}
 	}
 

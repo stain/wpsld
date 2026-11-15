@@ -219,7 +219,10 @@ public class TestEntityEditor extends UiTest {
 		crate.add("Person");
 		edit(crate.getRoot());
 		ComboBox<?> distribution = lookup("#value-distribution-0").queryAs(ComboBox.class);
+		// Offered once opened
+		interact(distribution::show);
 		assertEquals(List.of("#datadownload-1"), List.copyOf(distribution.getItems()));
+		interact(distribution::hide);
 		// Typing filters by @id and name
 		clickOn(distribution.getEditor()).write("zzz");
 		assertTrue(distribution.getItems().isEmpty());
@@ -411,5 +414,47 @@ public class TestEntityEditor extends UiTest {
 		chooseType("SoftwareSourceCode");
 		assertTrue(lookup("#otherProperties").query().isVisible());
 		assertEquals("text/csv", value("fileFormat", 0).getText());
+	}
+
+	/**
+	 * A field of many values, e.g. a root's thousands of parts, shows the
+	 * first as rows and the others on asking; those not shown are kept as
+	 * they are when a row is changed, and a reference row offers the crate's
+	 * entities only once opened
+	 */
+	@Test
+	public void manyValuesShownOnAsking() {
+		int many = EntityEditor.ROWS + 10;
+		List<JsonNode> parts = new java.util.ArrayList<>();
+		interact(() -> {
+			for (int i = 0; i < many; i++) {
+				Entity file = crate.add("File");
+				crate.rename(file, "data/" + i + ".csv");
+				parts.add(ref(file.getId()));
+			}
+			crate.getRoot().setAll("hasPart", parts);
+		});
+		// The root's parts, under its @id
+		edit(crate.getRoot());
+		assertTrue(lookup("#headerValue-hasPart-" + (EntityEditor.ROWS - 1)).tryQuery().isPresent());
+		assertTrue(lookup("#headerValue-hasPart-" + EntityEditor.ROWS).tryQuery().isEmpty());
+		Button more = lookup("#headerMore-hasPart").queryButton();
+		assertEquals("Show 10 more of 10 values", more.getText());
+		// Changing a row shown keeps those not shown, after it
+		interact(() -> ((ComboBox<?>) lookup("#headerValue-hasPart-0").query()).getEditor().setText("data/1.csv"));
+		List<JsonNode> now = crate.getRoot().getAll("hasPart");
+		assertEquals(many, now.size());
+		assertEquals(ref("data/1.csv"), now.get(0));
+		assertEquals(parts.subList(EntityEditor.ROWS, many), now.subList(EntityEditor.ROWS, many));
+		// Not filled until opened
+		@SuppressWarnings("unchecked")
+		ComboBox<String> first = lookup("#headerValue-hasPart-1").queryAs(ComboBox.class);
+		assertTrue(first.getItems().isEmpty());
+		interact(first::show);
+		assertEquals(many, first.getItems().size());
+		interact(first::hide);
+		interact(more::fire);
+		assertTrue(lookup("#headerValue-hasPart-" + (many - 2)).tryQuery().isPresent());
+		assertFalse(lookup("#headerMore-hasPart").query().isVisible());
 	}
 }

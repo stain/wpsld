@@ -434,7 +434,7 @@ public class TestCrateEditor extends UiTest {
 		assertEquals(title(dir.getFileName() + java.io.File.separator + "ro-crate-metadata.json", false),
 				stage.getTitle());
 		// Written with its own version, and nothing to discard yet
-		assertTrue(lookup("#preview").queryTextInputControl().getText().contains("https://w3id.org/ro/crate/1.2/context"));
+		assertTrue(json().contains("https://w3id.org/ro/crate/1.2/context"));
 		push(KeyCode.SHORTCUT, KeyCode.N);
 		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
 		assertEquals(1, entities().getItems().size());
@@ -890,7 +890,9 @@ public class TestCrateEditor extends UiTest {
 		WaitForAsyncUtils.waitForFxEvents();
 	}
 
+	/** The crate's JSON-LD, as its tab shows it (filled once shown, after typing pauses) */
 	private String json() {
+		interact(app::showJson);
 		return lookup("#preview").queryTextInputControl().getText();
 	}
 
