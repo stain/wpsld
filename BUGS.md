@@ -526,12 +526,14 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   check the app image (`podman build`) and its THIRD-PARTY-NOTICES.txt
   (version, and NOTICE or licence changes), and watch for one pulling in
   another's newer version (as Tika 4.2.0 did commonmark 0.31.0 over our
-  0.24.0, now aligned). Newer than ours (13 November 2026): Jackson
-  2.23.0 (2.22.4), commonmark 0.32.0 (0.31.0, but Tika's choice), JUnit
-  4.13.2 (4.13; or JUnit 5); not yet: SLF4J 2.1.0-alpha1, JavaFX 28 (early
-  access). Current: Tika 4.2.0, PDFBox 3.0.8, metadata-extractor 2.22.0,
-  Ikonli 12.4.0, TestFX 4.0.18. Perhaps Dependabot or Renovate to say so,
-  still merged one at a time.
+  0.24.0, now aligned). *Done 16 November 2026*, each with the whole
+  build and the image's modules checked: Jackson 2.23.0 (was 2.22.4),
+  commonmark 0.32.0 (was 0.31.0, Tika's; Tika's strikethrough extension
+  constrained to the same), JUnit 4.13.2 (was 4.13). Not yet: SLF4J
+  2.1.0-alpha1, JavaFX 28 (early access); JUnit 5 some day. Current: Tika
+  4.2.0, PDFBox 3.0.8, metadata-extractor 2.22.0, Ikonli 12.4.0, TestFX
+  4.0.18, JMustache 1.16 and picocli 4.7.7 (on their branches). Perhaps
+  Dependabot or Renovate to say so, still merged one at a time.
 
 ## To check on Windows and macOS
 
