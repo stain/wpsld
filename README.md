@@ -241,13 +241,14 @@ release's commits go on a branch, `release-<version>`.
 
 To release, run the workflow on `main` from GitHub: Actions → Release → Run
 workflow, with the version (e.g. `0.8.0`). It commits `version=0.8.0`, tags
-it `v0.8.0`, commits `0.9.0-SNAPSHOT`, pushes the branch and tag, and opens
-the branch's pull request. Then it builds the tagged commit and makes a
-draft GitHub release, to check and publish. Merge the pull request with
-*Create a merge commit*, before or after publishing: squash or rebase would
-make new commits, and leave the tagged one out of `main`'s history. Opening
-the pull request needs Settings → Actions → General → *Allow GitHub Actions
-to create and approve pull requests*; without it, open it by hand.
+it `v0.8.0`, commits `0.9.0-SNAPSHOT` and pushes the branch and tag. Then it
+builds the tagged commit and makes a draft GitHub release, to check and
+publish. Open the branch's pull request from the link in the run's summary
+and merge it with *Create a merge commit*, before or after publishing:
+squash or rebase would make new commits, and leave the tagged one out of
+`main`'s history. The workflow doesn't open the pull request itself, as
+letting workflows open pull requests (Settings → Actions → General) would
+also let them approve them: leave that off.
 
 The same from a checkout of an up-to-date `main`, with
 [`scripts/release.sh`](scripts/release.sh):
