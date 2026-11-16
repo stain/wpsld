@@ -40,6 +40,22 @@
       }
     }
   ],
+  "funding": [
+    {
+      "type": "Grant",
+      "name": "BioFAIR Method Commons",
+      "funder": {
+        "type": "Organization",
+        "id": "https://ror.org/00cwqg982",
+        "name": "Biotechnology and Biological Sciences Research Council (BBSRC)",
+        "parentOrganization": {
+          "type": "Organization",
+          "id": "https://ror.org/001aqnf71",
+          "name": "UK Research and Innovation (UKRI)"
+        }
+      }
+    }
+  ],
   "copyrightHolder": {
     "type": "Organization",
     "id": "https://ror.org/027m9bs27",
