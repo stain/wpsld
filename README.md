@@ -241,6 +241,12 @@ the workflow only keeps the zips as artifacts.
 The source code in this repository is under the
 [Apache License 2.0](LICENSE.txt).
 
+Except the stylesheet of the RO-Crate previews wpsld writes
+([`ro-crate-preview.css`](lib/src/main/resources/no/s11/wpsld/form/ro-crate-preview.css),
+copied into each `ro-crate-preview.html`), which is dedicated to the public
+domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/),
+so that a crate's preview can be distributed with it under any terms.
+
 The built application also includes third-party software: Jackson,
 commonmark-java, Ikonli, Microsoft's Fluent UI System Icons, Apache Tika,
 Apache PDFBox and FontBox, metadata-extractor, Adobe XMPCore, Apache
