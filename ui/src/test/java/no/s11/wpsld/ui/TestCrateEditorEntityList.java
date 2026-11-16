@@ -88,12 +88,14 @@ public class TestCrateEditorEntityList extends UiTest {
 
 	private ListView<Entity> entities() {
 		try {
-			WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#entities").tryQuery().isPresent()
-					&& lookup("#save").tryQuery().isPresent());
+			WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> WaitForAsyncUtils
+					.asyncFx(() -> lookup("#entities").tryQuery().isPresent()
+							&& lookup("#save").tryQuery().isPresent())
+					.get());
+			return WaitForAsyncUtils.<ListView<Entity>>asyncFx(() -> lookup("#entities").queryListView()).get();
 		} catch (Exception e) {
 			throw new AssertionError("Editor did not appear", e);
 		}
-		return lookup("#entities").queryListView();
 	}
 
 	@SuppressWarnings("unchecked")
