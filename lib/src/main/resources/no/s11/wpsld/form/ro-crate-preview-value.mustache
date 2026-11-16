@@ -3,8 +3,12 @@
   an entity of the crate, a file or the web), an @id of neither, text (in
   a language, perhaps), a description made from its Markdown, or JSON
   shown as it is. Each key is there, false where not used, as Mustache
-  looks for a missing one in the enclosing sections. No newline at the
-  end, so that the value stays in its table cell.
+  looks for a missing one in the enclosing sections.
+
+  Kept on one line, not indented, and with no newline at the end: the
+  value is inline, in a table cell or a list item, between links and
+  <span>s, where any line break or indentation added here would show as
+  a space in the page (e.g. before a language, or around a link).
 
   SPDX-License-Identifier: CC0-1.0 (see ro-crate-preview.html.mustache)
 }}
