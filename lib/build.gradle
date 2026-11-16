@@ -24,8 +24,12 @@ dependencies {
     // File formats by content (magic) and name, as media types; core only, no parsers
     implementation 'org.apache.tika:tika-core:4.2.0'
     // Descriptions written in Markdown, in the HTML preview
-    implementation 'org.commonmark:commonmark:0.31.0'
-    implementation 'org.commonmark:commonmark-ext-gfm-tables:0.31.0'
+    implementation 'org.commonmark:commonmark:0.32.0'
+    implementation 'org.commonmark:commonmark-ext-gfm-tables:0.32.0'
+    constraints {
+        // Tika's, the same version as commonmark's core above
+        implementation 'org.commonmark:commonmark-ext-gfm-strikethrough:0.32.0'
+    }
     // The HTML preview's page, a Mustache template (one small jar, no dependencies)
     implementation 'com.samskivert:jmustache:1.16'
 

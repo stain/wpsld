@@ -23,7 +23,7 @@ resemble their looks.
 
 ============================================================================
 commonmark-java (commonmark, commonmark-ext-gfm-tables,
-commonmark-ext-gfm-strikethrough) 0.31.0
+commonmark-ext-gfm-strikethrough) 0.32.0
 https://github.com/commonmark/commonmark-java
 BSD 2-Clause License
 ============================================================================
