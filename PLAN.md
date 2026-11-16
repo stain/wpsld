@@ -637,6 +637,89 @@ Styles:
   backgrounds where JavaFX allows.
 - Check the colours of each style on the real systems, side by side.
 
+### Following the OS, and a web-like style
+
+wpsld aims at a native desktop experience: regular menus, the clipboard,
+keyboard shortcuts, editing many entities at once. There are several
+web-based RO-Crate editors already. Looking shiny is not the aim, and the
+OS/2 Warp style is where wpsld started rather than what it is about.
+
+Following the OS where JavaFX can:
+- **The style follows the OS by default**: Windows 11 on Windows, macOS on
+  macOS, and on Linux Classic or a Linux style (below). Today Classic is
+  the default everywhere; View > Style still overrides it.
+- The **accent colour** and **increased contrast** from
+  `Platform.Preferences` (see "Platform guidelines and styles"), and the
+  OS's font where a style doesn't name one.
+- The screen's menu bar on macOS whatever the style, not only in the macOS
+  style (today `setUseSystemMenuBar` only for `Style.MACOS`).
+
+**Linux: its own style, or a more modern Classic?** To investigate. Classic
+is Modena, JavaFX's look from 2014, which looks dated beside GNOME's
+libadwaita (flat, rounded, header bars, Adwaita Sans) and KDE's Breeze.
+Either:
+- an **Adwaita** style (and perhaps Breeze, chosen by `XDG_CURRENT_DESKTOP`),
+  as Windows 11 and macOS are their platforms' styles; or
+- **Classic made modern**: flatter, rounded, the system font and accent
+  colour, fewer gradients, so it serves Linux and anyone who wants a
+  neutral style. Classic's dark colours (VS Code's Dark Modern) are
+  already of today.
+
+Look at AtlantaFX (MIT; Primer, Nord and Cupertino themes for JavaFX) for
+either, and check it is still maintained before depending on it.
+
+**A web-like style** ("Modern"?), as people expect from web applications
+made with Bootstrap or React, for those who find native styles old-fashioned.
+As with the Warp style, it needs its own components and form layout
+(`FormLayout.WEB`), not only a stylesheet:
+- the form as cards, labels above the fields, help and validation messages
+  under each field rather than in popovers or dialogs;
+- several values as chips or tags with × inside, added from an input at
+  their end;
+- primary and secondary buttons (one filled, the others outlined), larger
+  click targets, more space, rounded corners, subtle shadows;
+- notices as toasts at a corner, and empty states with a sentence and a
+  button rather than empty lists;
+- the sidebar as a navigation list, perhaps a search field at its top.
+
+It keeps the menus, shortcuts, clipboard and multiple selection: it
+changes how wpsld looks and lays out its form, not how it behaves.
+
+### The GUI toolkit: staying with JavaFX
+
+Considered in 2026-11 as thought experiments: rewriting wpsld in Rust, or
+in .NET (C#). For now wpsld stays with JavaFX.
+
+- **Rust**: `lib` and `bin` would port well (serde_json keeping key order,
+  pulldown-cmark or comrak, a Mustache crate with the same whitespace rules,
+  reqwest, clap) and gain a small native CLI and WebAssembly (a check or
+  preview page on a homepage). Reading files' metadata has no Tika: EXIF,
+  PDF, OOXML/ODF and MP4 crates cover the common formats only. The GUI is
+  the hard part: Slint, egui and iced draw their own widgets (menus inside
+  the window unless with `muda`, basic tables, varying IME and screen
+  reader support); gtk4-rs is native only on Linux; Tauri and Dioxus are a
+  web page in a window, which is what wpsld is not. They would start
+  faster and use less memory, but editing would be no faster than now:
+  0.7.0's speed-ups were algorithms, not drawing.
+- **.NET**: Avalonia is much like JavaFX (its own widgets, all three OSes,
+  also mobile and web); MAUI has no Linux and is mobile first; Eto.Forms
+  wraps the native widgets (WPF or WinForms, AppKit, GTK), the most native
+  option, but mainly kept by one company. Markdig, System.Text.Json,
+  dotNetRDF, Stubble, PdfPig and a .NET metadata-extractor exist; no Tika,
+  and no TestFX for Eto. Moving means rewriting `lib` as well, which works.
+- **SWT** (Eclipse's toolkit) gives the native widgets of Eto while keeping
+  Java: only `ui` would be rewritten, keeping `lib`, `bin`, Tika and their
+  tests; SWTBot for the GUI tests. Check jpackage with SWT's per-platform
+  jars first.
+- **Java in the browser** without a rewrite: TeaVM or GraalVM's Web Image
+  could compile `lib` (Jackson's reflection and Tika the likely obstacles),
+  or CheerpJ run it as a jar.
+
+If following the OS from JavaFX isn't native enough (native text fields
+and tables with the OS's spell checking and text services), prototype an
+SWT `ui`: the entity list, one form and pasting 2,000 entities, timed on
+all three OSes against the performance crates.
+
 ### Entities
 
 - **Choosing a type that hides the entity edited** *(to investigate,
