@@ -158,6 +158,14 @@ memory (JUnit category `Damaged`):
     ./gradlew damagedTest                        # 20 rounds of each file
     ./gradlew damagedTest -PdamageRounds=200     # more
 
+And the tests timing the editor on large crates, step by step, each step's
+time in `ui/build/test-results/performance.tsv` (JUnit category
+`Performance`, see PLAN.md, Performance on larger crates):
+
+    ./gradlew performanceTest                         # fails when a step is over its limit
+    ./gradlew performanceTest -PperformanceSlack=2    # twice the limits, on a slower machine
+    ./gradlew performanceTest -PperformanceProfile    # and Flight Recordings, ui/build/performance/
+
 ### With conda
 
 [`environment.yml`](environment.yml) gives OpenJDK 25 and the libraries

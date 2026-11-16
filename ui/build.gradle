@@ -218,6 +218,15 @@ test {
     }
 }
 
+// The crates the performance tests time the editor on (see
+// PerformanceCrates), made again into src/test/resources/performance
+tasks.register('performanceCrates', JavaExec) {
+    description = 'Makes the crates of the performance tests again.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'no.s11.wpsld.ui.PerformanceCrates'
+    args file('src/test/resources/performance').path
+}
+
 application {
   applicationName = 'wpsld'
   // Not the CrateEditor itself, so that its log is set up before JavaFX starts

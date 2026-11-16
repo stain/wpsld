@@ -19,6 +19,14 @@
 # ran out of memory or overflowed its stack; wpsld itself survives these
 # (each reader is isolated, see FileMetadata), but such a reader should be
 # fixed, reported upstream or given a smaller limit.
+#
+# Performance: the tests timing the editor on large crates, step by step
+# (see PLAN.md, Performance on larger crates), on Linux only, where they
+# take about a minute: macOS's runners are too slow and uneven to time
+# on. Each step's time is kept as an artifact (performance.tsv), to
+# compare across runs; a failure names the steps over their limits, times
+# the slack (2, as the runners are slower than the machine they were set
+# on).
 name: Integration tests
 
 on:
@@ -30,6 +38,9 @@ on:
       rounds:
         description: Rounds of damaged copies of each file (about 100 copies each)
         default: '200'
+      performanceSlack:
+        description: Times the performance tests' limits
+        default: '2'
   workflow_call:
     secrets:
       GEONAMES_USERNAME:
@@ -91,4 +102,32 @@ jobs:
           name: damaged-input-test-reports
           path: |
             */build/reports/tests/damagedTest/
+          if-no-files-found: ignore
+
+  performance-tests:
+    name: Performance tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Time the editor
+        env:
+          SLACK: ${{ inputs.performanceSlack || '2' }}
+        run: ./gradlew --no-daemon performanceTest "-PperformanceSlack=$SLACK"
+
+      - name: Keep the times and the test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: performance-test-results
+          path: |
+            ui/build/test-results/performance.tsv
+            ui/build/reports/tests/performanceTest/
           if-no-files-found: ignore

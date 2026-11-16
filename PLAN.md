@@ -1436,9 +1436,24 @@ crate above, a ROHub crate, and generated ones with 1 000, 10 000 and
   field (each change checks the crate for undo and relists), saving and
   Repair Crate; switching to Entities by Folder and by Part; listing the
   folder's files (now at most 10 000, again after 5 seconds).
-- How: a benchmark test (not run by default, as `onlineTest` isn't) that
-  builds such crates and reports times, and the JDK's Flight Recorder on
-  the running editor for where the time goes.
+- How (*done*): `./gradlew performanceTest`, the JUnit category
+  `Performance`, left out of `build` (`TestEditorPerformance`). It times
+  each step (opening, selecting, typing, undo, the trees, saving, adding
+  3 030 files as parts, copying and pasting 1 000 entities) on crates made
+  in advance by `PerformanceCrates` (`./gradlew :ui:performanceCrates`
+  makes them again into `ui/src/test/resources/performance/`): `large`
+  (3 200 entities of many types referring to each other), `wide` (a root
+  with 4 000 parts, all by one person), `deep` (folders ten deep) and
+  `variables` (1 000 PropertyValues); and on a folder of 3 000 files made
+  when run. Each step's time is in `ui/build/test-results/performance.tsv`,
+  and a step fails when over its limit (some three times its time when
+  written, `-PperformanceSlack=2` on a slower machine; lower a limit when
+  its step is made faster). `-PperformanceProfile` records each test with
+  the JDK's Flight Recorder (`ui/build/performance/<test>.jfr`, e.g. for
+  `jfr print --events jdk.ExecutionSample` or JDK Mission Control). All
+  of it took 35 s here, in November 2026; GitHub Actions runs it monthly
+  on Linux (integration-tests.yml). Next: crates of 10 000 and 100 000
+  entities, and the typing steps with the preview and JSON-LD tabs shown.
 - Likely costs to look at: `crate.toJson()` compared on every change
   (undo, the title's "modified"), `dataEntities()` and `byId()` built
   again in loops, the tree made again from scratch, and the preview's
@@ -1488,7 +1503,9 @@ crate above, a ROHub crate, and generated ones with 1 000, 10 000 and
   into a large crate, now 1 s (0.2 s into a new one), as they are
   selected at once with no form. Pasting or adding as parts more than
   200 now shows the busy pointer first (`CrateEditor.busy`); moving the
-  slow parts to a job is left.
+  slow parts to a job is left. Timed by `performanceTest`
+  (`copyAndPaste1000Entities`): 1 000 into their own crate, a large one
+  and a new one, 0.1 to 0.3 s each.
 
 ### Internationalisation (i18n)
 
