@@ -244,6 +244,11 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   made from it by `scripts/update-icons.sh`; on every window (`AppIcon`),
   the About box, the README and the app images' launchers, `wpsld-cli`'s
   too.
+- **The Windows app image failed to build** (*fixed*) in the 0.7.0
+  release: jpackage said "Malformed \uxxxx encoding". It reads
+  `wpsld-cli`'s launcher, with the new icon, from a properties file, where
+  the icon's path `…\ui\src\icons\wpsld.ico` has `\u` as an escape.
+  `ui/build.gradle` gives the icon's path with `/`, which Windows takes too.
 - **File > Save as Attached Crate…**: choose a folder (empty or new;
   otherwise a warning, as it would mix with what is there), write the
   crate there as `ro-crate-metadata.json` (now the name has to be typed
