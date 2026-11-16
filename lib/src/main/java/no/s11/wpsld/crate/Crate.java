@@ -74,6 +74,24 @@ public class Crate {
 		return new ObjectMapper()
 				.writer(new DefaultPrettyPrinter().withObjectIndenter(new DefaultIndenter("  ", lineEnd)));
 	}
+
+	/**
+	 * The line ends of a file's content: \r\n if every line ends so (as a
+	 * file saved on Windows may), else \n; to write it back with the same
+	 * (see {@link #writer(String)})
+	 */
+	public static String lineEnd(byte[] content) {
+		boolean any = false;
+		for (int i = 0; i < content.length; i++) {
+			if (content[i] == '\n') {
+				if (i == 0 || content[i - 1] != '\r') {
+					return "\n";
+				}
+				any = true;
+			}
+		}
+		return any ? "\r\n" : "\n";
+	}
 	/** The RO-Crate specification's versions start with this */
 	public static final String RO_CRATE_SPEC = "https://w3id.org/ro/crate/";
 	public static final String RO_CRATE_1_3 = "https://w3id.org/ro/crate/1.3";

@@ -211,16 +211,7 @@ final class CrateFile {
 	}
 
 	static String lineEnd(byte[] content) {
-		boolean any = false;
-		for (int i = 0; i < content.length; i++) {
-			if (content[i] == '\n') {
-				if (i == 0 || content[i - 1] != '\r') {
-					return "\n";
-				}
-				any = true;
-			}
-		}
-		return any ? "\r\n" : "\n";
+		return Crate.lineEnd(content);
 	}
 
 	/**
