@@ -409,6 +409,37 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
     ones too if simple): dataset label, timestamp, variables' names,
     labels and value labels, notes (characteristics).
   - SAS `.sas7bdat`: undocumented, reverse-engineered; later, if asked.
+- **Metadata of CWL workflows and tools** (`.cwl`), as the CWL user
+  guide recommends writing it
+  (https://www.commonwl.org/user_guide/topics/metadata-and-authorship.html):
+  extension fields with prefixes from the document's `$namespaces`
+  (usually `s: https://schema.org/` and `edam: http://edamontology.org/`),
+  else full IRIs; so read by expanding them, not by fixed names. Its
+  examples give `label` (the name) and `doc` (the description);
+  `s:author` and `s:contributor` (`class: s:Person` with `s:identifier`,
+  an ORCID iD, also as `http://orcid.org/…`, `s:email` as `mailto:` and
+  `s:name`); `s:citation` (a DOI, e.g. `https://dx.doi.org/…`);
+  `s:codeRepository`; `s:dateCreated`; `s:license` (an SPDX URL);
+  `s:keywords` (EDAM topics, `edam:topic_0091`); `s:programmingLanguage`;
+  and each input's and output's `label`, `doc` and `format` (EDAM
+  formats, e.g. `edam:format_2572`, BAM).
+  - Into the crate as the Workflow RO-Crate profile has it: the file a
+    `File`, `SoftwareSourceCode` and `ComputationalWorkflow` (for `class:
+    Workflow`; a `CommandLineTool` perhaps `SoftwareApplication`), with
+    `programmingLanguage` the CWL `ComputerLanguage` entity (`#cwl`, its
+    `version` from `cwlVersion`); people as Person entities by their ORCID
+    iDs (written as `ORCID.repair` does, merged with the crate's), the
+    citation by its DOI (as `DOI`), the licence by its SPDX IRI (as
+    `SPDXLicenses`), keywords as EDAM `DefinedTerm`s; inputs and outputs as
+    `FormalParameter`s (`input`/`output`), their formats as
+    `encodingFormat` EDAM IRIs. Offered as Metadata from the File… and
+    Update File Details… offer what files say, never given unasked.
+  - Packed workflows (`$graph`, the `#main` one), and JSON as well as
+    YAML. YAML needs a parser `lib` doesn't have: a reader module of its
+    own (as `readers-image`), e.g. with Jackson's YAML (SnakeYAML, about
+    0.4 MB), safely (no aliases' expansion bombs, no types made, a size
+    limit) and with the damaged-input tests, as CWL files come from
+    anywhere. Also for `wpsld-cli`, once it updates file details.
 - **Where a photo was taken, named**: now GPS gives a Place "Where
   photo.jpg was made" with its point (only on purpose). Also:
   - Name it by GeoNames' nearest place to the point (`findNearbyPlaceName`,
