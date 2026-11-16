@@ -177,9 +177,10 @@ test {
     forkEvery = 1
     maxHeapSize = '1536m'
     // Several test classes at once, each in its own JVM with its own
-    // headless JavaFX: one core left for Gradle, and at most three JVMs, as
-    // each may take its heap (CI's macOS runner has 3 cores and 7 GB)
-    maxParallelForks = Math.max(1, Math.min(3, Runtime.runtime.availableProcessors() - 1))
+    // headless JavaFX: one a core, as Gradle is all but idle meanwhile, and
+    // at most three JVMs, as each may take its heap (CI's macOS runner has
+    // 3 cores and 7 GB; its tests take 4 times as long as on Linux)
+    maxParallelForks = Math.max(1, Math.min(3, Runtime.runtime.availableProcessors()))
     // A test JVM short of memory thrashes rather than fails (seen when a
     // class had too many tests): fail instead. All took 8 to 11 minutes one
     // class at a time on Linux, over 20 on macOS in CI, whose runner is
