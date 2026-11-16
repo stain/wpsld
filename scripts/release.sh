@@ -12,7 +12,8 @@
 #
 # On main, up to date with origin and with nothing uncommitted: makes the
 # branch release-<version> from main, sets version=<version> in
-# gradle.properties, commits "Release <version>", tags it v<version>
+# gradle.properties and the version (and codemeta's dateModified, today) in
+# codemeta.json and .zenodo.json, commits "Release <version>", tags it v<version>
 # (annotated), then sets version=<next>-SNAPSHOT and commits that; main
 # itself is left as it was. Pushes nothing: it prints the push of the
 # branch and the tag. The tag starts .github/workflows/release.yml, which
@@ -78,9 +79,22 @@ set_version() {
     grep -q "^version=$1\$" "$PROPERTIES"
 }
 
+# The software's metadata: CodeMeta, and Zenodo's for the DOI it registers
+# when the release is published. Each has one "version" key, at the top
+set_metadata() {
+    for file in codemeta.json .zenodo.json; do
+        sed -e "s/^\(  \"version\": \)\"[^\"]*\"/\1\"$1\"/" \
+            -e "s/^\(  \"dateModified\": \)\"[^\"]*\"/\1\"$(date -u +%Y-%m-%d)\"/" \
+            "$file" > "$file.tmp"
+        mv "$file.tmp" "$file"
+        grep -q "^  \"version\": \"$1\"" "$file"
+    done
+}
+
 git switch -q -c "$BRANCH"
 set_version "$VERSION"
-git commit -q -m "Release $VERSION" "$PROPERTIES"
+set_metadata "$VERSION"
+git commit -q -m "Release $VERSION" "$PROPERTIES" codemeta.json .zenodo.json
 git tag -a "v$VERSION" -m "wpsld $VERSION"
 set_version "$NEXT-SNAPSHOT"
 git commit -q -m "Version $NEXT-SNAPSHOT, after releasing $VERSION" "$PROPERTIES"

@@ -264,6 +264,15 @@ the tag on GitHub's website: the tagged commit must have the version, as
 Help > About shows. Run without a version, the workflow only keeps the zips
 as artifacts.
 
+[`codemeta.json`](codemeta.json) ([CodeMeta](https://codemeta.github.io/))
+and [`.zenodo.json`](.zenodo.json) describe wpsld as software: authors,
+licence, keywords. The release commit sets their version (and CodeMeta's
+`dateModified`), and the workflow checks them against the tag too. Zenodo
+archives each published GitHub release and registers a DOI for it, with
+`.zenodo.json`'s metadata, once the repository is switched on in
+[Zenodo's GitHub settings](https://zenodo.org/account/settings/github/).
+Change other details (authors, description, funding) in both files.
+
 ## Project layout
 
 | Module | Contents |

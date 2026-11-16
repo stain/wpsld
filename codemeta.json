@@ -1,0 +1,48 @@
+{
+  "@context": "https://w3id.org/codemeta/3.0",
+  "type": "SoftwareSourceCode",
+  "name": "wpsld",
+  "description": "A desktop editor for RO-Crate metadata: it describes files and folders with schema.org-based Linked Data and saves the result as ro-crate-metadata.json, with forms narrowed by RO-Crate profiles. With wpsld-cli, which checks, repairs and previews crates on the command line.",
+  "version": "0.7.0",
+  "dateCreated": "2021-05-31",
+  "datePublished": "2026-11-06",
+  "dateModified": "2026-11-16",
+  "license": "https://spdx.org/licenses/Apache-2.0",
+  "codeRepository": "https://github.com/stain/wpsld",
+  "issueTracker": "https://github.com/stain/wpsld/issues",
+  "downloadUrl": "https://github.com/stain/wpsld/releases",
+  "readme": "https://github.com/stain/wpsld/blob/main/README.md",
+  "developmentStatus": "https://www.repostatus.org/#wip",
+  "programmingLanguage": "Java",
+  "runtimePlatform": ["Java 25", "JavaFX 27"],
+  "operatingSystem": ["Windows", "macOS", "Linux"],
+  "applicationCategory": "Research data management",
+  "keywords": [
+    "RO-Crate",
+    "research objects",
+    "metadata editor",
+    "schema.org",
+    "Linked Data",
+    "JSON-LD",
+    "FAIR",
+    "JavaFX"
+  ],
+  "author": [
+    {
+      "type": "Person",
+      "id": "https://orcid.org/0000-0001-9842-9718",
+      "givenName": "Stian",
+      "familyName": "Soiland-Reyes",
+      "affiliation": {
+        "type": "Organization",
+        "id": "https://ror.org/027m9bs27",
+        "name": "The University of Manchester"
+      }
+    }
+  ],
+  "copyrightHolder": {
+    "type": "Organization",
+    "id": "https://ror.org/027m9bs27",
+    "name": "The University of Manchester"
+  }
+}
