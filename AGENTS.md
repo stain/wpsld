@@ -19,3 +19,15 @@ as `ZipException: invalid LOC header`, or tests of half-edited files). So:
 - Don't run a second Gradle build in this tree while one runs here.
 - While debugging a failure, run the tests in this tree, in the
   foreground, as the changes are made here.
+
+## Commit messages
+
+A short subject line (at most 72 characters, no full stop) saying what
+changed, a blank line, then the why and the details as a body wrapped at
+about 72 columns. GitHub cuts a longer subject with "…" and moves the rest
+into the pull request's description, which then reads badly. For example:
+
+    Build releases without the Gradle download cache
+
+    What is released is built from the dependencies as their
+    repositories have them, not from what another run left behind.
