@@ -34,9 +34,9 @@ dependencies {
     implementation 'com.samskivert:jmustache:1.16'
 
     // Use JUnit test framework.
-    testImplementation 'junit:junit:4.13'
+    testImplementation 'junit:junit:4.13.2'
     // Damage's checks
-    testFixturesImplementation 'junit:junit:4.13'
+    testFixturesImplementation 'junit:junit:4.13.2'
 
 }
 

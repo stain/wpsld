@@ -151,7 +151,7 @@ javafx {
 
 dependencies {
     // Use JUnit test framework.
-    testImplementation 'junit:junit:4.13'
+    testImplementation 'junit:junit:4.13.2'
     // GUI tests, run headless with JavaFX's own headless platform (JavaFX 26+)
     testImplementation 'org.testfx:testfx-junit:4.0.18'
     testImplementation testFixtures(project(':lib'))
