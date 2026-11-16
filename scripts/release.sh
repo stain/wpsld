@@ -1,6 +1,8 @@
 #!/bin/sh
 # Make a release of wpsld, Maven style: the version committed and tagged
-# here, then pushed, rather than a tag made on GitHub.
+# here, then pushed, rather than a tag made on GitHub. main's rules on
+# GitHub take changes only through pull requests, so the commits go on a
+# branch, release-<version>, merged by a pull request.
 #
 #   scripts/release.sh <version> [<next>]
 #
@@ -8,13 +10,17 @@
 # <next>     the version after it, without -SNAPSHOT (default: <version>
 #            with its minor number one up, e.g. 0.8.0)
 #
-# On main, up to date with origin and with nothing uncommitted: sets
-# version=<version> in gradle.properties, commits "Release <version>",
-# tags it v<version> (annotated), then sets version=<next>-SNAPSHOT and
-# commits that. Pushes nothing: it prints the push, which starts
-# .github/workflows/release.yml on the tag, which builds the zips (and
-# checks the tag against gradle.properties) and makes a draft release to
-# review and publish on GitHub. Don't make the tag or release on GitHub's
+# On main, up to date with origin and with nothing uncommitted: makes the
+# branch release-<version> from main, sets version=<version> in
+# gradle.properties, commits "Release <version>", tags it v<version>
+# (annotated), then sets version=<next>-SNAPSHOT and commits that; main
+# itself is left as it was. Pushes nothing: it prints the push of the
+# branch and the tag. The tag starts .github/workflows/release.yml, which
+# builds the zips (and checks the tag against gradle.properties) and makes a
+# draft release to review and publish on GitHub. Merge the branch's pull
+# request with "Create a merge commit", whenever its checks pass, before or
+# after publishing: squashing or rebasing would make new commits, leaving
+# the tagged one out of main. Don't make the tag or release on GitHub's
 # website: the workflow makes the release, with the tag's notes.
 
 set -eu
@@ -59,6 +65,12 @@ if git rev-parse -q --verify "refs/tags/v$VERSION" > /dev/null; then
     echo "The tag v$VERSION exists already" >&2
     exit 1
 fi
+BRANCH=release-$VERSION
+if git rev-parse -q --verify "refs/heads/$BRANCH" > /dev/null ||
+        git ls-remote --exit-code -q --heads origin "$BRANCH" > /dev/null; then
+    echo "The branch $BRANCH exists already" >&2
+    exit 1
+fi
 
 set_version() {
     sed "s/^version=.*/version=$1/" "$PROPERTIES" > "$PROPERTIES.tmp"
@@ -66,14 +78,19 @@ set_version() {
     grep -q "^version=$1\$" "$PROPERTIES"
 }
 
+git switch -q -c "$BRANCH"
 set_version "$VERSION"
 git commit -q -m "Release $VERSION" "$PROPERTIES"
 git tag -a "v$VERSION" -m "wpsld $VERSION"
 set_version "$NEXT-SNAPSHOT"
 git commit -q -m "Version $NEXT-SNAPSHOT, after releasing $VERSION" "$PROPERTIES"
+git switch -q main
 
-echo "Tagged v$VERSION; main is now at $NEXT-SNAPSHOT. To release, push both:"
+echo "Tagged v$VERSION on the branch $BRANCH, which then has $NEXT-SNAPSHOT."
+echo "To release, push both:"
 echo
-echo "    git push --atomic origin main v$VERSION"
+echo "    git push --atomic origin $BRANCH v$VERSION"
 echo
-echo "then review and publish the draft release the workflow makes."
+echo "then open a pull request of $BRANCH and merge it with \"Create a merge"
+echo "commit\" (not squash or rebase, which leave the tagged commit out of"
+echo "main), and review and publish the draft release the workflow makes."
