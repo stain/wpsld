@@ -434,6 +434,16 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
     `FormalParameter`s (`input`/`output`), their formats as
     `encodingFormat` EDAM IRIs. Offered as Metadata from the File… and
     Update File Details… offer what files say, never given unasked.
+  - Carry forward the other annotations too, those the guide doesn't
+    prescribe: any field with a `$namespaces` prefix or a full IRI, on the
+    document or an input or output, as a property of its entity by the
+    expanded IRI: a schema.org term by the name the RO-Crate context gives
+    it (`s:funder` as `funder`), others as their absolute IRIs (as RO-Crate
+    allows terms outside its context, ideally with a definition, see
+    "Unknown types and properties"); values as they are, IRIs and CURIEs
+    as references, objects with a `class` as entities of that type.
+    CWL's own fields (`hints`, `requirements`, `inputBinding`…) stay out:
+    they are the workflow, not about it.
   - Packed workflows (`$graph`, the `#main` one), and JSON as well as
     YAML. YAML needs a parser `lib` doesn't have: a reader module of its
     own (as `readers-image`), e.g. with Jackson's YAML (SnakeYAML, about
