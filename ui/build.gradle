@@ -182,8 +182,9 @@ test {
     maxParallelForks = Math.max(1, Math.min(3, Runtime.runtime.availableProcessors() - 1))
     // A test JVM short of memory thrashes rather than fails (seen when a
     // class had too many tests): fail instead. All took 8 to 11 minutes one
-    // class at a time on Linux, over 20 on macOS in CI.
-    timeout = java.time.Duration.ofMinutes(30)
+    // class at a time on Linux, over 20 on macOS in CI, whose runner is
+    // slower: more time there.
+    timeout = java.time.Duration.ofMinutes(isMac ? 40 : 30)
     // Each test class's time, in the log as it ends and in
     // build/test-results/class-times.tsv (kept by CI), to see which are slow;
     // written as each ends, as the task's time-out loses the reports
