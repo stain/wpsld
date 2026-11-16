@@ -416,14 +416,17 @@ public class TestCrateEditorMetadata extends UiTest {
 				.asyncFx(() -> app.inBackground(stage, "Reading slowly", slowJob())).get();
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils.asyncFx(job::isRunning).get());
 		Platform.runLater(() -> app.newCrate(stage));
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
-				() -> lookup("Still working in the background").tryQuery().isPresent());
-		assertTrue(lookup(".dialog-pane .content").queryLabeled().getText().contains("Reading slowly (0 of 1000 files read)"));
+		// Looked up on the JavaFX thread, as the dialog opens meanwhile
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils
+				.asyncFx(() -> lookup("Still working in the background").tryQuery().isPresent()).get());
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> lookup(".dialog-pane .content").queryLabeled().getText()).get()
+				.contains("Reading slowly (0 of 1000 files read)"));
 		clickDialogButton("Cancel");
 		assertTrue(WaitForAsyncUtils.asyncFx(job::isRunning).get());
 		Platform.runLater(() -> app.newCrate(stage));
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
-				() -> lookup("Still working in the background").tryQuery().isPresent());
+		// Looked up on the JavaFX thread, as the dialog opens meanwhile
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils
+				.asyncFx(() -> lookup("Still working in the background").tryQuery().isPresent()).get());
 		clickDialogButton("Stop");
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils.asyncFx(job::isCancelled).get());
 		WaitForAsyncUtils.waitForFxEvents();
