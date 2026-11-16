@@ -18,43 +18,42 @@
 package no.s11.wpsld.form;
 
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
+import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.CrateChecks;
 import no.s11.wpsld.crate.CrateDocument;
-import no.s11.wpsld.crate.CrateDocument.Problem;
-import no.s11.wpsld.crate.CrateDocument.Severity;
 import no.s11.wpsld.crate.CrateFolder;
 import no.s11.wpsld.crate.CrateTerms;
+import no.s11.wpsld.crate.Issue;
+import no.s11.wpsld.crate.Issue.Severity;
 
 /**
  * A crate checked as the editor checks it before saving, as
- * <code>wpsld-cli check</code> reports it: the problems reading it; the
+ * <code>wpsld-cli check</code> reports it (see {@link Issue}): the problems
+ * reading it (errors REQUIRED, warnings RECOMMENDED); RO-Crate's own
+ * requirements of the root data entity ({@link CrateChecks}); the
  * properties its profiles require (see {@link CrateProfiles} and
- * {@link RequiredFields}); RO-Crate's own requirements of the root data
- * entity ({@link CrateChecks}); and for an attached crate, its files and
- * folders ({@link CrateFolder#problems}), and as warnings, the files in
- * its folder that it doesn't describe. Not a full validator: see
+ * {@link RequiredFields}); for an attached crate, its files and folders
+ * ({@link CrateFolder#issues}), and, RECOMMENDED, the files in its folder
+ * that it doesn't describe. An issue worded as one before it is left out,
+ * e.g. a profile's that RO-Crate requires too. Not a full validator: see
  * rocrate-validator for that.
  *
- * @param reading  The problems reading the crate, errors first
+ * @param read     Whether the crate could be read
  * @param profiles The profiles checked, and those not found
- * @param problems What the crate lacks or has wrong, each once
- * @param warnings What may be meant otherwise, but is allowed: the files in
- *                 an attached crate's folder that it doesn't describe (at
- *                 most {@link #FILES} of them)
+ * @param issues   What the crate lacks or has wrong
  */
-public record CrateCheck(List<Problem> reading, CrateProfiles profiles, List<String> problems,
-		List<String> warnings) {
+public record CrateCheck(boolean read, CrateProfiles profiles, List<Issue> issues) {
 	/** How many of the folder's files to look at, at most, as the editor's Entities by Folder */
 	public static final int FILES = 10_000;
 
 	public CrateCheck {
-		reading = List.copyOf(reading);
-		problems = List.copyOf(problems);
-		warnings = List.copyOf(warnings);
+		issues = List.copyOf(issues);
 	}
 
 	/**
@@ -64,28 +63,32 @@ public record CrateCheck(List<Problem> reading, CrateProfiles profiles, List<Str
 	 */
 	public static CrateCheck of(CrateDocument document, CrateProfiles profiles, CrateTerms terms,
 			Optional<Path> folder) {
-		List<Problem> reading = document.problems().stream()
-				.sorted((a, b) -> a.severity().compareTo(b.severity())).toList();
+		Stream<Issue> reading = document.problems().stream()
+				.map(p -> new Issue(p.severity() == CrateDocument.Severity.ERROR ? Severity.REQUIRED
+						: Severity.RECOMMENDED, "wpsld:reading", "Reading the crate's JSON-LD", Issue.RO_CRATE,
+						p.message(), Optional.empty(), Optional.empty(), Optional.empty()));
 		if (document.crate().isEmpty()) {
-			return new CrateCheck(reading, profiles, List.of(), List.of());
+			return new CrateCheck(false, profiles, reading.toList());
 		}
-		var crate = document.crate().get();
+		Crate crate = document.crate().get();
 		SchemaOrgFormFields schemaOrg = new SchemaOrgFormFields(terms);
-		// Each profile's required properties, then RO-Crate's own checks
-		// (worded alike, so each problem only once)
-		List<String> problems = Stream.of(
+		Stream<Issue> undescribed = folder.map(f -> CrateFolder.match(crate, f, FILES).undescribed())
+				.orElse(List.of()).stream()
+				.map(id -> new Issue(Severity.RECOMMENDED, "rocrate:file-undescribed",
+						"Attached crate: the files in its folder described", Issue.RO_CRATE,
+						id + " is in the crate's folder, but not in the crate", Optional.empty(), Optional.empty(),
+						Optional.of(id)));
+		Set<String> said = new HashSet<>();
+		List<Issue> issues = Stream.of(reading, CrateChecks.issues(crate).stream(),
 				profiles.matched().stream()
-						.flatMap(p -> RequiredFields.check(crate, new ProfileFormFields(p, schemaOrg), terms).stream()),
-				CrateChecks.check(crate).stream(),
-				folder.map(f -> CrateFolder.problems(crate, f)).orElse(List.of()).stream())
-				.flatMap(s -> s).distinct().toList();
-		List<String> warnings = folder.map(f -> CrateFolder.match(crate, f, FILES).undescribed()).orElse(List.of())
-				.stream().map(id -> id + " is in the crate's folder, but not in the crate").toList();
-		return new CrateCheck(reading, profiles, problems, warnings);
+						.flatMap(p -> RequiredFields.issues(crate, new ProfileFormFields(p, schemaOrg), terms).stream()),
+				folder.map(f -> CrateFolder.issues(crate, f)).orElse(List.of()).stream(), undescribed)
+				.flatMap(s -> s).filter(i -> said.add(i.message())).toList();
+		return new CrateCheck(true, profiles, issues);
 	}
 
-	/** Whether it could be read, without errors, and has no problems; warnings don't count */
+	/** Whether it could be read and has no REQUIRED issues; others (warnings) don't count */
 	public boolean passed() {
-		return reading.stream().noneMatch(p -> p.severity() == Severity.ERROR) && problems.isEmpty();
+		return read && issues.stream().noneMatch(Issue::isRequired);
 	}
 }

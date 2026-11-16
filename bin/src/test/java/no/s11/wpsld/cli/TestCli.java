@@ -80,7 +80,7 @@ public class TestCli {
 		out.getBuffer().setLength(0);
 		assertEquals(0, run("check", "--offline", folder.toString()));
 		assertTrue(out.toString(), out.toString().contains("Warning: notes.txt is in the crate's folder, but not in the crate"));
-		assertTrue(out.toString().contains("Passed."));
+		assertTrue(out.toString().contains("Passed. 1 warning."));
 	}
 
 	@Test
@@ -91,16 +91,36 @@ public class TestCli {
 		assertTrue(text, text.contains("Profiles: RO-Crate Machine Actionable Profile"));
 		assertTrue(text, text.contains("Profile not found: https://example.org/no-such-profile"));
 		assertTrue(text, text.contains("• The root data entity must have a license"));
-		assertTrue(text, text.contains("WARNING: ./ funder has an object written in it without an @id"));
+		assertTrue(text, text.contains("Warning: ./ funder has an object written in it without an @id"));
 
 		out.getBuffer().setLength(0);
 		assertEquals(1, run("check", "--offline", "--json", metadata.toString()));
+		// As rocrate-validator's JSON
 		JsonNode report = new ObjectMapper().readTree(out.toString());
+		assertEquals("wpsld-cli", report.at("/meta/generated_by").asText());
 		assertFalse(report.get("passed").asBoolean());
 		assertEquals("https://language-research-technology.github.io/ro-crate-masp/profiles/ro-crate/profile-crate/",
-				report.get("profiles").get(0).get("id").asText());
-		assertTrue(report.get("unknownProfiles").has("https://example.org/no-such-profile"));
-		assertTrue(report.get("problems").toString().contains("must have a license"));
+				report.at("/validation_settings/profile_identifiers/0").asText());
+		assertTrue(report.get("unknown_profiles").has("https://example.org/no-such-profile"));
+		JsonNode license = null;
+		for (JsonNode issue : report.get("issues")) {
+			if (issue.at("/check/identifier").asText().equals("rocrate:root-license")) {
+				license = issue;
+			}
+		}
+		assertNotNull(report.toString(), license);
+		assertEquals("REQUIRED", license.get("severity").asText());
+		assertEquals("./", license.get("violatingEntity").asText());
+		assertEquals("http://schema.org/license", license.get("violatingProperty").asText());
+		assertTrue(license.get("violatingPropertyValue").isNull());
+		assertEquals("https://w3id.org/ro/crate/1.3", license.at("/check/requirement/profile/uri").asText());
+		// Each issue once, though the profile requires a license too
+		assertEquals(1, report.get("issues").findValues("message").stream()
+				.filter(m -> m.asText().equals("The root data entity must have a license")).count());
+		// Warnings don't fail
+		JsonNode funder = report.get("issues").get(0);
+		assertEquals("RECOMMENDED", funder.get("severity").asText());
+		assertTrue(funder.get("message").asText().startsWith("./ funder has an object"));
 	}
 
 	@Test

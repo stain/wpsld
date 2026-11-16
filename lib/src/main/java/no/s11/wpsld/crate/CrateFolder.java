@@ -38,6 +38,8 @@ import java.util.Set;
 
 import com.fasterxml.jackson.databind.node.TextNode;
 
+import no.s11.wpsld.crate.Issue.Severity;
+
 /**
  * The files and folders of an attached crate's folder, as relative
  * <code>@id</code>s, to tell those the crate doesn't describe yet; and what
@@ -143,51 +145,77 @@ public final class CrateFolder {
 	 * page.html#t2, the file).
 	 */
 	public static List<String> problems(Crate crate, Path folder) {
+		List<Issue> issues = issues(crate, folder);
 		List<String> problems = new ArrayList<>();
-		String root = crate.getRoot().getId();
-		if (!root.equals("./") && !Crate.isAbsolute(root)) {
-			problems.add("The root data entity's @id must be ./ or an absolute URI, not " + root);
+		issues.stream().filter(i -> i.check().equals(ROOT_ID)).forEach(i -> problems.add(i.message()));
+		grouped(problems, issues, OUTSIDE, " entity is", " entities are",
+				" outside the crate's folder, which an attached crate can't have: ");
+		grouped(problems, issues, NO_SLASH, " Dataset's @id", " Datasets' @ids", " should end with / as a folder's: ");
+		grouped(problems, issues, OTHER_CASE, " file or folder is", " files or folders are",
+				" named with other upper and lower case in the crate's folder, which other computers tell apart: ");
+		grouped(problems, issues, MISSING, " file or folder is", " files or folders are",
+				" not in the crate's folder: ");
+		return problems;
+	}
+
+	private static final String ROOT_ID = "rocrate:root-id";
+	private static final String OUTSIDE = "rocrate:attached-outside";
+	private static final String NO_SLASH = "rocrate:dataset-slash";
+	private static final String OTHER_CASE = "rocrate:file-case";
+	private static final String MISSING = "rocrate:file-missing";
+
+	/** The issues of one check, as one problem with examples of the entities */
+	private static void grouped(List<String> problems, List<Issue> issues, String check, String one, String many,
+			String what) {
+		List<String> ids = issues.stream().filter(i -> i.check().equals(check)).map(i -> i.entity().orElseThrow())
+				.toList();
+		if (!ids.isEmpty()) {
+			problems.add(ids.size() + (ids.size() == 1 ? one : many) + what + examples(ids));
 		}
-		List<String> outside = new ArrayList<>();
-		List<String> noSlash = new ArrayList<>();
-		List<String> missing = new ArrayList<>();
-		List<String> otherCase = new ArrayList<>();
+	}
+
+	/**
+	 * The problems of {@link #problems}, one for each entity (see
+	 * {@link Issue}): a Dataset's @id without its / is RECOMMENDED (SHOULD),
+	 * the others REQUIRED
+	 */
+	public static List<Issue> issues(Crate crate, Path folder) {
+		List<Issue> issues = new ArrayList<>();
+		Entity root = crate.getRoot();
+		if (!root.getId().equals("./") && !Crate.isAbsolute(root.getId())) {
+			issues.add(Issue.of(Severity.REQUIRED, ROOT_ID, "Root data entity: @id",
+					"The root data entity's @id must be ./ or an absolute URI, not " + root.getId(), root,
+					Optional.of("@id"), Optional.of(root.getId())));
+		}
 		for (Entity entity : crate.getEntities()) {
 			String id = entity.getId();
 			String file = id.contains("#") ? id.substring(0, id.indexOf('#')) : id;
-			if (entity == crate.getRoot() || file.isEmpty() || !isRelativePath(file)) {
+			if (entity == root || file.isEmpty() || !isRelativePath(file)) {
 				continue;
 			}
 			if (isOutside(file)) {
-				outside.add(id);
+				issues.add(Issue.of(Severity.REQUIRED, OUTSIDE, "Attached crate: data entities in its folder",
+						id + " is outside the crate's folder, which an attached crate can't have", entity,
+						Optional.of("@id"), Optional.of(id)));
 				continue;
 			}
 			if (!id.contains("#") && entity.getTypes().contains("Dataset") && !id.endsWith("/")) {
-				noSlash.add(id);
+				issues.add(Issue.of(Severity.RECOMMENDED, NO_SLASH, "Dataset: @id ending with /",
+						"The @id of the Dataset " + id + " should end with / as a folder's", entity,
+						Optional.of("@id"), Optional.of(id)));
 			}
 			Optional<String> problem = problem(folder, file);
-			if (problem.isPresent()) {
-				(problem.get().startsWith(NAMED) ? otherCase : missing).add(id);
+			if (problem.isPresent() && problem.get().startsWith(NAMED)) {
+				issues.add(Issue.of(Severity.REQUIRED, OTHER_CASE, "Attached crate: data entities in its folder",
+						id + " is named with other upper and lower case in the crate's folder, which other"
+								+ " computers tell apart",
+						entity, Optional.of("@id"), Optional.of(id)));
+			} else if (problem.isPresent()) {
+				issues.add(Issue.of(Severity.REQUIRED, MISSING, "Attached crate: data entities in its folder",
+						id + " is not in the crate's folder", entity, Optional.of("@id"), Optional.of(id)));
 			}
 		}
-		if (!outside.isEmpty()) {
-			problems.add(outside.size() + (outside.size() == 1 ? " entity is" : " entities are")
-					+ " outside the crate's folder, which an attached crate can't have: " + examples(outside));
-		}
-		if (!noSlash.isEmpty()) {
-			problems.add(noSlash.size() + (noSlash.size() == 1 ? " Dataset's @id" : " Datasets' @ids")
-					+ " should end with / as a folder's: " + examples(noSlash));
-		}
-		if (!otherCase.isEmpty()) {
-			problems.add(otherCase.size() + (otherCase.size() == 1 ? " file or folder is" : " files or folders are")
-					+ " named with other upper and lower case in the crate's folder, which other computers tell apart: "
-					+ examples(otherCase));
-		}
-		if (!missing.isEmpty()) {
-			problems.add(missing.size() + (missing.size() == 1 ? " file or folder is" : " files or folders are")
-					+ " not in the crate's folder: " + examples(missing));
-		}
-		return problems;
+		return issues;
 	}
 
 	/** Whether a relative path leads out of the crate's folder, e.g. ../other/data.csv */

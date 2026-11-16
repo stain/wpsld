@@ -20,11 +20,17 @@ package no.s11.wpsld.cli;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import no.s11.wpsld.crate.Issue;
 import no.s11.wpsld.form.CrateCheck;
 import no.s11.wpsld.form.CrateProfiles;
 import no.s11.wpsld.masp.Profile;
@@ -41,7 +47,7 @@ import picocli.CommandLine.Spec;
 				+ " its profiles require (by its conformsTo; else the core RO-Crate profile), RO-Crate's own"
 				+ " requirements, and an attached crate's files and folders; files in its folder that it doesn't"
 				+ " describe are warnings.",
-				"Exit status 0 if it has none, 1 if it has, 2 if it can't be read." })
+				"Exit status 0 if it has none (warnings allowed), 1 if it has, 2 if it can't be read." })
 final class CheckCommand implements Callable<Integer> {
 	@ParentCommand
 	private Main main;
@@ -51,7 +57,7 @@ final class CheckCommand implements Callable<Integer> {
 	@Parameters(paramLabel = "CRATE", description = "The crate's folder, or its metadata file")
 	private Path crate;
 
-	@Option(names = "--json", description = "Report as JSON")
+	@Option(names = "--json", description = "Report as JSON, as rocrate-validator writes it (validate -f json)")
 	private boolean json;
 
 	@Option(names = "--offline", description = "Don't load profiles from the web: only those bundled, or kept by"
@@ -61,46 +67,87 @@ final class CheckCommand implements Callable<Integer> {
 	@Override
 	public Integer call() throws IOException {
 		PrintWriter out = spec.commandLine().getOut();
+		Instant started = Instant.now();
 		OpenedCrate opened = OpenedCrate.open(crate);
 		CrateProfiles profiles = opened.document().crate().isPresent()
 				? CrateProfiles.of(opened.document(), main.profiles(), !offline)
-				: new CrateProfiles(java.util.List.of(), java.util.List.of(), java.util.Map.of());
+				: new CrateProfiles(List.of(), List.of(), Map.of());
 		CrateCheck check = CrateCheck.of(opened.document(), profiles, main.terms(), opened.folder());
 		if (json) {
-			ObjectNode report = new ObjectMapper().createObjectNode();
-			report.put("crate", opened.metadata().toString());
-			report.put("passed", check.passed());
-			var checked = report.putArray("profiles");
-			profiles.matched().forEach(p -> checked.addObject().put("id", p.identifiers().isEmpty() ? p.id() : p.identifiers().get(0))
-					.put("name", p.name().orElse(p.id())));
-			var unknown = report.putObject("unknownProfiles");
-			profiles.unknown().forEach(unknown::put);
-			var reading = report.putArray("reading");
-			check.reading().forEach(p -> reading.addObject().put("severity", p.severity().toString())
-					.put("message", p.message()));
-			var problems = report.putArray("problems");
-			check.problems().forEach(problems::add);
-			var warnings = report.putArray("warnings");
-			check.warnings().forEach(warnings::add);
-			out.println(new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(report));
+			out.println(new ObjectMapper().writerWithDefaultPrettyPrinter()
+					.writeValueAsString(report(opened, check, started, Instant.now())));
 		} else {
 			out.println(opened.metadata());
 			out.println("Profiles: " + (profiles.matched().isEmpty() ? "none"
 					: String.join(", ", profiles.matched().stream().map(CheckCommand::describe).toList()))
 					+ (profiles.declared().isEmpty() ? " (none declared in conformsTo)" : ""));
 			profiles.unknown().forEach((id, why) -> out.println("Profile not found: " + id + " (" + why + ")"));
-			check.reading().forEach(p -> out.println(p));
-			check.problems().forEach(p -> out.println("• " + p));
-			check.warnings().forEach(w -> out.println("Warning: " + w));
-			out.println(opened.document().crate().isEmpty() ? "Couldn't be read."
+			check.issues().forEach(i -> out.println((i.isRequired() ? "• " : "Warning: ") + i.message()));
+			long required = check.issues().stream().filter(Issue::isRequired).count();
+			long warnings = check.issues().size() - required;
+			out.println((!check.read() ? "Couldn't be read."
 					: check.passed() ? "Passed."
-					: check.problems().size() + (check.problems().size() == 1 ? " problem." : " problems."));
+					: required + (required == 1 ? " problem." : " problems."))
+					+ (warnings == 0 ? "" : " " + warnings + (warnings == 1 ? " warning." : " warnings.")));
 		}
 		out.flush();
-		if (opened.document().crate().isEmpty()) {
+		if (!check.read()) {
 			return Main.UNUSABLE;
 		}
 		return check.passed() ? 0 : Main.PROBLEMS;
+	}
+
+	/**
+	 * The report as rocrate-validator writes its JSON (validate -f json), so
+	 * that what reads its reports can read these: meta, validation_settings,
+	 * passed, issues (each with its severity, message, violating entity,
+	 * property and value, and the check, its requirement and profile) and
+	 * statistics; and wpsld's own unknown_profiles
+	 */
+	private ObjectNode report(OpenedCrate opened, CrateCheck check, Instant started, Instant finished) {
+		ObjectNode report = new ObjectMapper().createObjectNode();
+		report.putObject("meta").put("generated_by", "wpsld-cli").put("version", Main.version());
+		ObjectNode settings = report.putObject("validation_settings");
+		settings.put("rocrate_uri", crate.toString());
+		settings.put("metadata_file", opened.metadata().toString());
+		settings.put("packaging_mode", opened.folder().isPresent() ? "attached" : "detached");
+		settings.put("offline", offline);
+		ArrayNode identifiers = settings.putArray("profile_identifiers");
+		check.profiles().matched().forEach(p -> identifiers.add(identifier(p)));
+		report.put("passed", check.passed());
+		ArrayNode issues = report.putArray("issues");
+		for (Issue issue : check.issues()) {
+			ObjectNode shown = issues.addObject();
+			shown.put("severity", issue.severity().toString());
+			shown.put("message", issue.message());
+			shown.put("violatingEntity", issue.entity().orElse(null));
+			shown.put("violatingProperty", issue.property()
+					.map(p -> p.startsWith("@") ? p : main.terms().iri(p).map(Object::toString).orElse(p)).orElse(null));
+			shown.put("violatingPropertyValue", issue.value().orElse(null));
+			ObjectNode checked = shown.putObject("check");
+			checked.put("identifier", issue.check());
+			checked.put("name", issue.name());
+			checked.put("severity", issue.severity().toString());
+			checked.put("profile", issue.source().uri());
+			ObjectNode requirement = checked.putObject("requirement");
+			requirement.put("identifier", issue.check());
+			requirement.put("name", issue.name());
+			requirement.putObject("profile").put("identifier", issue.source().uri()).put("uri", issue.source().uri())
+					.put("name", issue.source().name());
+		}
+		ObjectNode unknown = report.putObject("unknown_profiles");
+		check.profiles().unknown().forEach(unknown::put);
+		ObjectNode statistics = report.putObject("statistics");
+		statistics.put("started_at", started.toString());
+		statistics.put("finished_at", finished.toString());
+		statistics.put("duration", Duration.between(started, finished).toMillis() / 1000.0);
+		ArrayNode checkedProfiles = statistics.putArray("profiles");
+		check.profiles().matched().forEach(p -> checkedProfiles.add(identifier(p)));
+		return report;
+	}
+
+	private static String identifier(Profile profile) {
+		return profile.identifiers().isEmpty() ? profile.id() : profile.identifiers().get(0);
 	}
 
 	private static String describe(Profile profile) {
