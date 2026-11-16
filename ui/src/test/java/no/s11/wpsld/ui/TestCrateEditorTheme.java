@@ -27,10 +27,12 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.DialogPane;
 import javafx.scene.control.Label;
 import javafx.scene.control.Menu;
@@ -38,6 +40,7 @@ import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.RadioMenuItem;
 import javafx.scene.input.KeyCode;
+import javafx.scene.layout.Region;
 import javafx.stage.Stage;
 import no.s11.wpsld.Settings;
 import no.s11.wpsld.crate.CrateReader;
@@ -48,7 +51,7 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
 /**
  * View > Style and Colours: the look of every window, kept in the settings.
  */
-public class TestCrateEditorTheme extends ApplicationTest {
+public class TestCrateEditorTheme extends UiTest {
 	private Stage stage;
 	private Path settingsFile;
 
@@ -196,6 +199,22 @@ public class TestCrateEditorTheme extends ApplicationTest {
 		choose("Style", "win11");
 		assertTrue(lookup("#notebook").tryQuery().isEmpty());
 		assertTrue(lookup("#label-name").tryQuery().isPresent());
+	}
+
+	/** Dialogs don't shrink below their text, which could cut it off */
+	@Test
+	public void dialogsFitTheirText() throws Exception {
+		editorShown();
+		choose("Style", "warp");
+		Alert[] alert = new Alert[1];
+		interact(() -> {
+			alert[0] = new Alert(AlertType.WARNING, "You have unsaved changes. Reload the file to see it as it is"
+					+ " now, discarding your changes, or keep them and choose when you save.", ButtonType.OK);
+			alert[0].initOwner(stage);
+			alert[0].show();
+		});
+		assertEquals(Region.USE_PREF_SIZE, alert[0].getDialogPane().getMinHeight(), 0);
+		interact(() -> alert[0].close());
 	}
 
 	@Test

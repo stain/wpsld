@@ -1,0 +1,24 @@
+// PDFs' own metadata (no.s11.wpsld.readers.pdf): a MetadataReader in a
+// module of its own, with PDFBox, which needs java.desktop
+plugins {
+    id 'java-library'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':lib')
+    implementation 'org.apache.pdfbox:pdfbox:3.0.8'
+
+    testImplementation 'junit:junit:4.13'
+    // The test categories (no.s11.wpsld.test)
+    testImplementation testFixtures(project(':lib'))
+}
+
+// The module name's s11 is the organisation's domain (s11.no); javac's lint
+// would warn about its digits on every build
+tasks.named('compileJava') {
+    options.compilerArgs += ['-Xlint:-module']
+}

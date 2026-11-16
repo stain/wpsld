@@ -91,6 +91,7 @@ public interface MapTiles {
 
 	final class OpenStreetMap implements MapTiles {
 		/** About 16 MB of tiles at most */
+		private static final System.Logger LOGGER = System.getLogger(MapTiles.class.getName());
 		private static final int CACHED = 512;
 		private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10))
 				.followRedirects(HttpClient.Redirect.NORMAL).build();
@@ -118,10 +119,18 @@ public interface MapTiles {
 			HttpRequest request = HttpRequest.newBuilder(URI.create("https://tile.openstreetmap.org/" + key + ".png"))
 					.timeout(Duration.ofSeconds(20)).header("User-Agent", userAgent).GET().build();
 			CompletableFuture<Optional<Image>> tile = http.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray())
-					.thenApply(response -> response.statusCode() == 200
-							? Optional.of(new Image(new ByteArrayInputStream(response.body())))
-							: Optional.<Image>empty())
-					.exceptionally(e -> Optional.empty());
+					.thenApply(response -> {
+						if (response.statusCode() != 200) {
+							LOGGER.log(System.Logger.Level.DEBUG, "Map tile {0}: HTTP {1}", key,
+									response.statusCode());
+							return Optional.<Image>empty();
+						}
+						return Optional.of(new Image(new ByteArrayInputStream(response.body())));
+					}).exceptionally(e -> {
+						// Offline, each tile fails: details only
+						LOGGER.log(System.Logger.Level.DEBUG, "Map tile " + key + " not loaded", e);
+						return Optional.empty();
+					});
 			cache.put(key, tile);
 			return tile;
 		}

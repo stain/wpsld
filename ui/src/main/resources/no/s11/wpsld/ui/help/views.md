@@ -3,7 +3,11 @@
 Select an entity on the left to edit its form in the middle. On the right,
 **Preview** shows the selected entity and its links; **JSON-LD** shows the
 crate's metadata. Selecting a link to another described entity in Preview
-opens it in the editor.
+opens it in the editor. Web addresses open in the browser, and files
+beside the crate as your system opens them, also from the values of
+properties that take a URL, such as **URL**. A compact `@id` such as
+`s:ActiveActionStatus` opens as the address the crate's `@context` gives
+it, here `http://schema.org/ActiveActionStatus`.
 
 The entity list shows the dataset as a whole (the root) first, then the
 other entities by type, name and `@id`. An entity moves to its place in
@@ -58,7 +62,8 @@ crate's files are not looked for.
 web (under **External resources**) whether it is there, following
 redirects, and marks those that are not the same way, saying what they
 answered, until checked again. It needs an internet connection, and asks
-a few addresses at a time.
+a few addresses at a time, in the background: the foot of the window
+shows it, and **Show...** there brings up its progress, with **Cancel**.
 
 Selecting an entity selects it in each place it is shown; **Copy** and
 **Remove** act on it once. Each entity has an icon for its type. **View > Entities by Type** shows the

@@ -19,9 +19,18 @@ module no.s11.wpsld.ui {
 	requires javafx.graphics;
 	requires javafx.controls;
 	requires java.net.http;
+	requires java.logging;
     requires no.s11.wpsld;
     requires com.fasterxml.jackson.databind;
     requires org.commonmark;
+    requires org.commonmark.ext.gfm.tables;
+    // Readers of files' own metadata: services lib finds (FileMetadata),
+    // required so that jlink links them in
+    requires no.s11.wpsld.readers.image;
+    requires no.s11.wpsld.readers.pdf;
+    // SLF4J (Tika's) to java.util.logging: a service, required so that
+    // jlink links it in
+    requires org.slf4j.jul;
     requires org.kordamp.ikonli.javafx;
     requires org.kordamp.ikonli.fluentui;
     // JavaFX creates the Application by reflection

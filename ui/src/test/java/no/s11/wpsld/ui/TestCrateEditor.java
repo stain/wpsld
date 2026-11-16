@@ -27,12 +27,12 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import javafx.scene.Node;
@@ -64,7 +64,7 @@ import no.s11.wpsld.form.FormFields;
 /**
  * GUI tests of the crate window, run headless (see ui/build.gradle).
  */
-public class TestCrateEditor extends ApplicationTest {
+public class TestCrateEditor extends UiTest {
 
 	private CrateEditor app;
 
@@ -764,6 +764,62 @@ public class TestCrateEditor extends ApplicationTest {
 				|| lookup(n -> n instanceof javafx.scene.control.Label l && l.getText() != null
 						&& l.getText().contains(org.getId())).tryQuery().isPresent());
 		clickOn("OK");
+	}
+
+	/**
+	 * Pasting entities the crate has already says so, in one dialog for the
+	 * paste: those the same left out, and those merged or kept.
+	 */
+	@Test
+	public void pasteReportsWhatIsAlreadyThere() throws Exception {
+		entities();
+		addEntity("person");
+		renameTo("https://orcid.org/0000-0002-1825-0097");
+		addEntity("person");
+		Entity orcid = entities().getItems().stream()
+				.filter(e -> e.getId().equals("https://orcid.org/0000-0002-1825-0097")).findFirst().orElseThrow();
+		Entity local = entities().getItems().stream().filter(e -> e.getId().startsWith("#")).findFirst()
+				.orElseThrow();
+		clickOn("#entities");
+		interact(() -> {
+			entities().getSelectionModel().clearSelection();
+			entities().getSelectionModel().selectIndices(entities().getItems().indexOf(orcid),
+					entities().getItems().indexOf(local));
+		});
+		interact(menuItem("menuCopy")::fire);
+		interact(menuItem("menuPaste")::fire);
+		// The local one copied, the ORCID one the same
+		assertEquals(4, entities().getItems().size());
+		DialogPane report = lookup(".dialog-pane").queryAs(DialogPane.class);
+		assertEquals("Pasted 1 of 2 entities: the others are already in this crate", report.getHeaderText());
+		assertTrue(report.getContentText(), report.getContentText()
+				.startsWith("Already in this crate, the same, so not added again: https://orcid.org/"));
+		clickOn("OK");
+
+		// Only the ORCID one, changed: merged
+		JsonNode copied = new ObjectMapper().readTree((String) WaitForAsyncUtils
+				.asyncFx(() -> Clipboard.getSystemClipboard().getContent(EntityClipboard.ENTITY)).get());
+		ArrayNode graph = (ArrayNode) copied.get("document").get("@graph");
+		graph.remove(1);
+		((ObjectNode) graph.get(0)).put("name", "Josiah Carberry");
+		interact(() -> {
+			ClipboardContent content = new ClipboardContent();
+			content.put(EntityClipboard.ENTITY, copied.toString());
+			Clipboard.getSystemClipboard().setContent(content);
+		});
+		clickOn("#entities");
+		// Not waiting for Paste, which waits for the Merge dialog
+		WaitForAsyncUtils.asyncFx(menuItem("menuPaste")::fire);
+		WaitForAsyncUtils.waitForFxEvents();
+		clickOn("Merge");
+		WaitForAsyncUtils.waitForFxEvents();
+		report = lookup(".dialog-pane").queryAs(DialogPane.class);
+		assertEquals("Nothing new pasted: it is already in this crate", report.getHeaderText());
+		assertEquals("Merged into those in this crate with the same @id: Josiah Carberry"
+				+ " (https://orcid.org/0000-0002-1825-0097).", report.getContentText());
+		clickOn("OK");
+		assertEquals("Josiah Carberry", orcid.getLabel());
+		assertEquals(4, entities().getItems().size());
 	}
 
 	/**

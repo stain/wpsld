@@ -44,9 +44,11 @@ import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.TextFlow;
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.Places;
+import no.s11.wpsld.form.Markdown;
 
 /**
  * A read-only preview of one entity of the crate, like an RO-Crate's
@@ -65,6 +67,8 @@ public class EntityPreview extends ScrollPane {
 	private final Function<String, String> label;
 	/** The folder of the crate, if it has one (opened from or saved to it) */
 	private Supplier<Optional<Path>> folder = Optional::empty;
+	/** Whether a property takes URLs, if known */
+	private Function<String, Optional<Boolean>> takesUrl = property -> Optional.empty();
 	private final VBox content = new VBox(8);
 	private Entity entity;
 
@@ -86,6 +90,14 @@ public class EntityPreview extends ScrollPane {
 	 */
 	public void setFolder(Supplier<Optional<Path>> folder) {
 		this.folder = Objects.requireNonNull(folder);
+	}
+
+	/**
+	 * How to tell whether a property takes URLs, by its range, to show its
+	 * text values as links.
+	 */
+	public void setTakesUrl(Function<String, Optional<Boolean>> takesUrl) {
+		this.takesUrl = Objects.requireNonNull(takesUrl);
 	}
 
 	/**
@@ -121,9 +133,20 @@ public class EntityPreview extends ScrollPane {
 		List<String> descriptions = entity.getAll("description").stream().filter(JsonNode::isValueNode)
 				.map(JsonNode::asText).toList();
 		if (!descriptions.isEmpty()) {
-			Label description = new Label(String.join("\n\n", descriptions));
+			String text = String.join("\n\n", descriptions);
+			// Formatted when written in Markdown, as the HTML preview does
+			Node description;
+			if (Markdown.looksLike(text)) {
+				TextFlow flow = new TextFlow();
+				flow.setMinWidth(0);
+				HelpMarkdown.description(flow, text, browse);
+				description = flow;
+			} else {
+				Label label = new Label(text);
+				label.setWrapText(true);
+				description = label;
+			}
 			description.setId("previewDescription");
-			description.setWrapText(true);
 			content.getChildren().add(description);
 		}
 		if (entity != current.getRoot()) {
@@ -151,7 +174,7 @@ public class EntityPreview extends ScrollPane {
 				continue;
 			}
 			VBox values = new VBox(2);
-			entity.getAll(property).forEach(v -> values.getChildren().add(value(v, current)));
+			entity.getAll(property).forEach(v -> values.getChildren().add(value(property, v, current)));
 			properties.addRow(row++, propertyLabel(property), values);
 		}
 		content.getChildren().add(properties);
@@ -201,9 +224,12 @@ public class EntityPreview extends ScrollPane {
 	}
 
 	/**
-	 * A value: a link to an entity of the crate or a web address, or text.
+	 * A value: a link to an entity of the crate or a web address, or text;
+	 * text of a property that takes URLs as a link to the web or the file it
+	 * names, of other properties not, and of properties not known only if
+	 * it is a web address.
 	 */
-	private Node value(JsonNode value, Crate current) {
+	private Node value(String property, JsonNode value, Crate current) {
 		if (value.isObject() && value.path("@id").isTextual()) {
 			String id = value.get("@id").asText();
 			Optional<Entity> target = current.get(id);
@@ -214,15 +240,21 @@ public class EntityPreview extends ScrollPane {
 				}
 				return link;
 			}
-			if (isWebAddress(id)) {
-				return webLink(id);
+			if (isWebAddress(current.expandId(id))) {
+				return webLink(id, current.expandId(id));
 			}
 			Label missing = new Label(id + " (not in the crate)");
 			missing.getStyleClass().add("faint-text");
 			return missing;
 		}
-		if (value.isTextual() && isWebAddress(value.asText())) {
-			return webLink(value.asText());
+		if (value.isTextual()) {
+			String text = value.asText();
+			Optional<Boolean> url = takesUrl.apply(property);
+			Optional<String> to = url.orElse(false) ? address(text)
+					: url.isEmpty() && isWebAddress(text) ? Optional.of(text) : Optional.empty();
+			if (to.isPresent()) {
+				return to.get().equals(text) ? webLink(text) : fileLink(text, to.get());
+			}
 		}
 		Label text = new Label(value.isValueNode() ? value.asText() : value.toString());
 		text.setWrapText(true);
@@ -243,15 +275,9 @@ public class EntityPreview extends ScrollPane {
 	 * just as text.
 	 */
 	private Node identifier(String id) {
-		if (isWebAddress(id)) {
-			return webLink(id);
-		}
-		Optional<Path> file = local(id);
-		if (file.isPresent()) {
-			Hyperlink link = new Hyperlink(id);
-			link.setTooltip(new Tooltip(Files.isDirectory(file.get()) ? "Open the folder" : "Open the file"));
-			link.setOnAction(e -> browse.accept(file.get().toUri().toString()));
-			return link;
+		Optional<String> to = address(id);
+		if (to.isPresent()) {
+			return isWebAddress(to.get()) ? webLink(id, to.get()) : fileLink(id, to.get());
 		}
 		Label text = new Label(id);
 		text.setWrapText(true);
@@ -265,7 +291,8 @@ public class EntityPreview extends ScrollPane {
 	 * none for others.
 	 */
 	Optional<String> address(String id) {
-		return isWebAddress(id) ? Optional.of(id) : local(id).map(file -> file.toUri().toString());
+		String iri = crate.get().expandId(id);
+		return isWebAddress(iri) ? Optional.of(iri) : local(id).map(file -> file.toUri().toString());
 	}
 
 	/**
@@ -293,8 +320,24 @@ public class EntityPreview extends ScrollPane {
 	}
 
 	private Hyperlink webLink(String address) {
-		Hyperlink link = new Hyperlink(address);
-		link.setTooltip(new Tooltip("Open in the browser"));
+		return webLink(address, address);
+	}
+
+	/**
+	 * A link to a web address, shown as written, e.g. a compact IRI such as
+	 * <code>s:ActiveActionStatus</code> for its expanded address.
+	 */
+	private Hyperlink webLink(String text, String address) {
+		Hyperlink link = new Hyperlink(text);
+		link.setTooltip(new Tooltip(text.equals(address) ? "Open in the browser" : "Open " + address + " in the browser"));
+		link.setOnAction(e -> browse.accept(address));
+		return link;
+	}
+
+	/** A link to a file or folder beside the crate, by its file: address */
+	private Hyperlink fileLink(String text, String address) {
+		Hyperlink link = new Hyperlink(text);
+		link.setTooltip(new Tooltip(address.endsWith("/") ? "Open the folder" : "Open the file"));
 		link.setOnAction(e -> browse.accept(address));
 		return link;
 	}

@@ -22,7 +22,6 @@ import static org.junit.Assert.*;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import javafx.scene.control.Label;
@@ -32,7 +31,7 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
 /**
  * A failure loading the RO-Crate context is shown as such.
  */
-public class TestCrateEditorContextFailure extends ApplicationTest {
+public class TestCrateEditorContextFailure extends UiTest {
 
 	@Override
 	public void start(Stage stage) throws Exception {

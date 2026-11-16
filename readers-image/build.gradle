@@ -1,0 +1,24 @@
+// Images' own metadata (no.s11.wpsld.readers.image): a MetadataReader in
+// a module of its own, with metadata-extractor and its xmpcore
+plugins {
+    id 'java-library'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':lib')
+    implementation 'com.drewnoakes:metadata-extractor:2.22.0'
+
+    testImplementation 'junit:junit:4.13'
+    // The test categories (no.s11.wpsld.test), the photo and picture to read
+    testImplementation testFixtures(project(':lib'))
+}
+
+// The module name's s11 is the organisation's domain (s11.no); javac's lint
+// would warn about its digits on every build
+tasks.named('compileJava') {
+    options.compilerArgs += ['-Xlint:-module']
+}

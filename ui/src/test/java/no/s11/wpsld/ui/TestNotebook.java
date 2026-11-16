@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
@@ -38,7 +37,7 @@ import javafx.stage.Stage;
 /**
  * GUI tests of the OS/2-style notebook, run headless.
  */
-public class TestNotebook extends ApplicationTest {
+public class TestNotebook extends UiTest {
 	private Notebook notebook;
 	/** How many pages have been built */
 	private final AtomicInteger built = new AtomicInteger();

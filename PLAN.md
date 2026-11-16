@@ -894,6 +894,44 @@ Styles:
     4. The special cases stay hand-written, behind small hooks: the map,
        the DOI typed into Citation, PRONOM's media type on the file.
     Only then plugin JARs from a folder (module layer), as above.
+- **Plugins for files' metadata readers** *(TODO, consider)*: the same
+  mechanism for what reads files' own metadata (`EmbeddedMetadata`, and
+  `PdfMetadata` in ui as PDFBox needs java.desktop): an interface in lib
+  (which files it reads, by start bytes or media type; `read(path)` giving
+  `EmbeddedMetadata.Found`s), the built-in readers behind it first, and
+  plugin JARs for formats whose library has a licence wpsld shouldn't
+  carry or is large: JPEG 2000 with jai-imageio-jpeg2000 (its JJ2000
+  licence), perhaps audio tags, scientific formats (NetCDF, HDF5 and FITS
+  attributes), or Microsoft's old binary Office files with Apache POI. A
+  plugin that is installed separately keeps its licence out of wpsld's
+  release.
+  The jlink image is only the boot layer: modules not linked into it can
+  be loaded at run time into a layer above it, also wpsld's own, shipped
+  in a `plugins/` folder of the release zip beside the runtime (jpackage
+  `--app-content`), not linked. So keep the linked image minimal (the
+  JDK modules, JavaFX, wpsld's lib and ui with the interfaces, Jackson)
+  and let plugins bring the rest: the metadata readers (metadata-extractor
+  and xmpcore, PDFBox, jHDF), perhaps Tika. A library without
+  module-info, e.g. PDFBox, then stays an automatic module there rather
+  than being merged into wpsld.merged.module, whose generated module-info
+  missed java.xml and java.desktop (tried 13 November 2026: PDFBox in
+  such a layer reads a PDF; see BUGS.md). The boot layer must have the
+  JDK modules plugins need (they can't add any; e.g. java.desktop, there
+  for JavaFX, and java.sql and java.xml), and plugins mustn't bring
+  packages the boot layer has (e.g. commons-logging goes with PDFBox).
+  JDK modules to link for the plugins planned (metadata readers, lookups,
+  offline data; not visualisation, so no javafx.web, javafx.media or
+  javafx.swing): as now java.base, java.desktop (PDFBox, FontBox,
+  commons-lang3, image I/O), java.xml, jdk.zipfs, java.net.http,
+  java.logging, java.prefs, java.datatransfer; and, by jlink's
+  `--add-modules` as nothing in the image requires them, jdk.unsupported
+  (`sun.misc.Unsafe` of lz4-java and compress-lzf, which jHDF uses, and
+  of pdfbox-io), java.sql (Tika's `TikaInputStream`, libraries' dates)
+  and jdk.charsets (SPSS's, Stata's and IPTC's encodings beyond the
+  common ones). Not java.compiler, java.scripting, java.management,
+  java.naming or jdk.jfr until a plugin needs one. JavaFX's 3D classes
+  are in javafx.graphics, so they stay. Check each plugin's needs with
+  `jdeps --print-module-deps`.
 - **More lookups for RO-Crate's recommended identifiers** (Recommended
   Identifiers in RO-Crate 1.3's metadata page). Smaller helpers: `keywords` edited as tags but
   written as one comma-separated string, and `temporalCoverage` as a
@@ -1150,7 +1188,10 @@ extension. Next:
   choice (or a temporary one, read-only), then opens it as an attached
   crate. Big zips in a window of their own, as copying files is. Check
   zip entries' names for `..` and absolute paths (zip slip), and sizes
-  (zip bombs).
+  (zip bombs). With the JDK's zip file system (`jdk.zipfs`,
+  `FileSystems.newFileSystem(path)`), which reading Office documents'
+  metadata would use too (see BUGS.md); the runtime image must include
+  it, as it is a service provider.
 - **BagIt**: a crate packaged as a BagIt bag (RFC 8493), as RO-Crate
   describes in its implementation notes: `bagit.txt`, the payload in
   `data/` with `ro-crate-metadata.json` there (or at the top, as some
@@ -1164,7 +1205,44 @@ extension. Next:
   (from the crate's name, description, dates, creator) and the
   manifests; and update the manifests on save. Check
   https://github.com/LibraryOfCongress/bagit-java (archived) or write the
-  little BagIt needs (it is simple: text files and checksums).
+  little BagIt needs (it is simple: text files and checksums). A bag
+  whose payload is listed in `fetch.txt` (a "holey" bag) is opened as a
+  detached crate, fetching nothing. Manifests checked: SHA-512 (as
+  RFC 8493 recommends) and SHA-256 (common); others reported as not
+  checked.
+- **Open URL/PID defensively** (many ways to fail): repositories such as
+  Zenodo, a common home of crates, link their files with
+  `rel="item"` Signposting but without the RO-Crate profile, and a record
+  may have several items (zips, JSON, other files): offer them for the
+  user to pick, those most likely a crate first (`.crate.zip`, a zip, a
+  `ro-crate-metadata.json`), saying what each is (name, type, size). A
+  JSON item is hopefully `ro-crate-metadata.json`, but crates are also
+  deposited under other names: read it (within limits) and check it is a
+  crate (its `@graph` has a metadata descriptor `about` a root dataset)
+  before opening it, else say what it is. Every failure says what was
+  tried, in the order of "Retrieving an RO-Crate" (`Retrieved.steps`):
+  no network, not found, HTTP errors, redirect loops, too large, not
+  JSON, JSON but not a crate, a zip without a crate, rate limits, login
+  pages.
+- **A zip by FAIR Signposting**: `CrateRetriever` also follows
+  `rel="item"` links to an RO-Crate zip (`type="application/zip"`, with
+  the RO-Crate profile), as "Retrieving an RO-Crate" allows: downloaded
+  in the background within the same limits, then opened as a zip (above).
+- **Keep the persistent identifier**: a crate opened by its DOI or other
+  PID gets it as the root's `identifier` and `cite-as`, where it has none,
+  from Signposting's `cite-as` (and its `license` link where the crate has
+  no licence), so that a local copy still says where it came from.
+- **Open a zip without unpacking**: browse a zip read-only through the zip
+  file system, with Crate > Extract to Folder… to edit it, rather than
+  always unpacking; so that large `.eln` exports open at once, and files'
+  own metadata is read from zip paths as they are.
+- **Background jobs**: downloading, unpacking and checking manifests are
+  slow and cancellable, so they are jobs (`Jobs`, shown by `JobsView` at
+  the foot of the window, with a window of progress, status lines, Cancel
+  and Run in Background; done).
+- **Order**: Open URL/PID (read-only, Save As); open and
+  export zips; open and check a bag; make a bag (last, as it moves the
+  user's files into `data/`).
 
 ### Nested RO-Crates
 
@@ -1211,7 +1289,11 @@ RO-Crates" in the spec's data entities). Recognise them:
 ### HTML preview (ro-crate-preview.html)
 
 *Done, basic*: saving an attached crate writes `ro-crate-preview.html`
-(`CratePreview`): plain HTML and CSS, light and dark, no scripts; the
+(`CratePreview`): plain HTML and CSS, light and dark, a few colours, no
+scripts but the metadata's JSON-LD in `<script type="application/ld+json">`;
+descriptions as Markdown when they look like it (`Markdown.looksLike`),
+else paragraphs with their line breaks; files linked by their paths
+wherever they are linked from; a Top link in each section; the
 crate's name and description, a contents list, a section per entity with
 its properties, `#entity-n` anchors between them, links to files and the
 web; marked with `<meta name="generator" content="wpsld …">` so that
@@ -1222,8 +1304,10 @@ not in hasPart). Next: a preference to not write it; the generator as a
 SoftwareApplication with a CreateAction (object the metadata, result the
 preview), as the spec's example; images and maps for files and places;
 "Referenced by" as in the editor's preview; anchors that stay the same
-across saves (by @id rather than position); Markdown descriptions
-rendered. For a richer preview, investigate which existing previewer
+across saves (by @id rather than position). The Preview tab renders
+Markdown descriptions too, by the same heuristics, as JavaFX nodes
+(`HelpMarkdown.description`, as the help viewer's pages). For a richer
+preview, investigate which existing previewer
 is easiest to reuse without running JavaScript or Python inside the Java
 application (no GraalJS, Jython or a bundled Node):
 - Previewers whose template could run in Java as it is: e.g. ro-crate-py's
@@ -1296,3 +1380,31 @@ wpsld is in English only. Translating it means more than the UI's labels:
   file or a registry, and chosen by the crate's `conformsTo`. See
   [MASP.md](MASP.md) for how, and for what's next (SHACL shapes for profiles
   such as FAIRSCAPE, checking kept profiles for updates).
+- **Infer a profile from an example crate**: Crate > Make Profile from
+  This Crate… drafts a MASP profile crate from one (or later several)
+  example crates, as a start to edit rather than a finished profile:
+  - A class rule (`rdfs:Class`, `prov:specializationOf` the type's IRI)
+    for each type used, with how many entities of it the crate has as a
+    suggested `sh:minCount`/`sh:maxCount` (e.g. exactly one root, one
+    license). Several `@type`s on one entity: a rule for the combination,
+    or for the most specific type (see the open question below).
+  - A property rule per property per class: `rdfs:label` as written in
+    the crate, `domainIncludes` that class rule, `rangeIncludes` from the
+    values seen (class rules of the entities referred to, or Text,
+    Number, Boolean, Date, URL by the values' form), `sh:minCount` 1 when
+    every entity of the class has it, `sh:maxCount` 1 when none has more
+    than one value. Comments from schema.org or the crate's own
+    definitions (ad hoc `rdfs:Class`/`rdf:Property` entities, or another
+    profile it conforms to).
+  - The root and descriptor rules MASP finds the root by; types and
+    properties the crate defines itself carried into the profile.
+  - From several crates: the union of types and properties, required
+    only when all have it, counts as ranges seen across them; a value
+    the same in all (e.g. a fixed `conformsTo` or `license`) as a
+    `PropertyValue` or `ItemList` to choose from.
+  - Shown in a dialog to choose which types and properties to keep and
+    to loosen what was inferred (one example says little about what is
+    required), then written as a new profile crate with its own
+    `profile-documentation.md`, opened in the editor like any crate and
+    usable at once as a profile for other crates. One example is not
+    enough to infer value patterns (regexes); leave those to editing.

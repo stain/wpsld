@@ -104,10 +104,11 @@ jobs:
         run: ./gradlew --no-daemon "-Pversion=$VERSION" build
 
   # The web services wpsld looks things up in, still answering as it
-  # expects; reported, but not holding up the release, as a service may just
-  # be down for a while
-  online-tests:
-    uses: ./.github/workflows/online-tests.yml
+  # expects, and the metadata readers on damaged files, none hanging nor
+  # running out of memory; reported, but not holding up the release, as a
+  # service may just be down for a while
+  integration-tests:
+    uses: ./.github/workflows/integration-tests.yml
     secrets:
       GEONAMES_USERNAME: ${{ secrets.GEONAMES_USERNAME }}
 

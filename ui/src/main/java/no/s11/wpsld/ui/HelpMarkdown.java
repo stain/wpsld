@@ -26,6 +26,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import org.commonmark.ext.gfm.tables.TableBlock;
+import org.commonmark.ext.gfm.tables.TableCell;
+import org.commonmark.ext.gfm.tables.TableHead;
+import org.commonmark.ext.gfm.tables.TableRow;
+import org.commonmark.ext.gfm.tables.TablesExtension;
 import org.commonmark.node.*;
 import org.commonmark.parser.Parser;
 import org.commonmark.renderer.text.TextContentRenderer;
@@ -36,12 +41,47 @@ import javafx.scene.control.Hyperlink;
 import javafx.scene.image.ImageView;
 import javafx.scene.text.TextFlow;
 
-/** Renders the help's Markdown as native JavaFX nodes. */
+/**
+ * Renders Markdown as native JavaFX nodes: the help's, and descriptions
+ * written in Markdown in the preview.
+ */
 final class HelpMarkdown {
 	private static final Parser PARSER = Parser.builder().build();
+	/** Descriptions, with GitHub's tables as crates' READMEs have them */
+	private static final Parser DESCRIPTION_PARSER = Parser.builder()
+			.extensions(java.util.List.of(TablesExtension.create())).build();
 	private static final TextContentRenderer PLAIN = TextContentRenderer.builder().build();
 
+	/**
+	 * How to render: help pages follow links to other pages and show their
+	 * images; descriptions only link to the web, and show no images.
+	 *
+	 * @param imageWidth The width to fit images in; null for none
+	 * @param textClass  The style class of the text, to colour it
+	 */
+	private record Rendering(Consumer<String> browse, ObservableDoubleValue imageWidth, String textClass) {
+		boolean help() {
+			return imageWidth != null;
+		}
+	}
+
 	private HelpMarkdown() {
+	}
+
+	/**
+	 * Show a description written in Markdown in a text flow, its links to
+	 * the web opening with browse
+	 */
+	static void description(TextFlow flow, String markdown, Consumer<String> browse) {
+		flow.getChildren().clear();
+		Node document = DESCRIPTION_PARSER.parse(markdown);
+		flow.setAccessibleText(PLAIN.render(document));
+		blocks(flow, document, new Rendering(browse, null, "preview-text"), 0, new LinkedHashMap<>());
+		// Not ending in a blank line
+		while (!flow.getChildren().isEmpty() && flow.getChildren().getLast() instanceof javafx.scene.text.Text last
+				&& last.getText().isBlank()) {
+			flow.getChildren().removeLast();
+		}
 	}
 
 	/**
@@ -56,7 +96,7 @@ final class HelpMarkdown {
 		Node document = PARSER.parse(markdown);
 		flow.setAccessibleText(PLAIN.render(document));
 		Map<String, javafx.scene.Node> headings = new LinkedHashMap<>();
-		blocks(flow, document, browse, imageWidth, 0, headings);
+		blocks(flow, document, new Rendering(browse, imageWidth, "help-text"), 0, headings);
 		return headings;
 	}
 
@@ -74,67 +114,90 @@ final class HelpMarkdown {
 		return page.isEmpty() && destination.length() > 1 || HelpDialog.Topic.fromResource(page).isPresent();
 	}
 
-	private static void blocks(TextFlow flow, Node parent, Consumer<String> browse,
-			ObservableDoubleValue imageWidth, int depth, Map<String, javafx.scene.Node> headings) {
+	private static void blocks(TextFlow flow, Node parent, Rendering r, int depth,
+			Map<String, javafx.scene.Node> headings) {
 		for (Node node = parent.getFirstChild(); node != null; node = node.getNext()) {
 			if (node instanceof Heading) {
 				int first = flow.getChildren().size();
-				inline(flow, node, browse, imageWidth, "-fx-font-weight: bold; -fx-font-size: 1.25em;");
+				inline(flow, node, r, "-fx-font-weight: bold; -fx-font-size: 1.25em;");
 				if (flow.getChildren().size() > first) {
 					headings.putIfAbsent(anchor(PLAIN.render(node)), flow.getChildren().get(first));
 				}
-				text(flow, "\n\n", "");
+				text(flow, "\n\n", "", r.textClass());
 			} else if (node instanceof Paragraph) {
-				inline(flow, node, browse, imageWidth, "");
-				text(flow, "\n\n", "");
+				inline(flow, node, r, "");
+				text(flow, "\n\n", "", r.textClass());
 			} else if (node instanceof BulletList || node instanceof OrderedList) {
 				int number = node instanceof OrderedList list && list.getMarkerStartNumber() != null
 						? list.getMarkerStartNumber() : 1;
 				for (Node item = node.getFirstChild(); item != null; item = item.getNext()) {
 					String marker = node instanceof OrderedList ? number++ + ". " : "• ";
-					text(flow, "  ".repeat(depth) + marker, "");
-					blocks(flow, item, browse, imageWidth, depth + 1, headings);
+					text(flow, "  ".repeat(depth) + marker, "", r.textClass());
+					blocks(flow, item, r, depth + 1, headings);
 				}
 			} else if (node instanceof FencedCodeBlock code) {
-				text(flow, code.getLiteral() + "\n", "-fx-font-family: monospace;");
+				text(flow, code.getLiteral() + "\n", "-fx-font-family: monospace;", r.textClass());
 			} else if (node instanceof IndentedCodeBlock code) {
-				text(flow, code.getLiteral() + "\n", "-fx-font-family: monospace;");
+				text(flow, code.getLiteral() + "\n", "-fx-font-family: monospace;", r.textClass());
 			} else if (node instanceof ThematicBreak) {
-				text(flow, "────────\n\n", "");
+				text(flow, "────────\n\n", "", r.textClass());
 			} else if (node instanceof HtmlBlock html) {
-				text(flow, html.getLiteral() + "\n", "");
+				text(flow, html.getLiteral() + "\n", "", r.textClass());
+			} else if (node instanceof TableBlock) {
+				table(flow, node, r);
+				text(flow, "\n", "", r.textClass());
 			} else {
-				blocks(flow, node, browse, imageWidth, depth, headings);
+				blocks(flow, node, r, depth, headings);
 			}
 		}
 	}
 
-	private static void inline(TextFlow flow, Node parent, Consumer<String> browse,
-			ObservableDoubleValue imageWidth, String style) {
+	/** A table's rows a line each, its cells apart, the head's in bold */
+	private static void table(TextFlow flow, Node parent, Rendering r) {
+		for (Node node = parent.getFirstChild(); node != null; node = node.getNext()) {
+			if (node instanceof TableRow) {
+				String style = node.getParent() instanceof TableHead ? "-fx-font-weight: bold;" : "";
+				for (Node cell = node.getFirstChild(); cell != null; cell = cell.getNext()) {
+					if (cell != node.getFirstChild()) {
+						text(flow, "   │   ", "", r.textClass());
+					}
+					if (cell instanceof TableCell) {
+						inline(flow, cell, r, style);
+					}
+				}
+				text(flow, "\n", "", r.textClass());
+			} else {
+				table(flow, node, r);
+			}
+		}
+	}
+
+	private static void inline(TextFlow flow, Node parent, Rendering r, String style) {
 		for (Node node = parent.getFirstChild(); node != null; node = node.getNext()) {
 			if (node instanceof org.commonmark.node.Text value) {
-				text(flow, value.getLiteral(), style);
+				text(flow, value.getLiteral(), style, r.textClass());
 			} else if (node instanceof Code code) {
-				text(flow, code.getLiteral(), style + "-fx-font-family: monospace;");
+				text(flow, code.getLiteral(), style + "-fx-font-family: monospace;", r.textClass());
 			} else if (node instanceof SoftLineBreak) {
-				text(flow, " ", style);
+				text(flow, " ", style, r.textClass());
 			} else if (node instanceof HardLineBreak) {
-				text(flow, "\n", style);
+				text(flow, "\n", style, r.textClass());
 			} else if (node instanceof StrongEmphasis) {
-				inline(flow, node, browse, imageWidth, style + "-fx-font-weight: bold;");
+				inline(flow, node, r, style + "-fx-font-weight: bold;");
 			} else if (node instanceof Emphasis) {
-				inline(flow, node, browse, imageWidth, style + "-fx-font-style: italic;");
-			} else if (node instanceof org.commonmark.node.Image image) {
-				image(flow, image, imageWidth);
+				inline(flow, node, r, style + "-fx-font-style: italic;");
+			} else if (node instanceof org.commonmark.node.Image image && r.help()) {
+				image(flow, image, r.imageWidth());
 			} else if (node instanceof Link link && (isWebLink(link.getDestination())
-					|| isHelpLink(link.getDestination()))) {
+					|| r.help() && isHelpLink(link.getDestination()))) {
 				Hyperlink hyperlink = new Hyperlink(plainChildren(link));
-				hyperlink.setOnAction(e -> browse.accept(link.getDestination()));
+				hyperlink.setOnAction(e -> r.browse().accept(link.getDestination()));
 				flow.getChildren().add(hyperlink);
 			} else if (node instanceof HtmlInline html) {
-				text(flow, html.getLiteral(), style);
+				text(flow, html.getLiteral(), style, r.textClass());
 			} else {
-				inline(flow, node, browse, imageWidth, style);
+				// Also a description's images, by their text
+				inline(flow, node, r, style);
 			}
 		}
 	}
@@ -199,8 +262,12 @@ final class HelpMarkdown {
 	}
 
 	private static void text(TextFlow flow, String value, String style) {
+		text(flow, value, style, "help-text");
+	}
+
+	private static void text(TextFlow flow, String value, String style, String styleClass) {
 		javafx.scene.text.Text text = new javafx.scene.text.Text(value);
-		text.getStyleClass().add("help-text");
+		text.getStyleClass().add(styleClass);
 		text.setStyle(style);
 		flow.getChildren().add(text);
 	}

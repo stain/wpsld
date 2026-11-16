@@ -27,3 +27,12 @@ wpsld is developed on GitHub, at
 [github.com/stain/wpsld](https://github.com/stain/wpsld): its source code,
 releases and these help pages. Report a problem or suggest an improvement
 in its [issues](https://github.com/stain/wpsld/issues).
+
+wpsld logs what goes wrong, such as a file it can't read or a web service
+that doesn't answer, on your computer only. Attach the log when you report
+a problem. Find it in **Edit > Preferences... > Logs**, which opens its
+folder, sets how much to log, and clears the logs. The folder is
+`~/.local/state/wpsld/logs` on Linux, `%LOCALAPPDATA%\wpsld\Logs` on
+Windows and `~/Library/Logs/wpsld` on macOS. The latest log is
+`wpsld.0.log`; each log is started anew at 20 MB, and the last three are
+kept.

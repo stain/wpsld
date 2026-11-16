@@ -28,7 +28,6 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import javafx.application.Platform;
@@ -52,7 +51,7 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
  * Places: found in GeoNames (here a stand-in for it), and shown and moved on
  * a map (without tiles in the tests, see ui/build.gradle).
  */
-public class TestCrateEditorPlaces extends ApplicationTest {
+public class TestCrateEditorPlaces extends UiTest {
 	private static final GeoNames.Place CATALINA = new GeoNames.Place(8152662, "Catalina Park",
 			Optional.of("New South Wales"), Optional.of("Australia"), Optional.of("park"), -33.7152, 150.30119);
 	private Stage stage;
@@ -187,5 +186,35 @@ public class TestCrateEditorPlaces extends ApplicationTest {
 		interact(() -> username.setText("someone"));
 		clickOn("OK");
 		assertEquals("someone", Settings.load(settingsFile).geonamesUsername());
+	}
+
+	/**
+	 * Edit > Preferences > Logs keeps how much to log, and logs that much.
+	 */
+	@Test
+	public void logLevelInPreferences() throws Exception {
+		java.util.logging.Logger root = java.util.logging.Logger.getLogger("");
+		java.util.logging.Level was = root.getLevel();
+		try {
+			entities();
+			Platform.runLater(() -> app.showPreferences(stage));
+			waitFor("#keptProfiles");
+			Tab logs = lookup(".tab-pane").queryAllAs(TabPane.class).stream().flatMap(t -> t.getTabs().stream())
+					.filter(t -> "logsTab".equals(t.getId())).findFirst().orElseThrow();
+			interact(() -> logs.getTabPane().getSelectionModel().select(logs));
+			@SuppressWarnings("unchecked")
+			javafx.scene.control.ChoiceBox<String> level = lookup("#logLevel")
+					.queryAs(javafx.scene.control.ChoiceBox.class);
+			assertEquals("INFO", level.getValue());
+			// Not logging to a file in tests
+			assertEquals("Not logged to a file", lookup("#logsFolder").queryLabeled().getText());
+			assertTrue(lookup("#clearLogs").queryButton().isDisabled());
+			interact(() -> level.setValue("FINE"));
+			clickOn("OK");
+			assertEquals("FINE", Settings.load(settingsFile).logLevel());
+			assertEquals(java.util.logging.Level.FINE, root.getLevel());
+		} finally {
+			root.setLevel(was);
+		}
 	}
 }

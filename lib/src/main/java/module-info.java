@@ -21,6 +21,14 @@ module no.s11.wpsld {
     // Loading MASP profiles by URL
     requires java.net.http;
     requires org.apache.tika.core;
+    // Documents' own metadata (EmbeddedMetadata): their XML, in ZIP files;
+    // the zip file system is a service, so jlink only adds it if required
+    requires java.xml;
+    requires jdk.zipfs;
+    // Readers of files' own metadata in other modules (FileMetadata)
+    uses no.s11.wpsld.lookup.MetadataReader;
+    requires org.commonmark;
+    requires org.commonmark.ext.gfm.tables;
     exports no.s11.wpsld;
     exports no.s11.wpsld.arcp;
     exports no.s11.wpsld.soss;
@@ -29,4 +37,6 @@ module no.s11.wpsld {
     exports no.s11.wpsld.lookup;
     exports no.s11.wpsld.jsonld;
     exports no.s11.wpsld.masp;
+    // Where the user interface keeps its log (AppDirectories)
+    exports no.s11.wpsld.util to no.s11.wpsld.ui;
 }

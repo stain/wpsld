@@ -176,6 +176,7 @@ class OrganizationFinder extends Dialog<OrganizationFinder.Chosen> {
 		});
 		task.setOnFailed(e -> {
 			Throwable problem = task.getException();
+			System.getLogger(OrganizationFinder.class.getName()).log(System.Logger.Level.WARNING, "ROR search failed", problem);
 			status.setText("Can't search ROR: "
 					+ (problem.getMessage() == null ? problem.toString() : problem.getMessage())
 					+ ". You can still type the ROR identifier as the organisation's @id.");

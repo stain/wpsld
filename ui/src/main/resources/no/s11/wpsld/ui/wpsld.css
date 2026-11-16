@@ -28,6 +28,25 @@
 }
 
 /*
+ * A scale under a job's progress, shown only where a style asks (OS/2
+ * Warp); a job's buttons on the right, unless a style asks otherwise. Set
+ * here, so that switching from a style that changes them changes them back.
+ */
+.progress-scale {
+    visibility: hidden;
+}
+
+.jobs-window .job-buttons {
+    -fx-alignment: center-right;
+}
+
+/* At the foot of the window, e.g. that files added say something about themselves */
+.notice {
+    -fx-background-color: -fx-box-border, derive(-fx-base, 4%);
+    -fx-background-insets: 0, 1 0 0 0;
+}
+
+/*
  * Buttons for small actions (EntityEditor.iconButton): their text, e.g.
  * "×", unless a style shows their icon instead
  */
@@ -221,4 +240,9 @@
 
 .list-view:focused .list-cell.problem:filled:selected, .tree-view:focused .tree-cell.problem:filled:selected {
     -fx-background-color: -fx-selection-bar;
+}
+
+/* A description written in Markdown, in the preview: as its labels */
+.preview-text {
+    -fx-fill: -fx-text-background-color;
 }

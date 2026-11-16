@@ -158,6 +158,7 @@ class PersonFinder extends Dialog<Person> {
 		});
 		task.setOnFailed(e -> {
 			Throwable problem = task.getException();
+			System.getLogger(PersonFinder.class.getName()).log(System.Logger.Level.WARNING, "ORCID search failed", problem);
 			status.setText("Can't search ORCID: "
 					+ (problem.getMessage() == null ? problem.toString() : problem.getMessage())
 					+ ". You can still type the ORCID iD as the person's @id.");

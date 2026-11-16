@@ -28,7 +28,6 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import javafx.application.Platform;
@@ -49,7 +48,7 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
  * People found in ORCID (here a stand-in for it, with ORCID's fictional
  * researcher).
  */
-public class TestCrateEditorPeople extends ApplicationTest {
+public class TestCrateEditorPeople extends UiTest {
 	private static final ORCID.Person CARBERRY = new ORCID.Person("0000-0002-1825-0097", Optional.of("Josiah"),
 			Optional.of("Carberry"), Optional.empty(), List.of("Josiah Stinkney Carberry"),
 			List.of("Brown University", "Wesleyan University"));

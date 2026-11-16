@@ -22,7 +22,6 @@ import static org.junit.Assert.*;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import javafx.scene.input.KeyCode;
@@ -32,7 +31,7 @@ import javafx.stage.Stage;
  * Closing the window with changes not saved, in a class of its own as the
  * window stays closed.
  */
-public class TestCrateEditorClose extends ApplicationTest {
+public class TestCrateEditorClose extends UiTest {
 	private Stage stage;
 
 	@Override

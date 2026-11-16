@@ -58,7 +58,8 @@ Files from elsewhere are copied in first, into a folder of the crate you
 choose: if it has files of the same names, choose **Replace**, **Keep
 Both** (copied as e.g. `counts (2).csv`) or **Skip**. Copying happens in
 a window of its own, with its progress and **Cancel**, so you can go on
-editing. Each file is written in full under a hidden name before it gets
+editing; the foot of the editor's window shows it too, and **Show...**
+there brings the window back. Each file is written in full under a hidden name before it gets
 its own, so a full disk or a file that can't be read leaves no half
 copies; what wasn't copied, and why, is told at the end, and the files
 that were copied are added.
@@ -74,7 +75,14 @@ the folder are shown in red (see [Views and styles](views.md)).
 **Crate > Update File Details...** brings the files an attached crate
 describes up to date with its folder: their size (`contentSize`) and date
 modified, where missing or changed since. Optionally, it also fills in
-their [formats](formats.md) where they have none.
+their [formats](formats.md) where they have none, and what the files say
+about themselves (titles, authors, dates, licences, sizes; see
+[Metadata from the file](files.md#metadata-from-the-file)) where they
+have no value yet. Where a photo was taken and the camera are left out:
+choose those for one file with **Metadata from the File...**. The files
+are read in the background, two at a time, with progress and **Cancel**;
+then a notice at the foot of the window offers what they say, to **Fill
+in** at once (one **Undo**), telling which files couldn't be read.
 
 ## Show in Explorer or Finder
 

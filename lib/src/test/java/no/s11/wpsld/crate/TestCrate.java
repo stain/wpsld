@@ -248,6 +248,9 @@ public class TestCrate {
 		Crate.Pasted pasted = crate.paste(aliceBobAndUom().subList(0, 1), Map.of(), true);
 		assertEquals(List.of(), pasted.added());
 		assertEquals(Map.of(), pasted.existing());
+		// Reported as the crate's own
+		assertEquals(List.of(crate.get("https://orcid.org/0000-0002-1825-0097").orElseThrow()), pasted.same());
+		assertEquals(List.of(), first.same());
 		assertEquals(3, first.added().size());
 		assertEquals(4, crate.getEntities().size());
 	}

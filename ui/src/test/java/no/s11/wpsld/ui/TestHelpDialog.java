@@ -21,7 +21,6 @@ import static org.junit.Assert.*;
 
 import java.io.InputStream;
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import java.util.ArrayList;
@@ -46,7 +45,7 @@ import javafx.scene.text.TextFlow;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
-public class TestHelpDialog extends ApplicationTest {
+public class TestHelpDialog extends UiTest {
 	private Stage stage;
 
 	@Override

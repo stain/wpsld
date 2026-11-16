@@ -104,6 +104,17 @@ final class CopyWindow {
 		});
 	}
 
+	/** Stop copying at the next block, as Cancel does */
+	void cancel() {
+		cancelled.set(true);
+	}
+
+	/** Bring the window up, e.g. from the jobs at the foot of the editor */
+	void toFront() {
+		stage.show();
+		stage.toFront();
+	}
+
 	/** Start copying, showing the window */
 	Task<FileCopy.Result> start() {
 		stage.show();

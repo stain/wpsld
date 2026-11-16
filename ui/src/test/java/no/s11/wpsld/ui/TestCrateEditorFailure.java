@@ -22,7 +22,6 @@ import static org.junit.Assert.*;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import javafx.scene.control.Label;
@@ -33,7 +32,7 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
  * A failure while loading the schema is shown, not lost in the background
  * loading (which would leave "Loading…" forever).
  */
-public class TestCrateEditorFailure extends ApplicationTest {
+public class TestCrateEditorFailure extends UiTest {
 
 	@Override
 	public void start(Stage stage) throws Exception {

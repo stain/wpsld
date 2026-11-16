@@ -28,7 +28,6 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import javafx.application.Platform;
@@ -53,7 +52,7 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
 /**
  * Organisations found in ROR (here a stand-in for it).
  */
-public class TestCrateEditorOrganizations extends ApplicationTest {
+public class TestCrateEditorOrganizations extends UiTest {
 	static final ROR.Organization OSLO = new ROR.Organization("01xtthb56", "University of Oslo",
 			List.of(new ROR.Name("University of Oslo", Optional.of("en"), List.of("ror_display", "label")),
 					new ROR.Name("Universitetet i Oslo", Optional.of("no"), List.of("label")),

@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Optional;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -50,7 +49,7 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
 /**
  * GUI tests of the entity form, run headless (see ui/build.gradle).
  */
-public class TestEntityEditor extends ApplicationTest {
+public class TestEntityEditor extends UiTest {
 	private static final SchemaFromJsonLd SCHEMA = new SchemaFromJsonLd();
 	private static final JsonNodeFactory JSON = JsonNodeFactory.instance;
 	private final Crate crate = new Crate();

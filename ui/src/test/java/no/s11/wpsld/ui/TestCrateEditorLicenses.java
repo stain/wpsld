@@ -27,7 +27,6 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import com.fasterxml.jackson.databind.node.TextNode;
@@ -51,7 +50,7 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
 /**
  * Licences chosen from the bundled SPDX License List.
  */
-public class TestCrateEditorLicenses extends ApplicationTest {
+public class TestCrateEditorLicenses extends UiTest {
 	@Override
 	public void start(Stage stage) throws Exception {
 		Path temp = Files.createTempDirectory("wpsld-licenses");

@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
@@ -35,7 +34,7 @@ import javafx.stage.Stage;
  * Help > About wpsld: version, licence and third-party notices, as the
  * build copies them into the resources.
  */
-public class TestAboutDialog extends ApplicationTest {
+public class TestAboutDialog extends UiTest {
 	private Stage stage;
 	private final List<String> browsed = new ArrayList<>();
 

@@ -33,6 +33,19 @@ jlink {
     // package. They are unused outside OSGi and newer jlink rejects the split.
     options = ['--strip-debug', '--no-header-files', '--no-man-pages',
                '--exclude-resources', 'glob:/org.kordamp.ikonli.*/OSGI-INF/**']
+    // The jars without modules (Tika, metadata-extractor, xmpcore, PDFBox)
+    // are merged into one, whose generated module doesn't require the JDK
+    // modules some of them use, failing only in the image, with
+    // IllegalAccessError: xmpcore parses XMP with java.xml, PDFBox needs
+    // java.desktop, and Tika's TikaInputStream refers to java.sql (Tika's
+    // java.compiler is its annotation processor's, for building). Check
+    // with jdeps --print-module-deps when adding such a dependency.
+    mergedModule {
+        additive = true
+        requires 'java.xml'
+        requires 'java.desktop'
+        requires 'java.sql'
+    }
     launcher {
         name = 'wpsld'
         // Windows .bat launcher starts javaw, without a console window
@@ -135,9 +148,14 @@ dependencies {
 
     implementation project(':lib')
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.4'
-    implementation 'org.commonmark:commonmark:0.24.0'
-    // Tika (in lib) logs through SLF4J: quietly, rather than warn of no logger
-    runtimeOnly 'org.slf4j:slf4j-nop:2.0.20'
+    implementation 'org.commonmark:commonmark:0.31.0'
+    implementation 'org.commonmark:commonmark-ext-gfm-tables:0.31.0'
+    // Readers of files' own metadata, found as services (FileMetadata)
+    implementation project(':readers-image')
+    implementation project(':readers-pdf')
+    // Tika (in lib) logs through SLF4J: to java.util.logging, as all else
+    // does (see Logs)
+    implementation 'org.slf4j:slf4j-jdk14:2.0.20'
     // Icons as font glyphs: Microsoft's Fluent System Icons, for the
     // Windows 11 style (see Theme)
     implementation 'org.kordamp.ikonli:ikonli-javafx:12.4.0'
@@ -158,11 +176,23 @@ test {
     // the JVM ends: one JVM per test class, with room for ~25 MB per test
     forkEvery = 1
     maxHeapSize = '1536m'
+    // A test JVM short of memory thrashes rather than fails (seen when a
+    // class had too many tests): fail instead. All take 8 to 11 minutes.
+    timeout = java.time.Duration.ofMinutes(20)
+    // Each failure in the log as it happens, with its stack (and UiTest's
+    // JavaFX thread stack on a time-out), as the report of a class still
+    // running is lost when the task's time-out ends it (as on macOS in CI)
+    testLogging {
+        events 'failed'
+        exceptionFormat 'full'
+        showStackTraces = true
+    }
 }
 
 application {
   applicationName = 'wpsld'
-  mainClass = 'no.s11.wpsld.ui.CrateEditor'
+  // Not the CrateEditor itself, so that its log is set up before JavaFX starts
+  mainClass = 'no.s11.wpsld.ui.Main'
   mainModule = 'no.s11.wpsld.ui'
 }
 

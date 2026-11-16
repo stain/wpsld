@@ -56,6 +56,68 @@ Saving a crate of RO-Crate 1.1 or later beside RO-Crate 1.0's
 `ro-crate-metadata.jsonld` offers to remove that old file (a symbolic link
 of that name can stay).
 
+## Metadata from the file
+
+Some files say what they are, who made them, when and under which
+licence. Right-click a file in the entity list and choose **Metadata from
+the File…** to see what it says:
+
+- Office files (`.docx`, `.xlsx`, `.pptx`) and OpenDocument files from
+  LibreOffice or OpenOffice (`.odt`, `.ods`, `.odp`, and the older
+  `.sxw`): title, description, author, keywords, language, when created
+  and last changed, and a licence in their custom properties.
+- PDFs: their document information (title, subject, author, keywords,
+  dates) and their XMP metadata.
+- EPS and PostScript (also older Illustrator `.ai`), Photoshop (`.psd`)
+  and InDesign files: their XMP metadata.
+- Photos and images (JPEG, PNG, TIFF, WebP, HEIC and HEIF, AVIF, GIF,
+  BMP, and camera raw files: DNG, CR2, CR3, NEF, ARW, ORF, RW2, RAF):
+  description, artist, copyright, keywords, when taken and changed, a
+  licence in their XMP, their size in pixels, the camera and its
+  settings, and where the photo was taken, if the camera recorded it.
+- Videos (MP4, QuickTime `.mov`): title, description, author, when
+  made, how long, their size in pixels, and from phones the phone and
+  where the video was taken. A phone's own time includes its time zone;
+  otherwise the time is in UTC.
+- SVG drawings: their title, description and size, and the metadata
+  Inkscape writes (creator, date, rights, keywords, licence).
+
+A licence named in a copyright notice, e.g. "© 2026 Ada Lovelace, CC BY
+4.0", is offered as the licence too.
+
+Tick what to give the file's entity. Those it has no value for yet are
+ticked to start with, except where a photo or video was taken and the
+camera or phone: a photo can tell more than meant, such as where someone lives, so give
+those only on purpose. Hover over a value to see where in the file it is, and the
+entity's value now. Authors become links to a Person of that name, added
+if the crate has none; a licence known to SPDX a link to it; and where a
+photo was taken a new Place with its point on the map. **Edit > Undo**
+takes it all back at once. To fill in many files at once, where they have
+no value yet, use **Crate > Update File Details...**.
+
+When you add files (**Insert > Files...**, or adding files of the crate's
+folder as parts), up to five of them are read in the background while you
+work. If they say
+something their entities lack, a notice at the foot of the window offers
+it: **Review...** opens the dialog above for one file, and **Fill in**
+gives several files what they say where they have no value yet (not
+where or the camera). More files, or very large ones, are not read at
+once: the notice offers **Read what they say...** instead.
+
+Nothing a file says is given to its entity until you click: what you type
+meanwhile is kept, and **Edit > Undo Metadata from Files** takes back
+just what was filled in. If you stop reading, what was read so far is
+offered. Opening another crate stops reading the files of this one,
+asking first if you asked for it.
+
+Files are read in the background. While they are, the foot of the
+window shows the progress; **Show...** brings up the window of the jobs
+running, with **Cancel**, **Run in Background** and **Help**, which also
+opens by itself for reading you asked for that takes more than a moment.
+It shows what each job is at, and the files that couldn't be read. A file that is damaged, or that a reader takes too long over
+(20 seconds), says what could be read, and which reader failed. A reader
+still busy with two such files is skipped for others until it is done.
+
 ## HTML preview
 
 Saving an attached crate also writes `ro-crate-preview.html` beside its
@@ -63,7 +125,10 @@ metadata file: the crate described as a web page, to read in a browser.
 It has the crate's name and description, a list of its entities (files
 and folders first, then the others by type) and a section for each, with
 its properties; links go to the entities it refers to, to its files, and
-to the web. The crate describes the page, as RO-Crate shows it: an entity
+to the web. Descriptions keep their paragraphs and line breaks, or are
+shown formatted when they are written in Markdown (headings, lists,
+**bold**, links, tables). The page also holds a copy of the metadata, for
+programs that read it. The crate describes the page, as RO-Crate shows it: an entity
 `ro-crate-preview.html`, a CreativeWork about the crate, not one of its
 parts.
 

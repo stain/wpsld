@@ -110,6 +110,7 @@ import no.s11.wpsld.form.FormFields;
 import no.s11.wpsld.form.Labels;
 import no.s11.wpsld.form.ValueKind;
 import no.s11.wpsld.soss.ClassDef;
+import no.s11.wpsld.soss.PropertyDef;
 import no.s11.wpsld.soss.SchemaFromJsonLd;
 
 /**
@@ -182,6 +183,8 @@ public class EntityEditor extends ScrollPane {
 	private List<String> headerLinks = List.of();
 	/** Labels of the fields of the entity shown, by property */
 	private final Map<String, String> labels = new HashMap<>();
+	/** What the fields of the entity shown take, by property */
+	private final Map<String, List<ClassDef>> ranges = new HashMap<>();
 	/** How to show the current values again, for the editors of each property */
 	private final Map<String, List<Reload>> reloads = new HashMap<>();
 
@@ -469,7 +472,9 @@ public class EntityEditor extends ScrollPane {
 		reloads.clear();
 		List<FormField> fields = formFields.fieldsFor(typeIris(), entity == root.get());
 		labels.clear();
+		ranges.clear();
 		fields.forEach(f -> labels.putIfAbsent(f.name(), f.label()));
+		fields.forEach(f -> ranges.putIfAbsent(f.name(), f.range()));
 		// name and description under @id too, as every entity should have a
 		// name: plain text, while their group allows several values or links
 		int headerRow = 2;
@@ -545,6 +550,7 @@ public class EntityEditor extends ScrollPane {
 		List<FormField> retiredFields = formFields.retiredFieldsFor(typeIris()).stream()
 				.filter(f -> !fieldNames.contains(f.name())).toList();
 		retiredFields.forEach(f -> labels.putIfAbsent(f.name(), f.label()));
+		retiredFields.forEach(f -> ranges.putIfAbsent(f.name(), f.range()));
 		Set<String> retiredNames = retiredFields.stream().map(FormField::name).collect(Collectors.toSet());
 		long retiredInUse = retiredFields.stream().filter(f -> entity.get(f.name()).isPresent()).count();
 
@@ -652,6 +658,7 @@ public class EntityEditor extends ScrollPane {
 	private static final URI PERSON = URI.create("http://schema.org/Person");
 	private static final URI ORGANIZATION = URI.create("http://schema.org/Organization");
 	private static final URI GEO_COORDINATES = URI.create("http://schema.org/GeoCoordinates");
+	private static final URI URL = URI.create("http://schema.org/URL");
 
 	/** Whether the entity is of the class or one of its subclasses */
 	private boolean isA(URI type) {
@@ -1394,6 +1401,20 @@ public class EntityEditor extends ScrollPane {
 
 	public String label(String property) {
 		return labels.getOrDefault(property, Labels.fromTerm(property));
+	}
+
+	/**
+	 * Whether a property takes URLs (its range includes schema.org's URL),
+	 * by the field of the entity shown, else by schema.org; empty for
+	 * properties neither knows.
+	 */
+	public Optional<Boolean> takesUrl(String property) {
+		List<ClassDef> range = ranges.get(property);
+		if (range == null) {
+			range = terms.propertyDef(property).map(PropertyDef::getRangeIncludes).orElse(null);
+		}
+		return Optional.ofNullable(range)
+				.map(r -> r.stream().anyMatch(c -> URL.equals(c.getID())));
 	}
 
 	/**

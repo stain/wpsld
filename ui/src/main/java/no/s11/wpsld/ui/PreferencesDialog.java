@@ -18,6 +18,7 @@
 package no.s11.wpsld.ui;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
@@ -33,6 +34,7 @@ import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
@@ -46,6 +48,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
+import javafx.util.StringConverter;
 import no.s11.wpsld.Settings;
 import no.s11.wpsld.lookup.GeoNames;
 import no.s11.wpsld.masp.Profile;
@@ -53,11 +56,16 @@ import no.s11.wpsld.masp.ProfileCache;
 import no.s11.wpsld.masp.ProfileRegistry;
 
 /**
- * The user's preferences: which profile registries to use, and the profiles
- * kept from earlier loads, which can be removed (at once, not on OK). Gives
- * the new {@link Settings} on OK.
+ * The user's preferences: which profile registries to use, the profiles
+ * kept from earlier loads, which can be removed (at once, not on OK), the
+ * GeoNames account, and how much to log, with the logs cleared at once.
+ * Gives the new {@link Settings} on OK.
  */
 class PreferencesDialog extends Dialog<Settings> {
+	/** What each log level offered logs */
+	private static final Map<String, String> LOG_LEVELS = Map.of("SEVERE", "Errors only", "WARNING",
+			"Errors and warnings", "INFO", "Also what it does (the default)", "FINE", "Also details, to find faults",
+			"ALL", "Everything");
 	private static final DateTimeFormatter WHEN = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
 			.withZone(ZoneId.systemDefault());
 
@@ -148,7 +156,65 @@ class PreferencesDialog extends Dialog<Settings> {
 		Tab placesTab = new Tab("Places", placesBox);
 		placesTab.setId("placesTab");
 
-		TabPane tabs = new TabPane(registryTab, keptTab, placesTab);
+		ChoiceBox<String> logLevel = new ChoiceBox<>();
+		logLevel.setId("logLevel");
+		logLevel.getItems().setAll(Settings.LOG_LEVELS);
+		logLevel.setConverter(new StringConverter<>() {
+			@Override
+			public String toString(String level) {
+				return level == null ? "" : LOG_LEVELS.getOrDefault(level, level);
+			}
+
+			@Override
+			public String fromString(String label) {
+				return null;
+			}
+		});
+		logLevel.setValue(settings.logLevel());
+		Label logsAbout = new Label("wpsld logs what goes wrong, e.g. a file it can't read or a web service that "
+				+ "doesn't answer, for when you report a problem. The logs stay on this computer.");
+		logsAbout.setWrapText(true);
+		Label logsFolder = new Label();
+		logsFolder.setId("logsFolder");
+		logsFolder.getStyleClass().add("dim-text");
+		logsFolder.setWrapText(true);
+		Runnable showLogs = () -> logsFolder.setText(Logs.folder().map(dir -> {
+			long size = Logs.files().stream().mapToLong(f -> {
+				try {
+					return Files.size(f);
+				} catch (IOException e) {
+					return 0;
+				}
+			}).sum();
+			return "Kept in " + dir + " (" + (size < 1024 ? size + " bytes" : size < 1 << 20 ? size / 1024 + " KB"
+					: String.format("%.1f MB", size / (double) (1 << 20))) + ")";
+		}).orElse("Not logged to a file"));
+		showLogs.run();
+		Hyperlink openLogs = new Hyperlink("Open the logs' folder");
+		openLogs.setId("openLogs");
+		openLogs.setDisable(Logs.folder().isEmpty());
+		openLogs.setOnAction(e -> Logs.folder().ifPresent(dir -> browse.accept(dir.toUri().toString())));
+		Button clearLogs = new Button("Clear logs");
+		clearLogs.setId("clearLogs");
+		clearLogs.setDisable(Logs.folder().isEmpty());
+		clearLogs.setOnAction(e -> {
+			try {
+				Logs.clear();
+			} catch (IOException ex) {
+				Alert alert = new Alert(AlertType.ERROR, ex.toString(), ButtonType.OK);
+				alert.initOwner(getDialogPane().getScene().getWindow());
+				alert.setHeaderText("Can't clear the logs");
+				alert.show();
+			}
+			showLogs.run();
+		});
+		VBox logsBox = new VBox(8, logsAbout, new Label("What to log"), logLevel, new HBox(8, clearLogs), logsFolder,
+				openLogs);
+		logsBox.setPadding(new Insets(12));
+		Tab logsTab = new Tab("Logs", logsBox);
+		logsTab.setId("logsTab");
+
+		TabPane tabs = new TabPane(registryTab, keptTab, placesTab, logsTab);
 		tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 		tabs.setPrefSize(640, 400);
 		Hyperlink help = new Hyperlink("Help with profiles");
@@ -169,7 +235,8 @@ class PreferencesDialog extends Dialog<Settings> {
 			}
 			Set<String> disabled = enabled.entrySet().stream().filter(e -> !e.getValue().isSelected())
 					.map(e -> e.getKey().name()).collect(Collectors.toSet());
-			return settings.withDisabledRegistries(disabled).withGeonamesUsername(geonames.getText());
+			return settings.withDisabledRegistries(disabled).withGeonamesUsername(geonames.getText())
+					.withLogLevel(logLevel.getValue());
 		});
 	}
 }

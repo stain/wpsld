@@ -90,6 +90,11 @@ public class ORCID {
 		public ORCIDException(String message) {
 			super(message);
 		}
+
+		/** With what it couldn't read, e.g. JSON broken off */
+		public ORCIDException(String message, Throwable cause) {
+			super(message, cause);
+		}
 	}
 
 	private final HttpClient http;
@@ -158,7 +163,7 @@ public class ORCID {
 		try {
 			return parse(MAPPER.readTree(response.body()));
 		} catch (IOException e) {
-			throw new ORCIDException("ORCID answered with no results");
+			throw new ORCIDException("ORCID answered with no results", e);
 		}
 	}
 

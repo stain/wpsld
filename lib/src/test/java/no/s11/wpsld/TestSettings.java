@@ -76,4 +76,19 @@ public class TestSettings {
 		Files.writeString(file, "{ not json");
 		assertEquals(Settings.DEFAULT, Settings.load(file));
 	}
+
+	@Test
+	public void logLevel() throws Exception {
+		Path file = temp.getRoot().toPath().resolve("settings.json");
+		assertEquals("INFO", Settings.DEFAULT.logLevel());
+		Settings settings = Settings.DEFAULT.withGeonamesUsername("someone").withLogLevel("FINE");
+		settings.save(file);
+		assertEquals(settings, Settings.load(file));
+		// Kept when other settings change
+		assertEquals("FINE", settings.withStyle("win11").withDisabledRegistries(Set.of()).logLevel());
+		// Not a level offered, e.g. edited by hand
+		assertEquals("INFO", Settings.DEFAULT.withLogLevel("LOUD").logLevel());
+		Files.writeString(file, "{\"logLevel\": \"finest\"}");
+		assertEquals(Settings.DEFAULT, Settings.load(file));
+	}
 }

@@ -112,14 +112,23 @@ The portable zip leaves out JavaFX. Either:
 wpsld keeps profiles you have loaded, and its settings (Edit > Preferences,
 and the style and colours from the View menu), in these places:
 
-| | Profiles | Settings |
-|-|----------|----------|
-| Linux | `~/.local/share/wpsld/profiles/` | `~/.config/wpsld/settings.json` |
-| macOS | `~/Library/Application Support/wpsld/profiles/` | `~/Library/Application Support/wpsld/settings.json` |
-| Windows | `%APPDATA%\wpsld\profiles\` | `%APPDATA%\wpsld\settings.json` |
+| | Profiles | Settings | Logs |
+|-|----------|----------|------|
+| Linux | `~/.local/share/wpsld/profiles/` | `~/.config/wpsld/settings.json` | `~/.local/state/wpsld/logs/` |
+| macOS | `~/Library/Application Support/wpsld/profiles/` | `~/Library/Application Support/wpsld/settings.json` | `~/Library/Logs/wpsld/` |
+| Windows | `%APPDATA%\wpsld\profiles\` | `%APPDATA%\wpsld\settings.json` | `%LOCALAPPDATA%\wpsld\Logs\` |
 
-On Linux, `$XDG_DATA_HOME` and `$XDG_CONFIG_HOME` are used instead if set.
-You can remove kept profiles under Edit > Preferences > Kept profiles.
+On Linux, `$XDG_DATA_HOME`, `$XDG_CONFIG_HOME` and `$XDG_STATE_HOME` are
+used instead if set. You can remove kept profiles under Edit > Preferences
+> Kept profiles, and set how much to log and clear the logs under Logs.
+
+wpsld logs with Java's own logging (`java.util.logging`), as do the
+libraries it uses: Tika's SLF4J through `slf4j-jdk14`, PDFBox's Commons
+Logging by itself, and JavaFX and the JDK through `System.Logger`. It logs
+to `wpsld.0.log`, starting anew at 20 MB and keeping three, and to the
+console when started from one. A second wpsld running at the same time
+logs to `wpsld.0.log.1` and so on. To log otherwise, give your own
+configuration with `-Djava.util.logging.config.file=<file>`.
 
 ## Building
 
@@ -141,6 +150,13 @@ they answer today; they are in the JUnit category `Online` and left out of
 
     ./gradlew onlineTest                         # ORCID, ROR, Crossref, DataCite, OpenStreetMap
     GEONAMES_USERNAME=<you> ./gradlew onlineTest # and GeoNames
+
+Likewise, the tests that read thousands of damaged copies of files with
+the readers of files' own metadata, which must neither hang nor run out of
+memory (JUnit category `Damaged`):
+
+    ./gradlew damagedTest                        # 20 rounds of each file
+    ./gradlew damagedTest -PdamageRounds=200     # more
 
 ### With conda
 
@@ -179,8 +195,9 @@ The portable zip, without JavaFX, is `./gradlew :ui:distZip`, written to
 runs its tests, the headless GUI tests too, for every pull request: they must
 pass on Linux, and are reported for Windows and macOS. The release workflow
 also runs them on each platform before making a release.
-[`.github/workflows/online-tests.yml`](.github/workflows/online-tests.yml)
-runs the online tests once a month, when run by hand, and on each release
+[`.github/workflows/integration-tests.yml`](.github/workflows/integration-tests.yml)
+runs the online tests and the damaged-file tests (with 200 rounds), each as
+a job of its own, once a month, when run by hand, and on each release
 (reported, without holding the release up). GeoNames' test needs the
 repository secret `GEONAMES_USERNAME`, and is skipped without it.
 
@@ -197,8 +214,10 @@ comes from [`gradle.properties`](gradle.properties).
 
 | Module | Contents |
 |--------|----------|
-| [`lib`](lib) (`no.s11.wpsld`) | No JavaFX. The schema.org model, form fields, the RO-Crate model, reading and retrieving crates, JSON-LD contexts, MASP profiles and registries, and settings. The lookups of RO-Crate's recommended identifiers are in `no.s11.wpsld.lookup` (`GeoNames`, `ORCID`, `ROR`, `DOI`, and the bundled `SPDXLicenses` and `PRONOMFormats`), which uses the crate model but not the other way round. Its only dependency is Jackson. |
-| [`ui`](ui) (`no.s11.wpsld.ui`) | The JavaFX editor: the crate window (`CrateEditor`), the entity form (`EntityEditor`), the preview, the type chooser, the preferences, the lookup dialogs (`PlaceFinder`, `PersonFinder`, `OrganizationFinder`, `WorkFinder`, `LicenseFinder`, `FormatFinder`), and its styles (`Theme`). Besides JavaFX, it uses [Ikonli](https://kordamp.org/ikonli/) for the Fluent icons of the Windows 11 style and [commonmark-java](https://github.com/commonmark/commonmark-java) for help. |
+| [`lib`](lib) (`no.s11.wpsld`) | No JavaFX. The schema.org model, form fields, the RO-Crate model, reading and retrieving crates, JSON-LD contexts, MASP profiles and registries, and settings. The lookups of RO-Crate's recommended identifiers are in `no.s11.wpsld.lookup` (`GeoNames`, `ORCID`, `ROR`, `DOI`, and the bundled `SPDXLicenses` and `PRONOMFormats`), which uses the crate model but not the other way round; and files' own metadata (`FileMetadata`, asking the `MetadataReader` services, each isolated with a time limit; the built-in readers needing only the JDK are in `EmbeddedMetadata`). No JavaFX nor AWT: its dependencies are Jackson, Apache Tika (core, for file formats) and commonmark-java (Markdown in the HTML preview). |
+| [`readers-image`](readers-image) (`no.s11.wpsld.readers.image`) | Images' and videos' own metadata (`ImageMetadata`: EXIF, IPTC, XMP, PNG text, GPS; HEIC, AVIF, GIF, raw formats; MP4 and QuickTime), a `MetadataReader` with [metadata-extractor](https://github.com/drewnoakes/metadata-extractor). |
+| [`readers-pdf`](readers-pdf) (`no.s11.wpsld.readers.pdf`) | PDFs' own metadata (`PdfMetadata`: document information and XMP), a `MetadataReader` with [Apache PDFBox](https://pdfbox.apache.org/), which needs AWT. |
+| [`ui`](ui) (`no.s11.wpsld.ui`) | The JavaFX editor: the crate window (`CrateEditor`), the entity form (`EntityEditor`), the preview, the type chooser, the preferences, the lookup dialogs (`PlaceFinder`, `PersonFinder`, `OrganizationFinder`, `WorkFinder`, `LicenseFinder`, `FormatFinder`), and its styles (`Theme`). Besides JavaFX, it uses [Ikonli](https://kordamp.org/ikonli/) for the Fluent icons of the Windows 11 style, [commonmark-java](https://github.com/commonmark/commonmark-java) for help and Markdown descriptions. It requires the metadata reader modules, so that jlink links them into the runtime image. |
 
 ## Licence
 
@@ -206,7 +225,9 @@ The source code in this repository is under the
 [Apache License 2.0](LICENSE.txt).
 
 The built application also includes third-party software: Jackson,
-commonmark-java, Ikonli, and Microsoft's Fluent UI System Icons, plus a
+commonmark-java, Ikonli, Microsoft's Fluent UI System Icons, Apache Tika,
+Apache PDFBox and FontBox, metadata-extractor, Adobe XMPCore, Apache
+Commons (IO, Logging, Secure XML) and SLF4J, plus a
 Java runtime and JavaFX in the zips for a platform. Their licences and notices are in
 [`ui/src/notices/THIRD-PARTY-NOTICES.txt`](ui/src/notices/THIRD-PARTY-NOTICES.txt),
 which the build puts in every zip and which Help > About wpsld shows. That

@@ -28,7 +28,6 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
-import org.testfx.framework.junit.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -55,7 +54,7 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
  * The entity list: the root first, then by type, name and @id; and only
  * those of a type chosen.
  */
-public class TestCrateEditorEntityList extends ApplicationTest {
+public class TestCrateEditorEntityList extends UiTest {
 	private CrateEditor app;
 	private Path temp;
 
