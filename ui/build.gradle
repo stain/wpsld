@@ -184,7 +184,7 @@ test {
     // running is lost when the task's time-out ends it (as on macOS in CI)
     testLogging {
         events 'failed'
-        exceptionFormat 'full'
+        exceptionFormat = 'full'
         showStackTraces = true
     }
 }
