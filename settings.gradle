@@ -5,3 +5,5 @@ include('lib')
 include('readers-image')
 include('readers-pdf')
 include('ui')
+// wpsld-cli: command-line tools with lib's functionality, without JavaFX
+include('bin')

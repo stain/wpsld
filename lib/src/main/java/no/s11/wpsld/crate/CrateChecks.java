@@ -24,8 +24,11 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import com.fasterxml.jackson.databind.JsonNode;
+
+import no.s11.wpsld.crate.Issue.Severity;
 
 /**
  * Checks of the RO-Crate 1.3 requirements (MUST) for the root data entity,
@@ -42,43 +45,61 @@ public class CrateChecks {
 	 * Problems found in the crate, empty if none.
 	 */
 	public static List<String> check(Crate crate) {
-		List<String> problems = new ArrayList<>();
+		return issues(crate).stream().map(Issue::message).toList();
+	}
+
+	/**
+	 * The problems found in the crate, with where they are and what they are
+	 * of (see {@link Issue}); empty if none
+	 */
+	public static List<Issue> issues(Crate crate) {
+		List<Issue> issues = new ArrayList<>();
 		Entity root = crate.getRoot();
 		if (!root.getTypes().contains("Dataset")) {
-			problems.add("The root data entity must have the type Dataset");
+			issues.add(Issue.of(Severity.REQUIRED, "rocrate:root-type", "Root data entity: type Dataset",
+					"The root data entity must have the type Dataset", root, Optional.of("@type"), Optional.empty()));
 		}
 		for (String property : List.of("name", "description", "license")) {
 			if (root.getAll(property).isEmpty()) {
-				problems.add("The root data entity must have a " + property);
+				issues.add(Issue.of(Severity.REQUIRED, "rocrate:root-" + property, "Root data entity: " + property,
+						"The root data entity must have a " + property, root, Optional.of(property), Optional.empty()));
 			}
 		}
 		List<JsonNode> published = root.getAll("datePublished");
+		String date = "Root data entity: datePublished";
 		if (published.isEmpty()) {
-			problems.add("The root data entity must have a datePublished");
+			issues.add(Issue.of(Severity.REQUIRED, "rocrate:root-datePublished", date,
+					"The root data entity must have a datePublished", root, Optional.of("datePublished"), Optional.empty()));
 		} else if (published.size() > 1) {
-			problems.add("The root data entity must have a single datePublished");
+			issues.add(Issue.of(Severity.REQUIRED, "rocrate:root-datePublished", date,
+					"The root data entity must have a single datePublished", root, Optional.of("datePublished"),
+					Optional.empty()));
 		} else if (!isIsoDate(published.get(0).asText())) {
-			problems.add("The datePublished of the root data entity must be an ISO 8601 date, e.g. "
-					+ LocalDate.now() + ", not " + published.get(0));
+			issues.add(Issue.of(Severity.REQUIRED, "rocrate:root-datePublished", date,
+					"The datePublished of the root data entity must be an ISO 8601 date, e.g. " + LocalDate.now()
+							+ ", not " + published.get(0),
+					root, Optional.of("datePublished"), Optional.of(published.get(0).asText())));
 		}
-		problems.addAll(danglingReferences(crate));
-		return problems;
+		issues.addAll(danglingReferences(crate));
+		return issues;
 	}
 
 	/**
 	 * References to local identifiers (not absolute URIs) of entities that
 	 * are not in the crate, e.g. a half-typed @id.
 	 */
-	private static List<String> danglingReferences(Crate crate) {
-		List<String> problems = new ArrayList<>();
+	private static List<Issue> danglingReferences(Crate crate) {
+		List<Issue> issues = new ArrayList<>();
 		for (Entity entity : crate.getEntities()) {
 			entity.getValues().keySet().forEach(property -> entity.getAll(property).stream()
 					.filter(v -> v.isObject() && v.has("@id")).map(v -> v.get("@id").asText())
 					.filter(id -> crate.get(id).isEmpty() && !isAbsoluteUri(id))
-					.forEach(id -> problems.add(entity.getLabel() + " has " + property + " " + id
-							+ ", which is not an entity in the crate")));
+					.forEach(id -> issues.add(new Issue(Severity.REQUIRED, "rocrate:reference",
+							"References to entities in the crate", Issue.RO_CRATE, entity.getLabel() + " has "
+									+ property + " " + id + ", which is not an entity in the crate",
+							Optional.of(entity.getId()), Optional.of(property), Optional.of(id)))));
 		}
-		return problems;
+		return issues;
 	}
 
 	private static boolean isAbsoluteUri(String id) {

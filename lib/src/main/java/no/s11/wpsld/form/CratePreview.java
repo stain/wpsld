@@ -22,6 +22,10 @@ import java.io.InputStream;
 import java.io.StringReader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -37,6 +41,7 @@ import com.samskivert.mustache.Template;
 
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.crate.SafeSave;
 
 /**
  * An RO-Crate's HTML preview, <code>ro-crate-preview.html</code>: the crate
@@ -142,6 +147,47 @@ public final class CratePreview {
 	/** Whether a page is a preview wpsld made, by its generator */
 	public static boolean isOurs(String html) {
 		return html.contains("<meta name=\"generator\" content=\"" + GENERATOR);
+	}
+
+	/** Whether a file is a preview wpsld made, by the generator near its start; not if it can't be read */
+	public static boolean isOurs(Path preview) {
+		try (InputStream in = Files.newInputStream(preview)) {
+			return isOurs(new String(in.readNBytes(4096), StandardCharsets.UTF_8));
+		} catch (IOException e) {
+			return false;
+		}
+	}
+
+	/**
+	 * Write the preview of a crate to a file, safely (see {@link SafeSave}),
+	 * over whatever is there
+	 *
+	 * @param label     a property's label, e.g. "Date published"
+	 * @param generator what made it, e.g. "wpsld 0.3", in the page
+	 */
+	public static void write(Path file, Crate crate, java.util.function.Function<String, String> label,
+			String generator) throws IOException {
+		SafeSave.write(file, html(crate, label, generator).getBytes(StandardCharsets.UTF_8));
+	}
+
+	/**
+	 * Move another tool's preview aside, before writing wpsld's in its place:
+	 * into <code>ro-crate-preview_files/</code> beside it (as RO-Crate's
+	 * previews keep their files), as
+	 * <code>old-ro-crate-preview-&lt;its date&gt;.html</code>, numbered if
+	 * there is one of that date already
+	 *
+	 * @return Where it is now
+	 */
+	public static Path moveAside(Path preview) throws IOException {
+		Path aside = Files.createDirectories(preview.toAbsolutePath().resolveSibling("ro-crate-preview_files"));
+		String date = LocalDate.ofInstant(Files.getLastModifiedTime(preview).toInstant(), ZoneId.systemDefault())
+				.toString();
+		Path old = aside.resolve("old-ro-crate-preview-" + date + ".html");
+		for (int n = 2; Files.exists(old); n++) {
+			old = aside.resolve("old-ro-crate-preview-" + date + "-" + n + ".html");
+		}
+		return Files.move(preview, old);
 	}
 
 	private static Map<String, Object> entity(Crate crate, Entity entity, Map<Entity, String> anchors,

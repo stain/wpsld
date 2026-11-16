@@ -280,30 +280,64 @@ mnemonics on tabs, the Warp 3 style
 
 ### Command-line tools (a `bin` module)
 
-*To do: consider* which of `lib`'s functionality is worth having as
-command-line tools, for scripts, pipelines and CI where no window is
-wanted, in a new module `bin` (no JavaFX, only `lib` and the
-`readers-*`): one `wpsld-cli`-style launcher with subcommands, or a few
-small ones, in the distribution zip and the app images beside the
-editor. Candidates:
-- **Write the RO-Crate preview** (`CratePreview`, already in `lib`):
-  `ro-crate-preview.html` for a crate, attached or detached, to a file
-  given (as File > Save RO-Crate Preview…, see HTML preview), with the
-  same check for another tool's preview.
-- **Repair a crate** (as Crate > Repair Crate: `TermRepairs`, objects
-  without `@id` made entities, nested entities flattened), writing the
-  crate back or to another file, and saying what was changed.
-- Others to weigh: check a crate (`CrateChecks`, as the editor warns on
-  opening; exit status for CI); update file details from what files say
-  about themselves (the `readers-*`); identify files' formats (PRONOM);
-  check web availability; make a crate detached or attached; describe a
-  folder as a new crate.
-- To decide: one launcher or several; how it is packaged (jlink image
-  without JavaFX, or the zip's `lib/`); options and output (JSON for
-  scripts, text for people); that what it writes is what the editor
-  writes for the same action (shared code in `lib`, moved there from
-  `CrateEditor` where needed, e.g. Repair Crate's parts still in `ui`);
-  tests of each, as of the editor's actions.
+*Done, first version (November 2026)*: `wpsld-cli` (the module `bin`,
+`no.s11.wpsld.cli`, with [picocli](https://picocli.info/) for its commands,
+options and `--help`; only `lib` besides, no JavaFX), a launcher of its own
+beside `wpsld` in the jlink and app images (`secondaryLauncher`, with a
+console on Windows) and the portable zip (`cliStartScripts`):
+- `check [--json] [--offline] CRATE`: what the editor checks before saving
+  (`CrateCheck`, a list of `Issue`s, each with its severity as RFC 2119's
+  REQUIRED/RECOMMENDED/OPTIONAL, check, requirement's source, entity,
+  property and value): reading the crate, the properties its profiles require,
+  the profiles found by its `conformsTo` as the editor finds them
+  (`CrateProfiles`: bundled, kept by the editor, else loaded from the web,
+  unless `--offline`; without any, the core RO-Crate profile), RO-Crate's
+  own requirements, and an attached crate's files and folders; files in its
+  folder that it doesn't describe are warnings (RECOMMENDED), as is a
+  Dataset's @id without its / (SHOULD). Exit status 0 if it passed
+  (warnings allowed), 1 for problems, 2 if it can't be read. `--json` writes
+  the report as rocrate-validator does (`validate -f json`: `meta`,
+  `validation_settings`, `passed`, `issues` with `severity`, `message`,
+  `violatingEntity`, `violatingProperty` as an IRI, `violatingPropertyValue`
+  and the `check` with its requirement and profile, and `statistics`), so
+  that what reads its reports reads wpsld's; plus `unknown_profiles`.
+- `repair [--dry-run] [-o FILE] [--json] CRATE`: Crate > Repair Crate
+  (`CrateRepair`, which the editor's dialog uses too), written back in place
+  safely (`SafeSave`) with the file's line ends (`Crate.lineEnd`), or to a
+  file; says what was done, as the editor's dialog.
+- `preview [-o FILE] [--replace-other] [--describe] [--offline] CRATE`:
+  `ro-crate-preview.html` beside an attached crate's metadata, or the file
+  given (as a detached crate needs), with the labels of the crate's profile;
+  another tool's preview only with `--replace-other`, moved aside into
+  `ro-crate-preview_files/` (`CratePreview.moveAside`, as the editor);
+  `--describe` describes it in the crate, as the editor does on saving.
+
+*To do*, next commands and options, each from what the editor already does
+in `lib` (moving what is still in `ui` there first):
+- **Make a crate detached or attached** (see Attached and detached crates):
+  `detach --base URI` (checking each file is at the base URI first, as a
+  job does in the editor) and `attach FOLDER` (downloading the files there,
+  checked against their sizes and checksums).
+- **Update file details**: what files say about themselves
+  (`FileMetadata`, the `readers-*`: EXIF, PDF, Office documents' own
+  metadata), as Crate > Update File Details… offers it, chosen by options
+  (e.g. `--only name,dateCreated`) rather than a dialog; with the readers'
+  modules in the image, as the editor has them.
+- **Check files and web availability**: an attached crate's files on disk
+  (sizes, checksums where given), and web-based data entities, as Check Web
+  Availability does (HEAD, sizes); as part of `check` with `--web`, or a
+  command of its own, as it asks the network.
+- **Reports in other formats** for CI, besides the text and
+  rocrate-validator's JSON (*done*, `--json`): GitHub Actions' workflow
+  commands (`::error file=…,title=…::…`, annotations in a pull request
+  without any set-up); SARIF 2.1.0 (OASIS; GitHub code scanning,
+  `upload-sarif`); EARL (W3C, RDF: `earl:Assertion`s of the crate against
+  each requirement, as JSON-LD) or a SHACL validation report
+  (`sh:ValidationReport`, the vocabulary rocrate-validator's checks are
+  written in). Each `Issue` has what they need.
+- Others to weigh: describe a folder as a new crate; identify files'
+  formats (PRONOM); a crate given as a URL or a zip, as the editor opens
+  them.
 
 ### Testing
 
@@ -337,6 +371,28 @@ editor. Candidates:
   should not assume `/` in paths or POSIX permissions, and `.gitattributes`
   checks text out with LF on Windows too, as tests check the SHA-256 of
   bundled files.
+- **How long the GUI tests take in CI** (measured November 2026, PR #24 and
+  #26, from each OS's `class-times.tsv` in its `test-reports-<os>`
+  artifact): the classes took 590 s in all on Linux, 830 s on Windows and
+  1 640 s on macOS. Each test, not some, is about 4 times as slow on
+  GitHub's macOS runner (3 cores, 7 GB) as on Linux, 1.4 times on Windows;
+  classes of one test take the same everywhere, so it is the JavaFX work
+  (software rendering, `prism.order=sw`), not starting JVMs. Done: test
+  classes in parallel, a JVM a core, at most three (`maxParallelForks`;
+  macOS's three cores gave no slower tests than two), and `TestCrateEditor`
+  split in four (it alone took 645 s on macOS): the job's Build and test
+  step went from over 20 minutes (timed out) to 15½, then 14 on macOS, and
+  5 minutes on Linux, 7 on Windows. Yet only about 2 of the 3 JVMs are busy
+  on average (the classes' time over the test task's: 2.1 on macOS, 2.2 on
+  Linux and Windows), where 3 would take about 9 minutes on macOS:
+  probably as Gradle starts the classes by name, so a long one starting
+  late (e.g. `TestEntityEditor`, 286 s on macOS) runs on alone at the end.
+  Left there for now; next, if wanted: record when each class starts and
+  ends in `class-times.tsv` (seconds from the task's start) to see it, and
+  split the longest classes (`TestCrateEditorEntityList` 297 s and
+  `TestEntityEditor` 286 s on macOS) so that none takes more than about
+  150 s; and the slowest tests themselves (e.g. the Getting started ones,
+  40 s on macOS) could share their set-up.
 
 ### User folders
 

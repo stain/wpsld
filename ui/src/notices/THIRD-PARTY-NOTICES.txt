@@ -320,6 +320,13 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ============================================================================
+picocli 4.7.7 (in wpsld-cli)
+https://picocli.info/
+Copyright 2017 Remko Popma
+Apache License 2.0, the same text as LICENSE.txt
+============================================================================
+
+============================================================================
 Ikonli (ikonli-core, ikonli-javafx, ikonli-fluentui-pack) 12.4.0
 https://kordamp.org/ikonli/
 Copyright 2015-2025 Andres Almiray

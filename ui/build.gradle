@@ -51,6 +51,16 @@ jlink {
         // Windows .bat launcher starts javaw, without a console window
         noConsole = true
     }
+    // wpsld-cli (the bin module): its own launcher, with a console, beside
+    // wpsld's in the image and app image; added to the image, as nothing
+    // the editor requires requires it
+    secondaryLauncher {
+        name = 'wpsld-cli'
+        moduleName = 'no.s11.wpsld.cli'
+        mainClass = 'no.s11.wpsld.cli.Main'
+        winConsole = true
+    }
+    addOptions('--add-modules', 'no.s11.wpsld.cli')
     // Link JavaFX from its jmods (-PjavafxJmods=<dir>), which install the
     // native libraries into the image; linked from the JavaFX jars they
     // end up inside lib/modules, and JavaFX fails with "no glass".
@@ -153,6 +163,8 @@ dependencies {
     // Readers of files' own metadata, found as services (FileMetadata)
     implementation project(':readers-image')
     implementation project(':readers-pdf')
+    // wpsld-cli, a launcher of its own in the images and zips (see jlink)
+    runtimeOnly project(':bin')
     // Tika (in lib) logs through SLF4J: to java.util.logging, as all else
     // does (see Logs)
     implementation 'org.slf4j:slf4j-jdk14:2.0.20'
@@ -252,12 +264,33 @@ tasks.named('distZip') {
     archiveClassifier = 'portable'
 }
 
+// Both launchers' module path: all of lib/
+def wholeLib = { CreateStartScripts scripts ->
+    scripts.unixScript.text = scripts.unixScript.text.replaceFirst(/(?m)^MODULE_PATH=.*$/,
+            java.util.regex.Matcher.quoteReplacement('MODULE_PATH=$APP_HOME/lib'))
+    scripts.windowsScript.text = scripts.windowsScript.text.replaceFirst(/(?m)^set MODULE_PATH=.*$/,
+            java.util.regex.Matcher.quoteReplacement('set MODULE_PATH=%APP_HOME%\\lib'))
+}
 tasks.named('startScripts') {
-    doLast {
-        unixScript.text = unixScript.text.replaceFirst(/(?m)^MODULE_PATH=.*$/,
-                java.util.regex.Matcher.quoteReplacement('MODULE_PATH=$APP_HOME/lib'))
-        windowsScript.text = windowsScript.text.replaceFirst(/(?m)^set MODULE_PATH=.*$/,
-                java.util.regex.Matcher.quoteReplacement('set MODULE_PATH=%APP_HOME%\\lib'))
+    doLast { wholeLib(it) }
+}
+
+// wpsld-cli's launchers beside wpsld's in the distribution zip; it needs
+// no JavaFX, as only the modules it requires are loaded
+def cliStartScripts = tasks.register('cliStartScripts', CreateStartScripts) {
+    def scripts = tasks.named('startScripts', CreateStartScripts).get()
+    applicationName = 'wpsld-cli'
+    mainModule = 'no.s11.wpsld.cli'
+    mainClass = 'no.s11.wpsld.cli.Main'
+    classpath = scripts.classpath
+    modularity.inferModulePath = scripts.modularity.inferModulePath
+    outputDir = layout.buildDirectory.dir('cli-scripts').get().asFile
+    doLast { wholeLib(it) }
+}
+distributions.main.contents {
+    from(cliStartScripts) {
+        into 'bin'
+        filePermissions { unix('rwxr-xr-x') }
     }
 }
 

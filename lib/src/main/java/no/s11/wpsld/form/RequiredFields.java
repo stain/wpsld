@@ -27,6 +27,8 @@ import java.util.stream.Collectors;
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.crate.Issue;
+import no.s11.wpsld.crate.Issue.Severity;
 
 /**
  * Checks that the crate's entities have the values their form fields
@@ -39,7 +41,19 @@ public class RequiredFields {
 	 * lists can be combined without repeating the same problem.
 	 */
 	public static List<String> check(Crate crate, FormFields fields, CrateTerms terms) {
-		List<String> problems = new ArrayList<>();
+		return issues(crate, fields, terms).stream().map(Issue::message).toList();
+	}
+
+	/**
+	 * The problems of {@link #check}, with where they are and what they are
+	 * of: the profile of the fields, else schema.org (see {@link Issue})
+	 */
+	public static List<Issue> issues(Crate crate, FormFields fields, CrateTerms terms) {
+		Issue.Source source = fields instanceof ProfileFormFields p
+				? new Issue.Source(p.getProfile().identifiers().stream().findFirst().orElse(p.getProfile().id()),
+						p.getProfile().name().orElse(fields.getName()))
+				: new Issue.Source("https://schema.org/", fields.getName());
+		List<Issue> issues = new ArrayList<>();
 		for (Entity entity : crate.getEntities()) {
 			boolean root = entity == crate.getRoot();
 			String who = root ? "The root data entity" : entity.getLabel();
@@ -48,13 +62,19 @@ public class RequiredFields {
 			for (FormField field : fields.fieldsFor(types, root)) {
 				int values = entity.getAll(field.name()).size();
 				if (values < field.minCount()) {
-					problems.add(who + " must have " + (field.minCount() == 1 ? "a " + field.name()
-							: field.minCount() + " values of " + field.name()));
+					issues.add(new Issue(Severity.REQUIRED, "profile:min-count", field.label() + ": at least "
+							+ field.minCount(), source, who + " must have " + (field.minCount() == 1
+									? "a " + field.name()
+									: field.minCount() + " values of " + field.name()),
+							Optional.of(entity.getId()), Optional.of(field.name()), Optional.empty()));
 				} else if (field.maxCount().isPresent() && values > field.maxCount().getAsInt()) {
-					problems.add(who + " may have at most " + field.maxCount().getAsInt() + " " + field.name());
+					issues.add(new Issue(Severity.REQUIRED, "profile:max-count", field.label() + ": at most "
+							+ field.maxCount().getAsInt(), source, who + " may have at most "
+									+ field.maxCount().getAsInt() + " " + field.name(),
+							Optional.of(entity.getId()), Optional.of(field.name()), Optional.empty()));
 				}
 			}
 		}
-		return problems;
+		return issues;
 	}
 }

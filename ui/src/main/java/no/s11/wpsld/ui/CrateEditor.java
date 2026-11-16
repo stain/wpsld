@@ -129,6 +129,7 @@ import no.s11.wpsld.crate.SafeSave;
 import no.s11.wpsld.crate.CrateDocument.Problem;
 import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
+import no.s11.wpsld.lookup.CrateRepair;
 import no.s11.wpsld.lookup.DOI;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.EntityJson;
@@ -142,7 +143,6 @@ import no.s11.wpsld.lookup.WebAvailability;
 import no.s11.wpsld.lookup.EmbeddedMetadata;
 import no.s11.wpsld.lookup.FileMetadata;
 import no.s11.wpsld.lookup.SPDXLicenses;
-import no.s11.wpsld.crate.TermRepairs;
 import no.s11.wpsld.crate.UndoHistory;
 import no.s11.wpsld.crate.UndoHistory.Place;
 import no.s11.wpsld.crate.UndoHistory.Step;
@@ -3566,7 +3566,7 @@ public class CrateEditor extends Application {
 	 */
 	private boolean mayWritePreview(Stage stage, Path folder) {
 		Path preview = folder.resolve(CratePreview.FILE);
-		if (Files.isRegularFile(preview) && !isOurPreview(preview)) {
+		if (Files.isRegularFile(preview) && !CratePreview.isOurs(preview)) {
 			if (keepPreview || previewAsked) {
 				return false;
 			}
@@ -3586,15 +3586,7 @@ public class CrateEditor extends Application {
 				return false;
 			}
 			try {
-				Path aside = Files.createDirectories(folder.resolve("ro-crate-preview_files"));
-				String date = java.time.LocalDate
-						.ofInstant(Files.getLastModifiedTime(preview).toInstant(), java.time.ZoneId.systemDefault())
-						.toString();
-				Path old = aside.resolve("old-ro-crate-preview-" + date + ".html");
-				for (int n = 2; Files.exists(old); n++) {
-					old = aside.resolve("old-ro-crate-preview-" + date + "-" + n + ".html");
-				}
-				Files.move(preview, old);
+				CratePreview.moveAside(preview);
 			} catch (IOException e) {
 				Alert error = new Alert(AlertType.ERROR, "Can't move " + preview + " aside:\n" + e.getMessage());
 				error.initOwner(stage);
@@ -3609,22 +3601,12 @@ public class CrateEditor extends Application {
 	private void writePreview(Stage stage, Path folder) {
 		Path preview = folder.resolve(CratePreview.FILE);
 		try {
-			SafeSave.write(preview, CratePreview.html(crate, entityEditor::label, "wpsld " + AboutDialog.version())
-					.getBytes(StandardCharsets.UTF_8));
+			CratePreview.write(preview, crate, entityEditor::label, "wpsld " + AboutDialog.version());
 		} catch (IOException e) {
 			Alert error = new Alert(AlertType.ERROR, "Saved the crate, but can't write its HTML preview, " + preview
 					+ ":\n" + e.getMessage());
 			error.initOwner(stage);
 			error.show();
-		}
-	}
-
-	/** Whether a preview is one wpsld wrote, by its generator */
-	private static boolean isOurPreview(Path preview) {
-		try (var in = Files.newInputStream(preview)) {
-			return CratePreview.isOurs(new String(in.readNBytes(4096), StandardCharsets.UTF_8));
-		} catch (IOException e) {
-			return false;
 		}
 	}
 
@@ -3712,82 +3694,11 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * Crate > Repair Crate: objects written in values without an @id made
-	 * entities of their own (see {@link Crate#flattenNested()}); add a Thing
-	 * for each reference to an entity not in
-	 * the crate, to be named and typed (see {@link Crate#addReferenced()});
-	 * no longer mention the entities linked otherwise from the root data
-	 * entity (see {@link Crate#unmentionLinked()}), and mention those not
-	 * linked (see {@link Crate#mentionUnlinked()}). First, SPDX licences
-	 * written otherwise (e.g. <code>https://spdx.org/licenses/MIT.html</code>,
-	 * or the text <code>CC-BY-4.0</code>) become the licence's SPDX IRI, and
-	 * are described from the SPDX License List (see
-	 * {@link SPDXLicenses#repair}), and PRONOM file formats likewise, also
-	 * for a media type that only one format has (see
-	 * {@link PRONOMFormats#repair}), and ORCID iDs, ROR identifiers and DOIs
-	 * written otherwise (see {@link ORCID#repair}, {@link ROR#repair} and
-	 * {@link DOI#repair}). Types written as IRIs get the names the RO-Crate
-	 * context gives them, and members of Enumerations written as text become
-	 * references to them (see {@link TermRepairs}), before references to
-	 * entities not in the crate are added. One undoable step, then tells
-	 * what was done.
+	 * Crate > Repair Crate (see {@link CrateRepair}, which wpsld-cli's repair
+	 * uses too): one undoable step, then tells what was done.
 	 */
 	void repair(Stage stage) {
-		List<Entity> flattened = crate.flattenNested();
-		List<String> types = TermRepairs.typeNames(crate, terms);
-		List<String> members = TermRepairs.enumerationMembers(crate, terms);
-		List<String> licences = SPDXLicenses.bundled().repair(crate);
-		List<String> formats = PRONOMFormats.bundled().repair(crate);
-		List<String> people = ORCID.repair(crate);
-		List<String> organizations = ROR.repair(crate);
-		List<String> dois = DOI.repair(crate);
-		List<Entity> added = crate.addReferenced();
-		List<Entity> unmentioned = crate.unmentionLinked();
-		List<Entity> mentioned = crate.mentionUnlinked();
-		List<String> done = new ArrayList<>();
-		if (!flattened.isEmpty()) {
-			done.add("Written in values without an @id, which flattened RO-Crate JSON-LD doesn't allow, now"
-					+ " entities of their own:\n" + list(flattened));
-		}
-		if (!types.isEmpty()) {
-			done.add("Types written by their names:\n" + types.stream().map(t -> "• " + t)
-					.collect(Collectors.joining("\n")));
-		}
-		if (!members.isEmpty()) {
-			done.add("Values of schema.org's lists (Enumerations), as references to them:\n"
-					+ members.stream().map(m -> "• " + m).collect(Collectors.joining("\n")));
-		}
-		if (!licences.isEmpty()) {
-			done.add("Licences of the SPDX License List:\n" + licences.stream().map(l -> "• " + l)
-					.collect(Collectors.joining("\n")));
-		}
-		if (!dois.isEmpty()) {
-			done.add("DOIs:\n" + dois.stream().map(f -> "• " + f)
-					.collect(Collectors.joining("\n")));
-		}
-		if (!people.isEmpty()) {
-			done.add("ORCID iDs:\n" + people.stream().map(f -> "• " + f)
-					.collect(Collectors.joining("\n")));
-		}
-		if (!organizations.isEmpty()) {
-			done.add("ROR identifiers:\n" + organizations.stream().map(f -> "• " + f)
-					.collect(Collectors.joining("\n")));
-		}
-		if (!formats.isEmpty()) {
-			done.add("File formats of PRONOM:\n" + formats.stream().map(f -> "• " + f)
-					.collect(Collectors.joining("\n")));
-		}
-		if (!added.isEmpty()) {
-			done.add("Added as Thing, referred to but not in the crate:\n" + list(added)
-					+ "\nGive them a name and type, or if an @id is mistyped, change it to the one meant"
-					+ " to merge them.");
-		}
-		if (!unmentioned.isEmpty()) {
-			done.add("No longer mentioned by the root, as linked otherwise:\n" + list(unmentioned));
-		}
-		if (!mentioned.isEmpty()) {
-			done.add("Mentioned by the root, as not linked otherwise:\n" + list(mentioned));
-		}
+		List<CrateRepair.Repaired> done = CrateRepair.repair(crate, terms);
 		if (!done.isEmpty()) {
 			// Entities may have been added, renamed or merged
 			relist();
@@ -3798,18 +3709,8 @@ public class CrateEditor extends Application {
 			refresh();
 			checkpoint(placeOf(null), Optional.of("Repair"));
 		}
-		report(stage, AlertType.INFORMATION, "Repair Crate",
-				done.isEmpty() ? "Nothing to repair." : String.join("\n\n", done)).showAndWait();
-	}
-
-	/**
-	 * The entities, one per line, all of them (in a report that scrolls,
-	 * see {@link #report})
-	 */
-	private static String list(List<Entity> listed) {
-		return listed.stream()
-				.map(e -> "• " + (e.getLabel().equals(e.getId()) ? e.getId() : e.getLabel() + " (" + e.getId() + ")"))
-				.collect(Collectors.joining("\n"));
+		report(stage, AlertType.INFORMATION, "Repair Crate", done.isEmpty() ? "Nothing to repair."
+				: done.stream().map(CrateRepair.Repaired::toString).collect(Collectors.joining("\n\n"))).showAndWait();
 	}
 
 	/** How many lines a report shows as text; more in a text area that scrolls */
