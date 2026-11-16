@@ -76,6 +76,28 @@ be installed.
 | `wpsld-<version>-windows-x64.zip` | Windows x64 | `wpsld\wpsld.exe` |
 | `wpsld-<version>-portable.zip` | any, with your own Java 25 and JavaFX 27 | `bin/wpsld`, `bin\wpsld.bat` |
 
+### On the command line: wpsld-cli
+
+Each zip also has `wpsld-cli`, wpsld's checks, Repair Crate and HTML
+preview for scripts and CI, without a window: `wpsld/bin/wpsld-cli` on
+Linux, `wpsld\wpsld-cli.exe` on Windows, `wpsld.app/Contents/MacOS/wpsld-cli`
+on macOS, and `bin/wpsld-cli` (`bin\wpsld-cli.bat`) in the portable zip,
+which needs no JavaFX for it. `CRATE` is a crate's folder or its metadata
+file:
+
+    wpsld-cli check CRATE              # what wpsld checks before saving, by the crate's profiles
+    wpsld-cli check --json CRATE       # as JSON, as rocrate-validator writes it
+    wpsld-cli repair --dry-run CRATE   # what Crate > Repair Crate would do
+    wpsld-cli repair CRATE             # do it, writing the crate back
+    wpsld-cli preview CRATE            # ro-crate-preview.html beside the metadata
+    wpsld-cli preview -o page.html CRATE
+    wpsld-cli help check               # the options of each
+
+`check` exits with 0 if the crate passes (warnings allowed, e.g. files in
+its folder that it doesn't describe), 1 if it has problems, and 2 if it
+can't be read. Run it from the source with `./gradlew :bin:run --args='check
+CRATE'`.
+
 ### The apps are not signed yet
 
 Windows and macOS mark files downloaded from the internet, and the mark
@@ -234,6 +256,7 @@ the workflow only keeps the zips as artifacts.
 | [`lib`](lib) (`no.s11.wpsld`) | No JavaFX. The schema.org model, form fields, the RO-Crate model, reading and retrieving crates, JSON-LD contexts, MASP profiles and registries, and settings. The lookups of RO-Crate's recommended identifiers are in `no.s11.wpsld.lookup` (`GeoNames`, `ORCID`, `ROR`, `DOI`, and the bundled `SPDXLicenses` and `PRONOMFormats`), which uses the crate model but not the other way round; and files' own metadata (`FileMetadata`, asking the `MetadataReader` services, each isolated with a time limit; the built-in readers needing only the JDK are in `EmbeddedMetadata`). No JavaFX nor AWT: its dependencies are Jackson, Apache Tika (core, for file formats), commonmark-java (Markdown in the HTML preview) and JMustache (the HTML preview's page, a Mustache template). |
 | [`readers-image`](readers-image) (`no.s11.wpsld.readers.image`) | Images' and videos' own metadata (`ImageMetadata`: EXIF, IPTC, XMP, PNG text, GPS; HEIC, AVIF, GIF, raw formats; MP4 and QuickTime), a `MetadataReader` with [metadata-extractor](https://github.com/drewnoakes/metadata-extractor). |
 | [`readers-pdf`](readers-pdf) (`no.s11.wpsld.readers.pdf`) | PDFs' own metadata (`PdfMetadata`: document information and XMP), a `MetadataReader` with [Apache PDFBox](https://pdfbox.apache.org/), which needs AWT. |
+| [`bin`](bin) (`no.s11.wpsld.cli`) | `wpsld-cli`: the commands `check`, `repair` and `preview` (`Main`), with [picocli](https://picocli.info/), over `lib`'s `CrateCheck`, `CrateRepair` and `CratePreview`, which the editor uses too. No JavaFX. |
 | [`ui`](ui) (`no.s11.wpsld.ui`) | The JavaFX editor: the crate window (`CrateEditor`), the entity form (`EntityEditor`), the preview, the type chooser, the preferences, the lookup dialogs (`PlaceFinder`, `PersonFinder`, `OrganizationFinder`, `WorkFinder`, `LicenseFinder`, `FormatFinder`), and its styles (`Theme`). Besides JavaFX, it uses [Ikonli](https://kordamp.org/ikonli/) for the Fluent icons of the Windows 11 style, [commonmark-java](https://github.com/commonmark/commonmark-java) for help and Markdown descriptions. It requires the metadata reader modules, so that jlink links them into the runtime image. |
 
 ## Licence
@@ -249,7 +272,7 @@ domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/),
 so that a crate's preview can be distributed with it under any terms.
 
 The built application also includes third-party software: Jackson,
-commonmark-java, JMustache, Ikonli, Microsoft's Fluent UI System Icons, Apache Tika,
+commonmark-java, JMustache, picocli, Ikonli, Microsoft's Fluent UI System Icons, Apache Tika,
 Apache PDFBox and FontBox, metadata-extractor, Adobe XMPCore, Apache
 Commons (IO, Logging, Secure XML) and SLF4J, plus a
 Java runtime and JavaFX in the zips for a platform. Their licences and notices are in

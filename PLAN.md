@@ -286,13 +286,21 @@ options and `--help`; only `lib` besides, no JavaFX), a launcher of its own
 beside `wpsld` in the jlink and app images (`secondaryLauncher`, with a
 console on Windows) and the portable zip (`cliStartScripts`):
 - `check [--json] [--offline] CRATE`: what the editor checks before saving
-  (`CrateCheck`): reading the crate, the properties its profiles require,
+  (`CrateCheck`, a list of `Issue`s, each with its severity as RFC 2119's
+  REQUIRED/RECOMMENDED/OPTIONAL, check, requirement's source, entity,
+  property and value): reading the crate, the properties its profiles require,
   the profiles found by its `conformsTo` as the editor finds them
   (`CrateProfiles`: bundled, kept by the editor, else loaded from the web,
   unless `--offline`; without any, the core RO-Crate profile), RO-Crate's
   own requirements, and an attached crate's files and folders; files in its
-  folder that it doesn't describe are warnings. Exit status 0 if it passed
-  (warnings allowed), 1 for problems, 2 if it can't be read.
+  folder that it doesn't describe are warnings (RECOMMENDED), as is a
+  Dataset's @id without its / (SHOULD). Exit status 0 if it passed
+  (warnings allowed), 1 for problems, 2 if it can't be read. `--json` writes
+  the report as rocrate-validator does (`validate -f json`: `meta`,
+  `validation_settings`, `passed`, `issues` with `severity`, `message`,
+  `violatingEntity`, `violatingProperty` as an IRI, `violatingPropertyValue`
+  and the `check` with its requirement and profile, and `statistics`), so
+  that what reads its reports reads wpsld's; plus `unknown_profiles`.
 - `repair [--dry-run] [-o FILE] [--json] CRATE`: Crate > Repair Crate
   (`CrateRepair`, which the editor's dialog uses too), written back in place
   safely (`SafeSave`) with the file's line ends (`Crate.lineEnd`), or to a
@@ -319,20 +327,14 @@ in `lib` (moving what is still in `ui` there first):
   (sizes, checksums where given), and web-based data entities, as Check Web
   Availability does (HEAD, sizes); as part of `check` with `--web`, or a
   command of its own, as it asks the network.
-- **Reports in a standard format** for CI, besides the text and the JSON
-  now (wpsld's own, `--json`); to choose from (see the comparison below
-  when done): the JSON of rocrate-validator (the RO-Crate community's
-  validator, `rocrate-validator validate -f json`: `passed`, and `issues`,
-  each with `severity`, `message`, `violatingEntity`, `violatingProperty`,
-  `violatingPropertyValue` and the `check` and profile), so that tools
-  reading its reports read wpsld's; GitHub Actions' workflow commands
-  (`::error file=…::…`, annotations in a pull request without any set-up);
-  SARIF 2.1.0 (OASIS; GitHub code scanning, `upload-sarif`); EARL (W3C,
-  RDF: `earl:Assertion`s of the crate against each requirement, as JSON-LD)
-  or a SHACL validation report (`sh:ValidationReport`, the vocabulary
-  rocrate-validator's checks are written in). The problems then need their
-  entity, property and requirement, not text alone (`RequiredFields`,
-  `CrateChecks`).
+- **Reports in other formats** for CI, besides the text and
+  rocrate-validator's JSON (*done*, `--json`): GitHub Actions' workflow
+  commands (`::error file=…,title=…::…`, annotations in a pull request
+  without any set-up); SARIF 2.1.0 (OASIS; GitHub code scanning,
+  `upload-sarif`); EARL (W3C, RDF: `earl:Assertion`s of the crate against
+  each requirement, as JSON-LD) or a SHACL validation report
+  (`sh:ValidationReport`, the vocabulary rocrate-validator's checks are
+  written in). Each `Issue` has what they need.
 - Others to weigh: describe a folder as a new crate; identify files'
   formats (PRONOM); a crate given as a URL or a zip, as the editor opens
   them.
