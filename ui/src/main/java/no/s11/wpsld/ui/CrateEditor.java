@@ -950,7 +950,7 @@ public class CrateEditor extends Application {
 		edit.getItems().addAll(textEditing(stage));
 		edit.getItems().addAll(new SeparatorMenuItem(), preferences);
 		edit.setId("menuEdit");
-		Menu view = new Menu("_View", null, sidebarItem(), new SeparatorMenuItem());
+		Menu view = new Menu("_View");
 		view.getItems().addAll(listings());
 		MenuItem crateJson = new MenuItem("Crate _JSON-LD…");
 		crateJson.setId("menuCrateJson");
@@ -2594,10 +2594,14 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * View > Entities by Type (the list) or by Folder (the tree).
+	 * View > No Sidebar, or the entities by Type (the list), by Folder or by
+	 * Part (the trees), in the sidebar.
 	 */
 	private List<MenuItem> listings() {
 		ToggleGroup group = new ToggleGroup();
+		RadioMenuItem noSidebar = new RadioMenuItem("No Side_bar");
+		noSidebar.setId("menuNoSidebar");
+		noSidebar.setToggleGroup(group);
 		RadioMenuItem byType = new RadioMenuItem("Entities by _Type");
 		byType.setId("menuListByType");
 		byType.setToggleGroup(group);
@@ -2609,10 +2613,25 @@ public class CrateEditor extends Application {
 		parts.setId("menuListByPart");
 		parts.setToggleGroup(group);
 		folderView = folders;
+		// The view shown in the sidebar, also while it is hidden
+		RadioMenuItem[] listed = { byType };
+		// Whether choosing No Sidebar just hid it (else it was hidden already)
+		boolean[] justHidden = { false };
 		group.selectedToggleProperty().addListener((obs, old, item) -> {
 			if (item == null) {
 				return;
 			}
+			if (item == noSidebar) {
+				justHidden[0] = true;
+				showSidebar(false);
+				return;
+			}
+			showSidebar(true);
+			if (item == listed[0]) {
+				// Shown again as it was
+				return;
+			}
+			listed[0] = (RadioMenuItem) item;
 			boolean logical = item == parts;
 			if (byFolder && item != byType && logical != byPart) {
 				// From one tree to the other
@@ -2625,6 +2644,18 @@ public class CrateEditor extends Application {
 				listByFolder(item != byType);
 			}
 		});
+		if (CrateFile.onMac()) {
+			// ⌃⌘S hides the sidebar, as on macOS, and shows it again
+			noSidebar.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN,
+					KeyCombination.CONTROL_DOWN));
+			noSidebar.setOnAction(e -> {
+				if (!justHidden[0]) {
+					// Chosen when already hidden: shown again
+					listed[0].setSelected(true);
+				}
+				justHidden[0] = false;
+			});
+		}
 		MenuItem refresh = new MenuItem("_Refresh");
 		refresh.setId("menuRefresh");
 		refresh.setAccelerator(new KeyCodeCombination(KeyCode.F5));
@@ -2651,35 +2682,11 @@ public class CrateEditor extends Application {
 				menu.addEventHandler(Menu.ON_SHOWING, e -> update.run());
 			}
 		});
-		return List.of(byType, folders, parts, files, refresh);
+		return List.of(noSidebar, byType, folders, parts, files, refresh);
 	}
 
 	/** View > Entities by Folder, chosen when opening a folder */
 	private RadioMenuItem folderView;
-
-	/**
-	 * View: show or hide the sidebar of entities. As the operating system
-	 * has it: on macOS an item that says what it will do (Hide Sidebar, Show
-	 * Sidebar, Control-Command-S), elsewhere a checked item.
-	 */
-	private MenuItem sidebarItem() {
-		if (CrateFile.onMac()) {
-			MenuItem item = new MenuItem("Hide Side_bar");
-			item.setId("menuSidebar");
-			item.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN,
-					KeyCombination.CONTROL_DOWN));
-			item.setOnAction(e -> {
-				showSidebar(!split.getItems().contains(sidebar));
-				item.setText(split.getItems().contains(sidebar) ? "Hide Side_bar" : "Show Side_bar");
-			});
-			return item;
-		}
-		CheckMenuItem item = new CheckMenuItem("Side_bar");
-		item.setId("menuSidebar");
-		item.setSelected(true);
-		item.selectedProperty().addListener((obs, old, show) -> showSidebar(show));
-		return item;
-	}
 
 	void showSidebar(boolean show) {
 		boolean shown = split.getItems().contains(sidebar);

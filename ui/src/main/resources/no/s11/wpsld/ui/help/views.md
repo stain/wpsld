@@ -117,8 +117,10 @@ list again.
 
 ![The entity tree, with the data folder open](images/entity-tree.png)
 
-Use **View > Sidebar** to hide or show the entity list. On macOS the menu
-item says **Hide Sidebar** or **Show Sidebar**.
+Choose **View > No Sidebar** to hide the entities, leaving more room for
+the form and preview, and one of the views of them, e.g. **View >
+Entities by Type**, to show them again. On macOS, ⌃⌘S hides the sidebar
+and shows it again.
 
 Choose **View > Style** to change the appearance and form layout, and
 **View > Colours** for light, dark or system colours. OS/2 Warp presents

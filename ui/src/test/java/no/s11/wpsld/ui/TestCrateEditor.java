@@ -41,13 +41,13 @@ import javafx.scene.input.Clipboard;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Button;
-import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.Label;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.DialogPane;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.ListCell;
@@ -882,27 +882,26 @@ public class TestCrateEditor extends UiTest {
 		assertEquals("abcabcabc", name.getText());
 	}
 
-	/** View > Sidebar hides the entities, and shows them again */
+	/**
+	 * View > No Sidebar hides the entities; choosing a view of them shows
+	 * them again, as they were, or in another view
+	 */
 	@Test
 	public void sidebar() {
 		entities();
 		SplitPane split = lookup(".split-pane").queryAs(SplitPane.class);
 		assertEquals(3, split.getItems().size());
-		MenuItem sidebar = menuItem("menuSidebar");
-		// As choosing it: a checked item on Windows and Linux, Hide/Show Sidebar on macOS
-		Runnable choose = () -> {
-			if (sidebar instanceof CheckMenuItem check) {
-				check.setSelected(!check.isSelected());
-			} else {
-				sidebar.fire();
-			}
-		};
-		interact(choose);
+		interact(() -> ((RadioMenuItem) menuItem("menuNoSidebar")).setSelected(true));
 		assertEquals(2, split.getItems().size());
 		assertTrue(lookup("#entities").tryQuery().isEmpty());
-		interact(choose);
+		interact(() -> ((RadioMenuItem) menuItem("menuListByType")).setSelected(true));
 		assertEquals(3, split.getItems().size());
 		assertTrue(lookup("#entities").tryQuery().isPresent());
+		// Hidden, then shown by folder
+		interact(() -> ((RadioMenuItem) menuItem("menuNoSidebar")).setSelected(true));
+		interact(() -> ((RadioMenuItem) menuItem("menuListByFolder")).setSelected(true));
+		assertEquals(3, split.getItems().size());
+		assertTrue(lookup("#entityTree").tryQuery().isPresent());
 	}
 
 	/** As another application (e.g. git) would: the crate with another name, and a later time */
