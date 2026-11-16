@@ -14,7 +14,9 @@ subprojects {
                 excludeCategories 'no.s11.wpsld.test.Online', 'no.s11.wpsld.test.Damaged',
                         'no.s11.wpsld.test.Performance'
             }
-            systemProperty 'wpsld.test.offline', 'true'
+            // Except while making the help's screenshots, whose maps show
+            // OpenStreetMap's tiles (ReadmeScreenshots)
+            systemProperty 'wpsld.test.offline', System.getenv('HELP_SCREENSHOTS') ? 'false' : 'true'
         }
         // The tests that read many damaged copies of files with the
         // metadata readers (no.s11.wpsld.test.Damaged), which take minutes:
