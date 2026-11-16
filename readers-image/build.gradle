@@ -12,7 +12,7 @@ dependencies {
     implementation project(':lib')
     implementation 'com.drewnoakes:metadata-extractor:2.22.0'
 
-    testImplementation 'junit:junit:4.13'
+    testImplementation 'junit:junit:4.13.2'
     // The test categories (no.s11.wpsld.test), the photo and picture to read
     testImplementation testFixtures(project(':lib'))
 }

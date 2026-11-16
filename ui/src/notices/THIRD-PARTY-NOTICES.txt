@@ -23,7 +23,7 @@ resemble their looks.
 
 ============================================================================
 commonmark-java (commonmark, commonmark-ext-gfm-tables,
-commonmark-ext-gfm-strikethrough) 0.31.0
+commonmark-ext-gfm-strikethrough) 0.32.0
 https://github.com/commonmark/commonmark-java
 BSD 2-Clause License
 ============================================================================
@@ -53,7 +53,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ============================================================================
-Jackson (jackson-databind, jackson-core, jackson-annotations) 2.22
+Jackson (jackson-databind, jackson-core, jackson-annotations) 2.23
 https://github.com/FasterXML/jackson
 Apache License 2.0, the same text as LICENSE.txt
 ============================================================================

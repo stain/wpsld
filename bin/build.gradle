@@ -12,11 +12,11 @@ repositories {
 
 dependencies {
     implementation project(':lib')
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.4'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.23.0'
     // Its commands, options and --help (one jar, no dependencies)
     implementation 'info.picocli:picocli:4.7.7'
 
-    testImplementation 'junit:junit:4.13'
+    testImplementation 'junit:junit:4.13.2'
     // The test categories, and keeping the tests offline (no.s11.wpsld.test)
     testImplementation testFixtures(project(':lib'))
 }

@@ -75,12 +75,12 @@ public class TestCrateEditorPeople extends UiTest {
 
 	private ListView<Entity> entities() {
 		try {
-			WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#entities").tryQuery().isPresent()
+			waitForFx(30, () -> lookup("#entities").tryQuery().isPresent()
 					&& lookup("#save").tryQuery().isPresent());
 		} catch (Exception e) {
 			throw new AssertionError("Editor did not appear", e);
 		}
-		return lookup("#entities").queryListView();
+		return onFx(() -> lookup("#entities").queryListView());
 	}
 
 	private Optional<Entity> entity(String id) {
@@ -88,7 +88,7 @@ public class TestCrateEditorPeople extends UiTest {
 	}
 
 	private void waitForResults() throws Exception {
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#personResults").tryQuery().isPresent()
+		waitForFx(10, () -> lookup("#personResults").tryQuery().isPresent()
 				&& !lookup("#personResults").queryListView().getItems().isEmpty());
 	}
 
@@ -101,7 +101,7 @@ public class TestCrateEditorPeople extends UiTest {
 		// Shown and waited for, so not inside interact()
 		Platform.runLater(() -> create.getItems().stream().filter(i -> "newOrcid-author".equals(i.getId()))
 				.findFirst().orElseThrow().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#personQuery").tryQuery().isPresent());
+		waitForFx(10, () -> lookup("#personQuery").tryQuery().isPresent());
 		interact(() -> lookup("#personQuery").queryAs(TextField.class).setText("Josiah Carberry"));
 		interact(() -> lookup("#personSearch").queryButton().fire());
 		waitForResults();
@@ -150,11 +150,11 @@ public class TestCrateEditorPeople extends UiTest {
 		MenuButton create = lookup("#new-author").queryAs(MenuButton.class);
 		Platform.runLater(() -> create.getItems().stream().filter(i -> "newOrcid-author".equals(i.getId()))
 				.findFirst().orElseThrow().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#personQuery").tryQuery().isPresent());
+		waitForFx(10, () -> lookup("#personQuery").tryQuery().isPresent());
 		interact(() -> lookup("#personQuery").queryAs(TextField.class).setText("offline"));
 		searches.clear();
 		interact(() -> lookup("#personSearch").queryButton().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
+		waitForFx(10,
 				() -> lookup("#personStatus").queryAs(Label.class).getText().startsWith("Can't search ORCID"));
 		assertTrue(lookup("#personStatus").queryAs(Label.class).getText()
 				.endsWith("You can still type the ORCID iD as the person's @id."));
@@ -250,7 +250,7 @@ public class TestCrateEditorPeople extends UiTest {
 		assertFalse(menuItem("menuMerge").isDisable());
 		// Not in interact(), which would wait for the dialog's answer
 		javafx.application.Platform.runLater(menuItem("menuMerge")::fire);
-		WaitForAsyncUtils.waitFor(10, java.util.concurrent.TimeUnit.SECONDS,
+		waitForFx(10,
 				() -> lookup("#mergeKeep").tryQuery().isPresent());
 		assertEquals("https://orcid.org/0000-0002-1825-0097",
 				((Entity) lookup("#mergeKeep").queryAs(javafx.scene.control.ChoiceBox.class).getValue()).getId());

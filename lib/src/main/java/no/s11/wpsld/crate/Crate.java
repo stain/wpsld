@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.util.DefaultIndenter;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -555,6 +556,48 @@ public class Crate {
 		}
 		hasParts.forEach((dataset, values) -> dataset.setAll("hasPart", values));
 		return added;
+	}
+
+	/**
+	 * References written as text, e.g.
+	 * <code>"author": "{\"@id\": \"https://orcid.org/…\"}"</code> (a JSON
+	 * object in a string, as a tool converting to JSON may write them): each
+	 * made the reference it says. Only text that is, as a whole, a JSON
+	 * object of an <code>@id</code> alone; other text, also JSON, stays.
+	 *
+	 * @return What was changed, e.g. "./: author https://orcid.org/…"
+	 */
+	public List<String> referencesFromText() {
+		List<String> done = new ArrayList<>();
+		ObjectMapper json = new ObjectMapper();
+		for (Entity entity : entities) {
+			for (String property : List.copyOf(entity.getValues().keySet())) {
+				List<JsonNode> values = new ArrayList<>(entity.getAll(property));
+				boolean changed = false;
+				for (int i = 0; i < values.size(); i++) {
+					String text = values.get(i).isTextual() ? values.get(i).asText().strip() : "";
+					if (!text.startsWith("{") || !text.endsWith("}")) {
+						continue;
+					}
+					try {
+						JsonNode written = json.readTree(text);
+						if (written.isObject() && written.size() == 1 && written.path("@id").isTextual()
+								&& !written.get("@id").asText().isBlank()) {
+							String id = written.get("@id").asText().strip();
+							values.set(i, JsonNodeFactory.instance.objectNode().put("@id", id));
+							done.add(entity.getId() + ": " + property + " " + id);
+							changed = true;
+						}
+					} catch (JsonProcessingException notJson) {
+						// Text, as it is
+					}
+				}
+				if (changed) {
+					entity.setAll(property, values);
+				}
+			}
+		}
+		return done;
 	}
 
 	/**

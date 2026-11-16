@@ -61,7 +61,7 @@ public class TestCrateEditorLoading extends UiTest {
 
 	@Test
 	public void contextLoadedInBackground() throws Exception {
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#entities").tryQuery().isPresent());
+		waitForFx(30, () -> lookup("#entities").tryQuery().isPresent());
 		long editorShown = System.nanoTime();
 		assertEquals("context loaded once, not on the JavaFX thread", List.of(false), contextLoadedOnFxThread);
 		assertTrue("editor shown after the context was loaded", contextDone > 0 && editorShown >= contextDone);

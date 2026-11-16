@@ -41,6 +41,15 @@ name or identifier. You can also copy one entity from the list and paste
 it into a reference field: its identifier is inserted as a link. Choose
 **→** beside a link to show the entity it links to.
 
+Where a property takes one of a fixed list of schema.org values, an
+*Enumeration*, its drop-down offers them too, as if they were entities of
+the crate: for example Action status (`actionStatus`) offers
+ActiveActionStatus, CompletedActionStatus, FailedActionStatus and
+PotentialActionStatus, saved as links to them
+(`{"@id": "http://schema.org/CompletedActionStatus"}`). Another value can
+still be typed, as a list may be extended. **Crate > Repair Crate** turns
+such values written as text into these links.
+
 To create and link a new description, choose **New** beside the property
 and select a type from its menu. Select the new entity in the list to fill
 in its name and other details, then return to the original entity to

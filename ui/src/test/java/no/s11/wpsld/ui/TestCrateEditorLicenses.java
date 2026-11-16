@@ -64,12 +64,12 @@ public class TestCrateEditorLicenses extends UiTest {
 
 	private ListView<Entity> entities() {
 		try {
-			WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#entities").tryQuery().isPresent()
+			waitForFx(30, () -> lookup("#entities").tryQuery().isPresent()
 					&& lookup("#save").tryQuery().isPresent());
 		} catch (Exception e) {
 			throw new AssertionError("Editor did not appear", e);
 		}
-		return lookup("#entities").queryListView();
+		return onFx(() -> lookup("#entities").queryListView());
 	}
 
 	private Optional<Entity> entity(String id) {
@@ -83,7 +83,7 @@ public class TestCrateEditorLicenses extends UiTest {
 		// Shown and waited for, so not inside interact()
 		Platform.runLater(() -> create.getItems().stream().filter(i -> "newSpdx-license".equals(i.getId()))
 				.findFirst().orElseThrow().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#licenseQuery").tryQuery().isPresent());
+		waitForFx(10, () -> lookup("#licenseQuery").tryQuery().isPresent());
 		interact(() -> lookup("#licenseQuery").queryAs(TextField.class).setText(query));
 		interact(() -> lookup("#licenseOk").queryButton().fire());
 	}
@@ -127,7 +127,7 @@ public class TestCrateEditorLicenses extends UiTest {
 		MenuButton create = lookup("#new-license").queryAs(MenuButton.class);
 		Platform.runLater(() -> create.getItems().stream().filter(i -> "newSpdx-license".equals(i.getId()))
 				.findFirst().orElseThrow().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#licenseQuery").tryQuery().isPresent());
+		waitForFx(10, () -> lookup("#licenseQuery").tryQuery().isPresent());
 		ListView<SPDXLicenses.License> results = lookup("#licenseResults").queryListView();
 		interact(() -> lookup("#licenseQuery").queryAs(TextField.class).setText("gpl-2.0"));
 		assertEquals("GPL-2.0-only", results.getItems().get(0).id());

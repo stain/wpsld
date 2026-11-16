@@ -29,8 +29,9 @@ import no.s11.wpsld.crate.TermRepairs;
 
 /**
  * Repair Crate, as the editor's Crate menu and <code>wpsld-cli repair</code>
- * do it: objects written in values without an <code>@id</code> made entities
- * of their own ({@link Crate#flattenNested()}); types written as IRIs given
+ * do it: references written as text made references
+ * ({@link Crate#referencesFromText()}); objects written in values without an
+ * <code>@id</code> made entities of their own ({@link Crate#flattenNested()}); types written as IRIs given
  * the names the RO-Crate context gives them, and members of Enumerations
  * written as text made references to them ({@link TermRepairs}); SPDX
  * licences, PRONOM formats, ORCID iDs, ROR identifiers and DOIs written
@@ -72,6 +73,7 @@ public final class CrateRepair {
 	 * @return What was repaired, by kind, in the order done; empty if nothing
 	 */
 	public static List<Repaired> repair(Crate crate, CrateTerms terms) {
+		List<String> textReferences = crate.referencesFromText();
 		List<Entity> flattened = crate.flattenNested();
 		List<String> types = TermRepairs.typeNames(crate, terms);
 		List<String> members = TermRepairs.enumerationMembers(crate, terms);
@@ -86,6 +88,7 @@ public final class CrateRepair {
 		List<Repaired> done = new ArrayList<>();
 		add(done, "Written in values without an @id, which flattened RO-Crate JSON-LD doesn't allow, now"
 				+ " entities of their own", described(flattened), Optional.empty());
+		add(done, "References written as text, now references", textReferences, Optional.empty());
 		add(done, "Types written by their names", types, Optional.empty());
 		add(done, "Values of schema.org's lists (Enumerations), as references to them", members, Optional.empty());
 		add(done, "Licences of the SPDX License List", licences, Optional.empty());

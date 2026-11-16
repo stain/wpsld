@@ -88,12 +88,11 @@ public class TestCrateEditorEntityList extends UiTest {
 
 	private ListView<Entity> entities() {
 		try {
-			WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#entities").tryQuery().isPresent()
-					&& lookup("#save").tryQuery().isPresent());
+			waitForFx(30, () -> lookup("#entities").tryQuery().isPresent() && lookup("#save").tryQuery().isPresent());
+			return onFx(() -> lookup("#entities").queryListView());
 		} catch (Exception e) {
 			throw new AssertionError("Editor did not appear", e);
 		}
-		return lookup("#entities").queryListView();
 	}
 
 	@SuppressWarnings("unchecked")
@@ -751,7 +750,7 @@ public class TestCrateEditorEntityList extends UiTest {
 
 		// Copied in by another program: shown soon, without Refresh
 		Files.writeString(folder.resolve("data/later.csv"), "");
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> rows(tree).contains("    later.csv ~"));
+		waitForFx(10, () -> rows(tree).contains("    later.csv ~"));
 	}
 
 	@Test

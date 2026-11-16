@@ -79,12 +79,12 @@ public class TestCrateEditorPlaces extends UiTest {
 
 	private ListView<Entity> entities() {
 		try {
-			WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#entities").tryQuery().isPresent()
+			waitForFx(30, () -> lookup("#entities").tryQuery().isPresent()
 					&& lookup("#save").tryQuery().isPresent());
 		} catch (Exception e) {
 			throw new AssertionError("Editor did not appear", e);
 		}
-		return lookup("#entities").queryListView();
+		return onFx(() -> lookup("#entities").queryListView());
 	}
 
 	private Optional<Entity> entity(String id) {
@@ -96,7 +96,7 @@ public class TestCrateEditorPlaces extends UiTest {
 	}
 
 	private void waitFor(String query) throws Exception {
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup(query).tryQuery().isPresent());
+		waitForFx(10, () -> lookup(query).tryQuery().isPresent());
 	}
 
 	/**
@@ -115,7 +115,7 @@ public class TestCrateEditorPlaces extends UiTest {
 		waitFor("#placeQuery");
 		interact(() -> lookup("#placeQuery").queryAs(TextField.class).setText("Catalina"));
 		interact(() -> lookup("#placeSearch").queryButton().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
+		waitForFx(10,
 				() -> !lookup("#placeResults").queryListView().getItems().isEmpty());
 		assertEquals(List.of("Catalina as tester"), searches);
 		assertEquals("1 place found; choose it and OK", lookup("#placeStatus").queryAs(Label.class).getText());
@@ -158,7 +158,7 @@ public class TestCrateEditorPlaces extends UiTest {
 		// Named, then looked up by that name
 		interact(() -> lookup("#header-name").queryAs(TextField.class).setText("Catalina Park"));
 		Platform.runLater(() -> lookup("#findPlace").queryButton().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
+		waitForFx(10,
 				() -> lookup("#placeResults").tryQuery().isPresent()
 						&& !lookup("#placeResults").queryListView().getItems().isEmpty());
 		assertEquals(List.of("Catalina Park as tester"), searches);

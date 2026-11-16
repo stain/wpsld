@@ -25,6 +25,8 @@ what it can and says what it did in the warnings:
 - An object written inside a value without an `@id` is kept as it is,
   with a warning: **Crate > Repair Crate** makes it an entity of its own
   with a new `@id` (see [Entities and identifiers](entities.md)).
+- A link written as text, `"{\"@id\": \"...\"}"` in quotes, stays text:
+  **Crate > Repair Crate** makes it the link it says.
 - Links written with JSON-LD's `@reverse` become links of the entities
   they come from.
 - Two entities with the same `@id` are merged.

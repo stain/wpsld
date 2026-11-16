@@ -69,12 +69,12 @@ public class TestCrateEditorMetadata extends UiTest {
 
 	private ListView<Entity> entities() {
 		try {
-			WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#entities").tryQuery().isPresent()
+			waitForFx(30, () -> lookup("#entities").tryQuery().isPresent()
 					&& lookup("#save").tryQuery().isPresent());
 		} catch (Exception e) {
 			throw new AssertionError("Editor did not appear", e);
 		}
-		return lookup("#entities").queryListView();
+		return onFx(() -> lookup("#entities").queryListView());
 	}
 
 	/** The entity of an @id, as listed */
@@ -288,7 +288,7 @@ public class TestCrateEditorMetadata extends UiTest {
 		Stage stage = (Stage) entities().getScene().getWindow();
 		Path dir = crateWithPhotos(stage, "photo.jpg");
 		interact(() -> app.insertFiles(stage, List.of(dir.resolve("photo.jpg"))));
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> app.notice().isPresent());
+		waitForFx(30, () -> app.notice().isPresent());
 		WaitForAsyncUtils.waitForFxEvents();
 		String notice = app.notice().orElseThrow();
 		assertTrue(notice, notice.startsWith("“photo.jpg” has its own description, author"));
@@ -296,7 +296,7 @@ public class TestCrateEditorMetadata extends UiTest {
 		// Not where it was taken, nor the camera
 		assertFalse(notice, notice.contains("contentLocation") || notice.contains("exifData"));
 		clickOn("#noticeAction");
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#fileMetadata").tryQuery().isPresent());
+		waitForFx(10, () -> lookup("#fileMetadata").tryQuery().isPresent());
 		clickDialogButton("OK");
 		Entity photo = listed("photo.jpg").orElseThrow();
 		assertEquals("Bus stop on Oxford Road", photo.get("description").orElseThrow().asText());
@@ -313,7 +313,7 @@ public class TestCrateEditorMetadata extends UiTest {
 		// Both selected, neither edited: no form for each in turn
 		assertEquals(2, entities().getSelectionModel().getSelectedItems().size());
 		assertEquals("2 entities selected: select one to edit it.", lookup("#noEntity").queryLabeled().getText());
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> app.notice().isPresent());
+		waitForFx(30, () -> app.notice().isPresent());
 		WaitForAsyncUtils.waitForFxEvents();
 		assertTrue(app.notice().orElseThrow(), app.notice().orElseThrow().startsWith("2 of the files added have"));
 		// Typed meanwhile: kept, and an undo step of its own
@@ -350,7 +350,7 @@ public class TestCrateEditorMetadata extends UiTest {
 		assertEquals(Optional.of("Added " + photos.length + " files. Files can say who made them, when and under which"
 				+ " licence."), app.notice());
 		clickOn("#noticeAction");
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS,
+		waitForFx(30,
 				() -> app.notice().filter(n -> n.startsWith("Read " + photos.length + " files. All")).isPresent());
 		clickOn("#noticeAction");
 		WaitForAsyncUtils.waitForFxEvents();
@@ -416,17 +416,13 @@ public class TestCrateEditorMetadata extends UiTest {
 				.asyncFx(() -> app.inBackground(stage, "Reading slowly", slowJob())).get();
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils.asyncFx(job::isRunning).get());
 		Platform.runLater(() -> app.newCrate(stage));
-		// Looked up on the JavaFX thread, as the dialog opens meanwhile
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils
-				.asyncFx(() -> lookup("Still working in the background").tryQuery().isPresent()).get());
+		waitForFx(10, () -> lookup("Still working in the background").tryQuery().isPresent());
 		assertTrue(WaitForAsyncUtils.asyncFx(() -> lookup(".dialog-pane .content").queryLabeled().getText()).get()
 				.contains("Reading slowly (0 of 1000 files read)"));
 		clickDialogButton("Cancel");
 		assertTrue(WaitForAsyncUtils.asyncFx(job::isRunning).get());
 		Platform.runLater(() -> app.newCrate(stage));
-		// Looked up on the JavaFX thread, as the dialog opens meanwhile
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils
-				.asyncFx(() -> lookup("Still working in the background").tryQuery().isPresent()).get());
+		waitForFx(10, () -> lookup("Still working in the background").tryQuery().isPresent());
 		clickDialogButton("Stop");
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils.asyncFx(job::isCancelled).get());
 		WaitForAsyncUtils.waitForFxEvents();
@@ -473,14 +469,14 @@ public class TestCrateEditorMetadata extends UiTest {
 				() -> lookup("#jobsStrip").query().isVisible() && lookup("#jobsLatest").queryLabeled().getText()
 						.equals("Reading slowly: 0 of 1000 files read")).get());
 		// Shown by itself after a moment, as the user asked for it
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#jobsHide").tryQuery().isPresent());
+		waitForFx(10, () -> lookup("#jobsHide").tryQuery().isPresent());
 		// Pressed rather than clicked, as a window just shown may not be on screen yet
 		interact(() -> lookup("#jobsHide").queryButton().fire());
 		WaitForAsyncUtils.waitForFxEvents();
 		assertTrue(lookup("#jobsHide").tryQuery().isEmpty());
 		assertTrue(WaitForAsyncUtils.asyncFx(job::isRunning).get());
 		clickOn("#jobsShow");
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#jobCancel").tryQuery().isPresent());
+		waitForFx(10, () -> lookup("#jobCancel").tryQuery().isPresent());
 		interact(() -> lookup("#jobCancel").queryButton().fire());
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils.asyncFx(job::isCancelled).get());
 		WaitForAsyncUtils.waitForFxEvents();
@@ -533,7 +529,7 @@ public class TestCrateEditorMetadata extends UiTest {
 		Stage stage = (Stage) entities().getScene().getWindow();
 		Path dir = crateWithPhotos(stage, "one.jpg", "two.jpg");
 		interact(() -> app.insertFiles(stage, List.of(dir.resolve("one.jpg"), dir.resolve("two.jpg"))));
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> app.notice().isPresent());
+		waitForFx(30, () -> app.notice().isPresent());
 		clickOn("#noticeClose");
 		// Both selected, as added
 		rightClickOn(lookup("#entities").queryListView().lookupAll(".list-cell").stream()
@@ -549,7 +545,7 @@ public class TestCrateEditorMetadata extends UiTest {
 			item.fire();
 			entities().getContextMenu().hide();
 		});
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS,
+		waitForFx(30,
 				() -> app.notice().filter(n -> n.startsWith("Read 2 files. All 2 have")).isPresent());
 		clickOn("#noticeAction");
 		WaitForAsyncUtils.waitForFxEvents();

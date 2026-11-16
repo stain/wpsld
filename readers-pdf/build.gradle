@@ -12,7 +12,7 @@ dependencies {
     implementation project(':lib')
     implementation 'org.apache.pdfbox:pdfbox:3.0.8'
 
-    testImplementation 'junit:junit:4.13'
+    testImplementation 'junit:junit:4.13.2'
     // The test categories (no.s11.wpsld.test)
     testImplementation testFixtures(project(':lib'))
 }

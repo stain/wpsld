@@ -45,7 +45,7 @@ public class TestCrateEditorFailure extends UiTest {
 
 	@Test
 	public void loadingFailureShown() throws Exception {
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#failure").tryQuery().isPresent());
+		waitForFx(30, () -> lookup("#failure").tryQuery().isPresent());
 		String text = lookup("#failure").queryAs(Label.class).getText();
 		assertTrue(text, text.startsWith("Can't load schema"));
 		assertTrue(text, text.contains("Broken schema"));

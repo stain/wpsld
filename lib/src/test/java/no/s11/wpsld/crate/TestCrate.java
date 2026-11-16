@@ -31,6 +31,7 @@ import org.junit.Test;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 
 public class TestCrate {
 	private static final JsonNodeFactory JSON = JsonNodeFactory.instance;
@@ -473,6 +474,30 @@ public class TestCrate {
 		assertEquals(Optional.of(literal), root.get("alternateName"));
 		assertEquals(Optional.of(list), root.get("keywords"));
 		assertTrue(crate.flattenNested().isEmpty());
+	}
+
+	/**
+	 * References written as text (a JSON object of an @id alone, in a
+	 * string) made references by Repair Crate; other text, also other JSON,
+	 * left as it is
+	 */
+	@Test
+	public void referencesFromText() {
+		Crate crate = new Crate();
+		Entity root = crate.getRoot();
+		root.setAll("author", List.of(TextNode.valueOf(" {\"@id\": \"https://orcid.org/0000-0002-1825-0097\"} "),
+				JsonNodeFactory.instance.objectNode().put("@id", "#alice")));
+		root.set("description", Optional.of(TextNode.valueOf("{\"@id\": \"#x\", \"name\": \"not only an @id\"}")));
+		root.set("alternateName", Optional.of(TextNode.valueOf("{not JSON}")));
+		root.set("keywords", Optional.of(TextNode.valueOf("{\"@id\": \"\"}")));
+
+		assertEquals(List.of("./: author https://orcid.org/0000-0002-1825-0097"), crate.referencesFromText());
+		assertEquals(List.of("https://orcid.org/0000-0002-1825-0097", "#alice"),
+				root.getAll("author").stream().map(v -> v.get("@id").asText()).toList());
+		assertTrue(root.get("description").orElseThrow().isTextual());
+		assertEquals("{not JSON}", root.get("alternateName").orElseThrow().asText());
+		assertTrue(root.get("keywords").orElseThrow().isTextual());
+		assertTrue(crate.referencesFromText().isEmpty());
 	}
 
 	@Test

@@ -155,12 +155,14 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   `http://schema.org/DefinedTerm`, written by the names the context gives
   them (`Person`) (*done*, `TermRepairs.typeNames`, also `https:` and
   `schema:`).
-- **References written as text**, reported for a ROHub crate: values
-  such as `"{\"@id\": \"https://…\"}"`, a JSON object as a string,
-  rather than the object. Not in the ROHub crate in `debug/` (its only
-  text IRIs are its types, repaired above); find the crate that has
-  them. Repair Crate could turn a string that parses as an object with
-  only `@id` into that reference, and say so.
+- **References written as text** (*done*, `Crate.referencesFromText`),
+  reported for a ROHub crate: values such as `"{\"@id\": \"https://…\"}"`,
+  a JSON object as a string, rather than the object. Not in the ROHub
+  crate in `debug/` (its only text IRIs are its types, repaired above).
+  Repair Crate now makes text that is, as a whole, a JSON object of an
+  `@id` alone the reference it says (first, so that ORCID iDs and the
+  like are then written as usual, and missing entities added), and says
+  so; other text, also other JSON, stays.
 - **Enumeration members written as text**, e.g. `"actionStatus":
   "PotentialActionStatus"`, as references, `{"@id":
   "http://schema.org/PotentialActionStatus"}`, where the property's range
@@ -180,10 +182,11 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   newer versions of the profiles a crate conforms to, e.g. Workflow Run
   Crate 0.5 to 0.6 (which also meets the ComputationalWorkflow change and
   newer RO-Crate). Say what changed, as Repair Crate does.
-- **Entities with the same `@id` in `@graph`**: not allowed in flattened,
-  compacted JSON-LD, but crates do have them by accident. Check what
-  opening one does now; offer to merge them (as renaming to a taken @id
-  does), saying which, or merge on opening with a warning.
+- **Entities with the same `@id` in `@graph`** (*done*): not allowed in
+  flattened, compacted JSON-LD, but crates do have them by accident.
+  Opening one merges them, as JSON-LD flattening does, with a warning
+  ("More than one entity with @id …, merged", `CrateReader`), as the help
+  says (Opening crates written in other ways).
 
 - **Cut, copy and paste of files into a folder, within a crate**: in the
   entity tree, cutting a File with a relative `@id` and pasting it into a
@@ -268,12 +271,14 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   highlight its object in the JSON-LD and scroll to it.
 - **Icons in Add Entity's type chooser**: show each type's icon there too,
   at least in the OS/2 Warp style, if it doesn't get too busy.
-- **Enumerations as drop-downs**: a property whose range is an Enumeration
-  subtype, from schema.org or a profile, should offer its members as if
-  they were entities of the crate, e.g. `actionStatus` (ActionStatusType)
-  offers ActiveActionStatus, CompletedActionStatus, FailedActionStatus and
-  PotentialActionStatus. Other values must still be allowed, as users may
-  extend an enumeration.
+- **Enumerations as drop-downs** (*done* for schema.org's): a property
+  whose range is an Enumeration subtype offers its members as if they were
+  entities of the crate, by their schema.org IRIs, e.g. `actionStatus`
+  (ActionStatusType) offers ActiveActionStatus, CompletedActionStatus,
+  FailedActionStatus and PotentialActionStatus, filtered by name while
+  typing; other values are still allowed, as users may extend an
+  enumeration. Left: a profile's own enumerations (e.g. LDaC's
+  vocabularies), from the profile crate's terms.
 - **Find entities (Edit > Find…, Ctrl+F)**: a dialog to search the
   crate's entities by their values and `@id`s, with tick-boxes for what
   to search (names, other values, `@id`s, nested objects; match case,
@@ -404,6 +409,47 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
     ones too if simple): dataset label, timestamp, variables' names,
     labels and value labels, notes (characteristics).
   - SAS `.sas7bdat`: undocumented, reverse-engineered; later, if asked.
+- **Metadata of CWL workflows and tools** (`.cwl`), as the CWL user
+  guide recommends writing it
+  (https://www.commonwl.org/user_guide/topics/metadata-and-authorship.html):
+  extension fields with prefixes from the document's `$namespaces`
+  (usually `s: https://schema.org/` and `edam: http://edamontology.org/`),
+  else full IRIs; so read by expanding them, not by fixed names. Its
+  examples give `label` (the name) and `doc` (the description);
+  `s:author` and `s:contributor` (`class: s:Person` with `s:identifier`,
+  an ORCID iD, also as `http://orcid.org/…`, `s:email` as `mailto:` and
+  `s:name`); `s:citation` (a DOI, e.g. `https://dx.doi.org/…`);
+  `s:codeRepository`; `s:dateCreated`; `s:license` (an SPDX URL);
+  `s:keywords` (EDAM topics, `edam:topic_0091`); `s:programmingLanguage`;
+  and each input's and output's `label`, `doc` and `format` (EDAM
+  formats, e.g. `edam:format_2572`, BAM).
+  - Into the crate as the Workflow RO-Crate profile has it: the file a
+    `File`, `SoftwareSourceCode` and `ComputationalWorkflow` (for `class:
+    Workflow`; a `CommandLineTool` perhaps `SoftwareApplication`), with
+    `programmingLanguage` the CWL `ComputerLanguage` entity (`#cwl`, its
+    `version` from `cwlVersion`); people as Person entities by their ORCID
+    iDs (written as `ORCID.repair` does, merged with the crate's), the
+    citation by its DOI (as `DOI`), the licence by its SPDX IRI (as
+    `SPDXLicenses`), keywords as EDAM `DefinedTerm`s; inputs and outputs as
+    `FormalParameter`s (`input`/`output`), their formats as
+    `encodingFormat` EDAM IRIs. Offered as Metadata from the File… and
+    Update File Details… offer what files say, never given unasked.
+  - Carry forward the other annotations too, those the guide doesn't
+    prescribe: any field with a `$namespaces` prefix or a full IRI, on the
+    document or an input or output, as a property of its entity by the
+    expanded IRI: a schema.org term by the name the RO-Crate context gives
+    it (`s:funder` as `funder`), others as their absolute IRIs (as RO-Crate
+    allows terms outside its context, ideally with a definition, see
+    "Unknown types and properties"); values as they are, IRIs and CURIEs
+    as references, objects with a `class` as entities of that type.
+    CWL's own fields (`hints`, `requirements`, `inputBinding`…) stay out:
+    they are the workflow, not about it.
+  - Packed workflows (`$graph`, the `#main` one), and JSON as well as
+    YAML. YAML needs a parser `lib` doesn't have: a reader module of its
+    own (as `readers-image`), e.g. with Jackson's YAML (SnakeYAML, about
+    0.4 MB), safely (no aliases' expansion bombs, no types made, a size
+    limit) and with the damaged-input tests, as CWL files come from
+    anywhere. Also for `wpsld-cli`, once it updates file details.
 - **Where a photo was taken, named**: now GPS gives a Place "Where
   photo.jpg was made" with its point (only on purpose). Also:
   - Name it by GeoNames' nearest place to the point (`findNearbyPlaceName`,
@@ -480,12 +526,14 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   check the app image (`podman build`) and its THIRD-PARTY-NOTICES.txt
   (version, and NOTICE or licence changes), and watch for one pulling in
   another's newer version (as Tika 4.2.0 did commonmark 0.31.0 over our
-  0.24.0, now aligned). Newer than ours (13 November 2026): Jackson
-  2.23.0 (2.22.4), commonmark 0.32.0 (0.31.0, but Tika's choice), JUnit
-  4.13.2 (4.13; or JUnit 5); not yet: SLF4J 2.1.0-alpha1, JavaFX 28 (early
-  access). Current: Tika 4.2.0, PDFBox 3.0.8, metadata-extractor 2.22.0,
-  Ikonli 12.4.0, TestFX 4.0.18. Perhaps Dependabot or Renovate to say so,
-  still merged one at a time.
+  0.24.0, now aligned). *Done 16 November 2026*, each with the whole
+  build and the image's modules checked: Jackson 2.23.0 (was 2.22.4),
+  commonmark 0.32.0 (was 0.31.0, Tika's; Tika's strikethrough extension
+  constrained to the same), JUnit 4.13.2 (was 4.13). Not yet: SLF4J
+  2.1.0-alpha1, JavaFX 28 (early access); JUnit 5 some day. Current: Tika
+  4.2.0, PDFBox 3.0.8, metadata-extractor 2.22.0, Ikonli 12.4.0, TestFX
+  4.0.18, JMustache 1.16, picocli 4.7.7. Perhaps
+  Dependabot or Renovate to say so, still merged one at a time.
 
 ## To check on Windows and macOS
 
