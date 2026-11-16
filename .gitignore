@@ -9,6 +9,9 @@ build
 .classpath
 .project
 .vscode
+# IDEs' build output in each module (e.g. ui/bin/, VS Code's Java); not
+# /bin/, which is to be the command-line tools' module (see PLAN.md)
+/*/bin/
 
 # Runtime image exported by podman build --output
 /dist
