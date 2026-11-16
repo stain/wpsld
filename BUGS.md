@@ -532,7 +532,7 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   constrained to the same), JUnit 4.13.2 (was 4.13). Not yet: SLF4J
   2.1.0-alpha1, JavaFX 28 (early access); JUnit 5 some day. Current: Tika
   4.2.0, PDFBox 3.0.8, metadata-extractor 2.22.0, Ikonli 12.4.0, TestFX
-  4.0.18, JMustache 1.16 and picocli 4.7.7 (on their branches). Perhaps
+  4.0.18, JMustache 1.16, picocli 4.7.7. Perhaps
   Dependabot or Renovate to say so, still merged one at a time.
 
 ## To check on Windows and macOS

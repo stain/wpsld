@@ -45,6 +45,7 @@ public class TestCli {
 			"  \"conformsTo\": [{\"@id\": \"https://language-research-technology.github.io/ro-crate-masp/profiles/ro-crate/profile-crate\"},",
 			"   {\"@id\": \"https://example.org/no-such-profile\"}],",
 			"  \"author\": {\"@id\": \"http://orcid.org/0000-0002-1825-0097\"},",
+			"  \"citation\": \"{\\\"@id\\\": \\\"https://doi.org/10.5281/zenodo.1234\\\"}\",",
 			"  \"funder\": {\"@type\": \"Organization\", \"name\": \"A funder\"}},",
 			" {\"@id\": \"http://orcid.org/0000-0002-1825-0097\", \"@type\": \"http://schema.org/Person\", \"name\": \"Josiah Carberry\"}",
 			"]}", "");
@@ -127,6 +128,8 @@ public class TestCli {
 	public void repairInPlaceKeepingLineEnds() throws Exception {
 		assertEquals(0, run("repair", "--dry-run", folder.toString()));
 		assertTrue(out.toString().contains("ORCID iDs:\n• http://orcid.org/0000-0002-1825-0097 is now"));
+		assertTrue(out.toString().contains("References written as text, now references:\n"
+				+ "• ./: citation https://doi.org/10.5281/zenodo.1234"));
 		assertTrue(out.toString().contains("Not written (--dry-run)."));
 		assertEquals(BROKEN, Files.readString(metadata));
 
