@@ -1,0 +1,13 @@
+{{!
+  One value of a property, in ro-crate-preview.html.mustache: a link (to
+  an entity of the crate, a file or the web), an @id of neither, text (in
+  a language, perhaps), a description made from its Markdown, or JSON
+  shown as it is. Each key is there, false where not used, as Mustache
+  looks for a missing one in the enclosing sections. No newline at the
+  end, so that the value stays in its table cell.
+
+  SPDX-License-Identifier: CC0-1.0 (see ro-crate-preview.html.mustache)
+}}
+{{#linkHref}}<a href="{{linkHref}}">{{linkText}}</a>{{/linkHref}}{{#plainId}}<span class="id">{{plainId}}</span>{{/plainId}}{{#literal}}{{literal}}{{#language}} <span class="types">({{language}})</span>{{/language}}{{/literal}}{{#description}}<div class="description">
+{{{description}}}</div>
+{{/description}}{{#json}}<code>{{json}}</code>{{/json}}

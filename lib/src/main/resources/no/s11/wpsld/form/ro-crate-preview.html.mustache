@@ -1,0 +1,89 @@
+{{!
+  The page of wpsld's RO-Crate previews (ro-crate-preview.html), a
+  Mustache template (https://mustache.github.io/mustache.5.html) that
+  CratePreview fills in with JMustache. Standard Mustache only, so that
+  other tools can use it too (e.g. mustache.js, or chevron in Python),
+  with the same data:
+
+  generator, title, style, metadata, metadataFile, rootAnchor
+  descriptions: [HTML of the root's descriptions]
+  groups (the contents): [{heading, entities}]
+  sections (the crate, then each group): [{heading, entities}]
+  entities: [{anchor, label, types: [text], idHref (or false), idText,
+             table (whether it has properties), properties}]
+  properties: [{label, many (whether a list), values}]
+  values: [{linkHref, linkText, plainId, literal, language,
+           description (HTML), json}], each false where not used
+
+  Tags in triple braces insert HTML as it is: the stylesheet, the
+  metadata's JSON-LD (with "</" escaped) and descriptions made from their
+  Markdown; all others are escaped. The value of one property is the
+  partial ro-crate-preview-value.mustache.
+
+  To the extent possible under law, The University of Manchester, UK, has
+  waived all copyright and related or neighbouring rights to this
+  template, so that previews made with it can be distributed with any
+  crate under any terms. This work is published from the United Kingdom.
+  https://creativecommons.org/publicdomain/zero/1.0/
+
+  SPDX-License-Identifier: CC0-1.0
+}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="{{generator}}">
+<title>{{title}}</title>
+<style>
+{{{style}}}</style>
+<script type="application/ld+json">
+{{{metadata}}}
+</script>
+</head>
+<body>
+<header id="top">
+<h1>{{title}}</h1>
+{{#descriptions}}
+<div class="description">
+{{{.}}}</div>
+{{/descriptions}}
+<p>This is an <a href="https://w3id.org/ro/crate">RO-Crate</a>: its metadata is in <a href="{{metadataFile}}">{{metadataFile}}</a>, described below.</p>
+</header>
+<nav>
+<h2>Contents</h2>
+<ul>
+<li><a href="#{{rootAnchor}}">{{title}}</a> (the crate)</li>
+</ul>
+{{#groups}}
+<h3>{{heading}}</h3>
+<ul>
+{{#entities}}
+<li><a href="#{{anchor}}">{{label}}</a></li>
+{{/entities}}
+</ul>
+{{/groups}}
+</nav>
+<main>
+{{#sections}}
+<h2>{{heading}}</h2>
+{{#entities}}
+<section class="entity" id="{{anchor}}">
+<p class="top"><a href="#top">Top</a></p>
+<h3>{{label}}</h3>
+<p class="types">{{#types}}<span>{{.}}</span>{{/types}}</p>
+<p class="id">{{#idHref}}<a href="{{idHref}}">{{idText}}</a>{{/idHref}}{{^idHref}}{{idText}}{{/idHref}}</p>
+{{#table}}
+<table>
+{{#properties}}
+<tr><th>{{label}}</th><td>{{#many}}<ul class="values">{{#values}}<li>{{> ro-crate-preview-value}}</li>{{/values}}</ul>{{/many}}{{^many}}{{#values}}{{> ro-crate-preview-value}}{{/values}}{{/many}}</td></tr>
+{{/properties}}
+</table>
+{{/table}}
+</section>
+{{/entities}}
+{{/sections}}
+</main>
+<footer>Made by {{generator}} from the crate's metadata.</footer>
+</body>
+</html>

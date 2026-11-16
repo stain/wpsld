@@ -19,6 +19,7 @@ package no.s11.wpsld.form;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringReader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -31,6 +32,8 @@ import java.util.TreeMap;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.samskivert.mustache.Mustache;
+import com.samskivert.mustache.Template;
 
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.Entity;
@@ -51,22 +54,33 @@ public final class CratePreview {
 	public static final String FILE = "ro-crate-preview.html";
 
 	/** The page's stylesheet, a resource beside this class, copied into each page */
-	private static final String STYLE = readStyle();
+	private static final String STYLE = stripComment(resource("ro-crate-preview.css"));
+
+	/**
+	 * The page, ro-crate-preview.html.mustache beside this class, with its
+	 * partials there too; escaped as {@link #escape(String)}
+	 */
+	private static final Template PAGE = Mustache.compiler().withEscaper(CratePreview::escape)
+			.withLoader(name -> new StringReader(resource(name + ".mustache")))
+			.compile(resource("ro-crate-preview.html.mustache"));
 
 	private CratePreview() {
 	}
 
-	private static String readStyle() {
-		try (InputStream in = CratePreview.class.getResourceAsStream("ro-crate-preview.css")) {
+	private static String resource(String name) {
+		try (InputStream in = CratePreview.class.getResourceAsStream(name)) {
 			if (in == null) {
-				throw new IllegalStateException("Can't find the preview's stylesheet ro-crate-preview.css");
+				throw new IllegalStateException("Can't find the preview's " + name);
 			}
-			String css = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-			// Not its opening comment, which is about the file, not the page
-			return css.startsWith("/*") ? css.substring(css.indexOf("*/") + 2).stripLeading() : css;
+			return new String(in.readAllBytes(), StandardCharsets.UTF_8);
 		} catch (IOException e) {
-			throw new UncheckedIOException("Can't read the preview's stylesheet", e);
+			throw new UncheckedIOException("Can't read the preview's " + name, e);
 		}
+	}
+
+	/** Not a stylesheet's opening comment, which is about the file, not the page */
+	private static String stripComment(String css) {
+		return css.startsWith("/*") ? css.substring(css.indexOf("*/") + 2).stripLeading() : css;
 	}
 
 	/**
@@ -92,55 +106,37 @@ public final class CratePreview {
 				byType.computeIfAbsent(entity.getTypes().get(0), t -> new ArrayList<>()).add(entity);
 			}
 		}
-		Map<String, List<Entity>> groups = new LinkedHashMap<>();
+		Map<String, List<Entity>> grouped = new LinkedHashMap<>();
 		if (!data.isEmpty()) {
-			groups.put("Files and folders", data);
+			grouped.put("Files and folders", data);
 		}
-		groups.putAll(byType);
+		grouped.putAll(byType);
 
-		StringBuilder html = new StringBuilder();
-		html.append("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n")
-				.append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n")
-				.append("<meta name=\"generator\" content=\"").append(escape(generator)).append("\">\n")
-				.append("<title>").append(escape(root.getLabel())).append("</title>\n")
-				.append("<style>\n").append(STYLE).append("</style>\n");
+		// What the template shows, as maps and lists (see its opening comment)
+		List<Map<String, Object>> groups = new ArrayList<>();
+		grouped.forEach((heading, entities) -> groups.add(Map.of("heading", heading, "entities",
+				entities.stream().map(e -> entity(crate, e, anchors, byId, label)).toList())));
+		List<Map<String, Object>> sections = new ArrayList<>();
+		sections.add(Map.of("heading", "The crate", "entities", List.of(entity(crate, root, anchors, byId, label))));
+		sections.addAll(groups);
+		Map<String, Object> page = new HashMap<>();
+		page.put("generator", generator);
+		page.put("title", root.getLabel());
+		page.put("style", STYLE);
 		// The metadata itself, as the RO-Crate specification asks of previews;
 		// </ escaped (as JSON allows) so that it can't end the script
 		try {
-			html.append("<script type=\"application/ld+json\">\n")
-					.append(Crate.WRITER.writeValueAsString(crate.toJson()).replace("</", "<\\/"))
-					.append("\n</script>\n");
+			page.put("metadata", Crate.WRITER.writeValueAsString(crate.toJson()).replace("</", "<\\/"));
 		} catch (JsonProcessingException e) {
 			throw new UncheckedIOException(e);
 		}
-		html.append("</head>\n<body>\n");
-		html.append("<header id=\"top\">\n<h1>").append(escape(root.getLabel())).append("</h1>\n");
-		root.getAll("description").stream().filter(JsonNode::isValueNode).forEach(d -> description(html, d.asText()));
-		html.append("<p>This is an <a href=\"https://w3id.org/ro/crate\">RO-Crate</a>: its metadata is in "
-				+ "<a href=\"" + Crate.RO_CRATE_METADATA_JSON + "\">" + Crate.RO_CRATE_METADATA_JSON
-				+ "</a>, described below.</p>\n</header>\n");
-
-		// Contents
-		html.append("<nav>\n<h2>Contents</h2>\n<ul>\n<li><a href=\"#").append(anchors.get(root)).append("\">")
-				.append(escape(root.getLabel())).append("</a> (the crate)</li>\n</ul>\n");
-		groups.forEach((group, entities) -> {
-			html.append("<h3>").append(escape(group)).append("</h3>\n<ul>\n");
-			entities.forEach(e -> html.append("<li><a href=\"#").append(anchors.get(e)).append("\">")
-					.append(escape(e.getLabel())).append("</a></li>\n"));
-			html.append("</ul>\n");
-		});
-		html.append("</nav>\n<main>\n");
-
-		// The crate itself, then each group
-		html.append("<h2>The crate</h2>\n");
-		entity(html, crate, root, anchors, byId, label);
-		groups.forEach((group, entities) -> {
-			html.append("<h2>").append(escape(group)).append("</h2>\n");
-			entities.forEach(e -> entity(html, crate, e, anchors, byId, label));
-		});
-		html.append("</main>\n<footer>Made by ").append(escape(generator))
-				.append(" from the crate's metadata.</footer>\n</body>\n</html>\n");
-		return html.toString();
+		page.put("metadataFile", Crate.RO_CRATE_METADATA_JSON);
+		page.put("rootAnchor", anchors.get(root));
+		page.put("descriptions", root.getAll("description").stream().filter(JsonNode::isValueNode)
+				.map(d -> Markdown.toHtml(d.asText())).toList());
+		page.put("groups", groups);
+		page.put("sections", sections);
+		return PAGE.execute(page);
 	}
 
 	/** Whether a page is a preview wpsld made, by its generator */
@@ -148,22 +144,16 @@ public final class CratePreview {
 		return html.contains("<meta name=\"generator\" content=\"" + GENERATOR);
 	}
 
-	private static void entity(StringBuilder html, Crate crate, Entity entity, Map<Entity, String> anchors,
+	private static Map<String, Object> entity(Crate crate, Entity entity, Map<Entity, String> anchors,
 			Map<String, Entity> byId, java.util.function.Function<String, String> label) {
-		html.append("<section class=\"entity\" id=\"").append(anchors.get(entity)).append("\">\n")
-				.append("<p class=\"top\"><a href=\"#top\">Top</a></p>\n<h3>")
-				.append(escape(entity.getLabel())).append("</h3>\n<p class=\"types\">");
-		entity.getTypes().forEach(t -> html.append("<span>").append(escape(t)).append("</span>"));
-		html.append("</p>\n<p class=\"id\">");
+		Map<String, Object> shown = new HashMap<>();
+		shown.put("anchor", anchors.get(entity));
+		shown.put("label", entity.getLabel());
+		shown.put("types", entity.getTypes());
 		String id = entity.getId();
+		shown.put("idText", id);
 		// Files and folders by their paths, wherever they are linked from
-		if (isWeb(crate.expandId(id)) || isRelative(id)) {
-			html.append("<a href=\"").append(escape(isRelative(id) ? id : crate.expandId(id))).append("\">")
-					.append(escape(id)).append("</a>");
-		} else {
-			html.append(escape(id));
-		}
-		html.append("</p>\n");
+		shown.put("idHref", isRelative(id) ? id : isWeb(crate.expandId(id)) ? crate.expandId(id) : false);
 		Map<String, List<JsonNode>> values = new LinkedHashMap<>();
 		entity.getValues().keySet().forEach(p -> values.put(p, entity.getAll(p)));
 		values.remove("name");
@@ -171,64 +161,50 @@ public final class CratePreview {
 			// In the header
 			values.remove("description");
 		}
-		if (!values.isEmpty()) {
-			html.append("<table>\n");
-			values.forEach((property, list) -> {
-				html.append("<tr><th>").append(escape(label.apply(property))).append("</th><td>");
-				if (list.size() == 1) {
-					value(html, crate, property, list.get(0), anchors, byId);
-				} else {
-					html.append("<ul class=\"values\">");
-					list.forEach(v -> {
-						html.append("<li>");
-						value(html, crate, property, v, anchors, byId);
-						html.append("</li>");
-					});
-					html.append("</ul>");
-				}
-				html.append("</td></tr>\n");
-			});
-			html.append("</table>\n");
-		}
-		html.append("</section>\n");
+		List<Map<String, Object>> properties = new ArrayList<>();
+		values.forEach((property, list) -> properties.add(Map.of("label", label.apply(property), "many",
+				list.size() > 1, "values", list.stream().map(v -> value(crate, property, v, anchors, byId)).toList())));
+		shown.put("table", !properties.isEmpty());
+		shown.put("properties", properties);
+		return shown;
 	}
 
-	private static void value(StringBuilder html, Crate crate, String property, JsonNode value, Map<Entity, String> anchors,
-			Map<String, Entity> byId) {
+	/** One value, each of the template's keys there, false where not used */
+	private static Map<String, Object> value(Crate crate, String property, JsonNode value,
+			Map<Entity, String> anchors, Map<String, Entity> byId) {
+		Map<String, Object> shown = new HashMap<>(Map.of("linkHref", false, "linkText", false, "plainId", false,
+				"literal", false, "language", false, "description", false, "json", false));
 		if (value.isObject() && value.path("@id").isTextual()) {
 			String id = value.get("@id").asText();
 			Entity linked = byId.get(id);
 			if (linked != null) {
-				html.append("<a href=\"#").append(anchors.get(linked)).append("\">").append(escape(linked.getLabel()))
-						.append("</a>");
+				shown.put("linkHref", "#" + anchors.get(linked));
+				shown.put("linkText", linked.getLabel());
 			} else if (isWeb(crate.expandId(id))) {
-				html.append("<a href=\"").append(escape(crate.expandId(id))).append("\">").append(escape(id))
-						.append("</a>");
+				shown.put("linkHref", crate.expandId(id));
+				shown.put("linkText", id);
 			} else {
-				html.append("<span class=\"id\">").append(escape(id)).append("</span>");
+				shown.put("plainId", id);
 			}
 		} else if (value.isObject() && value.has("@value")) {
-			html.append(escape(value.get("@value").asText()));
+			shown.put("literal", value.get("@value").asText());
 			if (value.path("@language").isTextual()) {
-				html.append(" <span class=\"types\">(").append(escape(value.get("@language").asText())).append(")</span>");
+				shown.put("language", value.get("@language").asText());
 			}
 		} else if (value.isValueNode()) {
 			String text = value.asText();
 			if (property.equals("description")) {
-				description(html, text);
+				shown.put("description", Markdown.toHtml(text));
 			} else if (isWeb(text)) {
-				html.append("<a href=\"").append(escape(text)).append("\">").append(escape(text)).append("</a>");
+				shown.put("linkHref", text);
+				shown.put("linkText", text);
 			} else {
-				html.append(escape(text));
+				shown.put("literal", text);
 			}
 		} else {
-			html.append("<code>").append(escape(value.toString())).append("</code>");
+			shown.put("json", value.toString());
 		}
-	}
-
-	/** A description: as Markdown if it looks like it, else paragraphs with their line breaks */
-	private static void description(StringBuilder html, String text) {
-		html.append("<div class=\"description\">\n").append(Markdown.toHtml(text)).append("</div>\n");
+		return shown;
 	}
 
 	private static boolean isWeb(String text) {

@@ -29,7 +29,7 @@ See also [MASP.md](MASP.md) for profile-aware editing with RO-Crate MASP.
 
 | Module | Contents |
 |--------|----------|
-| `lib` (`no.s11.wpsld`), **free of JavaFX** | schema model (`soss`: `SchemaFromJsonLd`, `ClassDef`, `PropertyDef`), form fields (`form`: `FormFields`, `SchemaOrgFormFields`), crate model (`crate`: `Crate`, `Entity`, `Places`), lookups of identifiers (`lookup`: `GeoNames`, `ORCID`, `ROR`, `DOI`, `SPDXLicenses`, `PRONOMFormats`; depends on `crate`, never the reverse), xattr metadata (`impl.WrittenMetadata`), arcp file system (`arcp`). Only dependency: Jackson. |
+| `lib` (`no.s11.wpsld`), **free of JavaFX** | schema model (`soss`: `SchemaFromJsonLd`, `ClassDef`, `PropertyDef`), form fields (`form`: `FormFields`, `SchemaOrgFormFields`), crate model (`crate`: `Crate`, `Entity`, `Places`), lookups of identifiers (`lookup`: `GeoNames`, `ORCID`, `ROR`, `DOI`, `SPDXLicenses`, `PRONOMFormats`; depends on `crate`, never the reverse), xattr metadata (`impl.WrittenMetadata`), arcp file system (`arcp`). Dependencies: Jackson, Apache Tika (core), commonmark-java and JMustache. |
 | `ui` (`no.s11.wpsld.ui`) | JavaFX 27: `CrateEditor` (main window: entities, editor, JSON-LD preview) and `EntityEditor` (type tree and form for one entity). |
 
 Builds: Java 25, Gradle 9.8; `./gradlew build` in the conda env
@@ -1434,20 +1434,42 @@ as their `@id`s, which in a detached crate are absolute. The same
 `CratePreview`, the same check for another tool's preview where the file
 is there already, and not described in the crate, which does not hold it.
 
-*To consider*: writing the page with a very lightweight template rather
-than `CratePreview`'s `StringBuilder` of HTML, so that the page's markup
-can be read and changed as HTML, as its stylesheet now is
-(`ro-crate-preview.css`, a resource in `lib` copied into each page). The
-JDK has no template engine of its own: String Templates (JEP 430/459)
-were withdrawn in JDK 23, and XSLT (in `java.xml`, which `lib` already
-requires) would mean the crate as XML first. Small ones to compare, for
-size, dependencies, escaping by default, and working in `lib`'s named
-module and a jlink image: JMustache (one small jar, no dependencies,
-logic-less), Mustache.java, jte (templates compiled to Java at build
-time, typed), and Pebble or Jinjava (larger; Jinjava would also run
-ro-crate-py's Jinja preview template). Whichever is chosen, the same
-template should serve File > Save RO-Crate Preview… and a command-line
-preview writer (see Command-line tools).
+*Done (November 2026)*: the page is a Mustache template,
+`ro-crate-preview.html.mustache` with the partial
+`ro-crate-preview-value.mustache` for one value (beside
+`ro-crate-preview.css` in `lib`'s resources, all three CC0 1.0, as they
+make every preview), filled in by `CratePreview` with
+[JMustache](https://github.com/samskivert/jmustache) from plain maps and
+lists, so that its markup can be read and changed as HTML. The pages are
+byte for byte as before (checked on nine crates). Standard Mustache only
+(none of JMustache's `-first`, `-index` and the like), so that other tools
+could fill in the same template (mustache.js, chevron in Python); every
+key of a value is given, false where not used, as Mustache looks for a
+missing one in the enclosing sections. `CratePreview` still works out
+what to show (anchors, groups, links, Markdown), as a logic-less template
+can't. Chosen over the others, in November 2026:
+- *The JDK*: no template engine of its own; String Templates (JEP
+  430/459) were withdrawn in JDK 23, and XSLT (`java.xml`) would mean the
+  crate as XML first.
+- *JMustache 1.16* (chosen): one 79 KB jar, no dependencies, a Java
+  module of its own (`com.samskivert.jmustache`), BSD 3-Clause. Stable
+  (1.x since 2010, 1.16 from November 2023, releases years apart, but
+  maintained: fixes merged in 2026, not yet released); Spring Boot's
+  Mustache support uses it. Escaping is CratePreview's own, as before
+  (`withEscaper`).
+- *Jinjava 2.8.5* (HubSpot's Jinja, Apache 2.0): Jinja is better known in
+  the RO-Crate community (ro-crate-py's preview), but 28 jars, 9.8 MB
+  with its dependencies (Guava, javassist, commons-lang3, commons-net,
+  SnakeYAML, …), about 7.5 MB more than `lib` has, and an older Jackson.
+  Its Jinja is HubSpot's dialect, so ro-crate-py's template may not run
+  as it is. If Jinja templates are wanted, as an optional module outside
+  `lib` (as the `readers-*` are), e.g. for the command-line tools.
+- Not compared further: Mustache.java (larger), jte (typed templates
+  compiled at build time, a Gradle plugin), Pebble.
+- Next: File > Save RO-Crate Preview… and a command-line preview writer
+  (see Command-line tools) with the same template; perhaps a template of
+  the user's own (a preference), as Mustache's logic-less templates can't
+  do harm beyond the page they make.
 
 The Preview tab renders
 Markdown descriptions too, by the same heuristics, as JavaFX nodes
