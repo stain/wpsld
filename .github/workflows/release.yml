@@ -131,11 +131,13 @@ jobs:
         with:
           ref: ${{ needs.tag.outputs.tag || github.ref }}
 
+      # No cache of Gradle's downloads: what is released is built from the
+      # dependencies as their repositories have them, not from what another
+      # run left behind
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '25'
-          cache: gradle
 
       # The version committed in gradle.properties (see scripts/release.sh);
       # a tag must name the same, so that a build of the tagged commit
