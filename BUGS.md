@@ -271,12 +271,14 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   highlight its object in the JSON-LD and scroll to it.
 - **Icons in Add Entity's type chooser**: show each type's icon there too,
   at least in the OS/2 Warp style, if it doesn't get too busy.
-- **Enumerations as drop-downs**: a property whose range is an Enumeration
-  subtype, from schema.org or a profile, should offer its members as if
-  they were entities of the crate, e.g. `actionStatus` (ActionStatusType)
-  offers ActiveActionStatus, CompletedActionStatus, FailedActionStatus and
-  PotentialActionStatus. Other values must still be allowed, as users may
-  extend an enumeration.
+- **Enumerations as drop-downs** (*done* for schema.org's): a property
+  whose range is an Enumeration subtype offers its members as if they were
+  entities of the crate, by their schema.org IRIs, e.g. `actionStatus`
+  (ActionStatusType) offers ActiveActionStatus, CompletedActionStatus,
+  FailedActionStatus and PotentialActionStatus, filtered by name while
+  typing; other values are still allowed, as users may extend an
+  enumeration. Left: a profile's own enumerations (e.g. LDaC's
+  vocabularies), from the profile crate's terms.
 - **Find entities (Edit > Find…, Ctrl+F)**: a dialog to search the
   crate's entities by their values and `@id`s, with tick-boxes for what
   to search (names, other values, `@id`s, nested objects; match case,

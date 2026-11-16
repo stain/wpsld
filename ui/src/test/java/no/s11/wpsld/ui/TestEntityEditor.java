@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.junit.Test;
+import org.testfx.util.WaitForAsyncUtils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -227,6 +228,29 @@ public class TestEntityEditor extends UiTest {
 		// Typing filters by @id and name
 		clickOn(distribution.getEditor()).write("zzz");
 		assertTrue(distribution.getItems().isEmpty());
+	}
+
+	/**
+	 * A property whose range is an Enumeration offers its members as if they
+	 * were entities of the crate, by their schema.org IRIs, filtered by name
+	 * while typing; chosen, a reference to it; other text still allowed
+	 */
+	@Test
+	public void enumerationMembersOffered() {
+		Entity run = crate.add("CreateAction");
+		edit(run);
+		clickOn("#propertySearch").write("actionStatus");
+		ComboBox<?> status = lookup("#value-actionStatus-0").queryAs(ComboBox.class);
+		interact(status::show);
+		assertEquals(List.of("http://schema.org/ActiveActionStatus", "http://schema.org/CompletedActionStatus",
+				"http://schema.org/FailedActionStatus", "http://schema.org/PotentialActionStatus"),
+				status.getItems().stream().map(Object::toString).sorted().toList());
+		interact(status::hide);
+		clickOn(status.getEditor()).write("complet");
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals(List.of("http://schema.org/CompletedActionStatus"), List.copyOf(status.getItems()));
+		interact(() -> status.getEditor().setText("http://schema.org/CompletedActionStatus"));
+		assertEquals(List.of(ref("http://schema.org/CompletedActionStatus")), run.getAll("actionStatus"));
 	}
 
 	@Test

@@ -1950,13 +1950,19 @@ public class EntityEditor extends ScrollPane {
 
 		/**
 		 * An editable drop-down of the crate's entities fitting the field's
-		 * range (like Crate-O), filtered by @id and name while typing.
+		 * range (like Crate-O), and the members of the schema.org
+		 * Enumerations in its range (e.g. actionStatus's
+		 * CompletedActionStatus), as if they were entities of the crate;
+		 * filtered by @id and name while typing. Other values may still be
+		 * typed, as an enumeration may be extended.
 		 */
 		private ComboBox<String> referenceCombo(FormField field, String rangeNames, String current) {
 			// The entities it may link to, by @id: only once opened or typed
 			// in, as a crate may have thousands, and a combo box lays out a
 			// cell for each item to size itself
 			Map<String, Entity> candidates = new LinkedHashMap<>();
+			// The Enumerations' members, by their IRIs, with the Enumeration's name
+			Map<String, String> members = new LinkedHashMap<>();
 			ObservableList<String> ids = FXCollections.observableArrayList();
 			Runnable offer = () -> {
 				if (!candidates.isEmpty() || !ids.isEmpty()) {
@@ -1966,8 +1972,15 @@ public class EntityEditor extends ScrollPane {
 				crateEntities.get().stream().filter(e -> e != entity)
 						.filter(e -> entityRange.stream().anyMatch(range -> entityTypes.isA(e.getTypes(), range)))
 						.forEach(e -> candidates.put(e.getId(), e));
+				entityRange.stream().filter(schema::isEnumeration).forEach(range -> schema.members(range).stream()
+						.map(URI::toString).filter(m -> !candidates.containsKey(m))
+						.forEach(m -> members.putIfAbsent(m, terms.name(range))));
 				ids.setAll(candidates.keySet());
+				ids.addAll(members.keySet());
 			};
+			// An entity's name, or a member's (the end of its IRI)
+			Function<String, String> label = id -> candidates.containsKey(id) ? candidates.get(id).getLabel()
+					: id.substring(id.lastIndexOf('/') + 1);
 			FilteredList<String> suggestions = new FilteredList<>(ids);
 			ComboBox<String> combo = new ComboBox<>(suggestions);
 			combo.setOnShowing(e -> offer.run());
@@ -1980,9 +1993,12 @@ public class EntityEditor extends ScrollPane {
 				protected void updateItem(String id, boolean empty) {
 					super.updateItem(id, empty);
 					Entity e = empty || id == null ? null : candidates.get(id);
-					setText(e == null ? id
-							: (e.getLabel().equals(id) ? id : e.getLabel() + "  " + id) + "  ("
-									+ String.join(", ", e.getTypes()) + ")");
+					String member = empty || id == null ? null : members.get(id);
+					setText(e != null
+							? (e.getLabel().equals(id) ? id : e.getLabel() + "  " + id) + "  ("
+									+ String.join(", ", e.getTypes()) + ")"
+							: member != null ? label.apply(id) + "  " + id + "  (" + member + ")"
+							: id);
 				}
 			});
 			combo.getEditor().setText(current);
@@ -1997,7 +2013,7 @@ public class EntityEditor extends ScrollPane {
 				Platform.runLater(() -> {
 					offer.run();
 					suggestions.setPredicate(id -> query.isEmpty() || id.toLowerCase(Locale.ROOT).contains(query)
-							|| candidates.get(id).getLabel().toLowerCase(Locale.ROOT).contains(query));
+							|| label.apply(id).toLowerCase(Locale.ROOT).contains(query));
 					if (suggestions.isEmpty()) {
 						combo.hide();
 					} else if (!combo.isShowing()) {
