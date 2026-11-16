@@ -18,6 +18,11 @@ styles](views.md)), to add with **Crate > Add File(s) to Has Part**, or **Add
 Dataset for Folder** for a folder, also several at once. Opening a
 crate's `ro-crate-metadata.json` with **File > Open...** works the same.
 
+Selecting a greyed-out file or folder shows no form, as the crate doesn't
+describe it yet, but says so, with a button to add it: **Add File(s) to
+Has Part**, or **Add Dataset for Folder**. Adding many at once, e.g.
+thousands of files, shows the busy pointer while they are added.
+
 ## Attached and detached crates
 
 A crate whose metadata file is named `ro-crate-metadata.json` (or

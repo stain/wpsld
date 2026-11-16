@@ -53,7 +53,8 @@ other entities by type, name and `@id`. An entity moves to its place in
 the list when you leave the field you are typing its name in. To see only
 entities of one type, choose it above the list: CreativeWork, for example,
 also shows Datasets and Files. Adding an entity of another type lists all
-types again.
+types again. Names too long for the list end in "…": drag the edge
+between the list and the form to widen it.
 
 Choose **View > Entities by Folder** to see them as a tree instead, as a
 file manager shows files:
