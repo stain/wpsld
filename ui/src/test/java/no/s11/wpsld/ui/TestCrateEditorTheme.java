@@ -93,7 +93,7 @@ public class TestCrateEditorTheme extends UiTest {
 	}
 
 	private void editorShown() throws Exception {
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		waitForFx(30, () -> lookup("#addEntity").tryQuery().isPresent());
 	}
 
 	@Test
@@ -159,7 +159,7 @@ public class TestCrateEditorTheme extends UiTest {
 		clickOn("#addEntity");
 		clickOn("#typeSearch").write("person").type(javafx.scene.input.KeyCode.ENTER);
 		javafx.scene.control.ListView<?> list = lookup("#entities").queryListView();
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> list.getItems().size() == 2);
+		waitForFx(10, () -> list.getItems().size() == 2);
 		interact(() -> list.getSelectionModel().clearAndSelect(1));
 		WaitForAsyncUtils.waitForFxEvents();
 		List<javafx.scene.control.ListCell<?>> cells = from(list).lookup(".list-cell").queryAll().stream()

@@ -44,7 +44,7 @@ public class TestCrateEditorClose extends UiTest {
 
 	@Test
 	public void closeAsksToSaveChanges() throws Exception {
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		waitForFx(30, () -> lookup("#addEntity").tryQuery().isPresent());
 		clickOn("#addEntity");
 		clickOn("#typeSearch").write("person").type(KeyCode.ENTER);
 

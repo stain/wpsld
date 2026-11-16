@@ -62,12 +62,12 @@ public class TestCrateEditorPreview extends UiTest {
 
 	private ListView<Entity> entities() {
 		try {
-			WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#entities").tryQuery().isPresent()
+			waitForFx(30, () -> lookup("#entities").tryQuery().isPresent()
 					&& lookup("#save").tryQuery().isPresent());
 		} catch (Exception e) {
 			throw new AssertionError("Editor did not appear", e);
 		}
-		return lookup("#entities").queryListView();
+		return onFx(() -> lookup("#entities").queryListView());
 	}
 
 	/** The entity of an @id, as listed */

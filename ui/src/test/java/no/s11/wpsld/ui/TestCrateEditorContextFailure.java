@@ -44,7 +44,7 @@ public class TestCrateEditorContextFailure extends UiTest {
 
 	@Test
 	public void contextFailureShown() throws Exception {
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#failure").tryQuery().isPresent());
+		waitForFx(30, () -> lookup("#failure").tryQuery().isPresent());
 		String text = lookup("#failure").queryAs(Label.class).getText();
 		assertTrue(text, text.startsWith("Can't load the RO-Crate context"));
 		assertTrue(text, text.contains("Broken context"));

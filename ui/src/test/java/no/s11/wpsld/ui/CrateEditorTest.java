@@ -60,12 +60,12 @@ public abstract class CrateEditorTest extends UiTest {
 		try {
 			// The schema loads in the background; the toolbar's buttons appear
 			// once it is laid out
-			WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#entities").tryQuery().isPresent()
+			waitForFx(30, () -> lookup("#entities").tryQuery().isPresent()
 					&& lookup("#save").tryQuery().isPresent());
 		} catch (Exception e) {
 			throw new AssertionError("Editor did not appear", e);
 		}
-		return lookup("#entities").queryListView();
+		return onFx(() -> lookup("#entities").queryListView());
 	}
 
 	protected void addEntity(String type) {
@@ -159,7 +159,7 @@ public abstract class CrateEditorTest extends UiTest {
 	/** Wait for the preview to show this name, as it is made again once typing pauses */
 	protected void waitForPreview(String name) {
 		try {
-			WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> lookup("#previewName").tryQuery()
+			waitForFx(5, () -> lookup("#previewName").tryQuery()
 					.map(n -> ((Label) n).getText().equals(name)).orElse(false));
 		} catch (java.util.concurrent.TimeoutException e) {
 			throw new AssertionError("Preview not showing " + name, e);

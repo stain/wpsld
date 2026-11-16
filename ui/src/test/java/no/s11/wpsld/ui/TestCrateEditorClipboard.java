@@ -35,6 +35,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import javafx.scene.Node;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.Clipboard;
+import javafx.scene.control.ListView;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.DialogPane;
@@ -172,7 +173,8 @@ public class TestCrateEditorClipboard extends CrateEditorTest {
 			busy[0] = scene.getCursor();
 		});
 		assertEquals(javafx.scene.Cursor.WAIT, busy[0]);
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> entities().getItems().size() > before);
+		ListView<Entity> list = entities();
+		waitForFx(10, () -> list.getItems().size() > before);
 		WaitForAsyncUtils.waitForFxEvents();
 		assertEquals(before + CrateEditor.QUICK + 1, entities().getItems().size());
 		assertNotEquals(javafx.scene.Cursor.WAIT, scene.getCursor());

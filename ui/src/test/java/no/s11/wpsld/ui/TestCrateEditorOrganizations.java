@@ -82,12 +82,12 @@ public class TestCrateEditorOrganizations extends UiTest {
 
 	private ListView<Entity> entities() {
 		try {
-			WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#entities").tryQuery().isPresent()
+			waitForFx(30, () -> lookup("#entities").tryQuery().isPresent()
 					&& lookup("#save").tryQuery().isPresent());
 		} catch (Exception e) {
 			throw new AssertionError("Editor did not appear", e);
 		}
-		return lookup("#entities").queryListView();
+		return onFx(() -> lookup("#entities").queryListView());
 	}
 
 	private Optional<Entity> entity(String id) {
@@ -95,7 +95,7 @@ public class TestCrateEditorOrganizations extends UiTest {
 	}
 
 	private void waitForResults() throws Exception {
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#organizationResults").tryQuery().isPresent()
+		waitForFx(10, () -> lookup("#organizationResults").tryQuery().isPresent()
 				&& !lookup("#organizationResults").queryListView().getItems().isEmpty());
 	}
 
@@ -105,7 +105,7 @@ public class TestCrateEditorOrganizations extends UiTest {
 		// Shown and waited for, so not inside interact()
 		Platform.runLater(() -> create.getItems().stream().filter(i -> ("newRor-" + field).equals(i.getId()))
 				.findFirst().orElseThrow().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#organizationQuery").tryQuery().isPresent());
+		waitForFx(10, () -> lookup("#organizationQuery").tryQuery().isPresent());
 	}
 
 	/**
@@ -182,7 +182,7 @@ public class TestCrateEditorOrganizations extends UiTest {
 		for (int i = 0; i < 2; i++) {
 			// Shown and waited for, so not inside interact()
 			Platform.runLater(insert::fire);
-			WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
+			waitForFx(10,
 					() -> lookup("#organizationQuery").tryQuery().isPresent());
 			interact(() -> lookup("#organizationQuery").queryAs(TextField.class).setText("Oslo"));
 			interact(() -> lookup("#organizationSearch").queryButton().fire());
@@ -206,7 +206,7 @@ public class TestCrateEditorOrganizations extends UiTest {
 	public void insertEntity() throws Exception {
 		int before = entities().getItems().size();
 		interact(insertItem("menuInsertEntity")::fire);
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#typeSearch").tryQuery().isPresent());
+		waitForFx(10, () -> lookup("#typeSearch").tryQuery().isPresent());
 		clickOn("#typeSearch").write("Organization").type(KeyCode.ENTER);
 		assertEquals(before + 1, entities().getItems().size());
 		assertEquals(List.of("Organization"), entities().getSelectionModel().getSelectedItem().getTypes());
@@ -219,7 +219,7 @@ public class TestCrateEditorOrganizations extends UiTest {
 		openFromNewMenu("publisher");
 		interact(() -> lookup("#organizationQuery").queryAs(TextField.class).setText("offline"));
 		interact(() -> lookup("#organizationSearch").queryButton().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
+		waitForFx(10,
 				() -> lookup("#organizationStatus").queryAs(Label.class).getText().startsWith("Can't search ROR"));
 		assertTrue(lookup("#organizationStatus").queryAs(Label.class).getText()
 				.endsWith("You can still type the ROR identifier as the organisation's @id."));

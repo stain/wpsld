@@ -402,7 +402,7 @@ public class TestCrateEditor extends CrateEditorTest {
 		assertTrue(tab.getText(), tab.getText().contains("\"@id\" : \"" + person.getId() + "\""));
 		assertFalse(tab.getText(), tab.getText().contains("ro-crate-metadata.json"));
 		clickOn(lookup("#header-name").queryAs(TextField.class)).write("Alice");
-		WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> tab.getText().contains("Alice"));
+		waitForFx(5, () -> tab.getText().contains("Alice"));
 		interact(() -> entities().getSelectionModel().clearAndSelect(0));
 		assertTrue(tab.getText(), tab.getText().contains("\"@id\" : \"./\""));
 		assertFalse(tab.getText(), tab.getText().contains("Alice"));
@@ -623,7 +623,7 @@ public class TestCrateEditor extends CrateEditorTest {
 		clickOn(lookup("#value-license-0").queryAs(ComboBox.class).getEditor())
 				.write("http://spdx.org/licenses/CC0-1.0");
 		try {
-			WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> lookup("#previewProperties").tryQuery().isPresent()
+			waitForFx(5, () -> lookup("#previewProperties").tryQuery().isPresent()
 					&& from(lookup("#previewProperties").queryAs(Node.class)).lookup(".hyperlink")
 							.queryAllAs(Hyperlink.class).stream()
 							.anyMatch(l -> l.getText().equals("http://spdx.org/licenses/CC0-1.0")));

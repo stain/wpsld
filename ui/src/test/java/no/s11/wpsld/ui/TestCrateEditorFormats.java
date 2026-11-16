@@ -62,12 +62,12 @@ public class TestCrateEditorFormats extends UiTest {
 
 	private ListView<Entity> entities() {
 		try {
-			WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#entities").tryQuery().isPresent()
+			waitForFx(30, () -> lookup("#entities").tryQuery().isPresent()
 					&& lookup("#save").tryQuery().isPresent());
 		} catch (Exception e) {
 			throw new AssertionError("Editor did not appear", e);
 		}
-		return lookup("#entities").queryListView();
+		return onFx(() -> lookup("#entities").queryListView());
 	}
 
 	private Optional<Entity> entity(String id) {
@@ -96,7 +96,7 @@ public class TestCrateEditorFormats extends UiTest {
 		// Shown and waited for, so not inside interact()
 		Platform.runLater(() -> create.getItems().stream().filter(i -> "newPronom-encodingFormat".equals(i.getId()))
 				.findFirst().orElseThrow().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#formatQuery").tryQuery().isPresent());
+		waitForFx(10, () -> lookup("#formatQuery").tryQuery().isPresent());
 		return lookup("#formatQuery").queryAs(TextField.class).getText();
 	}
 

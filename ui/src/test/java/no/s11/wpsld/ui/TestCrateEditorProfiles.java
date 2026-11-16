@@ -110,7 +110,7 @@ public class TestCrateEditorProfiles extends UiTest {
 
 	private ComboBox<FormFields> profiles() {
 		try {
-			WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#loadProfile").tryQuery().isPresent());
+			waitForFx(30, () -> lookup("#loadProfile").tryQuery().isPresent());
 		} catch (Exception e) {
 			throw new AssertionError("Editor did not appear", e);
 		}
@@ -174,7 +174,7 @@ public class TestCrateEditorProfiles extends UiTest {
 		clickOn("Close");
 		clickOn("#profileLocation").write(file.toString());
 		clickOn("Load");
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> profiles.getItems().size() == 3);
+		waitForFx(10, () -> profiles.getItems().size() == 3);
 		WaitForAsyncUtils.waitForFxEvents();
 		assertEquals("Dialog Profile 0.1.0", profiles.getValue().getName());
 	}
@@ -201,10 +201,10 @@ public class TestCrateEditorProfiles extends UiTest {
 	public void loadFromRegistry() throws Exception {
 		ComboBox<FormFields> profiles = profiles();
 		clickOn("#loadProfile");
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
+		waitForFx(10,
 				() -> !lookup("#registryProfiles").queryListView().getItems().isEmpty());
 		doubleClickOn("Registered Profile 0.1.0 \u2014 Test registry");
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> profiles.getItems().size() == 3);
+		waitForFx(10, () -> profiles.getItems().size() == 3);
 		WaitForAsyncUtils.waitForFxEvents();
 		assertEquals("Registered Profile 0.1.0", profiles.getValue().getName());
 	}

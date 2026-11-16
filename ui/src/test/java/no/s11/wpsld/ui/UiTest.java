@@ -18,7 +18,10 @@
 package no.s11.wpsld.ui;
 
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.junit.After;
@@ -28,6 +31,7 @@ import org.junit.rules.Timeout;
 import org.junit.runners.model.Statement;
 import org.junit.runners.model.TestTimedOutException;
 import org.testfx.framework.junit.ApplicationTest;
+import org.testfx.util.WaitForAsyncUtils;
 
 import javafx.application.Platform;
 import javafx.scene.control.DialogPane;
@@ -80,6 +84,28 @@ public abstract class UiTest extends ApplicationTest {
 				.map(d -> "“" + d.getHeaderText() + "”" + (d.getContentText() == null ? "" : ": " + d.getContentText()))
 				.toList();
 		return dialogs.isEmpty() ? "" : ", with a dialog open (unanswered?): " + String.join("; ", dialogs);
+	}
+
+	/**
+	 * Wait until a condition holds, checked on the JavaFX thread each time:
+	 * a condition looking nodes up from the test thread may walk the scene
+	 * graph while the JavaFX thread changes it, and fail with e.g.
+	 * IndexOutOfBoundsException in Parent.lookupAll (seen in CI)
+	 */
+	protected static void waitForFx(long seconds, Callable<Boolean> condition) throws TimeoutException {
+		WaitForAsyncUtils.waitFor(seconds, TimeUnit.SECONDS, () -> WaitForAsyncUtils.asyncFx(condition).get());
+	}
+
+	/** A value read on the JavaFX thread, as the scene may change meanwhile (see {@link #waitForFx}) */
+	protected static <T> T onFx(Callable<T> read) {
+		try {
+			return WaitForAsyncUtils.asyncFx(read).get();
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException(e);
+		} catch (ExecutionException e) {
+			throw e.getCause() instanceof RuntimeException r ? r : new IllegalStateException(e.getCause());
+		}
 	}
 
 	@After

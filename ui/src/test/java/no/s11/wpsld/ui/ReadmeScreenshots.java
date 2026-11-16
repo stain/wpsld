@@ -142,7 +142,7 @@ public class ReadmeScreenshots extends UiTest {
 		String folder = System.getenv("SCREENSHOTS");
 		Assume.assumeTrue("Set SCREENSHOTS to the folder for them", folder != null && !folder.isBlank());
 		Path out = Files.createDirectories(Path.of(folder));
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		waitForFx(30, () -> lookup("#addEntity").tryQuery().isPresent());
 		interact(() -> {
 			stage.setWidth(1200);
 			stage.setHeight(720);
@@ -189,7 +189,7 @@ public class ReadmeScreenshots extends UiTest {
 		String folder = System.getenv("HELP_SCREENSHOTS");
 		Assume.assumeTrue("Set HELP_SCREENSHOTS to the folder for them", folder != null && !folder.isBlank());
 		Path out = Files.createDirectories(Path.of(folder));
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		waitForFx(30, () -> lookup("#addEntity").tryQuery().isPresent());
 		interact(() -> {
 			stage.setWidth(1200);
 			stage.setHeight(720);
@@ -209,7 +209,7 @@ public class ReadmeScreenshots extends UiTest {
 		String folder = System.getenv("HELP_SCREENSHOTS");
 		Assume.assumeTrue("Set HELP_SCREENSHOTS to the folder for them", folder != null && !folder.isBlank());
 		Path out = Files.createDirectories(Path.of(folder));
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		waitForFx(30, () -> lookup("#addEntity").tryQuery().isPresent());
 		interact(() -> {
 			stage.setWidth(1400);
 			stage.setHeight(900);
@@ -263,7 +263,7 @@ public class ReadmeScreenshots extends UiTest {
 		MenuButton license = lookup("#new-license").queryAs(MenuButton.class);
 		Platform.runLater(() -> license.getItems().stream().filter(i -> "newSpdx-license".equals(i.getId()))
 				.findFirst().orElseThrow().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#licenseQuery").tryQuery().isPresent());
+		waitForFx(10, () -> lookup("#licenseQuery").tryQuery().isPresent());
 		interact(() -> lookup("#licenseQuery").queryAs(TextField.class).setText("cc-by-4.0"));
 		interact(() -> lookup("#licenseOk").queryButton().fire());
 		select("http://spdx.org/licenses/CC-BY-4.0");
@@ -333,7 +333,7 @@ public class ReadmeScreenshots extends UiTest {
 		String folder = System.getenv("HELP_SCREENSHOTS");
 		Assume.assumeTrue("Set HELP_SCREENSHOTS to the folder for them", folder != null && !folder.isBlank());
 		Path out = Files.createDirectories(Path.of(folder));
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		waitForFx(30, () -> lookup("#addEntity").tryQuery().isPresent());
 		interact(() -> {
 			stage.setWidth(1400);
 			stage.setHeight(900);
@@ -344,10 +344,10 @@ public class ReadmeScreenshots extends UiTest {
 		// The dialog waits for an answer, so not inside interact()
 		Platform.runLater(() -> create.getItems().stream()
 				.filter(i -> "newGeoNames-contentLocation".equals(i.getId())).findFirst().orElseThrow().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#placeQuery").tryQuery().isPresent());
+		waitForFx(10, () -> lookup("#placeQuery").tryQuery().isPresent());
 		interact(() -> lookup("#placeQuery").queryAs(TextField.class).setText("Catalina Park"));
 		interact(() -> lookup("#placeSearch").queryButton().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
+		waitForFx(10,
 				() -> !lookup("#placeResults").queryListView().getItems().isEmpty());
 		waitForTiles();
 		png(out.resolve("place-finder.png"), lookup(".dialog-pane").match(n -> n.lookup("#placeQuery") != null).query());
@@ -367,14 +367,14 @@ public class ReadmeScreenshots extends UiTest {
 		String folder = System.getenv("HELP_SCREENSHOTS");
 		Assume.assumeTrue("Set HELP_SCREENSHOTS to the folder for them", folder != null && !folder.isBlank());
 		Path out = Files.createDirectories(Path.of(folder));
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		waitForFx(30, () -> lookup("#addEntity").tryQuery().isPresent());
 		look("classic", "light");
 		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("license"));
 		MenuButton create = lookup("#new-license").queryAs(MenuButton.class);
 		// The dialog waits for an answer, so not inside interact()
 		Platform.runLater(() -> create.getItems().stream().filter(i -> "newSpdx-license".equals(i.getId()))
 				.findFirst().orElseThrow().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#licenseQuery").tryQuery().isPresent());
+		waitForFx(10, () -> lookup("#licenseQuery").tryQuery().isPresent());
 		interact(() -> lookup("#licenseQuery").queryAs(TextField.class).setText("creative commons attribution 4.0"));
 		png(out.resolve("licence-finder.png"),
 				lookup(".dialog-pane").match(n -> n.lookup("#licenseQuery") != null).query());
@@ -390,7 +390,7 @@ public class ReadmeScreenshots extends UiTest {
 		String folder = System.getenv("HELP_SCREENSHOTS");
 		Assume.assumeTrue("Set HELP_SCREENSHOTS to the folder for them", folder != null && !folder.isBlank());
 		Path out = Files.createDirectories(Path.of(folder));
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		waitForFx(30, () -> lookup("#addEntity").tryQuery().isPresent());
 		look("classic", "light");
 		interact(() -> lookup("#headerNew-hasPart").queryAs(MenuButton.class).getItems().stream()
 				.filter(i -> i.getText().equals("File")).findFirst().orElseThrow().fire());
@@ -405,7 +405,7 @@ public class ReadmeScreenshots extends UiTest {
 		// The dialog waits for an answer, so not inside interact()
 		Platform.runLater(() -> create.getItems().stream()
 				.filter(i -> "newPronom-encodingFormat".equals(i.getId())).findFirst().orElseThrow().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#formatQuery").tryQuery().isPresent());
+		waitForFx(10, () -> lookup("#formatQuery").tryQuery().isPresent());
 		interact(() -> lookup("#formatQuery").queryAs(TextField.class).setText("pdf 1."));
 		png(out.resolve("format-finder.png"),
 				lookup(".dialog-pane").match(n -> n.lookup("#formatQuery") != null).query());
@@ -420,17 +420,17 @@ public class ReadmeScreenshots extends UiTest {
 		String folder = System.getenv("HELP_SCREENSHOTS");
 		Assume.assumeTrue("Set HELP_SCREENSHOTS to the folder for them", folder != null && !folder.isBlank());
 		Path out = Files.createDirectories(Path.of(folder));
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		waitForFx(30, () -> lookup("#addEntity").tryQuery().isPresent());
 		look("classic", "light");
 		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("author"));
 		MenuButton create = lookup("#new-author").queryAs(MenuButton.class);
 		// The dialog waits for an answer, so not inside interact()
 		Platform.runLater(() -> create.getItems().stream().filter(i -> "newOrcid-author".equals(i.getId()))
 				.findFirst().orElseThrow().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#personQuery").tryQuery().isPresent());
+		waitForFx(10, () -> lookup("#personQuery").tryQuery().isPresent());
 		interact(() -> lookup("#personQuery").queryAs(TextField.class).setText("Josiah Carberry"));
 		interact(() -> lookup("#personSearch").queryButton().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
+		waitForFx(10,
 				() -> !lookup("#personResults").queryListView().getItems().isEmpty());
 		png(out.resolve("person-finder.png"),
 				lookup(".dialog-pane").match(n -> n.lookup("#personQuery") != null).query());
@@ -447,17 +447,17 @@ public class ReadmeScreenshots extends UiTest {
 		String folder = System.getenv("HELP_SCREENSHOTS");
 		Assume.assumeTrue("Set HELP_SCREENSHOTS to the folder for them", folder != null && !folder.isBlank());
 		Path out = Files.createDirectories(Path.of(folder));
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		waitForFx(30, () -> lookup("#addEntity").tryQuery().isPresent());
 		look("classic", "light");
 		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("publisher"));
 		MenuButton create = lookup("#new-publisher").queryAs(MenuButton.class);
 		// The dialog waits for an answer, so not inside interact()
 		Platform.runLater(() -> create.getItems().stream().filter(i -> "newRor-publisher".equals(i.getId()))
 				.findFirst().orElseThrow().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#organizationQuery").tryQuery().isPresent());
+		waitForFx(10, () -> lookup("#organizationQuery").tryQuery().isPresent());
 		interact(() -> lookup("#organizationQuery").queryAs(TextField.class).setText("University of Oslo"));
 		interact(() -> lookup("#organizationSearch").queryButton().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
+		waitForFx(10,
 				() -> !lookup("#organizationResults").queryListView().getItems().isEmpty());
 		png(out.resolve("organization-finder.png"),
 				lookup(".dialog-pane").match(n -> n.lookup("#organizationQuery") != null).query());
@@ -474,17 +474,17 @@ public class ReadmeScreenshots extends UiTest {
 		String folder = System.getenv("HELP_SCREENSHOTS");
 		Assume.assumeTrue("Set HELP_SCREENSHOTS to the folder for them", folder != null && !folder.isBlank());
 		Path out = Files.createDirectories(Path.of(folder));
-		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#addEntity").tryQuery().isPresent());
+		waitForFx(30, () -> lookup("#addEntity").tryQuery().isPresent());
 		look("classic", "light");
 		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("citation"));
 		MenuButton create = lookup("#new-citation").queryAs(MenuButton.class);
 		// The dialog waits for an answer, so not inside interact()
 		Platform.runLater(() -> create.getItems().stream().filter(i -> "newDoi-citation".equals(i.getId()))
 				.findFirst().orElseThrow().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#workQuery").tryQuery().isPresent());
+		waitForFx(10, () -> lookup("#workQuery").tryQuery().isPresent());
 		interact(() -> lookup("#workQuery").queryAs(TextField.class).setText("10.5281/zenodo.3541888"));
 		interact(() -> lookup("#workSearch").queryButton().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
+		waitForFx(10,
 				() -> !lookup("#workResults").queryListView().getItems().isEmpty());
 		png(out.resolve("work-finder.png"),
 				lookup(".dialog-pane").match(n -> n.lookup("#workQuery") != null).query());

@@ -82,12 +82,12 @@ public class TestCrateEditorWorks extends UiTest {
 
 	private ListView<Entity> entities() {
 		try {
-			WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> lookup("#entities").tryQuery().isPresent()
+			waitForFx(30, () -> lookup("#entities").tryQuery().isPresent()
 					&& lookup("#save").tryQuery().isPresent());
 		} catch (Exception e) {
 			throw new AssertionError("Editor did not appear", e);
 		}
-		return lookup("#entities").queryListView();
+		return onFx(() -> lookup("#entities").queryListView());
 	}
 
 	private Optional<Entity> entity(String id) {
@@ -102,10 +102,10 @@ public class TestCrateEditorWorks extends UiTest {
 		// Shown and waited for, so not inside interact()
 		Platform.runLater(() -> create.getItems().stream().filter(i -> "newDoi-citation".equals(i.getId()))
 				.findFirst().orElseThrow().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#workQuery").tryQuery().isPresent());
+		waitForFx(10, () -> lookup("#workQuery").tryQuery().isPresent());
 		interact(() -> lookup("#workQuery").queryAs(TextField.class).setText(query));
 		interact(() -> lookup("#workSearch").queryButton().fire());
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#workResults").tryQuery().isPresent()
+		waitForFx(10, () -> lookup("#workResults").tryQuery().isPresent()
 				&& !lookup("#workResults").queryListView().getItems().isEmpty());
 		interact(() -> lookup("#workOk").queryButton().fire());
 	}
@@ -157,7 +157,7 @@ public class TestCrateEditorWorks extends UiTest {
 		});
 		Platform.runLater(() -> lookup("#fillFromDoi").queryButton().fire());
 		// Looked up at once, by the DOI alone
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#workResults").tryQuery().isPresent()
+		waitForFx(10, () -> lookup("#workResults").tryQuery().isPresent()
 				&& !lookup("#workResults").queryListView().getItems().isEmpty());
 		assertEquals(List.of("10.5281/zenodo.3541888"), searches);
 		interact(() -> lookup("#workOk").queryButton().fire());
@@ -178,7 +178,7 @@ public class TestCrateEditorWorks extends UiTest {
 		interact(() -> editor.setText("doi:10.5281/zenodo.3541888"));
 		// Enter; the finder it opens waits for an answer, so not inside interact()
 		Platform.runLater(() -> editor.fireEvent(new ActionEvent()));
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#workResults").tryQuery().isPresent()
+		waitForFx(10, () -> lookup("#workResults").tryQuery().isPresent()
 				&& !lookup("#workResults").queryListView().getItems().isEmpty());
 		assertEquals(List.of("10.5281/zenodo.3541888"), searches);
 		assertEquals("https://doi.org/10.5281/zenodo.3541888", root.get("citation").orElseThrow().path("@id").asText());

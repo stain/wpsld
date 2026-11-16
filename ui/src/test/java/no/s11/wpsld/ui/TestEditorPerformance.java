@@ -160,9 +160,9 @@ public class TestEditorPerformance extends UiTest {
 	}
 
 	private ListView<Entity> entities() throws Exception {
-		WaitForAsyncUtils.waitFor(60, TimeUnit.SECONDS,
+		waitForFx(60,
 				() -> lookup("#entities").tryQuery().isPresent() && lookup("#save").tryQuery().isPresent());
-		return lookup("#entities").queryListView();
+		return onFx(() -> lookup("#entities").queryListView());
 	}
 
 	private MenuItem menuItem(String id) {
