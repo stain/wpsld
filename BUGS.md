@@ -155,12 +155,14 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   `http://schema.org/DefinedTerm`, written by the names the context gives
   them (`Person`) (*done*, `TermRepairs.typeNames`, also `https:` and
   `schema:`).
-- **References written as text**, reported for a ROHub crate: values
-  such as `"{\"@id\": \"https://…\"}"`, a JSON object as a string,
-  rather than the object. Not in the ROHub crate in `debug/` (its only
-  text IRIs are its types, repaired above); find the crate that has
-  them. Repair Crate could turn a string that parses as an object with
-  only `@id` into that reference, and say so.
+- **References written as text** (*done*, `Crate.referencesFromText`),
+  reported for a ROHub crate: values such as `"{\"@id\": \"https://…\"}"`,
+  a JSON object as a string, rather than the object. Not in the ROHub
+  crate in `debug/` (its only text IRIs are its types, repaired above).
+  Repair Crate now makes text that is, as a whole, a JSON object of an
+  `@id` alone the reference it says (first, so that ORCID iDs and the
+  like are then written as usual, and missing entities added), and says
+  so; other text, also other JSON, stays.
 - **Enumeration members written as text**, e.g. `"actionStatus":
   "PotentialActionStatus"`, as references, `{"@id":
   "http://schema.org/PotentialActionStatus"}`, where the property's range
