@@ -44,14 +44,25 @@
     {
       "type": "Grant",
       "name": "BioFAIR Method Commons",
+      "identifier": "MC25-001",
       "funder": {
         "type": "Organization",
-        "id": "https://ror.org/00cwqg982",
-        "name": "Biotechnology and Biological Sciences Research Council (BBSRC)",
+        "name": "BioFAIR",
+        "url": "https://biofair.uk/",
         "parentOrganization": {
           "type": "Organization",
-          "id": "https://ror.org/001aqnf71",
-          "name": "UK Research and Innovation (UKRI)"
+          "id": "https://ror.org/018cxtf62",
+          "name": "Earlham Institute"
+        },
+        "funder": {
+          "type": "Organization",
+          "id": "https://ror.org/00cwqg982",
+          "name": "Biotechnology and Biological Sciences Research Council (BBSRC)",
+          "parentOrganization": {
+            "type": "Organization",
+            "id": "https://ror.org/001aqnf71",
+            "name": "UK Research and Innovation (UKRI)"
+          }
         }
       }
     }
