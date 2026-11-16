@@ -29,6 +29,8 @@ module no.s11.wpsld {
     uses no.s11.wpsld.lookup.MetadataReader;
     requires org.commonmark;
     requires org.commonmark.ext.gfm.tables;
+    // The HTML preview's page, a Mustache template (CratePreview)
+    requires com.samskivert.jmustache;
     exports no.s11.wpsld;
     exports no.s11.wpsld.arcp;
     exports no.s11.wpsld.soss;

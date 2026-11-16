@@ -26,6 +26,8 @@ dependencies {
     // Descriptions written in Markdown, in the HTML preview
     implementation 'org.commonmark:commonmark:0.31.0'
     implementation 'org.commonmark:commonmark-ext-gfm-tables:0.31.0'
+    // The HTML preview's page, a Mustache template (one small jar, no dependencies)
+    implementation 'com.samskivert:jmustache:1.16'
 
     // Use JUnit test framework.
     testImplementation 'junit:junit:4.13'

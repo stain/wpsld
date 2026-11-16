@@ -158,6 +158,14 @@ memory (JUnit category `Damaged`):
     ./gradlew damagedTest                        # 20 rounds of each file
     ./gradlew damagedTest -PdamageRounds=200     # more
 
+And the tests timing the editor on large crates, step by step, each step's
+time in `ui/build/test-results/performance.tsv` (JUnit category
+`Performance`, see PLAN.md, Performance on larger crates):
+
+    ./gradlew performanceTest                         # fails when a step is over its limit
+    ./gradlew performanceTest -PperformanceSlack=2    # twice the limits, on a slower machine
+    ./gradlew performanceTest -PperformanceProfile    # and Flight Recordings, ui/build/performance/
+
 ### With conda
 
 [`environment.yml`](environment.yml) gives OpenJDK 25 and the libraries
@@ -223,7 +231,7 @@ the workflow only keeps the zips as artifacts.
 
 | Module | Contents |
 |--------|----------|
-| [`lib`](lib) (`no.s11.wpsld`) | No JavaFX. The schema.org model, form fields, the RO-Crate model, reading and retrieving crates, JSON-LD contexts, MASP profiles and registries, and settings. The lookups of RO-Crate's recommended identifiers are in `no.s11.wpsld.lookup` (`GeoNames`, `ORCID`, `ROR`, `DOI`, and the bundled `SPDXLicenses` and `PRONOMFormats`), which uses the crate model but not the other way round; and files' own metadata (`FileMetadata`, asking the `MetadataReader` services, each isolated with a time limit; the built-in readers needing only the JDK are in `EmbeddedMetadata`). No JavaFX nor AWT: its dependencies are Jackson, Apache Tika (core, for file formats) and commonmark-java (Markdown in the HTML preview). |
+| [`lib`](lib) (`no.s11.wpsld`) | No JavaFX. The schema.org model, form fields, the RO-Crate model, reading and retrieving crates, JSON-LD contexts, MASP profiles and registries, and settings. The lookups of RO-Crate's recommended identifiers are in `no.s11.wpsld.lookup` (`GeoNames`, `ORCID`, `ROR`, `DOI`, and the bundled `SPDXLicenses` and `PRONOMFormats`), which uses the crate model but not the other way round; and files' own metadata (`FileMetadata`, asking the `MetadataReader` services, each isolated with a time limit; the built-in readers needing only the JDK are in `EmbeddedMetadata`). No JavaFX nor AWT: its dependencies are Jackson, Apache Tika (core, for file formats), commonmark-java (Markdown in the HTML preview) and JMustache (the HTML preview's page, a Mustache template). |
 | [`readers-image`](readers-image) (`no.s11.wpsld.readers.image`) | Images' and videos' own metadata (`ImageMetadata`: EXIF, IPTC, XMP, PNG text, GPS; HEIC, AVIF, GIF, raw formats; MP4 and QuickTime), a `MetadataReader` with [metadata-extractor](https://github.com/drewnoakes/metadata-extractor). |
 | [`readers-pdf`](readers-pdf) (`no.s11.wpsld.readers.pdf`) | PDFs' own metadata (`PdfMetadata`: document information and XMP), a `MetadataReader` with [Apache PDFBox](https://pdfbox.apache.org/), which needs AWT. |
 | [`ui`](ui) (`no.s11.wpsld.ui`) | The JavaFX editor: the crate window (`CrateEditor`), the entity form (`EntityEditor`), the preview, the type chooser, the preferences, the lookup dialogs (`PlaceFinder`, `PersonFinder`, `OrganizationFinder`, `WorkFinder`, `LicenseFinder`, `FormatFinder`), and its styles (`Theme`). Besides JavaFX, it uses [Ikonli](https://kordamp.org/ikonli/) for the Fluent icons of the Windows 11 style, [commonmark-java](https://github.com/commonmark/commonmark-java) for help and Markdown descriptions. It requires the metadata reader modules, so that jlink links them into the runtime image. |
@@ -233,8 +241,15 @@ the workflow only keeps the zips as artifacts.
 The source code in this repository is under the
 [Apache License 2.0](LICENSE.txt).
 
+Except the template and stylesheet of the RO-Crate previews wpsld writes
+(`ro-crate-preview*.mustache` and `ro-crate-preview.css` in
+[`lib/src/main/resources/no/s11/wpsld/form/`](lib/src/main/resources/no/s11/wpsld/form/),
+which make each `ro-crate-preview.html`), which are dedicated to the public
+domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/),
+so that a crate's preview can be distributed with it under any terms.
+
 The built application also includes third-party software: Jackson,
-commonmark-java, Ikonli, Microsoft's Fluent UI System Icons, Apache Tika,
+commonmark-java, JMustache, Ikonli, Microsoft's Fluent UI System Icons, Apache Tika,
 Apache PDFBox and FontBox, metadata-extractor, Adobe XMPCore, Apache
 Commons (IO, Logging, Secure XML) and SLF4J, plus a
 Java runtime and JavaFX in the zips for a platform. Their licences and notices are in

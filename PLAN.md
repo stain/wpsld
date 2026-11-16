@@ -29,7 +29,7 @@ See also [MASP.md](MASP.md) for profile-aware editing with RO-Crate MASP.
 
 | Module | Contents |
 |--------|----------|
-| `lib` (`no.s11.wpsld`), **free of JavaFX** | schema model (`soss`: `SchemaFromJsonLd`, `ClassDef`, `PropertyDef`), form fields (`form`: `FormFields`, `SchemaOrgFormFields`), crate model (`crate`: `Crate`, `Entity`, `Places`), lookups of identifiers (`lookup`: `GeoNames`, `ORCID`, `ROR`, `DOI`, `SPDXLicenses`, `PRONOMFormats`; depends on `crate`, never the reverse), xattr metadata (`impl.WrittenMetadata`), arcp file system (`arcp`). Only dependency: Jackson. |
+| `lib` (`no.s11.wpsld`), **free of JavaFX** | schema model (`soss`: `SchemaFromJsonLd`, `ClassDef`, `PropertyDef`), form fields (`form`: `FormFields`, `SchemaOrgFormFields`), crate model (`crate`: `Crate`, `Entity`, `Places`), lookups of identifiers (`lookup`: `GeoNames`, `ORCID`, `ROR`, `DOI`, `SPDXLicenses`, `PRONOMFormats`; depends on `crate`, never the reverse), xattr metadata (`impl.WrittenMetadata`), arcp file system (`arcp`). Dependencies: Jackson, Apache Tika (core), commonmark-java and JMustache. |
 | `ui` (`no.s11.wpsld.ui`) | JavaFX 27: `CrateEditor` (main window: entities, editor, JSON-LD preview) and `EntityEditor` (type tree and form for one entity). |
 
 Builds: Java 25, Gradle 9.8; `./gradlew build` in the conda env
@@ -277,6 +277,33 @@ mnemonics on tabs, the Warp 3 style
   `ARCPFileSystemProvider` is unimplemented stubs, it has no tests, and it is
   not registered as a provider (no `provides` in `module-info`), so decide
   its role before testing or finishing it.
+
+### Command-line tools (a `bin` module)
+
+*To do: consider* which of `lib`'s functionality is worth having as
+command-line tools, for scripts, pipelines and CI where no window is
+wanted, in a new module `bin` (no JavaFX, only `lib` and the
+`readers-*`): one `wpsld-cli`-style launcher with subcommands, or a few
+small ones, in the distribution zip and the app images beside the
+editor. Candidates:
+- **Write the RO-Crate preview** (`CratePreview`, already in `lib`):
+  `ro-crate-preview.html` for a crate, attached or detached, to a file
+  given (as File > Save RO-Crate Preview…, see HTML preview), with the
+  same check for another tool's preview.
+- **Repair a crate** (as Crate > Repair Crate: `TermRepairs`, objects
+  without `@id` made entities, nested entities flattened), writing the
+  crate back or to another file, and saying what was changed.
+- Others to weigh: check a crate (`CrateChecks`, as the editor warns on
+  opening; exit status for CI); update file details from what files say
+  about themselves (the `readers-*`); identify files' formats (PRONOM);
+  check web availability; make a crate detached or attached; describe a
+  folder as a new crate.
+- To decide: one launcher or several; how it is packaged (jlink image
+  without JavaFX, or the zip's `lib/`); options and output (JSON for
+  scripts, text for people); that what it writes is what the editor
+  writes for the same action (shared code in `lib`, moved there from
+  `CrateEditor` where needed, e.g. Repair Crate's parts still in `ui`);
+  tests of each, as of the editor's actions.
 
 ### Testing
 
@@ -1407,6 +1434,43 @@ as their `@id`s, which in a detached crate are absolute. The same
 `CratePreview`, the same check for another tool's preview where the file
 is there already, and not described in the crate, which does not hold it.
 
+*Done (November 2026)*: the page is a Mustache template,
+`ro-crate-preview.html.mustache` with the partial
+`ro-crate-preview-value.mustache` for one value (beside
+`ro-crate-preview.css` in `lib`'s resources, all three CC0 1.0, as they
+make every preview), filled in by `CratePreview` with
+[JMustache](https://github.com/samskivert/jmustache) from plain maps and
+lists, so that its markup can be read and changed as HTML. The pages are
+as before but for their indentation (checked on nine crates). Standard Mustache only
+(none of JMustache's `-first`, `-index` and the like), so that other tools
+could fill in the same template (mustache.js, chevron in Python); every
+key of a value is given, false where not used, as Mustache looks for a
+missing one in the enclosing sections. `CratePreview` still works out
+what to show (anchors, groups, links, Markdown), as a logic-less template
+can't. Chosen over the others, in November 2026:
+- *The JDK*: no template engine of its own; String Templates (JEP
+  430/459) were withdrawn in JDK 23, and XSLT (`java.xml`) would mean the
+  crate as XML first.
+- *JMustache 1.16* (chosen): one 79 KB jar, no dependencies, a Java
+  module of its own (`com.samskivert.jmustache`), BSD 3-Clause. Stable
+  (1.x since 2010, 1.16 from November 2023, releases years apart, but
+  maintained: fixes merged in 2026, not yet released); Spring Boot's
+  Mustache support uses it. Escaping is CratePreview's own, as before
+  (`withEscaper`).
+- *Jinjava 2.8.5* (HubSpot's Jinja, Apache 2.0): Jinja is better known in
+  the RO-Crate community (ro-crate-py's preview), but 28 jars, 9.8 MB
+  with its dependencies (Guava, javassist, commons-lang3, commons-net,
+  SnakeYAML, …), about 7.5 MB more than `lib` has, and an older Jackson.
+  Its Jinja is HubSpot's dialect, so ro-crate-py's template may not run
+  as it is. If Jinja templates are wanted, as an optional module outside
+  `lib` (as the `readers-*` are), e.g. for the command-line tools.
+- Not compared further: Mustache.java (larger), jte (typed templates
+  compiled at build time, a Gradle plugin), Pebble.
+- Next: File > Save RO-Crate Preview… and a command-line preview writer
+  (see Command-line tools) with the same template; perhaps a template of
+  the user's own (a preference), as Mustache's logic-less templates can't
+  do harm beyond the page they make.
+
 The Preview tab renders
 Markdown descriptions too, by the same heuristics, as JavaFX nodes
 (`HelpMarkdown.description`, as the help viewer's pages). For a richer
@@ -1436,9 +1500,24 @@ crate above, a ROHub crate, and generated ones with 1 000, 10 000 and
   field (each change checks the crate for undo and relists), saving and
   Repair Crate; switching to Entities by Folder and by Part; listing the
   folder's files (now at most 10 000, again after 5 seconds).
-- How: a benchmark test (not run by default, as `onlineTest` isn't) that
-  builds such crates and reports times, and the JDK's Flight Recorder on
-  the running editor for where the time goes.
+- How (*done*): `./gradlew performanceTest`, the JUnit category
+  `Performance`, left out of `build` (`TestEditorPerformance`). It times
+  each step (opening, selecting, typing, undo, the trees, saving, adding
+  3 030 files as parts, copying and pasting 1 000 entities) on crates made
+  in advance by `PerformanceCrates` (`./gradlew :ui:performanceCrates`
+  makes them again into `ui/src/test/resources/performance/`): `large`
+  (3 200 entities of many types referring to each other), `wide` (a root
+  with 4 000 parts, all by one person), `deep` (folders ten deep) and
+  `variables` (1 000 PropertyValues); and on a folder of 3 000 files made
+  when run. Each step's time is in `ui/build/test-results/performance.tsv`,
+  and a step fails when over its limit (some three times its time when
+  written, `-PperformanceSlack=2` on a slower machine; lower a limit when
+  its step is made faster). `-PperformanceProfile` records each test with
+  the JDK's Flight Recorder (`ui/build/performance/<test>.jfr`, e.g. for
+  `jfr print --events jdk.ExecutionSample` or JDK Mission Control). All
+  of it took 35 s here, in November 2026; GitHub Actions runs it monthly
+  on Linux (integration-tests.yml). Next: crates of 10 000 and 100 000
+  entities, and the typing steps with the preview and JSON-LD tabs shown.
 - Likely costs to look at: `crate.toJson()` compared on every change
   (undo, the title's "modified"), `dataEntities()` and `byId()` built
   again in loops, the tree made again from scratch, and the preview's
@@ -1488,7 +1567,9 @@ crate above, a ROHub crate, and generated ones with 1 000, 10 000 and
   into a large crate, now 1 s (0.2 s into a new one), as they are
   selected at once with no form. Pasting or adding as parts more than
   200 now shows the busy pointer first (`CrateEditor.busy`); moving the
-  slow parts to a job is left.
+  slow parts to a job is left. Timed by `performanceTest`
+  (`copyAndPaste1000Entities`): 1 000 into their own crate, a large one
+  and a new one, 0.1 to 0.3 s each.
 
 ### Internationalisation (i18n)
 

@@ -4,12 +4,15 @@
 // services on every build; the other tests can't reach the network (see
 // OfflineResolverProvider). Run them with ./gradlew onlineTest, as GitHub
 // Actions does on release and monthly (.github/workflows). Likewise the
-// tests reading damaged files (no.s11.wpsld.test.Damaged), damagedTest.
+// tests reading damaged files (no.s11.wpsld.test.Damaged), damagedTest,
+// and those timing the editor (no.s11.wpsld.test.Performance),
+// performanceTest.
 subprojects {
     plugins.withType(JavaPlugin).configureEach {
         tasks.named('test', Test) {
             useJUnit {
-                excludeCategories 'no.s11.wpsld.test.Online', 'no.s11.wpsld.test.Damaged'
+                excludeCategories 'no.s11.wpsld.test.Online', 'no.s11.wpsld.test.Damaged',
+                        'no.s11.wpsld.test.Performance'
             }
             systemProperty 'wpsld.test.offline', 'true'
         }
@@ -34,6 +37,45 @@ subprojects {
                 includeCategories 'no.s11.wpsld.test.Damaged'
             }
             // Only the readers' projects have them
+            failOnNoDiscoveredTests = false
+        }
+        // As test (its JVM arguments and properties, e.g. headless JavaFX),
+        // but only the tests timing the editor (no.s11.wpsld.test.Performance),
+        // one class at a time so that they don't slow each other, each step's
+        // time in build/test-results/performance.tsv. A step fails when it
+        // takes longer than its limit, times -PperformanceSlack (e.g. 2 on a
+        // slow machine); -PperformanceProfile records each test with the
+        // JDK's Flight Recorder, in build/performance/<test>.jfr
+        tasks.register('performanceTest', Test) {
+            description = 'Runs the tests that time the editor.'
+            group = 'verification'
+            def unit = tasks.named('test', Test).get()
+            testClassesDirs = unit.testClassesDirs
+            classpath = unit.classpath
+            jvmArgs unit.jvmArgs
+            systemProperties unit.systemProperties
+            forkEvery = unit.forkEvery
+            maxHeapSize = unit.maxHeapSize
+            maxParallelForks = 1
+            def results = layout.buildDirectory.file('test-results/performance.tsv')
+            systemProperty 'wpsld.test.performanceResults', results.get().asFile.path
+            systemProperty 'wpsld.test.performanceSlack', findProperty('performanceSlack') ?: '1'
+            if (project.hasProperty('performanceProfile')) {
+                systemProperty 'wpsld.test.performanceProfile',
+                        layout.buildDirectory.dir('performance').get().asFile.path
+            }
+            doFirst {
+                results.get().asFile.with {
+                    parentFile.mkdirs()
+                    text = 'test\tstep\tms\tlimit ms\tFX thread CPU ms\n'
+                }
+            }
+            useJUnit {
+                includeCategories 'no.s11.wpsld.test.Performance'
+            }
+            // The editor may have changed, and the times are the point
+            outputs.upToDateWhen { false }
+            // Only the ui project has them
             failOnNoDiscoveredTests = false
         }
         // As test (its JVM arguments and properties, e.g. headless JavaFX),
