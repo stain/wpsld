@@ -437,6 +437,44 @@ public class TestCrate {
 		assertEquals("Alice", entity.getLabel());
 	}
 
+	/**
+	 * Objects written in values without an @id (not allowed in flattened
+	 * RO-Crate JSON-LD), made entities of their own by Repair Crate; literals,
+	 * references and objects with other keywords left as they are
+	 */
+	@Test
+	public void nestedFlattenedOnRepair() {
+		Crate crate = new Crate();
+		Entity root = crate.getRoot();
+		ObjectNode literal = JsonNodeFactory.instance.objectNode().put("@value", "Hei").put("@language", "no");
+		ObjectNode list = JsonNodeFactory.instance.objectNode();
+		list.putArray("@list").add("a");
+		ObjectNode depth = JsonNodeFactory.instance.objectNode().put("@type", "PropertyValue").put("name", "depth");
+		depth.putObject("unitCode").put("name", "metre");
+		root.setAll("variableMeasured", List.of(depth, JsonNodeFactory.instance.objectNode().put("@id", "#x")));
+		root.set("alternateName", Optional.of(literal));
+		root.set("keywords", Optional.of(list));
+		assertTrue(Crate.isAnonymous(depth));
+		assertFalse(Crate.isAnonymous(literal));
+		assertFalse(Crate.isAnonymous(list));
+
+		List<Entity> made = crate.flattenNested();
+		assertEquals(2, made.size());
+		Entity pv = made.get(0);
+		assertEquals(List.of("PropertyValue"), pv.getTypes());
+		assertTrue(pv.getId(), pv.getId().startsWith("#propertyvalue-"));
+		assertEquals(List.of(pv.getId(), "#x"),
+				root.getAll("variableMeasured").stream().map(v -> v.get("@id").asText()).toList());
+		// Written in it in turn: Thing, as it has no type
+		Entity unit = made.get(1);
+		assertEquals(List.of("Thing"), unit.getTypes());
+		assertEquals("metre", unit.getLabel());
+		assertEquals(unit.getId(), pv.get("unitCode").orElseThrow().get("@id").asText());
+		assertEquals(Optional.of(literal), root.get("alternateName"));
+		assertEquals(Optional.of(list), root.get("keywords"));
+		assertTrue(crate.flattenNested().isEmpty());
+	}
+
 	@Test
 	public void flattenedJsonLd() {
 		Crate crate = new Crate();

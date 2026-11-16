@@ -3705,7 +3705,9 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * Crate > Repair Crate: add a Thing for each reference to an entity not in
+	 * Crate > Repair Crate: objects written in values without an @id made
+	 * entities of their own (see {@link Crate#flattenNested()}); add a Thing
+	 * for each reference to an entity not in
 	 * the crate, to be named and typed (see {@link Crate#addReferenced()});
 	 * no longer mention the entities linked otherwise from the root data
 	 * entity (see {@link Crate#unmentionLinked()}), and mention those not
@@ -3724,6 +3726,7 @@ public class CrateEditor extends Application {
 	 * what was done.
 	 */
 	void repair(Stage stage) {
+		List<Entity> flattened = crate.flattenNested();
 		List<String> types = TermRepairs.typeNames(crate, terms);
 		List<String> members = TermRepairs.enumerationMembers(crate, terms);
 		List<String> licences = SPDXLicenses.bundled().repair(crate);
@@ -3735,6 +3738,10 @@ public class CrateEditor extends Application {
 		List<Entity> unmentioned = crate.unmentionLinked();
 		List<Entity> mentioned = crate.mentionUnlinked();
 		List<String> done = new ArrayList<>();
+		if (!flattened.isEmpty()) {
+			done.add("Written in values without an @id, which flattened RO-Crate JSON-LD doesn't allow, now"
+					+ " entities of their own:\n" + list(flattened));
+		}
 		if (!types.isEmpty()) {
 			done.add("Types written by their names:\n" + types.stream().map(t -> "• " + t)
 					.collect(Collectors.joining("\n")));

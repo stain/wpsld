@@ -213,7 +213,8 @@ public class TestCrateReader {
 		assertEquals("en", x.get("name").orElseThrow().get("@language").asText());
 		// Nested, not flattened: reported, but not lost
 		assertEquals("Nested", x.get("author").orElseThrow().get("name").asText());
-		assertTrue(reports(document, Severity.WARNING, "#x author has a nested object"));
+		assertTrue(reports(document, Severity.WARNING, "#x author has an object written in it without an @id"));
+		assertTrue(reports(document, Severity.WARNING, "Crate > Repair Crate makes it an entity of its own"));
 		assertFalse(document.problems().toString(), reports(document, Severity.WARNING, "#x name"));
 	}
 

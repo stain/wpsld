@@ -540,6 +540,80 @@ public class Crate {
 	}
 
 	/**
+	 * Objects written in values without an <code>@id</code> (e.g. an inline
+	 * <code>{"@type": "PropertyValue", "name": "depth"}</code>), which
+	 * flattened RO-Crate JSON-LD doesn't allow (see {@link #isAnonymous}):
+	 * each made an entity of its own, with a new <code>@id</code> from its
+	 * type, and referred to by it; also those written in them.
+	 *
+	 * @return The entities made, in the order found
+	 */
+	public List<Entity> flattenNested() {
+		List<Entity> added = new ArrayList<>();
+		// Those added are looked through too, for objects written in them
+		for (int i = 0; i < entities.size(); i++) {
+			Entity entity = entities.get(i);
+			for (String property : List.copyOf(entity.getValues().keySet())) {
+				List<JsonNode> values = entity.getAll(property);
+				if (values.stream().noneMatch(Crate::isAnonymous)) {
+					continue;
+				}
+				List<JsonNode> flat = new ArrayList<>();
+				for (JsonNode value : values) {
+					if (!isAnonymous(value)) {
+						flat.add(value);
+						continue;
+					}
+					List<String> types = new ArrayList<>();
+					JsonNode type = value.path("@type");
+					(type.isArray() ? type : List.of(type)).forEach(t -> {
+						if (t.isTextual() && !t.asText().isBlank()) {
+							types.add(t.asText());
+						}
+					});
+					Entity made = add(types.isEmpty() ? "Thing" : types.get(0));
+					if (!types.isEmpty()) {
+						made.setTypes(types);
+					}
+					value.properties().forEach(e -> {
+						if (!e.getKey().equals("@type")) {
+							made.set(e.getKey(), Optional.of(e.getValue()));
+						}
+					});
+					added.add(made);
+					flat.add(JsonNodeFactory.instance.objectNode().put("@id", made.getId()));
+				}
+				entity.setAll(property, flat);
+			}
+		}
+		return added;
+	}
+
+	/**
+	 * Whether a value is an object written in it without an
+	 * <code>@id</code>, that could be an entity of its own: not a literal
+	 * (<code>@value</code>) nor a list, with properties other than JSON-LD's
+	 * keywords, or a <code>@type</code> as text
+	 */
+	public static boolean isAnonymous(JsonNode value) {
+		if (!value.isObject() || value.isEmpty() || value.has("@id") || value.has("@value")) {
+			return false;
+		}
+		boolean typed = true;
+		for (Map.Entry<String, JsonNode> e : value.properties()) {
+			if (e.getKey().equals("@type")) {
+				JsonNode type = e.getValue();
+				for (JsonNode t : type.isArray() ? type : List.of(type)) {
+					typed &= t.isTextual();
+				}
+			} else if (e.getKey().startsWith("@") || e.getKey().isBlank()) {
+				return false;
+			}
+		}
+		return typed;
+	}
+
+	/**
 	 * Add a Dataset for each of these folders, e.g. <code>raw/</code>, as a
 	 * part of the dataset above it (see {@link #addParts}).
 	 *

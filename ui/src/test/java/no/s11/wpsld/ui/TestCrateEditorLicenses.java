@@ -174,6 +174,9 @@ public class TestCrateEditorLicenses extends UiTest {
 		interact(() -> {
 			root.setTypes(List.of("Dataset", "http://schema.org/CreativeWork"));
 			root.set("actionStatus", Optional.of(TextNode.valueOf("PotentialActionStatus")));
+			// Written in a value without an @id
+			root.set("variableMeasured", Optional.of(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance
+					.objectNode().put("@type", "PropertyValue").put("name", "depth")));
 		});
 		MenuBar bar = lookup("#menuBar").queryAs(MenuBar.class);
 		MenuItem repair = bar.getMenus().stream().flatMap(m -> m.getItems().stream())
@@ -184,8 +187,10 @@ public class TestCrateEditorLicenses extends UiTest {
 		assertTrue(report, report.contains("Types written by their names:\n• ./: http://schema.org/CreativeWork → CreativeWork"));
 		assertTrue(report, report.contains("as references to them:\n• ./: actionStatus PotentialActionStatus"));
 		assertFalse(report, report.contains("Added as Thing"));
+		assertTrue(report, report.contains("now entities of their own:\n• depth (#propertyvalue-1)"));
 		clickOn("OK");
 		assertEquals(List.of("Dataset", "CreativeWork"), root.getTypes());
+		assertEquals("#propertyvalue-1", root.get("variableMeasured").orElseThrow().path("@id").asText());
 		assertEquals("http://schema.org/PotentialActionStatus", root.get("actionStatus").orElseThrow().path("@id").asText());
 	}
 

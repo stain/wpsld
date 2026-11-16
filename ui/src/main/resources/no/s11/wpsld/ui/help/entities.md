@@ -37,7 +37,10 @@ List, file formats from PRONOM, ORCID iDs, ROR identifiers and DOIs, see [Proper
 addresses, such as `http://schema.org/Person`, get their names
 (`Person`), and values from schema.org's lists, such as an action's
 status written as the text `PotentialActionStatus`, become links to that
-value. It reports what it changed. Give any
+value. Objects written inside a value without an `@id` (such as an
+inline PropertyValue), which RO-Crate's flattened JSON-LD doesn't allow
+and which opening a crate warns about, become entities of their own. It
+reports what it changed. Give any
 placeholders appropriate types and names, or correct mistaken identifiers.
 Use **Edit > Undo** if needed.
 

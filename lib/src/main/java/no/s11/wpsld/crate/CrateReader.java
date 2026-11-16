@@ -454,7 +454,10 @@ public class CrateReader {
 		}
 
 		private void checkValue(JsonNode value, String where) {
-			if (value.isObject() && !(value.has("@id") && value.size() == 1) && !value.has("@value")
+			if (Crate.isAnonymous(value)) {
+				warn(where + " has an object written in it without an @id, which flattened RO-Crate JSON-LD"
+						+ " doesn't allow; kept as it is. Crate > Repair Crate makes it an entity of its own");
+			} else if (value.isObject() && !(value.has("@id") && value.size() == 1) && !value.has("@value")
 					&& !value.has("@list")) {
 				warn(where + " has a nested object; RO-Crate JSON-LD should be flattened, kept as it is");
 			} else if (value.isArray()) {
