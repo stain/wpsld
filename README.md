@@ -236,18 +236,32 @@ repository secret `GEONAMES_USERNAME`, and is skipped without it.
 [`.github/workflows/release.yml`](.github/workflows/release.yml) builds the
 app image zips on each platform's GitHub runner, plus the portable zip.
 The version is in [`gradle.properties`](gradle.properties): `<next>-SNAPSHOT`
-between releases. To release, on an up-to-date `main`:
+between releases. `main` takes changes only through pull requests, so a
+release's commits go on a branch, `release-<version>`.
+
+To release, run the workflow on `main` from GitHub: Actions → Release → Run
+workflow, with the version (e.g. `0.8.0`). It commits `version=0.8.0`, tags
+it `v0.8.0`, commits `0.9.0-SNAPSHOT`, pushes the branch and tag, and opens
+the branch's pull request. Then it builds the tagged commit and makes a
+draft GitHub release, to check and publish. Merge the pull request with
+*Create a merge commit*, before or after publishing: squash or rebase would
+make new commits, and leave the tagged one out of `main`'s history. Opening
+the pull request needs Settings → Actions → General → *Allow GitHub Actions
+to create and approve pull requests*; without it, open it by hand.
+
+The same from a checkout of an up-to-date `main`, with
+[`scripts/release.sh`](scripts/release.sh):
 
 ```sh
-scripts/release.sh 0.7.0        # commits version=0.7.0, tags v0.7.0, then 0.8.0-SNAPSHOT
-git push --atomic origin main v0.7.0
+scripts/release.sh 0.8.0        # on a branch release-0.8.0: version=0.8.0, tag v0.8.0, then 0.9.0-SNAPSHOT
+git push --atomic origin release-0.8.0 v0.8.0
 ```
 
-The tag builds that version (the workflow checks that `gradle.properties`
-says the same) and makes a draft GitHub release, to check and publish. Make
-the tag this way rather than on GitHub's website, so that the tagged commit
-has the version, as Help > About shows. Run by hand from the Actions tab,
-the workflow only keeps the zips as artifacts.
+The pushed tag starts the workflow, which checks that `gradle.properties`
+says the same version, builds it and makes the draft release. Don't make
+the tag on GitHub's website: the tagged commit must have the version, as
+Help > About shows. Run without a version, the workflow only keeps the zips
+as artifacts.
 
 ## Project layout
 

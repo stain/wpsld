@@ -3,11 +3,17 @@
 # (jpackage: wpsld.exe, wpsld.app, bin/wpsld) and Java and JavaFX included,
 # plus a portable zip without JavaFX for any platform (see ui/src/dist).
 #
-# A tag v<version> (e.g. v0.2.0), made with scripts/release.sh so that
-# gradle.properties has that version, builds it and makes a draft GitHub
-# release with the zips (or adds them to the tag's release, if one was
-# made already), to review and publish by hand. Run from
-# Actions -> Run workflow, it only keeps the zips as workflow artifacts.
+# To release: Actions -> Release -> Run workflow on main, with the version
+# (e.g. 0.8.0). It runs scripts/release.sh, pushes its branch
+# release-<version> and tag v<version>, and opens the branch's pull request
+# (merge it with "Create a merge commit"), then builds the tagged commit and
+# makes a draft GitHub release with the zips, to review and publish by hand.
+# A tag pushed by a workflow starts no other workflow, so this run builds it.
+#
+# A tag v<version> pushed from elsewhere, made with scripts/release.sh so
+# that gradle.properties has that version, does the same from the build on
+# (or adds the zips to the tag's release, if one was made already). Run
+# without a version, the workflow only keeps the zips as workflow artifacts.
 #
 # Not built: Windows on Arm, as JavaFX 27 has no windows-aarch64 jmods.
 # The apps are not signed, so Windows SmartScreen and macOS Gatekeeper
@@ -18,16 +24,83 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 0.8.0; empty only builds the zips'
+        required: false
+        default: ''
+      next:
+        description: 'Version after it, without -SNAPSHOT; empty for the minor number one up'
+        required: false
+        default: ''
 
 permissions:
   contents: read
+
+# One release at a time
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 env:
   # Keep in sync with javafx.version in ui/build.gradle and the Dockerfile
   JAVAFX_VERSION: 27.0.1
 
 jobs:
+  # Run by hand with a version: the release's commits and tag, made by
+  # scripts/release.sh as from a checkout, then pushed. main takes changes
+  # only through pull requests, hence the branch and its pull request
+  tag:
+    if: github.event_name == 'workflow_dispatch' && inputs.version != ''
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - name: From main only
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Release from main, not $GITHUB_REF_NAME"
+          exit 1
+
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Commit and tag
+        id: release
+        env:
+          VERSION: ${{ inputs.version }}
+          NEXT: ${{ inputs.next }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          scripts/release.sh "$VERSION" $NEXT
+          git push --atomic origin "release-$VERSION" "v$VERSION"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      # Needs Settings -> Actions -> General -> "Allow GitHub Actions to
+      # create and approve pull requests"; without it, the release goes on
+      # and the pull request is left to open by hand
+      - name: Pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          body="The version committed for the release, tagged v$VERSION, then the next -SNAPSHOT.
+
+          Merge with **Create a merge commit**: squash or rebase would make new commits, leaving the tagged one out of main's history."
+          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "release-$VERSION" \
+              --title "Release $VERSION" --body "$body" ||
+            echo "::warning::No pull request made: open one of release-$VERSION by hand, merged with a merge commit"
+
   build:
+    needs: tag
+    # Also when tag is skipped (a pushed tag, or run without a version)
+    if: ${{ !cancelled() && needs.tag.result != 'failure' }}
     strategy:
       fail-fast: false
       matrix:
@@ -51,8 +124,13 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      # The tag released, if any: made by the job tag, or pushed
+      TAG: ${{ needs.tag.outputs.tag || (startsWith(github.ref, 'refs/tags/v') && github.ref_name || '') }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.tag.outputs.tag || github.ref }}
 
       - uses: actions/setup-java@v6
         with:
@@ -66,8 +144,8 @@ jobs:
       - name: Version
         run: |
           VERSION=$(sed -n 's/^version=//p' gradle.properties)
-          if [[ "$GITHUB_REF" == refs/tags/v* && "$VERSION" != "${GITHUB_REF_NAME#v}" ]]; then
-            echo "::error::gradle.properties has version=$VERSION, but the tag is $GITHUB_REF_NAME: release with scripts/release.sh"
+          if [[ -n "$TAG" && "$VERSION" != "${TAG#v}" ]]; then
+            echo "::error::gradle.properties has version=$VERSION, but the tag is $TAG: release with scripts/release.sh"
             exit 1
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
@@ -120,11 +198,13 @@ jobs:
       GEONAMES_USERNAME: ${{ secrets.GEONAMES_USERNAME }}
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [tag, build]
+    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.tag.outputs.tag != '' || startsWith(github.ref, 'refs/tags/v')) }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+    env:
+      TAG: ${{ needs.tag.outputs.tag || github.ref_name }}
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -141,9 +221,9 @@ jobs:
           sha256sum *.zip > SHA256SUMS
           # A release of this tag made already (e.g. on GitHub's website)
           # gets the zips, rather than a second one for the same tag
-          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" *.zip SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG" *.zip SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" *.zip SHA256SUMS --repo "$GITHUB_REPOSITORY" \
-              --draft --verify-tag --title "wpsld ${GITHUB_REF_NAME#v}" --generate-notes
+            gh release create "$TAG" *.zip SHA256SUMS --repo "$GITHUB_REPOSITORY" \
+              --draft --verify-tag --title "wpsld ${TAG#v}" --generate-notes
           fi
