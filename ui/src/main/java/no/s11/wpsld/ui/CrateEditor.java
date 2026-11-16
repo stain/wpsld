@@ -299,6 +299,7 @@ public class CrateEditor extends Application {
 	@Override
 	public void start(Stage stage) {
 		this.stage = stage;
+		AppIcon.forAllWindows();
 		BorderPane root = new BorderPane(new Label("Loading schema.org " + SchemaFromJsonLd.SCHEMAORG_VERSION + "…"));
 		notice.setId("notice");
 		notice.setAlignment(javafx.geometry.Pos.CENTER_LEFT);

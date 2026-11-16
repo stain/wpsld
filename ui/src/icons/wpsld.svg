@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>wpsld</title>
+  <!-- wpsld's icon. The window, About box, README and launcher icons are made
+       from this file by scripts/update-icons.sh.
+       Copyright 2026 The University of Manchester, UK. SPDX-License-Identifier: Apache-2.0 -->
+  <!-- An open crate seen from above, with linked data rising out of it, in
+       the OS/2 logo's flat colours: blue, black, red, yellow, green, grey -->
+  <!-- The links, behind the crate's front edge: grey on a white halo, so they
+       show on light and dark backgrounds -->
+  <g stroke="#ffffff" stroke-width="18" stroke-linecap="round" fill="none">
+    <line x1="128" y1="112" x2="76" y2="46"/>
+    <line x1="128" y1="112" x2="180" y2="42"/>
+    <line x1="76" y1="46" x2="180" y2="42"/>
+  </g>
+  <g stroke="#959a92" stroke-width="10" stroke-linecap="round" fill="none">
+    <line x1="128" y1="112" x2="76" y2="46"/>
+    <line x1="128" y1="112" x2="180" y2="42"/>
+    <line x1="76" y1="46" x2="180" y2="42"/>
+  </g>
+  <!-- The crate: its black opening, then its two sides, flat, the right lighter -->
+  <polygon points="128,88 222,134 128,180 34,134" fill="#000000"/>
+  <polygon points="34,134 128,180 128,244 34,198" fill="#127bca"/>
+  <polygon points="128,180 222,134 222,198 128,244" fill="#3d97dc"/>
+  <!-- Planks -->
+  <g stroke="#000000" stroke-width="4" stroke-linecap="round">
+    <line x1="34" y1="166" x2="128" y2="212"/>
+    <line x1="128" y1="212" x2="222" y2="166"/>
+  </g>
+  <!-- Edges: the rim grey, the sides outlined black, as the OS/2 logo's letters -->
+  <polygon points="34,134 128,180 222,134 222,198 128,244 34,198" fill="none" stroke="#000000"
+      stroke-width="4" stroke-linejoin="round"/>
+  <line x1="128" y1="180" x2="128" y2="244" stroke="#000000" stroke-width="3"/>
+  <polygon points="128,88 222,134 128,180 34,134" fill="none" stroke="#959a92" stroke-width="7"
+      stroke-linejoin="round"/>
+  <!-- The nodes: red in the crate, yellow and green above it, each on a white halo -->
+  <g fill="#ffffff">
+    <circle cx="128" cy="112" r="27"/>
+    <circle cx="76" cy="46" r="31"/>
+    <circle cx="180" cy="42" r="31"/>
+  </g>
+  <circle cx="128" cy="112" r="21" fill="#ed1c24" stroke="#000000" stroke-width="4"/>
+  <circle cx="76" cy="46" r="25" fill="#fddd04" stroke="#000000" stroke-width="4"/>
+  <circle cx="180" cy="42" r="25" fill="#00a880" stroke="#000000" stroke-width="4"/>
+</svg>

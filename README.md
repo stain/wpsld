@@ -1,4 +1,4 @@
-# wpsld
+# <img src="ui/src/icons/wpsld.svg" alt="" width="48" height="48" align="top"> wpsld
 
 wpsld is a desktop editor for [RO-Crate](https://w3id.org/ro/crate/1.3)
 metadata. It describes files and folders with schema.org-based Linked Data

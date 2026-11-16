@@ -36,6 +36,7 @@ import javafx.geometry.Insets;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Hyperlink;
+import javafx.scene.image.ImageView;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -59,6 +60,9 @@ class AboutDialog extends Dialog<Void> {
 		initOwner(owner);
 		setTitle("About wpsld");
 		setHeaderText("wpsld " + version());
+		ImageView logo = new ImageView(AppIcon.image(64));
+		logo.setId("aboutLogo");
+		setGraphic(logo);
 		Label about = new Label("A desktop editor for RO-Crate metadata.\n"
 				+ "Copyright 2026 The University of Manchester, UK. Apache License 2.0.");
 		about.setWrapText(true);
