@@ -147,6 +147,14 @@ jobs:
             echo "::error::gradle.properties has version=$VERSION, but the tag is $TAG: release with scripts/release.sh"
             exit 1
           fi
+          # And the metadata Zenodo registers the DOI with, and CodeMeta's
+          for file in codemeta.json .zenodo.json; do
+            META=$(jq -r .version "$file")
+            if [[ -n "$TAG" && "$META" != "${TAG#v}" ]]; then
+              echo "::error::$file has version $META, but the tag is $TAG: release with scripts/release.sh"
+              exit 1
+            fi
+          done
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       # The jmods, so that jlink installs JavaFX's native libraries in the image

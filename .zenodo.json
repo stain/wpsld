@@ -1,0 +1,26 @@
+{
+  "title": "wpsld: a desktop editor for RO-Crate metadata",
+  "description": "<p>wpsld is a desktop editor for RO-Crate metadata. It describes files and folders with schema.org-based Linked Data and saves the result as <code>ro-crate-metadata.json</code>, with forms narrowed by RO-Crate profiles. Its command-line tool, <code>wpsld-cli</code>, checks, repairs and previews crates.</p>",
+  "upload_type": "software",
+  "version": "0.7.0",
+  "creators": [
+    {
+      "name": "Soiland-Reyes, Stian",
+      "orcid": "0000-0001-9842-9718",
+      "affiliation": "The University of Manchester"
+    }
+  ],
+  "license": "Apache-2.0",
+  "keywords": [
+    "RO-Crate",
+    "research objects",
+    "metadata editor",
+    "schema.org",
+    "Linked Data",
+    "JSON-LD",
+    "FAIR",
+    "JavaFX"
+  ],
+  "language": "eng",
+  "notes": "Funded by BioFAIR Method Commons (BioFAIR's reference MC25-001), BBSRC, UKRI."
+}
