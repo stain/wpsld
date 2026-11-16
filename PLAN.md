@@ -1441,7 +1441,7 @@ is there already, and not described in the crate, which does not hold it.
 make every preview), filled in by `CratePreview` with
 [JMustache](https://github.com/samskivert/jmustache) from plain maps and
 lists, so that its markup can be read and changed as HTML. The pages are
-byte for byte as before (checked on nine crates). Standard Mustache only
+as before but for their indentation (checked on nine crates). Standard Mustache only
 (none of JMustache's `-first`, `-index` and the like), so that other tools
 could fill in the same template (mustache.js, chevron in Python); every
 key of a value is given, false where not used, as Mustache looks for a
