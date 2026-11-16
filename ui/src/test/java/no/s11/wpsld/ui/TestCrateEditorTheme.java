@@ -149,6 +149,32 @@ public class TestCrateEditorTheme extends UiTest {
 	}
 
 	/**
+	 * In Windows 11's style, the row selected is as tall as the others, its
+	 * text where it was: the accent pill beside it once made it taller
+	 */
+	@Test
+	public void windows11SelectedRowSameSize() throws Exception {
+		editorShown();
+		choose("Style", "win11");
+		clickOn("#addEntity");
+		clickOn("#typeSearch").write("person").type(javafx.scene.input.KeyCode.ENTER);
+		javafx.scene.control.ListView<?> list = lookup("#entities").queryListView();
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> list.getItems().size() == 2);
+		interact(() -> list.getSelectionModel().clearAndSelect(1));
+		WaitForAsyncUtils.waitForFxEvents();
+		List<javafx.scene.control.ListCell<?>> cells = from(list).lookup(".list-cell").queryAll().stream()
+				.<javafx.scene.control.ListCell<?>>map(n -> (javafx.scene.control.ListCell<?>) n).filter(c -> !c.isEmpty()).toList();
+		javafx.scene.control.ListCell<?> selected = cells.stream().filter(c -> c.isSelected()).findFirst().orElseThrow();
+		javafx.scene.control.ListCell<?> other = cells.stream().filter(c -> !c.isSelected()).findFirst().orElseThrow();
+		assertEquals(other.getHeight(), selected.getHeight(), 0.5);
+		assertEquals(other.getInsets(), selected.getInsets());
+		// The pill still drawn at its left, in another colour than the row's
+		javafx.scene.image.Image shot = WaitForAsyncUtils.asyncFx(() -> selected.snapshot(null, null)).get();
+		int middle = (int) (shot.getHeight() / 2);
+		assertNotEquals(shot.getPixelReader().getColor(8, middle), shot.getPixelReader().getColor(2, middle));
+	}
+
+	/**
 	 * macOS, which also asks for the screen's menu bar (only used on macOS).
 	 */
 	@Test
