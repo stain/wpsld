@@ -371,6 +371,28 @@ in `lib` (moving what is still in `ui` there first):
   should not assume `/` in paths or POSIX permissions, and `.gitattributes`
   checks text out with LF on Windows too, as tests check the SHA-256 of
   bundled files.
+- **How long the GUI tests take in CI** (measured November 2026, PR #24 and
+  #26, from each OS's `class-times.tsv` in its `test-reports-<os>`
+  artifact): the classes took 590 s in all on Linux, 830 s on Windows and
+  1 640 s on macOS. Each test, not some, is about 4 times as slow on
+  GitHub's macOS runner (3 cores, 7 GB) as on Linux, 1.4 times on Windows;
+  classes of one test take the same everywhere, so it is the JavaFX work
+  (software rendering, `prism.order=sw`), not starting JVMs. Done: test
+  classes in parallel, a JVM a core, at most three (`maxParallelForks`;
+  macOS's three cores gave no slower tests than two), and `TestCrateEditor`
+  split in four (it alone took 645 s on macOS): the job's Build and test
+  step went from over 20 minutes (timed out) to 15½, then 14 on macOS, and
+  5 minutes on Linux, 7 on Windows. Yet only about 2 of the 3 JVMs are busy
+  on average (the classes' time over the test task's: 2.1 on macOS, 2.2 on
+  Linux and Windows), where 3 would take about 9 minutes on macOS:
+  probably as Gradle starts the classes by name, so a long one starting
+  late (e.g. `TestEntityEditor`, 286 s on macOS) runs on alone at the end.
+  Left there for now; next, if wanted: record when each class starts and
+  ends in `class-times.tsv` (seconds from the task's start) to see it, and
+  split the longest classes (`TestCrateEditorEntityList` 297 s and
+  `TestEntityEditor` 286 s on macOS) so that none takes more than about
+  150 s; and the slowest tests themselves (e.g. the Getting started ones,
+  40 s on macOS) could share their set-up.
 
 ### User folders
 
