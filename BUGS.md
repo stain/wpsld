@@ -237,10 +237,13 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   are all over the place (none, blank nodes, `#` ids relative to the
   page, the page's own URL for several things), so each would need
   checking and renaming before it is added; and the page is untrusted.
-- **An icon for wpsld**, as SVG (and the PNG and ICO sizes the launchers
-  and the About box need), inspired by the RO-Crate logo and the OS/2
-  logo: for the window, the app image's launchers (jpackage) and the
-  README.
+- **An icon for wpsld** (*done*): an open crate seen from above with
+  linked data rising out of it, in the OS/2 logo's flat colours (blue,
+  black, red, yellow, green, grey), not its shapes. `ui/src/icons/wpsld.svg`,
+  with the launchers' `.png`, `.ico` and `.icns` and the windows' PNGs
+  made from it by `scripts/update-icons.sh`; on every window (`AppIcon`),
+  the About box, the README and the app images' launchers, `wpsld-cli`'s
+  too.
 - **File > Save as Attached Crate…**: choose a folder (empty or new;
   otherwise a warning, as it would mix with what is there), write the
   crate there as `ro-crate-metadata.json` (now the name has to be typed

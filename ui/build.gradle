@@ -20,6 +20,10 @@ repositories {
 // 0.1.0-SNAPSHOT
 def numericVersion = version.toString().replaceFirst(/[^0-9.].*$/, '') ?: '0.1.0'
 def isMac = System.getProperty('os.name').toLowerCase().contains('mac')
+def isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
+// The launchers' icon, in the format of the platform jpackage runs on (made
+// from src/icons/wpsld.svg by scripts/update-icons.sh)
+def launcherIcon = file(isMac ? 'src/icons/wpsld.icns' : isWindows ? 'src/icons/wpsld.ico' : 'src/icons/wpsld.png').path
 
 // Platforms to cross-link for (see Dockerfile and the jlink block below),
 // as name: [jdkHome, JavaFX jmods]
@@ -59,6 +63,7 @@ jlink {
         moduleName = 'no.s11.wpsld.cli'
         mainClass = 'no.s11.wpsld.cli.Main'
         winConsole = true
+        icon = launcherIcon
     }
     addOptions('--add-modules', 'no.s11.wpsld.cli')
     // Link JavaFX from its jmods (-PjavafxJmods=<dir>), which install the
@@ -84,6 +89,7 @@ jlink {
     // .github/workflows/windows-app-image.yml
     jpackage {
         imageName = 'wpsld'
+        icon = launcherIcon
         skipInstaller = true
         // macOS app bundles can't have version 0.x (CFBundleVersion); the
         // zip's name still says which version it is

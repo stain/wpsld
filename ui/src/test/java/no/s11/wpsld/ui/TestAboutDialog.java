@@ -29,6 +29,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 
 /**
  * Help > About wpsld: version, licence and third-party notices, as the
@@ -47,7 +48,15 @@ public class TestAboutDialog extends UiTest {
 
 	@Test
 	public void about() {
-		interact(() -> new AboutDialog(stage, browsed::add).show());
+		interact(() -> {
+			AppIcon.forAllWindows();
+			new AboutDialog(stage, browsed::add).show();
+		});
+		// wpsld's icon in the header, and on every window, this one too
+		assertEquals(64, lookup("#aboutLogo").queryAs(javafx.scene.image.ImageView.class).getImage().getWidth(), 0);
+		assertEquals(7, stage.getIcons().size());
+		assertTrue(onFx(() -> Window.getWindows().stream()
+				.allMatch(w -> !(w instanceof Stage s) || s.getIcons().size() == 7)));
 		// The build fills in the version, e.g. 0.1.0-SNAPSHOT
 		assertFalse(AboutDialog.version().contains("development"));
 		assertTrue(lookup("wpsld " + AboutDialog.version()).tryQuery().isPresent());
