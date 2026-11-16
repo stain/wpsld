@@ -4,7 +4,7 @@
 # Required on Linux, as in the Dockerfile and release.yml. Windows and macOS
 # run too, but only report: their headless GUI tests have not proven
 # themselves in CI yet. When tests fail, their reports are kept as an
-# artifact of the run.
+# artifact of the run; each OS's time per GUI test class always is.
 name: Test
 
 on:
@@ -60,4 +60,12 @@ jobs:
           path: |
             lib/build/reports/tests/
             ui/build/reports/tests/
+          if-no-files-found: ignore
+
+      - name: Keep the time per test class
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-times-${{ matrix.os }}
+          path: ui/build/test-results/class-times.tsv
           if-no-files-found: ignore
