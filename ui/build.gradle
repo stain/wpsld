@@ -22,8 +22,12 @@ def numericVersion = version.toString().replaceFirst(/[^0-9.].*$/, '') ?: '0.1.0
 def isMac = System.getProperty('os.name').toLowerCase().contains('mac')
 def isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
 // The launchers' icon, in the format of the platform jpackage runs on (made
-// from src/icons/wpsld.svg by scripts/update-icons.sh)
-def launcherIcon = file(isMac ? 'src/icons/wpsld.icns' : isWindows ? 'src/icons/wpsld.ico' : 'src/icons/wpsld.png').path
+// from src/icons/wpsld.svg by scripts/update-icons.sh). With / also on
+// Windows: jpackage reads a secondary launcher's icon from a properties
+// file, where the backslash before ui (of ui/src) starts a malformed
+// Unicode escape
+def launcherIcon = file(isMac ? 'src/icons/wpsld.icns' : isWindows ? 'src/icons/wpsld.ico' : 'src/icons/wpsld.png')
+        .path.replace('\\', '/')
 
 // Platforms to cross-link for (see Dockerfile and the jlink block below),
 // as name: [jdkHome, JavaFX jmods]
