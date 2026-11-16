@@ -180,10 +180,11 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   newer versions of the profiles a crate conforms to, e.g. Workflow Run
   Crate 0.5 to 0.6 (which also meets the ComputationalWorkflow change and
   newer RO-Crate). Say what changed, as Repair Crate does.
-- **Entities with the same `@id` in `@graph`**: not allowed in flattened,
-  compacted JSON-LD, but crates do have them by accident. Check what
-  opening one does now; offer to merge them (as renaming to a taken @id
-  does), saying which, or merge on opening with a warning.
+- **Entities with the same `@id` in `@graph`** (*done*): not allowed in
+  flattened, compacted JSON-LD, but crates do have them by accident.
+  Opening one merges them, as JSON-LD flattening does, with a warning
+  ("More than one entity with @id …, merged", `CrateReader`), as the help
+  says (Opening crates written in other ways).
 
 - **Cut, copy and paste of files into a folder, within a crate**: in the
   entity tree, cutting a File with a relative `@id` and pasting it into a
