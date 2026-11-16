@@ -5,9 +5,10 @@
 #
 # To release: Actions -> Release -> Run workflow on main, with the version
 # (e.g. 0.8.0). It runs scripts/release.sh, pushes its branch
-# release-<version> and tag v<version>, and opens the branch's pull request
-# (merge it with "Create a merge commit"), then builds the tagged commit and
+# release-<version> and tag v<version>, then builds the tagged commit and
 # makes a draft GitHub release with the zips, to review and publish by hand.
+# Open the branch's pull request from the link in the run's summary, and
+# merge it with "Create a merge commit".
 # A tag pushed by a workflow starts no other workflow, so this run builds it.
 #
 # A tag v<version> pushed from elsewhere, made with scripts/release.sh so
@@ -55,7 +56,6 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
-      pull-requests: write
     outputs:
       tag: ${{ steps.release.outputs.tag }}
     steps:
@@ -82,20 +82,19 @@ jobs:
           git push --atomic origin "release-$VERSION" "v$VERSION"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
-      # Needs Settings -> Actions -> General -> "Allow GitHub Actions to
-      # create and approve pull requests"; without it, the release goes on
-      # and the pull request is left to open by hand
+      # The pull request is opened by hand: letting workflows open pull
+      # requests (Settings -> Actions -> General) would also let them
+      # approve them
       - name: Pull request
         env:
-          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
         run: |
-          body="The version committed for the release, tagged v$VERSION, then the next -SNAPSHOT.
-
-          Merge with **Create a merge commit**: squash or rebase would make new commits, leaving the tagged one out of main's history."
-          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "release-$VERSION" \
-              --title "Release $VERSION" --body "$body" ||
-            echo "::warning::No pull request made: open one of release-$VERSION by hand, merged with a merge commit"
+          {
+            echo "Open the pull request of release-$VERSION and merge it with **Create a merge commit**"
+            echo "(squash or rebase would leave the tagged commit out of main's history):"
+            echo
+            echo "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...release-$VERSION?expand=1&title=Release+$VERSION"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   build:
     needs: tag
