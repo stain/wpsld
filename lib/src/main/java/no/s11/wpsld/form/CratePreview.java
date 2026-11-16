@@ -17,7 +17,10 @@
  */
 package no.s11.wpsld.form;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -47,51 +50,23 @@ public final class CratePreview {
 	/** The preview's file name, beside the metadata file */
 	public static final String FILE = "ro-crate-preview.html";
 
-	private static final String STYLE = """
-			body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.5;
-			  max-width: 60em; margin: 2em auto; padding: 0 1em; color: #1f2328; background: #fff; }
-			header { background: #eef4fb; border-left: 6px solid #2f6db5; border-radius: 6px;
-			  padding: 0.5em 1.5em; }
-			h1 { margin-bottom: 0.2em; color: #1b4f8a; }
-			h2 { margin-top: 2em; border-bottom: 2px solid #9cc0e8; padding-bottom: 0.2em; color: #1b4f8a; }
-			h3 { margin: 1.5em 0 0.3em; }
-			section.entity h3 { margin-top: 0.5em; }
-			.types { color: #59636e; margin: 0; }
-			.types span { display: inline-block; background: #e8f0e0; color: #3b5e1f; border-radius: 1em;
-			  padding: 0 0.6em; margin-right: 0.3em; font-size: 0.85em; }
-			.top { float: right; font-size: 0.85em; margin: 0.5em 0 0; }
-			.description table { width: auto; }
-			.description th, .description td { border: 1px solid #d0d7de; padding: 0.2em 0.5em; width: auto; }
-			.description pre, .description code { background: #f3f5f7; border-radius: 4px; }
-			.description pre { padding: 0.5em; overflow-x: auto; }
-			.description h1, .description h2 { font-size: 1.2em; border: none; color: inherit; margin-top: 1em; }
-			.id { font-family: ui-monospace, monospace; font-size: 0.9em; color: #59636e; word-break: break-all; }
-			section.entity { border: 1px solid #d0d7de; border-radius: 6px; padding: 0.5em 1em; margin: 1em 0; }
-			section.entity:target { border-color: #0969da; box-shadow: 0 0 0 2px #0969da33; }
-			table { border-collapse: collapse; width: 100%; }
-			th { text-align: left; vertical-align: top; width: 14em; padding: 0.3em 1em 0.3em 0; font-weight: 600;
-			  color: #5a3d87; }
-			td { padding: 0.3em 0; vertical-align: top; overflow-wrap: anywhere; }
-			ul.values { margin: 0; padding-left: 1.2em; }
-			nav ul { columns: 2; }
-			a { color: #0969da; }
-			footer { margin-top: 3em; color: #59636e; font-size: 0.85em; }
-			@media (prefers-color-scheme: dark) {
-			  body { color: #e6edf3; background: #0d1117; }
-			  .types, .id, footer { color: #9198a1; }
-			  section.entity { border-color: #3d444d; }
-			  header { background: #13233a; border-left-color: #4c8ed9; }
-			  h1, h2 { color: #8cb9ec; }
-			  h2 { border-color: #2d4d75; }
-			  .types span { background: #26361b; color: #b5d69a; }
-			  th { color: #c7a8f0; }
-			  .description th, .description td { border-color: #3d444d; }
-			  .description pre, .description code { background: #1c2129; }
-			  a { color: #4493f8; }
-			}
-			""";
+	/** The page's stylesheet, a resource beside this class, copied into each page */
+	private static final String STYLE = readStyle();
 
 	private CratePreview() {
+	}
+
+	private static String readStyle() {
+		try (InputStream in = CratePreview.class.getResourceAsStream("ro-crate-preview.css")) {
+			if (in == null) {
+				throw new IllegalStateException("Can't find the preview's stylesheet ro-crate-preview.css");
+			}
+			String css = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+			// Not its opening comment, which is about the file, not the page
+			return css.startsWith("/*") ? css.substring(css.indexOf("*/") + 2).stripLeading() : css;
+		} catch (IOException e) {
+			throw new UncheckedIOException("Can't read the preview's stylesheet", e);
+		}
 	}
 
 	/**
