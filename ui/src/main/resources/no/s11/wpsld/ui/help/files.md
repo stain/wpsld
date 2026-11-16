@@ -13,6 +13,24 @@ and may show warnings about a file it did open. It also tries to choose a
 declared [profile](profiles.md). Choose **File > Open Folder...** to open
 a folder as a crate (see [Folders and files](folders.md)).
 
+### Crates written in other ways
+
+RO-Crate's JSON-LD is *flattened*: each entity is written once in the
+`@graph`, and values link to others by `{"@id": "..."}` alone. Crates made
+by other tools don't always follow this. When opening one, wpsld keeps
+what it can and says what it did in the warnings:
+
+- An entity written out in full inside a value, with an `@id`, becomes a
+  link and an entity of its own (merged with the crate's of that `@id`).
+- An object written inside a value without an `@id` is kept as it is,
+  with a warning: **Crate > Repair Crate** makes it an entity of its own
+  with a new `@id` (see [Entities and identifiers](entities.md)).
+- Links written with JSON-LD's `@reverse` become links of the entities
+  they come from.
+- Two entities with the same `@id` are merged.
+- Text in a language, or of a datatype, is kept and can be edited (see
+  [Properties and links](properties.md)).
+
 Before replacing a description with New or Open, or when using **File >
 Close Window** or **File > Exit**, wpsld asks what to do with unsaved
 changes. Choose **Save**, **Don't Save**, or **Cancel** to keep editing.

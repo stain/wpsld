@@ -6,23 +6,47 @@ selected entity's metadata as JSON-LD. **View > Crate JSON-LD...** shows
 the whole crate's, as it would be saved, in a window of its own; press
 **Refresh** there after changes.
 
-You can also edit the entity's JSON-LD in its tab, or paste an entity's
-JSON-LD over it: **Apply**, or leaving the text, puts it in place of the
-entity's types and values, and changing `@id` renames it, updating links
-to it (or offers to merge it with another of that `@id`). It must be one
-object with an `@id` and `@type`. Values usually refer to other entities
-by `{"@id": "..."}` alone; entities written out in full in a value (as
-some repositories write a dataset's parts) become entities of their own,
-added, or merged into the crate's of the same `@id`, and those without
-an `@id` get a new one, as when opening such a crate. A notice says
-which. If something is wrong, wpsld says what below the text and changes
-nothing. **Revert** goes back to the entity as it is.
-**Edit > Undo** undoes an edit applied. Selecting a link to another described entity in Preview
+Selecting a link to another described entity in Preview
 opens it in the editor. Web addresses open in the browser, and files
 beside the crate as your system opens them, also from the values of
 properties that take a URL, such as **URL**. A compact `@id` such as
 `s:ActiveActionStatus` opens as the address the crate's `@context` gives
 it, here `http://schema.org/ActiveActionStatus`.
+
+## Edit the JSON-LD
+
+You can edit the selected entity's JSON-LD in the **JSON-LD** tab, or
+paste an entity's JSON-LD over it. **Apply**, or leaving the text, puts
+it in place of the entity's types and values, as one step that **Edit >
+Undo** undoes. **Revert** goes back to the entity as it is. While you
+edit, changes made elsewhere don't overwrite the text.
+
+- It must be one JSON object with an `@id` and one or more `@type`s,
+  as each entity is in the crate's `@graph`. To add several entities,
+  copy their JSON-LD and use **Edit > Paste** in the entity list instead
+  (see [Copy and paste](clipboard.md)).
+- Changing `@id` renames the entity and updates the links to it. If
+  another entity already has that `@id`, wpsld offers to merge them (see
+  [Entities and identifiers](entities.md)).
+- Values usually link to other entities by their `@id` alone,
+  `{"@id": "#alice"}`. An entity written out in full in a value, as some
+  repositories write a dataset's parts, becomes a link, and an entity of
+  its own: added, or merged into the crate's entity of that `@id`. One
+  written without an `@id`, such as
+  `{"@type": "PropertyValue", "name": "depth"}`, is added with a new one,
+  e.g. `#propertyvalue-1`. RO-Crate's flattened JSON-LD doesn't allow
+  entities written inside others, so this makes the crate follow it.
+- Links written with JSON-LD's `@reverse`, e.g.
+  `"@reverse": {"isPartOf": {"@id": "data/a.csv"}}` in `data/`, become
+  links of the entities they come from: `data/a.csv` gets `isPartOf`
+  `data/`.
+- Text in a language, `{"@value": "Hei", "@language": "no"}`, or of a
+  datatype, is kept as it is (see [Properties and links](properties.md)).
+
+A notice under the window says which entities were added, merged or
+linked. If the text can't be applied, wpsld says why below it (for
+example, where the JSON is broken) and changes nothing. If you then select
+another entity, those changes are dropped, and a notice says so.
 
 The entity list shows the dataset as a whole (the root) first, then the
 other entities by type, name and `@id`. An entity moves to its place in
