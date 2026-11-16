@@ -1397,7 +1397,17 @@ not in hasPart). Next: a preference to not write it; the generator as a
 SoftwareApplication with a CreateAction (object the metadata, result the
 preview), as the spec's example; images and maps for files and places;
 "Referenced by" as in the editor's preview; anchors that stay the same
-across saves (by @id rather than position). The Preview tab renders
+across saves (by @id rather than position).
+
+*Next*: **File > Save RO-Crate Preview…**, which writes the preview on its
+own, to a file the user chooses, for a detached crate (which has no folder
+for saving to write it in, e.g. to put beside its metadata on a web server)
+and for an attached crate whose preview is to go elsewhere; links to files
+as their `@id`s, which in a detached crate are absolute. The same
+`CratePreview`, the same check for another tool's preview where the file
+is there already, and not described in the crate, which does not hold it.
+
+The Preview tab renders
 Markdown descriptions too, by the same heuristics, as JavaFX nodes
 (`HelpMarkdown.description`, as the help viewer's pages). For a richer
 preview, investigate which existing previewer
