@@ -67,6 +67,22 @@ public class TestCli {
 		return line.execute(args);
 	}
 
+	/** Files in the folder that the crate doesn't describe: warnings, which don't fail the check */
+	@Test
+	public void filesNotInTheCrateWarned() throws Exception {
+		assertEquals(0, run("repair", folder.toString()));
+		Files.writeString(metadata, Files.readString(metadata).replace("\"datePublished\"",
+				"\"license\": {\"@id\": \"http://spdx.org/licenses/CC0-1.0\"}, \"datePublished\""));
+		out.getBuffer().setLength(0);
+		assertEquals(0, run("check", "--offline", folder.toString()));
+		assertFalse(out.toString(), out.toString().contains("Warning:"));
+		Files.writeString(folder.resolve("notes.txt"), "Not in the crate");
+		out.getBuffer().setLength(0);
+		assertEquals(0, run("check", "--offline", folder.toString()));
+		assertTrue(out.toString(), out.toString().contains("Warning: notes.txt is in the crate's folder, but not in the crate"));
+		assertTrue(out.toString().contains("Passed."));
+	}
+
 	@Test
 	public void checkFindsProblemsByProfile() throws Exception {
 		assertEquals(1, run("check", "--offline", folder.toString()));

@@ -35,18 +35,26 @@ import no.s11.wpsld.crate.CrateTerms;
  * properties its profiles require (see {@link CrateProfiles} and
  * {@link RequiredFields}); RO-Crate's own requirements of the root data
  * entity ({@link CrateChecks}); and for an attached crate, its files and
- * folders ({@link CrateFolder#problems}). Not a full validator: see
+ * folders ({@link CrateFolder#problems}), and as warnings, the files in
+ * its folder that it doesn't describe. Not a full validator: see
  * rocrate-validator for that.
  *
  * @param reading  The problems reading the crate, errors first
  * @param profiles The profiles checked, and those not found
  * @param problems What the crate lacks or has wrong, each once
+ * @param warnings What may be meant otherwise, but is allowed: the files in
+ *                 an attached crate's folder that it doesn't describe (at
+ *                 most {@link #FILES} of them)
  */
-public record CrateCheck(List<Problem> reading, CrateProfiles profiles, List<String> problems) {
+public record CrateCheck(List<Problem> reading, CrateProfiles profiles, List<String> problems,
+		List<String> warnings) {
+	/** How many of the folder's files to look at, at most, as the editor's Entities by Folder */
+	public static final int FILES = 10_000;
 
 	public CrateCheck {
 		reading = List.copyOf(reading);
 		problems = List.copyOf(problems);
+		warnings = List.copyOf(warnings);
 	}
 
 	/**
@@ -59,7 +67,7 @@ public record CrateCheck(List<Problem> reading, CrateProfiles profiles, List<Str
 		List<Problem> reading = document.problems().stream()
 				.sorted((a, b) -> a.severity().compareTo(b.severity())).toList();
 		if (document.crate().isEmpty()) {
-			return new CrateCheck(reading, profiles, List.of());
+			return new CrateCheck(reading, profiles, List.of(), List.of());
 		}
 		var crate = document.crate().get();
 		SchemaOrgFormFields schemaOrg = new SchemaOrgFormFields(terms);
@@ -71,10 +79,12 @@ public record CrateCheck(List<Problem> reading, CrateProfiles profiles, List<Str
 				CrateChecks.check(crate).stream(),
 				folder.map(f -> CrateFolder.problems(crate, f)).orElse(List.of()).stream())
 				.flatMap(s -> s).distinct().toList();
-		return new CrateCheck(reading, profiles, problems);
+		List<String> warnings = folder.map(f -> CrateFolder.match(crate, f, FILES).undescribed()).orElse(List.of())
+				.stream().map(id -> id + " is in the crate's folder, but not in the crate").toList();
+		return new CrateCheck(reading, profiles, problems, warnings);
 	}
 
-	/** Whether it could be read, without errors, and has no problems */
+	/** Whether it could be read, without errors, and has no problems; warnings don't count */
 	public boolean passed() {
 		return reading.stream().noneMatch(p -> p.severity() == Severity.ERROR) && problems.isEmpty();
 	}

@@ -39,7 +39,8 @@ import picocli.CommandLine.Spec;
 @Command(name = "check", mixinStandardHelpOptions = true,
 		description = { "Report a crate's problems, as wpsld finds them before saving: reading it, the properties"
 				+ " its profiles require (by its conformsTo; else the core RO-Crate profile), RO-Crate's own"
-				+ " requirements, and an attached crate's files and folders.",
+				+ " requirements, and an attached crate's files and folders; files in its folder that it doesn't"
+				+ " describe are warnings.",
 				"Exit status 0 if it has none, 1 if it has, 2 if it can't be read." })
 final class CheckCommand implements Callable<Integer> {
 	@ParentCommand
@@ -79,6 +80,8 @@ final class CheckCommand implements Callable<Integer> {
 					.put("message", p.message()));
 			var problems = report.putArray("problems");
 			check.problems().forEach(problems::add);
+			var warnings = report.putArray("warnings");
+			check.warnings().forEach(warnings::add);
 			out.println(new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(report));
 		} else {
 			out.println(opened.metadata());
@@ -88,6 +91,7 @@ final class CheckCommand implements Callable<Integer> {
 			profiles.unknown().forEach((id, why) -> out.println("Profile not found: " + id + " (" + why + ")"));
 			check.reading().forEach(p -> out.println(p));
 			check.problems().forEach(p -> out.println("• " + p));
+			check.warnings().forEach(w -> out.println("Warning: " + w));
 			out.println(opened.document().crate().isEmpty() ? "Couldn't be read."
 					: check.passed() ? "Passed."
 					: check.problems().size() + (check.problems().size() == 1 ? " problem." : " problems."));
