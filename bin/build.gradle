@@ -1,0 +1,41 @@
+// wpsld-cli (no.s11.wpsld.cli): command-line tools with lib's functionality,
+// e.g. checking, repairing and writing the preview of crates, for scripts
+// and CI; no JavaFX. Run it with ./gradlew :bin:run --args='check <crate>';
+// the app images and zips have it as a launcher of its own (see ui)
+plugins {
+    id 'application'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':lib')
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.4'
+    // Its commands, options and --help (one jar, no dependencies)
+    implementation 'info.picocli:picocli:4.7.7'
+
+    testImplementation 'junit:junit:4.13'
+    // The test categories, and keeping the tests offline (no.s11.wpsld.test)
+    testImplementation testFixtures(project(':lib'))
+}
+
+application {
+    applicationName = 'wpsld-cli'
+    mainClass = 'no.s11.wpsld.cli.Main'
+    mainModule = 'no.s11.wpsld.cli'
+}
+
+// The version for --version and the previews' generator
+tasks.named('processResources') {
+    filesMatching('**/about.properties') {
+        expand(version: version.toString())
+    }
+}
+
+// The module name's s11 is the organisation's domain (s11.no); javac's lint
+// would warn about its digits on every build
+tasks.named('compileJava') {
+    options.compilerArgs += ['-Xlint:-module']
+}
