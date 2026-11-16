@@ -157,7 +157,7 @@ dependencies {
     testImplementation testFixtures(project(':lib'))
 
     implementation project(':lib')
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.4'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.23.0'
     implementation 'org.commonmark:commonmark:0.31.0'
     implementation 'org.commonmark:commonmark-ext-gfm-tables:0.31.0'
     // Readers of files' own metadata, found as services (FileMetadata)
