@@ -278,6 +278,33 @@ mnemonics on tabs, the Warp 3 style
   not registered as a provider (no `provides` in `module-info`), so decide
   its role before testing or finishing it.
 
+### Command-line tools (a `bin` module)
+
+*To do: consider* which of `lib`'s functionality is worth having as
+command-line tools, for scripts, pipelines and CI where no window is
+wanted, in a new module `bin` (no JavaFX, only `lib` and the
+`readers-*`): one `wpsld-cli`-style launcher with subcommands, or a few
+small ones, in the distribution zip and the app images beside the
+editor. Candidates:
+- **Write the RO-Crate preview** (`CratePreview`, already in `lib`):
+  `ro-crate-preview.html` for a crate, attached or detached, to a file
+  given (as File > Save RO-Crate Preview…, see HTML preview), with the
+  same check for another tool's preview.
+- **Repair a crate** (as Crate > Repair Crate: `TermRepairs`, objects
+  without `@id` made entities, nested entities flattened), writing the
+  crate back or to another file, and saying what was changed.
+- Others to weigh: check a crate (`CrateChecks`, as the editor warns on
+  opening; exit status for CI); update file details from what files say
+  about themselves (the `readers-*`); identify files' formats (PRONOM);
+  check web availability; make a crate detached or attached; describe a
+  folder as a new crate.
+- To decide: one launcher or several; how it is packaged (jlink image
+  without JavaFX, or the zip's `lib/`); options and output (JSON for
+  scripts, text for people); that what it writes is what the editor
+  writes for the same action (shared code in `lib`, moved there from
+  `CrateEditor` where needed, e.g. Repair Crate's parts still in `ui`);
+  tests of each, as of the editor's actions.
+
 ### Testing
 
 - `lib`: JUnit 4 unit tests (`./gradlew :lib:test`), including that loading
