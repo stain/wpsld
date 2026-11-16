@@ -1434,6 +1434,21 @@ as their `@id`s, which in a detached crate are absolute. The same
 `CratePreview`, the same check for another tool's preview where the file
 is there already, and not described in the crate, which does not hold it.
 
+*To consider*: writing the page with a very lightweight template rather
+than `CratePreview`'s `StringBuilder` of HTML, so that the page's markup
+can be read and changed as HTML, as its stylesheet now is
+(`ro-crate-preview.css`, a resource in `lib` copied into each page). The
+JDK has no template engine of its own: String Templates (JEP 430/459)
+were withdrawn in JDK 23, and XSLT (in `java.xml`, which `lib` already
+requires) would mean the crate as XML first. Small ones to compare, for
+size, dependencies, escaping by default, and working in `lib`'s named
+module and a jlink image: JMustache (one small jar, no dependencies,
+logic-less), Mustache.java, jte (templates compiled to Java at build
+time, typed), and Pebble or Jinjava (larger; Jinjava would also run
+ro-crate-py's Jinja preview template). Whichever is chosen, the same
+template should serve File > Save RO-Crate Preview… and a command-line
+preview writer (see Command-line tools).
+
 The Preview tab renders
 Markdown descriptions too, by the same heuristics, as JavaFX nodes
 (`HelpMarkdown.description`, as the help viewer's pages). For a richer
