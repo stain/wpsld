@@ -162,4 +162,62 @@ public class TestCrateEditorLicenses extends UiTest {
 		assertEquals("Apache License 2.0", apache.getLabel());
 		assertTrue(entity("#spdx-Apache-2.0").isPresent());
 	}
+
+	/**
+	 * Crate > Repair Crate writes types given as IRIs by their names, and
+	 * a member of a schema.org list as a reference to it, saying so; the
+	 * member is not added as a Thing
+	 */
+	@Test
+	public void repairTerms() throws Exception {
+		Entity root = entities().getItems().get(0);
+		interact(() -> {
+			root.setTypes(List.of("Dataset", "http://schema.org/CreativeWork"));
+			root.set("actionStatus", Optional.of(TextNode.valueOf("PotentialActionStatus")));
+			// Written in a value without an @id
+			root.set("variableMeasured", Optional.of(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance
+					.objectNode().put("@type", "PropertyValue").put("name", "depth")));
+		});
+		MenuBar bar = lookup("#menuBar").queryAs(MenuBar.class);
+		MenuItem repair = bar.getMenus().stream().flatMap(m -> m.getItems().stream())
+				.filter(i -> "menuRepair".equals(i.getId())).findFirst().orElseThrow();
+		WaitForAsyncUtils.asyncFx(repair::fire);
+		WaitForAsyncUtils.waitForFxEvents();
+		String report = lookup(".dialog-pane").queryAs(DialogPane.class).getContentText();
+		assertTrue(report, report.contains("Types written by their names:\n• ./: http://schema.org/CreativeWork → CreativeWork"));
+		assertTrue(report, report.contains("as references to them:\n• ./: actionStatus PotentialActionStatus"));
+		assertFalse(report, report.contains("Added as Thing"));
+		assertTrue(report, report.contains("now entities of their own:\n• depth (#propertyvalue-1)"));
+		clickOn("OK");
+		assertEquals(List.of("Dataset", "CreativeWork"), root.getTypes());
+		assertEquals("#propertyvalue-1", root.get("variableMeasured").orElseThrow().path("@id").asText());
+		assertEquals("http://schema.org/PotentialActionStatus", root.get("actionStatus").orElseThrow().path("@id").asText());
+	}
+
+	/**
+	 * A long report, of many repairs, scrolls in a text area that can be
+	 * copied from, listing them all, so that the dialog fits on the screen
+	 */
+	@Test
+	public void longRepairReportScrolls() throws Exception {
+		Entity root = entities().getItems().get(0);
+		interact(() -> {
+			List<com.fasterxml.jackson.databind.JsonNode> authors = new java.util.ArrayList<>();
+			for (int i = 0; i < 30; i++) {
+				authors.add(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("@id",
+						"#missing-" + i));
+			}
+			root.setAll("author", authors);
+		});
+		MenuBar bar = lookup("#menuBar").queryAs(MenuBar.class);
+		MenuItem repair = bar.getMenus().stream().flatMap(m -> m.getItems().stream())
+				.filter(i -> "menuRepair".equals(i.getId())).findFirst().orElseThrow();
+		WaitForAsyncUtils.asyncFx(repair::fire);
+		WaitForAsyncUtils.waitForFxEvents();
+		javafx.scene.control.TextArea report = lookup("#report").queryAs(javafx.scene.control.TextArea.class);
+		assertFalse(report.isEditable());
+		assertTrue(report.getText(), report.getText().contains("• #missing-29"));
+		assertFalse(report.getText(), report.getText().contains("more"));
+		clickOn("OK");
+	}
 }

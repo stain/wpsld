@@ -86,7 +86,24 @@ public class Crate {
 	 */
 	public static final List<String> ROOT_LINKS = List.of("hasPart", "mentions");
 
-	private final List<Entity> entities = new ArrayList<>();
+	private final Entities entities = new Entities();
+	/**
+	 * The entities by @id, the first of each, for {@link #get}: rebuilt
+	 * when entities were added or removed, or any @id changed (see
+	 * {@link Entity#idChanges()}), as a crate may have thousands
+	 */
+	private Map<String, Entity> index;
+	private int indexedChanges;
+	private long indexedIds;
+
+	/** The entities, counting changes to them (as ArrayList does, for its iterators) */
+	private static final class Entities extends ArrayList<Entity> {
+		private static final long serialVersionUID = 1L;
+
+		int changes() {
+			return modCount;
+		}
+	}
 	/** The <code>@context</code> to write, as read or RO-Crate 1.3's */
 	private final JsonNode context;
 	/** The metadata descriptor as read, to write again; else a new one for 1.3 */
@@ -95,14 +112,14 @@ public class Crate {
 	private JsonLdContext processed;
 
 	public Crate() {
-		entities.add(new Entity(ROOT_ID, "Dataset"));
+		append(new Entity(ROOT_ID, "Dataset"));
 		context = TextNode.valueOf(RO_CRATE_1_3_CONTEXT);
 		descriptor = Optional.empty();
 	}
 
 	private Crate(Entity root, List<Entity> others, JsonNode context, Optional<Entity> descriptor) {
-		entities.add(root);
-		entities.addAll(others);
+		append(root);
+		others.forEach(this::append);
 		this.context = context.deepCopy();
 		this.descriptor = descriptor;
 	}
@@ -164,7 +181,39 @@ public class Crate {
 	}
 
 	public Optional<Entity> get(String id) {
-		return entities.stream().filter(e -> e.getId().equals(id)).findFirst();
+		if (!indexed()) {
+			indexedIds = Entity.idChanges();
+			indexedChanges = entities.changes();
+			index = byId();
+		}
+		return Optional.ofNullable(index.get(id));
+	}
+
+	private boolean indexed() {
+		return index != null && indexedChanges == entities.changes() && indexedIds == Entity.idChanges();
+	}
+
+	/** Add an entity, to the index by @id too if it is up to date (pasting thousands looks up as it adds) */
+	private void append(Entity entity) {
+		boolean was = indexed();
+		entities.add(entity);
+		entity.inCrate = true;
+		if (was) {
+			index.putIfAbsent(entity.getId(), entity);
+			indexedChanges = entities.changes();
+		}
+	}
+
+	/**
+	 * The last number of each prefix of new identifiers, counting on from
+	 * it, rather than from 1 for each new entity (thousands, when pasting)
+	 */
+	private final Map<String, Integer> last = new HashMap<>();
+
+	/** The entities by @id, the first of each, up to date (see {@link #get}); not to change */
+	private Map<String, Entity> index() {
+		get("");
+		return index;
 	}
 
 	/**
@@ -172,7 +221,23 @@ public class Crate {
 	 */
 	public Entity add(String type) {
 		Entity entity = new Entity(newId(type), type);
-		entities.add(entity);
+		append(entity);
+		return entity;
+	}
+
+	/**
+	 * Add an entity with this identifier, e.g. a file's path, which no
+	 * entity of the crate has: as {@link #add(String)} and renaming it, but
+	 * without looking through all references for the new one's
+	 *
+	 * @throws IllegalArgumentException if another entity has it
+	 */
+	public Entity add(String type, String id) {
+		if (get(id).isPresent()) {
+			throw new IllegalArgumentException("Another entity already has @id " + id);
+		}
+		Entity entity = new Entity(id, type);
+		append(entity);
 		return entity;
 	}
 
@@ -258,7 +323,7 @@ public class Crate {
 				continue;
 			}
 			// Added straight away, so that newId sees it
-			entities.add(entity);
+			append(entity);
 			added.add(entity);
 		}
 		List<Entity> pasted = new ArrayList<>(added);
@@ -267,9 +332,9 @@ public class Crate {
 
 		Set<String> dangling = new LinkedHashSet<>();
 		Set<String> ambiguous = new LinkedHashSet<>();
-		Map<String, Entity> byId = byId();
+		Map<String, Entity> byId = index();
 		pasted.stream().flatMap(e -> e.getValues().keySet().stream().flatMap(p -> references(e, p)))
-				.filter(id -> !copiedIds.contains(id) && !renamed.containsValue(id) && !isDescriptor(id))
+				.filter(id -> !copiedIds.contains(id) && !renamed.containsValue(id) && !isDescriptor(id) && !isTerm(id))
 				.forEach(id -> {
 					Entity entity = byId.get(id);
 					if (entity == null) {
@@ -307,6 +372,15 @@ public class Crate {
 		return id.startsWith("_:");
 	}
 
+	/**
+	 * Whether an <code>@id</code> is a schema.org term, e.g.
+	 * <code>http://schema.org/PotentialActionStatus</code> (a member of an
+	 * Enumeration), which a crate refers to without describing it
+	 */
+	public static boolean isTerm(String id) {
+		return id.startsWith("http://schema.org/") || id.startsWith("https://schema.org/");
+	}
+
 	private boolean isDescriptor(String id) {
 		return id.equals(RO_CRATE_METADATA_JSON) || id.equals(getRoot().getId() + RO_CRATE_METADATA_JSON);
 	}
@@ -318,10 +392,11 @@ public class Crate {
 	 */
 	private String newId(String type) {
 		String prefix = "#" + type.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-") + "-";
-		int n = 1;
+		int n = last.getOrDefault(prefix, 0) + 1;
 		while (get(prefix + n).isPresent()) {
 			n++;
 		}
+		last.put(prefix, n);
 		return prefix + n;
 	}
 
@@ -374,6 +449,8 @@ public class Crate {
 		if (other == getRoot()) {
 			// The root data entity stays first, now as the merged entity
 			entities.set(0, entity);
+			// Not a change ArrayList counts
+			index = null;
 			entities.remove(entities.lastIndexOf(entity));
 		} else {
 			entities.remove(other);
@@ -387,7 +464,7 @@ public class Crate {
 	 * as a <code>citation</code>, is a contextual entity.
 	 */
 	public List<Entity> dataEntities() {
-		Map<String, Entity> byId = byId();
+		Map<String, Entity> byId = index();
 		Set<Entity> parts = new LinkedHashSet<>();
 		Deque<Entity> queue = new ArrayDeque<>(List.of(getRoot()));
 		while (!queue.isEmpty()) {
@@ -403,17 +480,25 @@ public class Crate {
 	 * <code>data/raw/a.csv</code>, else the root data entity.
 	 */
 	public Entity partOf(String id) {
-		Set<Entity> data = Set.copyOf(dataEntities());
+		return partOf(id, dataFolders());
+	}
+
+	/** The data entities by their paths without ./, e.g. data/ */
+	private Map<String, Entity> dataFolders() {
+		Map<String, Entity> folders = new HashMap<>();
+		dataEntities().forEach(e -> folders.putIfAbsent(withoutDot(e.getId()), e));
+		return folders;
+	}
+
+	private Entity partOf(String id, Map<String, Entity> folders) {
 		String path = withoutDot(id);
 		if (path.endsWith("/")) {
 			path = path.substring(0, path.length() - 1);
 		}
 		for (int slash = path.lastIndexOf('/'); slash > 0; slash = path.lastIndexOf('/', slash - 1)) {
-			String folder = path.substring(0, slash + 1);
-			Optional<Entity> dataset = entities.stream()
-					.filter(e -> data.contains(e) && withoutDot(e.getId()).equals(folder)).findFirst();
-			if (dataset.isPresent()) {
-				return dataset.get();
+			Entity dataset = folders.get(path.substring(0, slash + 1));
+			if (dataset != null) {
+				return dataset;
 			}
 		}
 		return getRoot();
@@ -436,17 +521,96 @@ public class Crate {
 		List<Entity> sorted = parts.stream().filter(e -> e != getRoot())
 				.sorted(Comparator.comparing((Entity e) -> withoutDot(e.getId()).replaceAll("/$", "").split("/").length))
 				.toList();
+		// Each dataset's parts set once, as there may be thousands
+		Set<Entity> data = new HashSet<>(dataEntities());
+		Map<String, Entity> folders = dataFolders();
+		Map<Entity, List<JsonNode>> hasParts = new LinkedHashMap<>();
 		for (Entity part : sorted) {
-			if (dataEntities().contains(part)) {
+			if (!data.add(part)) {
 				continue;
 			}
-			Entity dataset = partOf(part.getId());
-			List<JsonNode> hasPart = new ArrayList<>(dataset.getAll("hasPart"));
-			hasPart.add(JsonNodeFactory.instance.objectNode().put("@id", part.getId()));
-			dataset.setAll("hasPart", hasPart);
+			Entity dataset = partOf(part.getId(), folders);
+			hasParts.computeIfAbsent(dataset, d -> new ArrayList<>(d.getAll("hasPart")))
+					.add(JsonNodeFactory.instance.objectNode().put("@id", part.getId()));
+			folders.putIfAbsent(withoutDot(part.getId()), part);
 			added.add(part);
 		}
+		hasParts.forEach((dataset, values) -> dataset.setAll("hasPart", values));
 		return added;
+	}
+
+	/**
+	 * Objects written in values without an <code>@id</code> (e.g. an inline
+	 * <code>{"@type": "PropertyValue", "name": "depth"}</code>), which
+	 * flattened RO-Crate JSON-LD doesn't allow (see {@link #isAnonymous}):
+	 * each made an entity of its own, with a new <code>@id</code> from its
+	 * type, and referred to by it; also those written in them.
+	 *
+	 * @return The entities made, in the order found
+	 */
+	public List<Entity> flattenNested() {
+		List<Entity> added = new ArrayList<>();
+		// Those added are looked through too, for objects written in them
+		for (int i = 0; i < entities.size(); i++) {
+			Entity entity = entities.get(i);
+			for (String property : List.copyOf(entity.getValues().keySet())) {
+				List<JsonNode> values = entity.getAll(property);
+				if (values.stream().noneMatch(Crate::isAnonymous)) {
+					continue;
+				}
+				List<JsonNode> flat = new ArrayList<>();
+				for (JsonNode value : values) {
+					if (!isAnonymous(value)) {
+						flat.add(value);
+						continue;
+					}
+					List<String> types = new ArrayList<>();
+					JsonNode type = value.path("@type");
+					(type.isArray() ? type : List.of(type)).forEach(t -> {
+						if (t.isTextual() && !t.asText().isBlank()) {
+							types.add(t.asText());
+						}
+					});
+					Entity made = add(types.isEmpty() ? "Thing" : types.get(0));
+					if (!types.isEmpty()) {
+						made.setTypes(types);
+					}
+					value.properties().forEach(e -> {
+						if (!e.getKey().equals("@type")) {
+							made.set(e.getKey(), Optional.of(e.getValue()));
+						}
+					});
+					added.add(made);
+					flat.add(JsonNodeFactory.instance.objectNode().put("@id", made.getId()));
+				}
+				entity.setAll(property, flat);
+			}
+		}
+		return added;
+	}
+
+	/**
+	 * Whether a value is an object written in it without an
+	 * <code>@id</code>, that could be an entity of its own: not a literal
+	 * (<code>@value</code>) nor a list, with properties other than JSON-LD's
+	 * keywords, or a <code>@type</code> as text
+	 */
+	public static boolean isAnonymous(JsonNode value) {
+		if (!value.isObject() || value.isEmpty() || value.has("@id") || value.has("@value")) {
+			return false;
+		}
+		boolean typed = true;
+		for (Map.Entry<String, JsonNode> e : value.properties()) {
+			if (e.getKey().equals("@type")) {
+				JsonNode type = e.getValue();
+				for (JsonNode t : type.isArray() ? type : List.of(type)) {
+					typed &= t.isTextual();
+				}
+			} else if (e.getKey().startsWith("@") || e.getKey().isBlank()) {
+				return false;
+			}
+		}
+		return typed;
 	}
 
 	/**
@@ -463,7 +627,7 @@ public class Crate {
 				continue;
 			}
 			Entity dataset = new Entity(id, "Dataset");
-			entities.add(dataset);
+			append(dataset);
 			added.add(dataset);
 		}
 		addParts(added);
@@ -515,21 +679,22 @@ public class Crate {
 	 * that is not an entity in the crate, e.g. an external IRI, a local
 	 * identifier of an entity removed or not yet added, or a typo, so that it
 	 * can be given a name and type, or renamed to the <code>@id</code> meant
-	 * (see {@link #merge}). Not for the metadata descriptor.
+	 * (see {@link #merge}). Not for the metadata descriptor, nor schema.org
+	 * terms, e.g. an Enumeration's member (see {@link #isTerm}).
 	 *
 	 * @return The entities added, in the order first referred to
 	 */
 	public List<Entity> addReferenced() {
-		Map<String, Entity> byId = byId();
+		Map<String, Entity> byId = index();
 		List<Entity> added = new ArrayList<>();
 		for (Entity entity : List.copyOf(entities)) {
 			for (String property : entity.getValues().keySet()) {
 				references(entity, property)
-						.filter(id -> !byId.containsKey(id) && !isDescriptor(id))
+						.filter(id -> !byId.containsKey(id) && !isDescriptor(id) && !isTerm(id))
 						.forEach(id -> {
 							Entity thing = new Entity(id, "Thing");
 							byId.put(id, thing);
-							entities.add(thing);
+							append(thing);
 							added.add(thing);
 						});
 			}
@@ -550,7 +715,7 @@ public class Crate {
 		Entity root = getRoot();
 		List<String> properties = root.getValues().keySet().stream().filter(p -> !p.equals("mentions")).toList();
 		Set<Entity> linked = linkedFrom(root.getId(), properties, new HashSet<>());
-		Map<String, Entity> byId = byId();
+		Map<String, Entity> byId = index();
 		List<Entity> unmentioned = new ArrayList<>();
 		List<JsonNode> mentions = new ArrayList<>();
 		for (JsonNode mention : root.getAll("mentions")) {
@@ -573,7 +738,7 @@ public class Crate {
 	 * properties.
 	 */
 	private Set<Entity> linkedFrom(String id, List<String> properties, Set<Entity> linked) {
-		Map<String, Entity> byId = byId();
+		Map<String, Entity> byId = index();
 		Deque<Entity> queue = new ArrayDeque<>();
 		Entity start = byId.get(id);
 		for (String property : properties) {

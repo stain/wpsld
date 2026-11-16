@@ -263,7 +263,63 @@ public class CrateReader {
 				}
 			}
 			flattenNested(entities);
+			linkReverse(entities);
 			return entities;
+		}
+
+		/** A link written with @reverse: from the entity of this @id, to the one it was written in */
+		private record Reverse(String from, String property, String to) {
+		}
+
+		private final List<Reverse> reverse = new ArrayList<>();
+
+		/**
+		 * <code>"@reverse": {"isPartOf": {"@id": "x"}}</code> in the entity
+		 * <code>y</code> says that <code>x</code> is part of <code>y</code>:
+		 * kept as that link of <code>x</code>'s, as JSON-LD flattening does,
+		 * as RO-Crate's JSON-LD is flattened
+		 */
+		private void readReverse(String id, JsonNode properties) {
+			properties.properties().forEach(e -> {
+				String property = e.getKey();
+				if (property.startsWith("@")) {
+					warn(id + " has @reverse " + property + ", ignored");
+					return;
+				}
+				for (JsonNode from : e.getValue().isArray() ? e.getValue() : List.of(e.getValue())) {
+					String fromId = from.path("@id").asText("");
+					if (fromId.isEmpty()) {
+						warn(id + " has @reverse " + property + " from an entity without @id, ignored");
+						continue;
+					}
+					// Written out in full: an entity of its own too
+					unnest(from);
+					reverse.add(new Reverse(fromId, property, id));
+				}
+			});
+		}
+
+		/** The links written with @reverse added to the entities they come from */
+		private void linkReverse(Map<String, Entity> entities) {
+			if (reverse.isEmpty()) {
+				return;
+			}
+			for (Reverse link : reverse) {
+				Entity from = entities.computeIfAbsent(link.from(), id -> {
+					warn(id + " is linked with @reverse but not described, read as Thing");
+					return new Entity(id, "Thing");
+				});
+				JsonNode to = MAPPER.createObjectNode().put("@id", link.to());
+				List<JsonNode> values = new ArrayList<>(from.getAll(link.property()));
+				if (!values.contains(to)) {
+					values.add(to);
+					from.setAll(link.property(), values);
+				}
+			}
+			Reverse first = reverse.get(0);
+			warn(reverse.size() + (reverse.size() == 1 ? " link was" : " links were") + " written with @reverse, e.g. "
+					+ first.from() + " " + first.property() + " " + first.to() + " in " + first.to()
+					+ "; RO-Crate JSON-LD should be flattened, so made links of the entities they come from");
 		}
 
 		/**
@@ -317,6 +373,10 @@ public class CrateReader {
 			node.properties().forEach(e -> {
 				String key = e.getKey();
 				if (key.equals("@id") || key.equals("@type")) {
+					return;
+				}
+				if (key.equals("@reverse") && e.getValue().isObject()) {
+					readReverse(id, e.getValue());
 					return;
 				}
 				if (key.startsWith("@")) {
@@ -394,7 +454,10 @@ public class CrateReader {
 		}
 
 		private void checkValue(JsonNode value, String where) {
-			if (value.isObject() && !(value.has("@id") && value.size() == 1) && !value.has("@value")
+			if (Crate.isAnonymous(value)) {
+				warn(where + " has an object written in it without an @id, which flattened RO-Crate JSON-LD"
+						+ " doesn't allow; kept as it is. Crate > Repair Crate makes it an entity of its own");
+			} else if (value.isObject() && !(value.has("@id") && value.size() == 1) && !value.has("@value")
 					&& !value.has("@list")) {
 				warn(where + " has a nested object; RO-Crate JSON-LD should be flattened, kept as it is");
 			} else if (value.isArray()) {

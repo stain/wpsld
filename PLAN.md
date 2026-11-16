@@ -556,6 +556,15 @@ Styles:
 
 ### Entities
 
+- **Choosing a type that hides the entity edited** *(to investigate,
+  undecided)*: now the form keeps showing it, and it is selected again
+  when listed again. Perhaps the form should empty instead ("No entity
+  selected"), as after removing it: why would the user choose another
+  type unless to go to another entity? But they may be looking for the
+  entity to link from the one edited (e.g. which Person to give as its
+  author), and lose their place. Watch what users do; perhaps keep the
+  form while the type is chosen from a reference field, or offer
+  "Back to …".
 - **Copy and paste entities.** In the entity list, Edit > Copy (and the
   list's own menu) puts the selected entities on the clipboard as their
   JSON-LD (`EntityClipboard`): as text for text editors (an object, or
@@ -639,11 +648,33 @@ Styles:
          merge dialogue), *merge all*, *keep the existing ones*, *paste as
          copies with new `@id`s* (which Edit > Duplicate is, step 6).
        - Later, how to treat the `@context` (step 4).
+       - **Files between attached crates**: pasting File entities copied
+         from another attached crate (another window) now leaves them
+         missing here, as their files stay in the other crate's folder
+         (reported). Offer to copy their files too, into a folder of this
+         crate (as Insert > Files does, in the background with progress,
+         Replace, Keep Both or Skip for names taken), with their `@id`s
+         following the folder chosen; and Datasets with their folders.
      - Enabled whenever Paste is, in the entity list.
-  3. **Merge Entities**: select two or more entities in the list and merge
-     them with the dialogue of renaming to an existing `@id` (`Crate.merge`,
-     one undo step), choosing which `@id` stays. For duplicates found
-     later, e.g. a pasted person who was already there under another `@id`.
+  3. **Merge Entities** (*done*: Edit > Merge Entities… and Merge… on the
+     right-click menu): select
+     two or more entities in the list or a tree and merge them with the
+     dialogue of renaming to an existing `@id` (`Crate.merge`, one undo
+     step), choosing which `@id` stays. For duplicates found later, e.g. a
+     pasted person who was already there under another `@id`. Two of
+     different types may be merged (their types combined); not offered
+     for more than two whose types differ, as one of them is likely
+     selected by accident.
+  3b. **Pasting into a type's folder** (Entities by Folder or by Part):
+     pasting one entity with an absolute `@id` (e.g. `https://…`) copied
+     from this crate onto a type's folder, e.g. Person, adds that type to
+     it, rather than pasting a copy; several only if they all have that
+     type as an explicit shared type already (else it is likely a
+     mistake). After Cut rather than Copy, the type of the folder it was
+     cut from is replaced by this one: a change of type rather than an
+     added one. Consider whether this belongs in Paste Special instead,
+     and what to do for `#` and `_:` entities, which a plain paste copies
+     with new identifiers.
   4. **Context merging.** When the pasted document's `@context` differs
      from the crate's (another RO-Crate version, e.g. Bioschemas IRIs of
      1.2 against 1.3, or extra terms such as `ldac:` or a custom `@vocab`),
@@ -1224,6 +1255,15 @@ extension. Next:
   no network, not found, HTTP errors, redirect loops, too large, not
   JSON, JSON but not a crate, a zip without a crate, rate limits, login
   pages.
+- **Repositories without Signposting**: LDaCA's collection pages are a
+  JavaScript application whose server answers HTTP 404 with an empty page,
+  whatever is asked for, and no `Link` headers; the crate is in its API:
+  `https://data.ldaca.edu.au/api/object/<arcp id, URL-encoded>?meta=original`
+  (an object's own crate; `/api/object/meta?id=` redirects there). Know
+  such repositories by their addresses (a small plugin each, as for
+  Publish): LDaCA and other Oni repositories, and others found (ROHub,
+  WorkflowHub's `/ro_crate` zips), each turning a page's address into its
+  crate's.
 - **A zip by FAIR Signposting**: `CrateRetriever` also follows
   `rel="item"` links to an RO-Crate zip (`type="application/zip"`, with
   the RO-Crate profile), as "Retrieving an RO-Crate" allows: downloaded
@@ -1244,6 +1284,48 @@ extension. Next:
   export zips; open and check a bag; make a bag (last, as it moves the
   user's files into `data/`).
 
+### Attached and detached crates
+
+- **Attached to detached** (Crate > Make Detached…), as the RO-Crate
+  specification suggests: the crate's files go "elsewhere", typically
+  published on the web (e.g. GitHub Pages, a repository, an institutional
+  web server). The user gives the base URI where they say the files now
+  are; wpsld checks that each file is there (in the background, as a job,
+  as Check Web Availability does: HEAD, sizes, perhaps checksums where
+  the server gives them) before rewriting each relative `@id` against it
+  (the root's `@id` the base URI itself, or a persistent identifier if
+  the user has one), and says which files were not found, leaving those
+  unchanged until they are. One undo step; the descriptor's `about` and
+  every reference follow the renamed `@id`s.
+- **Detached to attached** (Crate > Make Attached…): choose a folder; the
+  `@id`s under a base URI (the root's, or one the user gives) become
+  relative paths in it, and files there are offered to download (each
+  checked against `contentSize` and any checksum, as a job). Files not
+  downloaded keep their absolute `@id`s, as RO-Crate allows web-based
+  data entities in an attached crate.
+- **Attached to Folder** (the Crate menu's toggle) stays for crates
+  merely opened from elsewhere, e.g. downloaded on their own.
+
+### Publishing
+
+- **Crate > Publish To…**: deposit the crate in a repository or on the
+  web, as plugins (see "Plugins" above, a module layer of their own), one
+  for each service: ROHub, Zenodo (and InvenioRDM), WorkflowHub, GitHub
+  Pages (a repository's Pages branch, with the HTML preview as its
+  index), Dataverse. Each says what crates it takes, checked before
+  anything is uploaded: WorkflowHub a Workflow RO-Crate (a main workflow
+  and its language), ROHub a research object, Zenodo and Dataverse any
+  crate (as a zip, with their own metadata from the crate's: title,
+  creators with ORCIDs, licence, keywords), GitHub Pages an attached crate
+  of files small enough for Pages. Each shows what it would send and its
+  metadata to confirm, uploads as a job (sandbox first where the service
+  has one, e.g. Zenodo's), and leaves publishing (minting a DOI) to the
+  user on the service's own page unless asked. The identifier given back
+  (DOI, URL) is offered as the root's `identifier` and `cite-as`, and for
+  GitHub Pages as the base URI of a detached crate (above).
+- Accounts and tokens per service, kept in the platform's credential
+  store where there is one (not in settings.json), and never logged.
+
 ### Nested RO-Crates
 
 A crate may contain other crates: a folder of an attached crate with its
@@ -1263,6 +1345,17 @@ RO-Crates" in the spec's data entities). Recognise them:
 - Checks: files of a nested crate shouldn't be the outer crate's parts
   directly; the nested crate's own metadata file and preview are not
   data of the outer one.
+- **Collections of crates in a repository**, as LDaCA's (an Oni
+  repository): a collection is a crate of its own (a
+  `RepositoryCollection`, with no `hasPart` or `hasMember`), and each of
+  its members another crate (`RepositoryObject`, with its files), linking
+  up with `memberOf`. Mitchell and Delbridge has 7733 members, each about
+  13 entities and 1 s to fetch. Open the collection's crate, list its
+  members from the repository's API as they are asked for (paged:
+  `/api/objects?memberOf=<id>`, 100 in 2.4 s), and open a member as a
+  crate of its own; never put them all together (LDaCA's `?meta=all`
+  times out). Their files are on the web (`/api/stream?id=…&path=…`),
+  so members open as detached crates.
 
 ### Licences, defaults and the metadata descriptor
 
@@ -1304,7 +1397,17 @@ not in hasPart). Next: a preference to not write it; the generator as a
 SoftwareApplication with a CreateAction (object the metadata, result the
 preview), as the spec's example; images and maps for files and places;
 "Referenced by" as in the editor's preview; anchors that stay the same
-across saves (by @id rather than position). The Preview tab renders
+across saves (by @id rather than position).
+
+*Next*: **File > Save RO-Crate Preview…**, which writes the preview on its
+own, to a file the user chooses, for a detached crate (which has no folder
+for saving to write it in, e.g. to put beside its metadata on a web server)
+and for an attached crate whose preview is to go elsewhere; links to files
+as their `@id`s, which in a detached crate are absolute. The same
+`CratePreview`, the same check for another tool's preview where the file
+is there already, and not described in the crate, which does not hold it.
+
+The Preview tab renders
 Markdown descriptions too, by the same heuristics, as JavaFX nodes
 (`HelpMarkdown.description`, as the help viewer's pages). For a richer
 preview, investigate which existing previewer
@@ -1339,7 +1442,53 @@ crate above, a ROHub crate, and generated ones with 1 000, 10 000 and
 - Likely costs to look at: `crate.toJson()` compared on every change
   (undo, the title's "modified"), `dataEntities()` and `byId()` built
   again in loops, the tree made again from scratch, and the preview's
-  "Referenced by" scanning all entities.
+  "Referenced by" scanning all entities. Next: the form finding
+  references by `Crate.get` (the index) rather than going through the
+  entities, and an index of references (who refers to each `@id`) for the
+  preview's "Referenced by", kept as the `@id` index is; time both on
+  ICE-AUS.
+- *Considered*: keeping each set of types' form and reusing it for the
+  next entity of those types, its values cleared and filled again. Left
+  for now, as selecting takes 0.2 to 0.3 s since the groups show only the
+  properties in use: the form's handlers hold on to the entity they were
+  made for (lookups, Fill in, Find…, the map), so reusing them risks
+  writing to the previous entity, and a value left over is shown as the
+  new one's. If done: one cache per window's editor (nodes can't be in two
+  scenes, and several windows may come), cleared on opening another crate
+  and on changing style or profile, and each handler reading the entity
+  edited now.
+- *Measured and done (November 2026)*, by a test timing each step and
+  sampling the JavaFX thread's stack (kept outside the repository, as it
+  read downloaded crates): the COMPSs crate (WorkflowHub workflow 780,
+  1835 entities) opened in 174 s, now 2.2 s; see BUGS.md for what
+  changed. LDaCA's ICE-AUS collection (2374 entities, 1.3 MB): opening
+  3.9 s, selecting an entity 0.9 to 1.4 s, undo 1.2 s, mostly JavaFX
+  laying out the form, next to look at (fewer controls made at once,
+  e.g. groups built when opened, as folded ones already are).
+- A larger real one: LDaCA's Mitchell and Delbridge collection, 7733
+  member crates of about 13 entities each (about 43 MB of JSON-LD if put
+  together, some 35 000 to 50 000 entities); LDaCA's own API times out
+  (after 2 minutes) putting it together (`?meta=all`). As a stress test,
+  generate a crate of that size from a sample of its members rather than
+  fetching them all (an hour or two, one by one).
+- These crates' licences (CC BY, CC BY-NC) allow using them but not
+  bundling them: as online integration tests, downloading them when run.
+- **Pasting many small entities**: time copying and pasting 500 fairly
+  simple PropertyValue objects (e.g. a table's variables, as
+  `variableMeasured` would make), into an empty crate and into a large
+  one: the paste itself (`Crate.paste`, renaming clashing `#` ids, the
+  references checked), selecting them (now at once, with no form), the
+  undo step, relisting and the preview; and Paste's report, which lists
+  what was merged or kept. Reported: pasting thousands freezes the window
+  for seconds, without even a busy (hourglass) pointer. Work that may
+  take long on the JavaFX thread should at least show the busy pointer
+  (`Cursor.WAIT` on the scene, set before and cleared after, letting a
+  pulse show it first), and the slow parts move to a job (see `Jobs`)
+  where they don't touch the scene. *Measured*: pasting 2000 took 7.3 s
+  into a large crate, now 1 s (0.2 s into a new one), as they are
+  selected at once with no form. Pasting or adding as parts more than
+  200 now shows the busy pointer first (`CrateEditor.busy`); moving the
+  slow parts to a job is left.
 
 ### Internationalisation (i18n)
 

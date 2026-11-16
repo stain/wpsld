@@ -2,19 +2,59 @@
 
 Select an entity on the left to edit its form in the middle. On the right,
 **Preview** shows the selected entity and its links; **JSON-LD** shows the
-crate's metadata. Selecting a link to another described entity in Preview
+selected entity's metadata as JSON-LD. **View > Crate JSON-LD...** shows
+the whole crate's, as it would be saved, in a window of its own; press
+**Refresh** there after changes.
+
+Selecting a link to another described entity in Preview
 opens it in the editor. Web addresses open in the browser, and files
 beside the crate as your system opens them, also from the values of
 properties that take a URL, such as **URL**. A compact `@id` such as
 `s:ActiveActionStatus` opens as the address the crate's `@context` gives
 it, here `http://schema.org/ActiveActionStatus`.
 
+## Edit the JSON-LD
+
+You can edit the selected entity's JSON-LD in the **JSON-LD** tab, or
+paste an entity's JSON-LD over it. **Apply**, or leaving the text, puts
+it in place of the entity's types and values, as one step that **Edit >
+Undo** undoes. **Revert** goes back to the entity as it is. While you
+edit, changes made elsewhere don't overwrite the text.
+
+- It must be one JSON object with an `@id` and one or more `@type`s,
+  as each entity is in the crate's `@graph`. To add several entities,
+  copy their JSON-LD and use **Edit > Paste** in the entity list instead
+  (see [Copy and paste](clipboard.md)).
+- Changing `@id` renames the entity and updates the links to it. If
+  another entity already has that `@id`, wpsld offers to merge them (see
+  [Entities and identifiers](entities.md)).
+- Values usually link to other entities by their `@id` alone,
+  `{"@id": "#alice"}`. An entity written out in full in a value, as some
+  repositories write a dataset's parts, becomes a link, and an entity of
+  its own: added, or merged into the crate's entity of that `@id`. One
+  written without an `@id`, such as
+  `{"@type": "PropertyValue", "name": "depth"}`, is added with a new one,
+  e.g. `#propertyvalue-1`. RO-Crate's flattened JSON-LD doesn't allow
+  entities written inside others, so this makes the crate follow it.
+- Links written with JSON-LD's `@reverse`, e.g.
+  `"@reverse": {"isPartOf": {"@id": "data/a.csv"}}` in `data/`, become
+  links of the entities they come from: `data/a.csv` gets `isPartOf`
+  `data/`.
+- Text in a language, `{"@value": "Hei", "@language": "no"}`, or of a
+  datatype, is kept as it is (see [Properties and links](properties.md)).
+
+A notice under the window says which entities were added, merged or
+linked. If the text can't be applied, wpsld says why below it (for
+example, where the JSON is broken) and changes nothing. If you then select
+another entity, those changes are dropped, and a notice says so.
+
 The entity list shows the dataset as a whole (the root) first, then the
 other entities by type, name and `@id`. An entity moves to its place in
 the list when you leave the field you are typing its name in. To see only
 entities of one type, choose it above the list: CreativeWork, for example,
 also shows Datasets and Files. Adding an entity of another type lists all
-types again.
+types again. Names too long for the list end in "…": drag the edge
+between the list and the form to widen it.
 
 Choose **View > Entities by Folder** to see them as a tree instead, as a
 file manager shows files:
@@ -38,17 +78,23 @@ Dataset its own parts, wherever their files are: a part of two datasets
 is under both. Parts are named by their path from their dataset's
 folder. The other entities follow in a folder for each type, as by folder.
 
-To bring a greyed out folder or file into the crate, select it (or
-several) and choose **Crate > Add Dataset for Folder** or **Add to Has
-Part**, also on the right-click menu. A folder gets a Dataset, and a file
+In both trees, right-click to **Expand** or **Collapse** the folders
+selected, or with **Expand All** and **Collapse All** every folder within
+them too; with nothing selected, the top folders. The keys do the same:
+**+**, **-**, **\*** and **/**.
+
+Selecting a greyed out folder or file shows no form, but what it is and a
+button to add it. To bring a greyed out folder or file into the crate,
+select it (or several) and choose **Crate > Add Dataset for Folder** or **Add File(s)
+to Has Part**, also on the right-click menu. A folder gets a Dataset, and a file
 becomes a part, of the Dataset of the folder above it, or of the crate
 itself if that folder has none; select the outer folders too to add them
-all at once. Add to Has Part also makes a File or Dataset on the web a
+all at once. Add File(s) to Has Part also makes a File or Dataset on the web a
 part of the crate, under **External resources**.
 
 **View > Show Files Not in Crate** shows the files in an attached
 crate's folder that it doesn't describe yet, greyed out, to add with
-**Add to Has Part**: by folder at their places (on at first), by type at
+**Add File(s) to Has Part**: by folder at their places (on at first), by type at
 the end of the list, and by part in a folder **(Not in crate)** (both off
 at first). Each view keeps its own choice.
 
@@ -71,8 +117,10 @@ list again.
 
 ![The entity tree, with the data folder open](images/entity-tree.png)
 
-Use **View > Sidebar** to hide or show the entity list. On macOS the menu
-item says **Hide Sidebar** or **Show Sidebar**.
+Choose **View > No Sidebar** to hide the entities, leaving more room for
+the form and preview, and one of the views of them, e.g. **View >
+Entities by Type**, to show them again. On macOS, ⌃⌘S hides the sidebar
+and shows it again.
 
 Choose **View > Style** to change the appearance and form layout, and
 **View > Colours** for light, dark or system colours. OS/2 Warp presents

@@ -39,12 +39,17 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  * still be seen, removed, or used again when changing back.
  */
 public class Entity {
+	/** How many times any entity's @id was set, so that indexes by @id know when to update */
+	private static final java.util.concurrent.atomic.AtomicLong ID_CHANGES = new java.util.concurrent.atomic.AtomicLong();
+
 	private String id;
 	private List<String> types;
+	/** Whether it is in a crate, whose index by @id a new @id changes */
+	boolean inCrate;
 	private final Map<String, JsonNode> values = new LinkedHashMap<>();
 
 	public Entity(String id, String... types) {
-		setId(id);
+		this.id = Objects.requireNonNull(id);
 		setTypes(List.of(types));
 	}
 
@@ -54,6 +59,14 @@ public class Entity {
 
 	public void setId(String id) {
 		this.id = Objects.requireNonNull(id);
+		if (inCrate) {
+			ID_CHANGES.incrementAndGet();
+		}
+	}
+
+	/** How many times any entity's @id was set, e.g. to know when an index by @id is out of date */
+	static long idChanges() {
+		return ID_CHANGES.get();
 	}
 
 	/**

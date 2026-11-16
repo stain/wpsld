@@ -165,7 +165,7 @@ public class TestCrateEditorMetadata extends UiTest {
 				.filter(e -> e.getId().equals("workshop.docx")).findFirst().map(entities().getItems()::indexOf)
 				.orElseThrow()));
 		fromFile(stage);
-		assertTrue(lookup("Nothing new in “Week 8 workshop”").tryQuery().isPresent());
+		assertTrue(lookup("Everything in “Week 8 workshop” is in the crate").tryQuery().isPresent());
 		clickDialogButton("OK");
 	}
 
@@ -310,6 +310,9 @@ public class TestCrateEditorMetadata extends UiTest {
 		Stage stage = (Stage) entities().getScene().getWindow();
 		Path dir = crateWithPhotos(stage, "one.jpg", "two.jpg");
 		interact(() -> app.insertFiles(stage, List.of(dir.resolve("one.jpg"), dir.resolve("two.jpg"))));
+		// Both selected, neither edited: no form for each in turn
+		assertEquals(2, entities().getSelectionModel().getSelectedItems().size());
+		assertEquals("2 entities selected: select one to edit it.", lookup("#noEntity").queryLabeled().getText());
 		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> app.notice().isPresent());
 		WaitForAsyncUtils.waitForFxEvents();
 		assertTrue(app.notice().orElseThrow(), app.notice().orElseThrow().startsWith("2 of the files added have"));
@@ -413,14 +416,17 @@ public class TestCrateEditorMetadata extends UiTest {
 				.asyncFx(() -> app.inBackground(stage, "Reading slowly", slowJob())).get();
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils.asyncFx(job::isRunning).get());
 		Platform.runLater(() -> app.newCrate(stage));
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
-				() -> lookup("Still working in the background").tryQuery().isPresent());
-		assertTrue(lookup(".dialog-pane .content").queryLabeled().getText().contains("Reading slowly (0 of 1000 files read)"));
+		// Looked up on the JavaFX thread, as the dialog opens meanwhile
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils
+				.asyncFx(() -> lookup("Still working in the background").tryQuery().isPresent()).get());
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> lookup(".dialog-pane .content").queryLabeled().getText()).get()
+				.contains("Reading slowly (0 of 1000 files read)"));
 		clickDialogButton("Cancel");
 		assertTrue(WaitForAsyncUtils.asyncFx(job::isRunning).get());
 		Platform.runLater(() -> app.newCrate(stage));
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
-				() -> lookup("Still working in the background").tryQuery().isPresent());
+		// Looked up on the JavaFX thread, as the dialog opens meanwhile
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils
+				.asyncFx(() -> lookup("Still working in the background").tryQuery().isPresent()).get());
 		clickDialogButton("Stop");
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils.asyncFx(job::isCancelled).get());
 		WaitForAsyncUtils.waitForFxEvents();
@@ -462,20 +468,93 @@ public class TestCrateEditorMetadata extends UiTest {
 		assertFalse(lookup("#jobsStrip").query().isVisible());
 		Task<Map<String, FileMetadata.Reading>> job = WaitForAsyncUtils
 				.asyncFx(() -> app.inBackground(stage, "Reading slowly", slowJob())).get();
-		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#jobsStrip").query().isVisible()
-				&& lookup("#jobsLatest").queryLabeled().getText().equals("Reading slowly: 0 of 1000 files read"));
+		// Looked up on the JavaFX thread, as the scene changes meanwhile
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils.asyncFx(
+				() -> lookup("#jobsStrip").query().isVisible() && lookup("#jobsLatest").queryLabeled().getText()
+						.equals("Reading slowly: 0 of 1000 files read")).get());
 		// Shown by itself after a moment, as the user asked for it
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#jobsHide").tryQuery().isPresent());
-		clickOn("#jobsHide");
+		// Pressed rather than clicked, as a window just shown may not be on screen yet
+		interact(() -> lookup("#jobsHide").queryButton().fire());
 		WaitForAsyncUtils.waitForFxEvents();
 		assertTrue(lookup("#jobsHide").tryQuery().isEmpty());
 		assertTrue(WaitForAsyncUtils.asyncFx(job::isRunning).get());
 		clickOn("#jobsShow");
-		WaitForAsyncUtils.waitForFxEvents();
-		clickOn("#jobCancel");
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> lookup("#jobCancel").tryQuery().isPresent());
+		interact(() -> lookup("#jobCancel").queryButton().fire());
 		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> WaitForAsyncUtils.asyncFx(job::isCancelled).get());
 		WaitForAsyncUtils.waitForFxEvents();
 		assertFalse(lookup("#jobsStrip").query().isVisible());
 		assertTrue(lookup("#jobsHide").tryQuery().isEmpty());
+	}
+
+	/** Removing the entity edited leaves no form, rather than the removed one's */
+	@Test
+	public void removedNotEdited() throws Exception {
+		entities();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		Path dir = crateWithPhotos(stage, "photo.jpg");
+		interact(() -> app.insertFiles(stage, List.of(dir.resolve("photo.jpg"))));
+		assertEquals("photo.jpg", lookup("#entityId").queryTextInputControl().getText());
+		clickOn("#removeEntity");
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(listed("photo.jpg").isEmpty());
+		assertTrue(lookup("#entityId").tryQuery().isEmpty());
+		assertEquals("No entity selected: select one in the list to edit it.",
+				lookup("#noEntity").queryLabeled().getText());
+		// Selecting one edits it again
+		interact(() -> entities().getSelectionModel().clearAndSelect(0));
+		assertEquals("./", lookup("#entityId").queryTextInputControl().getText());
+	}
+
+	/** A kind of file wpsld reads no metadata from: the kinds it reads, listed */
+	@Test
+	public void kindNotRead() throws Exception {
+		entities();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		Path dir = crateWithPhotos(stage);
+		Files.writeString(dir.resolve("notes.txt"), "Nothing to say");
+		interact(() -> app.insertFiles(stage, List.of(dir.resolve("notes.txt"))));
+		fromFile(stage);
+		assertTrue(lookup("wpsld reads metadata from other kinds of files").tryQuery().isPresent());
+		String text = lookup(".dialog-pane").queryAs(javafx.scene.control.DialogPane.class).getContentText();
+		assertTrue(text, text.startsWith("Kinds of files wpsld reads metadata from:\n• Office"));
+		clickDialogButton("OK");
+	}
+
+	/**
+	 * Several files selected: the right-click menu offers Metadata from the
+	 * Files…, read as one job, offered in one notice to fill in (one undo
+	 * step), not a dialog for each
+	 */
+	@Test
+	public void metadataFromSeveralFiles() throws Exception {
+		entities();
+		Stage stage = (Stage) entities().getScene().getWindow();
+		Path dir = crateWithPhotos(stage, "one.jpg", "two.jpg");
+		interact(() -> app.insertFiles(stage, List.of(dir.resolve("one.jpg"), dir.resolve("two.jpg"))));
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS, () -> app.notice().isPresent());
+		clickOn("#noticeClose");
+		// Both selected, as added
+		rightClickOn(lookup("#entities").queryListView().lookupAll(".list-cell").stream()
+				.filter(c -> ((javafx.scene.control.ListCell<?>) c).getItem() != null
+						&& ((Entity) ((javafx.scene.control.ListCell<?>) c).getItem()).getId().equals("two.jpg"))
+				.findFirst().orElseThrow());
+		WaitForAsyncUtils.waitForFxEvents();
+		javafx.scene.control.MenuItem item = entities().getContextMenu().getItems().stream()
+				.filter(i -> "contextFileMetadata".equals(i.getId())).findFirst().orElseThrow();
+		assertEquals("Metadata from the 2 Files…", item.getText());
+		assertFalse(item.isDisable());
+		interact(() -> {
+			item.fire();
+			entities().getContextMenu().hide();
+		});
+		WaitForAsyncUtils.waitFor(30, TimeUnit.SECONDS,
+				() -> app.notice().filter(n -> n.startsWith("Read 2 files. All 2 have")).isPresent());
+		clickOn("#noticeAction");
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup("2 files updated").tryQuery().isPresent());
+		clickDialogButton("OK");
+		assertEquals("Bus stop on Oxford Road", listed("two.jpg").orElseThrow().get("description").orElseThrow().asText());
 	}
 }

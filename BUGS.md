@@ -31,18 +31,159 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   for now; if it needs a workaround of ours, perhaps re-showing the
   stage when its `outputScaleX` changes.
 
+- **Large crates slow** (*done* for the form, typing and undo): a COMPSs
+  workflow run crate from WorkflowHub (workflow 780, 1835 entities, 1813
+  of them files in the root's `hasPart`, 1 MB of JSON-LD) took 174 s to
+  open, 6 s to select a file, 0.6 s a keystroke. Now 2.2 s, 0.7 s and
+  0.1 s: a field shows its first 20 values, and the others 100 at a time
+  on asking (kept as they are meanwhile); a reference's choices of the
+  crate's entities are filled once its list is opened or typed in (a
+  combo box lays out a cell for each item to size itself);
+  `Crate.get` by an index (it went through all entities, for each of the
+  root's parts in the preview); `CrateTerms.classDef` remembered; the
+  JSON-LD tab filled only when shown, once typing pauses. Left: most of
+  the rest is JavaFX laying out the form (a File's has many fields); to
+  try with LDaCA's larger collections (see PLAN.md), as integration
+  tests reading them from the web, as their licences don't allow
+  bundling them.
+- **Typing slow in a large entity** (*done*): typing in the root's
+  description of ICE-AUS (hundreds of parts) took 0.2 s a key, as the
+  Preview tab was made again for each, adding each part's link one at a
+  time (JavaFX checks each child added against all the others). Now the
+  preview is made again once typing pauses, its values added at once,
+  and at most 100 of a property shown, with Show all; opening ICE-AUS
+  also went from 3.9 s to 1.75 s.
+- **Selecting an entity slow in large crates** (*faster*): most of the
+  time was JavaFX making and styling the form's controls: an open "From
+  CreativeWork" group made all 109 of its fields, each empty reference
+  with a drop-down, buttons and a New menu (some 6000 of a form's 8000
+  nodes). Now a vocabulary group opened because the entity uses some of
+  its properties shows only those, with Show all for the rest (the search
+  still finds them all), and each field's description is made when its ?
+  is pressed. Selecting a file of the COMPSs crate went from 0.7 to
+  0.27 s, an ICE-AUS entity from 0.76 to 0.2 s, a root of 3000 parts
+  from 1 to 0.3 s.
+- **Typing slow in a large crate, letter by letter** (*done*): typing
+  with pauses, as people do, cost 120 to 330 ms of the JavaFX thread a
+  letter in ICE-AUS's and COMPSs' root description (an empty crate's: 13
+  ms). Mostly not the typing: the entity list laid itself out again on
+  every frame (about 60 a second) while a field had the caret, as its
+  cells were each as wide as their text, and measuring more of its
+  thousands of rows changed their width again, never done; now its cells
+  are as wide as the list, long names cut off with … Also: the JSON-LD tab
+  shows the selected entity's JSON-LD rather than the whole crate's
+  (megabytes laid out again at each pause), the whole crate's in View >
+  Crate JSON-LD…; the preview makes again only its parts that changed;
+  a vocabulary group shown briefly leaves out the header's properties
+  (the root's parts were shown twice). Now about 19 ms a letter with the
+  preview, 40 to 50 ms with JSON-LD, and 3 ms of every 600 idle (was 80
+  to 190).
+- **Text in a language saved as its JSON** (*done*): a value such as
+  `{"@value": "Hei", "@language": "no"}` showed in its field as that JSON,
+  and typing in any field of the property saved it back as text,
+  `"{\"@value\": …}"`. Now the field shows its text with the language
+  (or datatype) beside it, kept when edited, and values not edited are
+  kept as they are, whatever they are; the preview shows "Hei (no)".
+- **`@reverse` dropped on opening** (*done*): links written with
+  `@reverse` (allowed in JSON-LD, not in flattened RO-Crate JSON-LD) were
+  ignored with a warning, so lost on saving; now made links of the
+  entities they come from, as JSON-LD flattening does, with a warning.
+  Likewise in the JSON-LD tab. The RO-Crate specification (1.2, 1.3) says
+  nothing of `@reverse`, `@language` or typed values, only that its
+  JSON-LD is flattened, with references as `{"@id": …}` alone.
+- **Adding several entities edited each in turn** (*done*): adding files
+  or pasting entities selected them one by one, so that the form and
+  preview were made for each (thousands in a large crate); now they are
+  selected at once, with no form ("37 entities selected: select one to
+  edit it"), as after removing the entity edited, which used to stay in
+  the form. A type chosen above the list that hides the entity edited
+  still keeps its form, as it is selected again when listed again.
+- **Long reports didn't fit on the screen** (*done*): Repair Crate's
+  report of thousands of changes grew taller than the screen, its OK
+  button out of reach. Long reports (Repair Crate, Update File Details,
+  Paste) now scroll in a text area that can be copied from, listing every
+  change rather than the first ten.
+- **The list scrolled after right-clicking a file** (*done*): in a
+  large crate's folder, right-clicking a file not in the crate after
+  scrolling down kept the selection but moved the list; selecting a row
+  already shown no longer scrolls. A file or folder not in the crate,
+  selected, now shows no form or preview but "Not in the crate" with the
+  actions to add it.
+- **Renaming to an ORCID iD in another form didn't merge** (*done*):
+  renaming `#person3` to `0000-0002-…` (or `http://orcid.org/…`) while
+  the person imported from ORCID was in the crate as
+  `https://orcid.org/…` made a second entity; ORCID iDs, ROR identifiers
+  and DOIs are now compared by their `https://` address, and merging is
+  offered as for the same `@id`.
+- **"Nothing new" from Metadata from the File was confusing** (*done*):
+  now one message for a kind of file wpsld reads that said nothing new,
+  and another, listing the kinds it reads, for one it doesn't.
+- **Expand and collapse only by keys** (*done*): Expand, Expand All,
+  Collapse and Collapse All are on the right-click menu of Entities by
+  Folder and by Part, for all the rows selected; Collapse All was
+  missing (`/`, also on the keypad, as `+ * -`).
+- **Dangling `#propertyvalue-N` references** (*explained*): a crate seen
+  in testing had thousands of references to `#propertyvalue-N` entities
+  not in the crate. Made on purpose, as a stress test, by copying and
+  pasting PropertyValues over and over; not a bug.
+- **Adding many files as parts is slow** (*faster*): in an attached
+  crate's folder of many files, selecting several (grey, not yet in the
+  crate) subfolders and choosing Add to hasPart from the context menu
+  took a while, with no progress. 3000 files in 30 folders took 8.9 s,
+  now 1.1 s: each file added with its `@id` rather than renamed (which
+  looked through every reference), each dataset's `hasPart` set once,
+  PRONOM's formats found by extension, and the tree selecting them all
+  in one walk. Most of the rest is reading each file's start for its
+  format; for more, show the busy pointer, or progress (a job, see
+  `Jobs`). (Renamed Add File(s) to Has Part, done.) Perhaps a third
+  action, **Add Folder with Its Contents**: a Dataset for the folder and
+  each folder in it, and all their files as parts, recursively; it needs
+  the speed and progress above first, as a folder may have thousands. In
+  the Crate menu as well as the right-click menu, as the other two are.
+- **Copying files in asks for the folder with the system's folder
+  chooser**: Insert > Files from outside the crate's folder opens a
+  second, similar-looking dialog, the platform's folder chooser, to
+  choose where in the crate to copy them, which allows going outside the
+  crate (then asked again) and is confusing right after the file
+  chooser. Choose the target with our own dialog instead: the crate's
+  folders as a tree (as View > Entities by Folder has them), the crate's
+  folder at the top, with New Folder…, and nothing outside it.
+
 ## Repair Crate
 
 - **Types written as IRIs**, e.g. ROHub's `http://schema.org/Person` and
-  `http://schema.org/DefinedTerm`, could be written by the names the
-  context gives them (`Person`). The entity list already shows them by
-  name; the type chips and the preview still show the IRIs.
+  `http://schema.org/DefinedTerm`, written by the names the context gives
+  them (`Person`) (*done*, `TermRepairs.typeNames`, also `https:` and
+  `schema:`).
+- **References written as text**, reported for a ROHub crate: values
+  such as `"{\"@id\": \"https://…\"}"`, a JSON object as a string,
+  rather than the object. Not in the ROHub crate in `debug/` (its only
+  text IRIs are its types, repaired above); find the crate that has
+  them. Repair Crate could turn a string that parses as an object with
+  only `@id` into that reference, and say so.
 - **Enumeration members written as text**, e.g. `"actionStatus":
-  "PotentialActionStatus"`, should be references, `{"@id":
-  "http://schema.org/PotentialActionStatus"}`, to be valid JSON-LD (see
-  Enumerations below).
+  "PotentialActionStatus"`, as references, `{"@id":
+  "http://schema.org/PotentialActionStatus"}`, where the property's range
+  is that Enumeration (*done*, `TermRepairs.enumerationMembers`; the
+  schema model now knows each Enumeration's members, for the drop-downs
+  below). References to schema.org terms are no longer added as Things.
 
 ## Requests
+
+- **Crate > Upgrade**: upgrade a crate from RO-Crate 1.1 to 1.2, and 1.2
+  to 1.3 (one step at a time, each its own undo step), changing the
+  descriptor's `conformsTo` and `@context`, and making the changes each
+  version asks for, with the fixes and suggestions that Save's check and
+  Repair Crate give (e.g. Bioschemas' `ComputationalWorkflow`, whose IRI
+  changed between versions: `https://bioschemas.org/ComputationalWorkflow`
+  to `https://bioschemas.org/terms/ComputationalWorkflow`). Likewise for
+  newer versions of the profiles a crate conforms to, e.g. Workflow Run
+  Crate 0.5 to 0.6 (which also meets the ComputationalWorkflow change and
+  newer RO-Crate). Say what changed, as Repair Crate does.
+- **Entities with the same `@id` in `@graph`**: not allowed in flattened,
+  compacted JSON-LD, but crates do have them by accident. Check what
+  opening one does now; offer to merge them (as renaming to a taken @id
+  does), saying which, or merge on opening with a warning.
 
 - **Cut, copy and paste of files into a folder, within a crate**: in the
   entity tree, cutting a File with a relative `@id` and pasting it into a
@@ -93,6 +234,16 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   are all over the place (none, blank nodes, `#` ids relative to the
   page, the page's own URL for several things), so each would need
   checking and renaming before it is added; and the page is untrusted.
+- **An icon for wpsld**, as SVG (and the PNG and ICO sizes the launchers
+  and the About box need), inspired by the RO-Crate logo and the OS/2
+  logo: for the window, the app image's launchers (jpackage) and the
+  README.
+- **File > Save as Attached Crate…**: choose a folder (empty or new;
+  otherwise a warning, as it would mix with what is there), write the
+  crate there as `ro-crate-metadata.json` (now the name has to be typed
+  in Save As to attach it), and offer to copy the crate's files there
+  too, if they are in another folder (in the background, as copying files
+  in is), so that the crate becomes attached to that folder.
 - **File > Recent**: the last 6 crates opened or saved, kept in the
   settings. A preference turns it off (and forgets the list), as the
   names and places of crates can be private.
@@ -221,6 +372,12 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   tried 13 November 2026, it works as an automatic module in a module
   layer of its own with java.desktop in the boot layer), and packets in
   other formats (MP4/MOV's `uuid` box, by FileTypeDetector, above).
+- **Which formats real crates have**: survey the files of LDaCA's
+  collections (their `encodingFormat`s, PRONOM ids and extensions, from
+  the members' crates, e.g. Mitchell and Delbridge's WAV recordings,
+  `fmt/141`, and ICE-AUS's transcripts) and of ROHub's research objects,
+  to see which our metadata readers read, which they could (and with
+  which library), and which matter most next.
 - **Metadata of scientific formats**: global attributes by the CF and
   ACDD conventions map onto the file's or dataset's properties: `title`
   (name), `summary` (description), `creator_name`/`creator_email`
@@ -272,6 +429,15 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   `description`; `propertyID` (an IRI defining it, e.g. a CF standard
   name, chosen by hand otherwise); for numbers `unitText`, `unitCode`
   (an IRI, e.g. QUDT), `minValue`, `maxValue`, `measurementTechnique`.
+  - R's `.RData`/`.rda` (and `.rds`): no title, author or licence, but
+    named objects whose data frames give columns: names, types (numeric,
+    factor with its levels, character, dates), number of rows, and labels
+    where packages keep them (Hmisc's and haven's `label` attributes, as
+    from SPSS, a `comment` attribute). R's serialisation format is
+    documented (R Internals, "Serialization Formats"): XDR, compressed
+    with gzip, bzip2 or xz, starting `RDX2`/`RDX3`; no Java library reads
+    it that isn't GPL (Renjin), so a small reader of our own, in the
+    statistics module, with the damaged-input tests.
   - CSV and TSV: the header row's names, each column's kind (number,
     date, text) and for numbers their minimum and maximum, by reading the
     file (in the background, as files may be large); with CSVW metadata

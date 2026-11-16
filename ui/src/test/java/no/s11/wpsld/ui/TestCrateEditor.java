@@ -41,18 +41,19 @@ import javafx.scene.input.Clipboard;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Button;
-import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.Label;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.DialogPane;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputControl;
 import javafx.scene.control.skin.VirtualFlow;
 import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
@@ -434,7 +435,7 @@ public class TestCrateEditor extends UiTest {
 		assertEquals(title(dir.getFileName() + java.io.File.separator + "ro-crate-metadata.json", false),
 				stage.getTitle());
 		// Written with its own version, and nothing to discard yet
-		assertTrue(lookup("#preview").queryTextInputControl().getText().contains("https://w3id.org/ro/crate/1.2/context"));
+		assertTrue(json().contains("https://w3id.org/ro/crate/1.2/context"));
 		push(KeyCode.SHORTCUT, KeyCode.N);
 		assertTrue(lookup(".dialog-pane").tryQuery().isEmpty());
 		assertEquals(1, entities().getItems().size());
@@ -698,6 +699,38 @@ public class TestCrateEditor extends UiTest {
 	}
 
 	/**
+	 * Pasting many entities shows the busy pointer first, as it takes a
+	 * while on the JavaFX thread, then pastes them
+	 */
+	@Test
+	public void pasteManyShowsBusy() throws Exception {
+		StringBuilder graph = new StringBuilder();
+		for (int i = 0; i <= CrateEditor.QUICK; i++) {
+			graph.append(i == 0 ? "" : ", ").append("{\"@id\": \"#pv-").append(i)
+					.append("\", \"@type\": \"PropertyValue\", \"name\": \"v").append(i).append("\"}");
+		}
+		String document = "{\"@context\": \"https://w3id.org/ro/crate/1.3/context\", \"@graph\": [" + graph + "]}";
+		interact(() -> {
+			ClipboardContent ldJson = new ClipboardContent();
+			ldJson.put(EntityClipboard.LD_JSON, document);
+			Clipboard.getSystemClipboard().setContent(ldJson);
+		});
+		int before = entities().getItems().size();
+		clickOn("#entities");
+		javafx.scene.Scene scene = entities().getScene();
+		javafx.scene.Cursor[] busy = new javafx.scene.Cursor[1];
+		interact(() -> {
+			menuItem("menuPaste").fire();
+			busy[0] = scene.getCursor();
+		});
+		assertEquals(javafx.scene.Cursor.WAIT, busy[0]);
+		WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> entities().getItems().size() > before);
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals(before + CrateEditor.QUICK + 1, entities().getItems().size());
+		assertNotEquals(javafx.scene.Cursor.WAIT, scene.getCursor());
+	}
+
+	/**
 	 * Several entities copied, with the one they refer to: pasted into the
 	 * same crate, references to the one not copied are right; from another
 	 * crate, they may not be, which is reported.
@@ -849,27 +882,26 @@ public class TestCrateEditor extends UiTest {
 		assertEquals("abcabcabc", name.getText());
 	}
 
-	/** View > Sidebar hides the entities, and shows them again */
+	/**
+	 * View > No Sidebar hides the entities; choosing a view of them shows
+	 * them again, as they were, or in another view
+	 */
 	@Test
 	public void sidebar() {
 		entities();
 		SplitPane split = lookup(".split-pane").queryAs(SplitPane.class);
 		assertEquals(3, split.getItems().size());
-		MenuItem sidebar = menuItem("menuSidebar");
-		// As choosing it: a checked item on Windows and Linux, Hide/Show Sidebar on macOS
-		Runnable choose = () -> {
-			if (sidebar instanceof CheckMenuItem check) {
-				check.setSelected(!check.isSelected());
-			} else {
-				sidebar.fire();
-			}
-		};
-		interact(choose);
+		interact(() -> ((RadioMenuItem) menuItem("menuNoSidebar")).setSelected(true));
 		assertEquals(2, split.getItems().size());
 		assertTrue(lookup("#entities").tryQuery().isEmpty());
-		interact(choose);
+		interact(() -> ((RadioMenuItem) menuItem("menuListByType")).setSelected(true));
 		assertEquals(3, split.getItems().size());
 		assertTrue(lookup("#entities").tryQuery().isPresent());
+		// Hidden, then shown by folder
+		interact(() -> ((RadioMenuItem) menuItem("menuNoSidebar")).setSelected(true));
+		interact(() -> ((RadioMenuItem) menuItem("menuListByFolder")).setSelected(true));
+		assertEquals(3, split.getItems().size());
+		assertTrue(lookup("#entityTree").tryQuery().isPresent());
 	}
 
 	/** As another application (e.g. git) would: the crate with another name, and a later time */
@@ -890,8 +922,144 @@ public class TestCrateEditor extends UiTest {
 		WaitForAsyncUtils.waitForFxEvents();
 	}
 
+	/** The crate's JSON-LD, as View > Crate JSON-LD shows it (closed again) */
 	private String json() {
-		return lookup("#preview").queryTextInputControl().getText();
+		interact(menuItem("menuCrateJson")::fire);
+		TextInputControl text = lookup("#crateJson").queryTextInputControl();
+		String json = text.getText();
+		interact(() -> text.getScene().getWindow().hide());
+		return json;
+	}
+
+	/**
+	 * The entity's JSON-LD edited in its tab: applied as one undo step, its
+	 * @id renamed with the references to it; refused saying why, changing
+	 * nothing; reverted; and pasted in, applied on leaving it
+	 */
+	@Test
+	public void jsonEdited() throws Exception {
+		entities();
+		addEntity("person");
+		Entity person = entities().getSelectionModel().getSelectedItem();
+		Entity root = entities().getItems().get(0);
+		clickOn("#jsonTab");
+		TextInputControl json = lookup("#preview").queryTextInputControl();
+		Button apply = lookup("#jsonApply").queryButton();
+		assertTrue(apply.isDisable());
+		String before = json.getText();
+
+		// Not right: says why, and changes nothing
+		interact(() -> json.setText("{\"@id\": \"#alice\""));
+		assertFalse(apply.isDisable());
+		interact(apply::fire);
+		assertTrue(lookup("#jsonError").queryLabeled().getText(), lookup("#jsonError").queryLabeled().getText().startsWith("Not JSON"));
+		assertEquals(List.of("Person"), person.getTypes());
+		interact(lookup("#jsonRevert").queryButton()::fire);
+		assertEquals(before, json.getText());
+		assertEquals("", lookup("#jsonError").queryLabeled().getText());
+		assertTrue(apply.isDisable());
+
+		interact(() -> json.setText("{\"@id\": \"#alice\", \"@type\": [\"Person\", \"Author\"], "
+				+ "\"name\": \"Alice\", \"email\": \"alice@example.org\"}"));
+		interact(apply::fire);
+		assertEquals("#alice", person.getId());
+		assertEquals(List.of("Person", "Author"), person.getTypes());
+		assertEquals("Alice", person.getLabel());
+		assertEquals("Alice", lookup("#header-name").queryAs(TextField.class).getText());
+		// The root's mention of it follows
+		assertTrue(root.getAll("mentions").stream().anyMatch(v -> v.path("@id").asText().equals("#alice")));
+		// Shown again as the crate writes it
+		assertTrue(json.getText(), json.getText().contains("\"email\" : \"alice@example.org\""));
+		assertTrue(apply.isDisable());
+		Stage stage = (Stage) entities().getScene().getWindow();
+		MenuItem undo = menuItem("menuUndo");
+		assertEquals("_Undo Edit JSON-LD", WaitForAsyncUtils.asyncFx(() -> {
+			app.nameUndo(stage, undo, menuItem("menuRedo"));
+			return undo.getText();
+		}).get());
+
+		// Pasted in, applied on leaving it
+		interact(() -> {
+			ClipboardContent text = new ClipboardContent();
+			text.putString("{\"@id\": \"#alice\", \"@type\": \"Person\", \"name\": \"Alice Smith\"}");
+			Clipboard.getSystemClipboard().setContent(text);
+		});
+		clickOn(json);
+		push(KeyCode.SHORTCUT, KeyCode.A);
+		push(KeyCode.SHORTCUT, KeyCode.V);
+		clickOn("#entities");
+		assertEquals("Alice Smith", person.getLabel());
+		assertEquals(List.of("Person"), person.getTypes());
+		assertTrue(person.get("email").isEmpty());
+
+		interact(undo::fire);
+		Entity undone = entities().getItems().stream().filter(e -> e.getId().equals("#alice")).findFirst().orElseThrow();
+		assertEquals("Alice", undone.getLabel());
+	}
+
+	/**
+	 * Entities written in the JSON-LD edited, as ROHub writes a dataset's
+	 * parts: added as entities of their own, said in a notice, and undone
+	 * with the edit
+	 */
+	@Test
+	public void jsonNestedFlattened() throws Exception {
+		entities();
+		interact(() -> entities().getSelectionModel().clearAndSelect(0));
+		clickOn("#jsonTab");
+		TextInputControl json = lookup("#preview").queryTextInputControl();
+		int before = entities().getItems().size();
+		interact(() -> json.setText("""
+				{"@id": "./", "@type": "Dataset", "name": "Survey",
+				 "hasPart": {"@id": "https://w3id.org/ro-id/x/folders/a", "@type": "Dataset", "name": "Folder A"},
+				 "variableMeasured": {"@type": "PropertyValue", "name": "depth"}}"""));
+		interact(lookup("#jsonApply").queryButton()::fire);
+		assertEquals("", lookup("#jsonError").queryLabeled().getText());
+		assertEquals(before + 2, entities().getItems().size());
+		Entity folder = entities().getItems().stream().filter(e -> e.getId().equals("https://w3id.org/ro-id/x/folders/a"))
+				.findFirst().orElseThrow();
+		assertEquals("Folder A", folder.getLabel());
+		assertTrue(entities().getItems().stream().anyMatch(e -> e.getTypes().equals(List.of("PropertyValue"))
+				&& e.getLabel().equals("depth") && e.getId().startsWith("#propertyvalue-")));
+		String notice = lookup("#noticeText").queryLabeled().getText();
+		assertTrue(notice, notice.contains("added 2 entities written in it"));
+		// The root shown again, as the crate writes it: references only
+		assertTrue(json.getText(), json.getText().contains("\"@id\" : \"https://w3id.org/ro-id/x/folders/a\""));
+		assertFalse(json.getText(), json.getText().contains("Folder A"));
+
+		clickOn("#entities");
+		interact(menuItem("menuUndo")::fire);
+		assertEquals(before, entities().getItems().size());
+	}
+
+	/**
+	 * The JSON-LD tab shows the entity selected, as it changes; View > Crate
+	 * JSON-LD the whole crate's, made again with Refresh
+	 */
+	@Test
+	public void jsonOfEntityAndCrate() throws Exception {
+		entities();
+		addEntity("person");
+		Entity person = entities().getSelectionModel().getSelectedItem();
+		clickOn("#jsonTab");
+		TextInputControl tab = lookup("#preview").queryTextInputControl();
+		assertTrue(tab.getText(), tab.getText().contains("\"@id\" : \"" + person.getId() + "\""));
+		assertFalse(tab.getText(), tab.getText().contains("ro-crate-metadata.json"));
+		clickOn(lookup("#header-name").queryAs(TextField.class)).write("Alice");
+		WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> tab.getText().contains("Alice"));
+		interact(() -> entities().getSelectionModel().clearAndSelect(0));
+		assertTrue(tab.getText(), tab.getText().contains("\"@id\" : \"./\""));
+		assertFalse(tab.getText(), tab.getText().contains("Alice"));
+
+		interact(menuItem("menuCrateJson")::fire);
+		TextInputControl crate = lookup("#crateJson").queryTextInputControl();
+		assertTrue(crate.getText().contains("ro-crate-metadata.json"));
+		assertTrue(crate.getText().contains("Alice"));
+		interact(() -> person.set("name", Optional.of(JsonNodeFactory.instance.textNode("Bob"))));
+		assertFalse(crate.getText().contains("Bob"));
+		interact(lookup("#crateJsonRefresh").queryButton()::fire);
+		assertTrue(crate.getText().contains("Bob"));
+		interact(() -> crate.getScene().getWindow().hide());
 	}
 
 	/**
@@ -1252,10 +1420,19 @@ public class TestCrateEditor extends UiTest {
 		clickOn("#propertySearch").write("name");
 		TextField name = lookup("#header-name").queryAs(TextField.class);
 		clickOn(name).write("My crate");
-		assertEquals("My crate", lookup("#previewName").queryAs(Label.class).getText());
+		// Once typing pauses
+		waitForPreview("My crate");
 		clickOn("#propertySearch").eraseText(4).write("license");
 		clickOn(lookup("#value-license-0").queryAs(ComboBox.class).getEditor())
 				.write("http://spdx.org/licenses/CC0-1.0");
+		try {
+			WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> lookup("#previewProperties").tryQuery().isPresent()
+					&& from(lookup("#previewProperties").queryAs(Node.class)).lookup(".hyperlink")
+							.queryAllAs(Hyperlink.class).stream()
+							.anyMatch(l -> l.getText().equals("http://spdx.org/licenses/CC0-1.0")));
+		} catch (java.util.concurrent.TimeoutException e) {
+			throw new AssertionError("Preview not updated", e);
+		}
 		// Human readable labels of the properties
 		assertTrue(from(lookup("#previewProperties").queryAs(Node.class)).lookup(".label").queryAllAs(Label.class)
 				.stream().anyMatch(l -> l.getText().equals("License")));
@@ -1317,5 +1494,15 @@ public class TestCrateEditor extends UiTest {
 			assertFalse("Root cell's item changed while typing", itemChanged[0]);
 			assertTrue(after.getText().startsWith("My crate\n"));
 		}).get();
+	}
+
+	/** Wait for the preview to show this name, as it is made again once typing pauses */
+	private void waitForPreview(String name) {
+		try {
+			WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> lookup("#previewName").tryQuery()
+					.map(n -> ((Label) n).getText().equals(name)).orElse(false));
+		} catch (java.util.concurrent.TimeoutException e) {
+			throw new AssertionError("Preview not showing " + name, e);
+		}
 	}
 }

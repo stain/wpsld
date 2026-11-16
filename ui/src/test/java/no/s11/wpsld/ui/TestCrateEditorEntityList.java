@@ -333,7 +333,7 @@ public class TestCrateEditorEntityList extends UiTest {
 	}
 
 	/**
-	 * Crate > Add Dataset for Folder and Add to Has Part bring greyed out
+	 * Crate > Add Dataset for Folder and Add File(s) to Has Part bring greyed out
 	 * folders and files into the crate's hasPart
 	 */
 	@Test
@@ -678,7 +678,8 @@ public class TestCrateEditorEntityList extends UiTest {
 		assertEquals(List.of("Bird survey", "my%20notes.txt"), labels());
 		// Selected, it isn't edited, but can be added
 		interact(() -> entities().getSelectionModel().clearAndSelect(1));
-		assertEquals("./", lookup("#entityId").queryAs(TextField.class).getText());
+		assertEquals("“my notes.txt” is in the crate's folder, but not in the crate.",
+				lookup("#noEntity").queryLabeled().getText());
 		interact(() -> menuItem("menuAddPart").fire());
 		WaitForAsyncUtils.waitForFxEvents();
 		assertEquals("my%20notes.txt", lookup("#entityId").queryAs(TextField.class).getText());
@@ -810,14 +811,16 @@ public class TestCrateEditorEntityList extends UiTest {
 		assertEquals("data/counts.csv", lookup("#entityId").queryAs(TextField.class).getText());
 		assertEquals(List.of("Survey", "  data", "    counts.csv", "  docs ~", "  raw ~", "External resources", "  https://example.com/z.csv", "Person", "  Alice"), rows(tree));
 
-		// Folders without an entity: selected, but the form stays
+		// Folders without an entity: what they are, and adding a Dataset
 		interact(() -> tree.getSelectionModel().clearAndSelect(4));
-		assertEquals("data/counts.csv", lookup("#entityId").queryAs(TextField.class).getText());
+		assertEquals("“raw” is in the crate's folder, but not in the crate.",
+				lookup("#noEntity").queryLabeled().getText());
+		assertEquals("Add Dataset for Folder", lookup("#addNotInCrate").queryButton().getText());
 		assertTrue(lookup("#removeEntity").queryButton().isDisabled());
 
-		// Back to the list: the file still selected
+		// Back to the list: nothing selected, as no entity was
 		choose("menuListByType");
-		assertEquals("Bird counts", entities().getSelectionModel().getSelectedItem().getLabel());
+		assertNull(entities().getSelectionModel().getSelectedItem());
 		interact(() -> entities().getSelectionModel().clearAndSelect(entities().getItems().indexOf(
 				entities().getItems().stream().filter(e -> e.getId().equals("raw/2025/a.txt")).findFirst()
 						.orElseThrow())));
@@ -848,5 +851,107 @@ public class TestCrateEditorEntityList extends UiTest {
 		interact(tree::requestFocus);
 		assertEquals("    cited.pdf", rows(tree).get(3));
 		assertEquals("docs/cited.pdf", tree.selectedEntities().get(0).getId());
+	}
+
+	/**
+	 * Expand, Expand All, Collapse and Collapse All, from the tree's
+	 * right-click menu and its keys + * - /, act on all the folders selected
+	 */
+	@Test
+	public void expandAndCollapseSelected() throws Exception {
+		Path folder = Files.createDirectories(temp.resolve("study"));
+		for (String file : List.of("a/x/1.csv", "a/y/2.csv", "b/z/3.csv", "c/4.csv")) {
+			Path path = folder.resolve(file);
+			Files.createDirectories(path.getParent());
+			Files.writeString(path, "");
+		}
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.openFolder(stage, folder)).get());
+		EntityTreeView tree = lookup("#entityTree").queryAs(EntityTreeView.class);
+		WaitForAsyncUtils.waitForFxEvents();
+		java.util.function.Function<String, javafx.scene.control.MenuItem> item = id -> tree.getContextMenu()
+				.getItems().stream().filter(i -> id.equals(i.getId())).findFirst().orElseThrow();
+		java.util.function.Function<String, Integer> row = name -> {
+			for (int i = 0; i < tree.getExpandedItemCount(); i++) {
+				if (tree.getTreeItem(i).getValue().name().equals(name)) {
+					return i;
+				}
+			}
+			throw new AssertionError(name + " not shown: " + rows(tree));
+		};
+		// Folders a and b selected: Expand All opens them and theirs, not c
+		// All closed (nothing selected: the top, the crate's folder), then
+		// the crate's folder opened, one level
+		interact(() -> {
+			tree.getSelectionModel().clearSelection();
+			tree.collapse(true);
+			tree.expand(false);
+		});
+		assertEquals(List.of("study", "  a ~", "  b ~", "  c ~"), rows(tree));
+		interact(() -> {
+			tree.getSelectionModel().select(row.apply("a"));
+			tree.getSelectionModel().select(row.apply("b"));
+		});
+		interact(() -> item.apply("contextExpandAll").fire());
+		List<String> shown = rows(tree);
+		assertTrue(shown.toString(), shown.containsAll(List.of("1.csv ~", "2.csv ~", "3.csv ~")
+				.stream().map(n -> "      " + n).toList()));
+		assertFalse(shown.toString(), shown.stream().anyMatch(r -> r.strip().startsWith("4.csv")));
+		// Collapse closes both; Expand opens both, one level
+		interact(() -> item.apply("contextCollapse").fire());
+		assertFalse(rows(tree).toString(), rows(tree).stream().anyMatch(r -> r.strip().startsWith("x")));
+		interact(() -> item.apply("contextExpand").fire());
+		assertTrue(rows(tree).toString(), rows(tree).stream().anyMatch(r -> r.strip().startsWith("x")));
+		assertTrue(rows(tree).toString(), rows(tree).stream().anyMatch(r -> r.strip().startsWith("z")));
+		// Their folders opened before stay open within: / closes all within
+		clickOn(tree);
+		interact(() -> {
+			tree.getSelectionModel().clearSelection();
+			tree.getSelectionModel().select(row.apply("a"));
+			tree.getSelectionModel().select(row.apply("b"));
+		});
+		type(KeyCode.SLASH);
+		assertFalse(rows(tree).toString(), rows(tree).stream().anyMatch(r -> r.strip().startsWith("x")));
+		interact(() -> {
+			tree.getSelectionModel().clearSelection();
+			tree.getSelectionModel().select(row.apply("a"));
+			tree.getSelectionModel().select(row.apply("b"));
+		});
+		write("*");
+		assertTrue(rows(tree).toString(), rows(tree).stream().anyMatch(r -> r.strip().startsWith("1.csv")));
+		assertTrue(rows(tree).toString(), rows(tree).stream().anyMatch(r -> r.strip().startsWith("3.csv")));
+		write("/");
+		assertFalse(rows(tree).toString(), rows(tree).stream().anyMatch(r -> r.strip().startsWith("x")));
+	}
+
+	/**
+	 * A file of the crate's folder not in the crate, selected: no form nor
+	 * preview of the entity edited before, but what it is, and a button
+	 * adding it, after which it is edited
+	 */
+	@Test
+	public void fileNotInCrateSelected() throws Exception {
+		Path folder = Files.createDirectories(temp.resolve("notyet"));
+		Files.createDirectories(folder.resolve("data"));
+		Files.writeString(folder.resolve("data/1.csv"), "");
+		Stage stage = (Stage) entities().getScene().getWindow();
+		assertTrue(WaitForAsyncUtils.asyncFx(() -> app.openFolder(stage, folder)).get());
+		EntityTreeView tree = lookup("#entityTree").queryAs(EntityTreeView.class);
+		interact(() -> tree.expand(true));
+		int row = -1;
+		for (int i = 0; i < tree.getExpandedItemCount(); i++) {
+			if (tree.getTreeItem(i).getValue().name().equals("1.csv")) {
+				row = i;
+			}
+		}
+		assertTrue(rows(tree).toString(), row >= 0);
+		int file = row;
+		interact(() -> tree.getSelectionModel().clearAndSelect(file));
+		assertEquals("“1.csv” is in the crate's folder, but not in the crate.",
+				lookup("#noEntity").queryLabeled().getText());
+		assertTrue(lookup("#previewName").tryQuery().isEmpty());
+		interact(() -> lookup("#addNotInCrate").queryButton().fire());
+		WaitForAsyncUtils.waitForFxEvents();
+		assertEquals("data/1.csv", lookup("#entityId").queryTextInputControl().getText());
 	}
 }

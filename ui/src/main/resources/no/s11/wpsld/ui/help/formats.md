@@ -7,7 +7,7 @@ file formats.
 
 ## Found from the file
 
-When wpsld adds a file from the crate's folder (**Add to Has Part**,
+When wpsld adds a file from the crate's folder (**Add File(s) to Has Part**,
 **Insert > Files...**, or **Crate > Update File Details...**), it fills in
 the file's `encodingFormat`, if it has none, with its media type, and a
 link to its [PRONOM](https://www.nationalarchives.gov.uk/PRONOM/) format

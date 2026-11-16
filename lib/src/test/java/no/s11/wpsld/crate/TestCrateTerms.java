@@ -125,4 +125,19 @@ public class TestCrateTerms {
 		assertEquals("https://bioschemas.org/profiles/ComputationalWorkflow/1.0-RELEASE",
 				CrateDocument.normalise("https://bioschemas.org/profiles/ComputationalWorkflow/1.0-RELEASE"));
 	}
+
+	/** Types written as IRIs: the names the context gives them */
+	@Test
+	public void typeNames() {
+		assertEquals(Optional.of("Person"), terms.typeName("http://schema.org/Person"));
+		assertEquals(Optional.of("DefinedTerm"), terms.typeName("https://schema.org/DefinedTerm"));
+		assertEquals(Optional.of("Person"), terms.typeName("schema:Person"));
+		assertEquals(Optional.of("File"), terms.typeName("http://schema.org/MediaObject"));
+		// Outside schema.org, as the context names it
+		assertEquals(Optional.of("ComputationalWorkflow"),
+				terms.typeName("https://bioschemas.org/terms/ComputationalWorkflow"));
+		// Names already, and IRIs the context doesn't name
+		assertEquals(Optional.empty(), terms.typeName("Person"));
+		assertEquals(Optional.empty(), terms.typeName("https://example.org/Thing"));
+	}
 }

@@ -205,10 +205,19 @@ repository secret `GEONAMES_USERNAME`, and is skipped without it.
 
 [`.github/workflows/release.yml`](.github/workflows/release.yml) builds the
 app image zips on each platform's GitHub runner, plus the portable zip.
-Pushing a tag `v<version>`, e.g. `v0.2.0`, builds that version and makes a
-draft GitHub release, to check and publish. Run by hand from the Actions
-tab, the workflow only keeps the zips as artifacts. The version otherwise
-comes from [`gradle.properties`](gradle.properties).
+The version is in [`gradle.properties`](gradle.properties): `<next>-SNAPSHOT`
+between releases. To release, on an up-to-date `main`:
+
+```sh
+scripts/release.sh 0.7.0        # commits version=0.7.0, tags v0.7.0, then 0.8.0-SNAPSHOT
+git push --atomic origin main v0.7.0
+```
+
+The tag builds that version (the workflow checks that `gradle.properties`
+says the same) and makes a draft GitHub release, to check and publish. Make
+the tag this way rather than on GitHub's website, so that the tagged commit
+has the version, as Help > About shows. Run by hand from the Actions tab,
+the workflow only keeps the zips as artifacts.
 
 ## Project layout
 

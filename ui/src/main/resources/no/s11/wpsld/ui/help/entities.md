@@ -25,12 +25,22 @@ the **Edit** menu or by right-clicking, or press **Del**, to remove their
 descriptions from the crate. The root dataset cannot be removed. This does not delete
 files from your computer. References to removed entities may remain in
 other descriptions: check and remove or replace those references as needed.
-**Edit > Undo** can restore an accidental removal.
+**Edit > Undo** can restore an accidental removal. Once the entity you
+were editing is removed, no form shows until you select another. When you
+add or paste several entities at once, they are all selected, and no form
+shows either: select one to edit it.
 
 **Crate > Repair Crate** can add placeholder Things for references to
 entities not described in the crate, and update the root's mentions for
 otherwise unlinked entities. It also tidies licences from the SPDX License
-List, file formats from PRONOM, ORCID iDs, ROR identifiers and DOIs, see [Properties and links](properties.md). It reports what it changed. Give any
+List, file formats from PRONOM, ORCID iDs, ROR identifiers and DOIs, see [Properties and links](properties.md). Types written as web
+addresses, such as `http://schema.org/Person`, get their names
+(`Person`), and values from schema.org's lists, such as an action's
+status written as the text `PotentialActionStatus`, become links to that
+value. Objects written inside a value without an `@id` (such as an
+inline PropertyValue), which RO-Crate's flattened JSON-LD doesn't allow
+and which opening a crate warns about, become entities of their own. It
+reports what it changed. Give any
 placeholders appropriate types and names, or correct mistaken identifiers.
 Use **Edit > Undo** if needed.
 
@@ -52,4 +62,10 @@ that identifier, wpsld asks whether to merge them. Choose **Merge** only
 when both descriptions really refer to the same thing: their types and
 values are combined and references point to the merged entity. **Cancel**
 keeps them separate. Review the combined values; use **Edit > Undo** if
-the merge was a mistake.
+the merge was a mistake. An ORCID iD, ROR identifier or DOI typed in
+another form (e.g. `0000-0002-1825-0097`) counts as its web address.
+
+To merge entities without renaming, select them (two, or more of the same
+types) and choose **Edit > Merge Entities...** or **Merge...** on the
+right-click menu, then which `@id` to keep: one with a web address, such
+as an ORCID iD, is offered first, and the crate's own root stays itself.

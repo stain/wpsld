@@ -176,15 +176,44 @@ test {
     // the JVM ends: one JVM per test class, with room for ~25 MB per test
     forkEvery = 1
     maxHeapSize = '1536m'
+    // Several test classes at once, each in its own JVM with its own
+    // headless JavaFX: one core left for Gradle, and at most three JVMs, as
+    // each may take its heap (CI's macOS runner has 3 cores and 7 GB)
+    maxParallelForks = Math.max(1, Math.min(3, Runtime.runtime.availableProcessors() - 1))
     // A test JVM short of memory thrashes rather than fails (seen when a
-    // class had too many tests): fail instead. All take 8 to 11 minutes.
-    timeout = java.time.Duration.ofMinutes(20)
+    // class had too many tests): fail instead. All took 8 to 11 minutes one
+    // class at a time on Linux, over 20 on macOS in CI, whose runner is
+    // slower: more time there.
+    timeout = java.time.Duration.ofMinutes(isMac ? 40 : 30)
+    // Each test class's time, in the log as it ends and in
+    // build/test-results/class-times.tsv (kept by CI), to see which are slow;
+    // written as each ends, as the task's time-out loses the reports
+    def classTimes = layout.buildDirectory.file('test-results/class-times.tsv')
+    doFirst {
+        classTimes.get().asFile.with {
+            parentFile.mkdirs()
+            text = 'class\ttests\tfailed\tskipped\tseconds\n'
+        }
+    }
+    def log = logger
+    addTestListener(new TestListener() {
+        void beforeSuite(TestDescriptor suite) {}
+        void afterSuite(TestDescriptor suite, TestResult result) {
+            if (suite.className != null && suite.name == suite.className) {
+                def seconds = String.format(Locale.ROOT, '%.1f', (result.endTime - result.startTime) / 1000.0)
+                log.lifecycle("${suite.className}: ${result.testCount} tests, ${result.failedTestCount} failed, ${seconds} s")
+                classTimes.get().asFile << "${suite.className}\t${result.testCount}\t${result.failedTestCount}\t${result.skippedTestCount}\t${seconds}\n"
+            }
+        }
+        void beforeTest(TestDescriptor test) {}
+        void afterTest(TestDescriptor test, TestResult result) {}
+    })
     // Each failure in the log as it happens, with its stack (and UiTest's
     // JavaFX thread stack on a time-out), as the report of a class still
     // running is lost when the task's time-out ends it (as on macOS in CI)
     testLogging {
         events 'failed'
-        exceptionFormat 'full'
+        exceptionFormat = 'full'
         showStackTraces = true
     }
 }

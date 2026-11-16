@@ -42,9 +42,11 @@ import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.css.PseudoClass;
 import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Bounds;
@@ -258,6 +260,28 @@ public class EntityEditor extends ScrollPane {
 		}
 		this.entity = Objects.requireNonNull(entity);
 		showForm();
+	}
+
+	/**
+	 * Show no form, as no entity is edited: e.g. after it was removed, or
+	 * while several just added are selected, so that a form isn't made for
+	 * each
+	 *
+	 * @param why     What to say instead, e.g. "No entity selected"
+	 * @param actions What can be done, e.g. a button adding the file
+	 *                selected to the crate
+	 */
+	public void editNone(String why, javafx.scene.Node... actions) {
+		entity = null;
+		propertyQuery = "";
+		Label none = new Label(why);
+		none.setId("noEntity");
+		none.setWrapText(true);
+		none.getStyleClass().add("dim-text");
+		VBox box = new VBox(8, none);
+		box.getChildren().addAll(actions);
+		box.setPadding(new Insets(12));
+		form.getChildren().setAll(box);
 	}
 
 	/**
@@ -640,8 +664,13 @@ public class EntityEditor extends ScrollPane {
 			boolean other = groupFields.get(0).tier() == FieldTier.OTHER;
 			String title = (other ? "From " + group.getKey() : group.getKey() + " by " + formFields.getName())
 					+ " (" + groupFields.size() + ")";
-			FieldGroup fieldGroup = new FieldGroup(title, groupFields,
-					!other || hasValues || (first && !profileGroups));
+			// The vocabulary's other groups open, if in use, with only those
+			// in use until asked for all (e.g. CreativeWork's hundred), other
+			// than those the header shows (e.g. the root's thousands of parts)
+			FieldGroup fieldGroup = other && hasValues && !(first && !profileGroups)
+					? new FieldGroup(title, groupFields, f -> entity.get(f.name()).isPresent()
+							&& !HEADER.contains(f.name()) && !headerLinks.contains(f.name()))
+					: new FieldGroup(title, groupFields, !other || hasValues || (first && !profileGroups));
 			if (other) {
 				first = false;
 			}
@@ -1058,13 +1087,29 @@ public class EntityEditor extends ScrollPane {
 		private final Node before;
 		/** Whether the group was open before the search started, to restore it */
 		private boolean expandedBeforeSearch;
+		/**
+		 * The fields in use, if only those are to be made until asked for
+		 * all (or searched), as a group may have a hundred
+		 */
+		private Optional<Predicate<FormField>> brief = Optional.empty();
 
 		FieldGroup(String title, List<FormField> fields, boolean expanded) {
 			this(title, fields, expanded, field -> false, null);
 		}
 
+		/** A group open with only its fields in use, until asked for all */
+		FieldGroup(String title, List<FormField> fields, Predicate<FormField> inUse) {
+			this(title, fields, true, field -> false, null, Optional.of(inUse));
+		}
+
 		FieldGroup(String title, List<FormField> fields, boolean expanded, Predicate<FormField> onlyWhenNamed,
 				Node before) {
+			this(title, fields, expanded, onlyWhenNamed, before, Optional.empty());
+		}
+
+		private FieldGroup(String title, List<FormField> fields, boolean expanded,
+				Predicate<FormField> onlyWhenNamed, Node before, Optional<Predicate<FormField>> brief) {
+			this.brief = brief.filter(inUse -> fields.stream().anyMatch(inUse.negate()));
 			this.fields = fields;
 			this.onlyWhenNamed = onlyWhenNamed;
 			this.before = before;
@@ -1087,9 +1132,28 @@ public class EntityEditor extends ScrollPane {
 		}
 
 		private void build() {
-			if (pane.getContent() == null) {
+			if (pane.getContent() != null) {
+				return;
+			}
+			if (brief.isEmpty()) {
 				GridPane grid = fieldsGrid(fields, rows);
 				pane.setContent(before == null ? grid : new VBox(8, before, grid));
+				return;
+			}
+			GridPane grid = fieldsGrid(fields.stream().filter(brief.get()).toList(), rows);
+			Hyperlink all = new Hyperlink("Show all " + fields.size() + " properties");
+			all.setId(id("showAll", pane.getText().replaceAll(" \\(\\d+\\)$", "")));
+			all.setOnAction(e -> buildAll());
+			pane.setContent(before == null ? new VBox(8, grid, all) : new VBox(8, before, grid, all));
+		}
+
+		/** Every field made, after only those in use were */
+		private void buildAll() {
+			if (brief.isPresent()) {
+				brief = Optional.empty();
+				rows.clear();
+				pane.setContent(null);
+				build();
 			}
 		}
 
@@ -1136,6 +1200,8 @@ public class EntityEditor extends ScrollPane {
 				return;
 			}
 			build();
+			// Not only those in use, as it may be one of the others
+			buildAll();
 			rows.forEach((field, nodes) -> show(nodes, matches(field, query)));
 			pane.setExpanded(true);
 			showIfAny();
@@ -1163,36 +1229,42 @@ public class EntityEditor extends ScrollPane {
 			VBox editor = new VBox(4, new FieldEditor(field).node());
 			retiredNote(field.name()).ifPresent(editor.getChildren()::add);
 			field.comment().ifPresent(comment -> {
-				Label text = new Label(Labels.plainText(comment));
-				text.setWrapText(true);
-				text.getStyleClass().add("dim-text");
-				VBox description = new VBox(2, text);
-				description.setId(id("description", field.name()));
-				// The full definition, e.g. https://schema.org/datePublished
-				String address = field.property().toString();
-				if (address.startsWith("http://schema.org/") || address.startsWith("https://schema.org/")) {
-					String page = "https://schema.org/" + address.substring(address.indexOf("schema.org/") + 11);
-					Hyperlink link = new Hyperlink(page.substring("https://".length()));
-					link.setId(id("definition", field.name()));
-					link.setTooltip(new Tooltip("Open in the browser"));
-					link.setOnAction(e -> browse.accept(page));
-					description.getChildren().add(link);
-				}
+				// Made on asking, as a form has a hundred or more of them
+				Supplier<VBox> describe = () -> {
+					Label text = new Label(Labels.plainText(comment));
+					text.setWrapText(true);
+					text.getStyleClass().add("dim-text");
+					VBox description = new VBox(2, text);
+					description.setId(id("description", field.name()));
+					// The full definition, e.g. https://schema.org/datePublished
+					String address = field.property().toString();
+					if (address.startsWith("http://schema.org/") || address.startsWith("https://schema.org/")) {
+						String page = "https://schema.org/" + address.substring(address.indexOf("schema.org/") + 11);
+						Hyperlink link = new Hyperlink(page.substring("https://".length()));
+						link.setId(id("definition", field.name()));
+						link.setTooltip(new Tooltip("Open in the browser"));
+						link.setOnAction(e -> browse.accept(page));
+						description.getChildren().add(link);
+					}
+					return description;
+				};
 				Button help;
 				if (layout.popoverHelp()) {
 					// ⓘ, as on macOS ? opens the app's help
 					help = iconButton("i", FluentUiRegularAL.INFO_16);
 					help.getStyleClass().add("info-button");
-					help.setOnAction(e -> showPopover(help, description));
+					help.setOnAction(e -> showPopover(help, describe.get()));
 				} else {
-					description.setVisible(false);
-					description.setManaged(false);
 					help = iconButton("?", FluentUiRegularMZ.QUESTION_CIRCLE_16);
 					help.setOnAction(e -> {
-						description.setVisible(!description.isVisible());
-						description.setManaged(description.isVisible());
+						Optional<Node> shown = editor.getChildren().stream()
+								.filter(n -> id("description", field.name()).equals(n.getId())).findFirst();
+						if (shown.isPresent()) {
+							editor.getChildren().remove(shown.get());
+						} else {
+							editor.getChildren().add(describe.get());
+						}
 					});
-					editor.getChildren().add(description);
 				}
 				help.getStyleClass().add("help-button");
 				help.setId(id("help", field.name()));
@@ -1444,7 +1516,7 @@ public class EntityEditor extends ScrollPane {
 		text.setPromptText("Text");
 		Runnable show = () -> {
 			List<JsonNode> values = entity.getAll(field.name());
-			boolean editable = values.isEmpty() || values.get(0).isTextual();
+			boolean editable = values.isEmpty() || values.get(0).isTextual() || isLiteral(values.get(0));
 			String current = values.isEmpty() ? "" : text(values.get(0));
 			if (!text.getText().equals(current)) {
 				text.setText(current);
@@ -1465,7 +1537,9 @@ public class EntityEditor extends ScrollPane {
 				updated.remove(0);
 			}
 			if (!typed.isBlank()) {
-				updated.add(0, JsonNodeFactory.instance.textNode(typed));
+				// Text in a language stays in it
+				updated.add(0, !values.isEmpty() && isLiteral(values.get(0)) ? edited(values.get(0), typed)
+						: JsonNodeFactory.instance.textNode(typed));
 			}
 			entity.setAll(field.name(), updated);
 			reloadOthers(field.name(), text);
@@ -1515,6 +1589,10 @@ public class EntityEditor extends ScrollPane {
 	 * another value (up to the field's maximum), and for references, a menu
 	 * to create a new entity of the field's range and link it.
 	 */
+	/** How many of a field's values are shown at first, and how many more each time asked */
+	static final int ROWS = 20;
+	static final int MORE = 100;
+
 	private class FieldEditor {
 		private final FormField field;
 		private final List<Row> rows = new ArrayList<>();
@@ -1523,9 +1601,30 @@ public class EntityEditor extends ScrollPane {
 		private final VBox node;
 		/** Shown under @id rather than in the field's group, with ids of its own */
 		private final boolean header;
+		/**
+		 * Values not shown as rows (yet), as there are many, e.g. a root's
+		 * thousands of parts: kept as they are, after those shown
+		 */
+		private final List<JsonNode> hidden = new ArrayList<>();
+		private final Button showMore = new Button();
 
-		/** A value row: its control and how to get the text typed in it */
-		private record Row(HBox node, Supplier<String> text) {
+		/**
+		 * A value row: its control, how to get the text typed in it, and the
+		 * value it shows, if any, kept as it is while its text is (e.g. one
+		 * of a language, or an object the form has no field for)
+		 */
+		private record Row(HBox node, Supplier<String> text, JsonNode original) {
+			/** The value as typed: the one shown if unchanged, a literal keeping its language or datatype */
+			Optional<JsonNode> value(FormField field) {
+				String typed = text.get();
+				if (original != null && typed.equals(EntityEditor.text(original))) {
+					return Optional.of(original);
+				}
+				if (original != null && isLiteral(original) && !typed.isBlank()) {
+					return Optional.of(edited(original, typed));
+				}
+				return EntityEditor.value(field, typed);
+			}
 		}
 
 		FieldEditor(FormField field) {
@@ -1540,9 +1639,12 @@ public class EntityEditor extends ScrollPane {
 				reloads.computeIfAbsent(field.name(), k -> new ArrayList<>()).add(new Reload(this, () -> {
 					rows.clear();
 					rowsBox.getChildren().clear();
+					hidden.clear();
 					showValues();
 				}));
 			}
+			showMore.setId(id(prefix("more"), field.name()));
+			showMore.setOnAction(e -> showMore());
 			addValue.setId(id(prefix("add"), field.name()));
 			addValue.setTooltip(new Tooltip("Add another value"));
 			addValue.setOnAction(e -> addRow(""));
@@ -1595,7 +1697,7 @@ public class EntityEditor extends ScrollPane {
 				}
 				actions.getChildren().add(create);
 			}
-			node = new VBox(4, rowsBox, actions);
+			node = new VBox(4, rowsBox, showMore, actions);
 			node.setId(id(prefix("field"), field.name()));
 		}
 
@@ -1610,17 +1712,35 @@ public class EntityEditor extends ScrollPane {
 			return header ? "header" + Character.toUpperCase(prefix.charAt(0)) + prefix.substring(1) : prefix;
 		}
 
+		/** The values, the first {@value #ROWS} as rows, the others hidden until asked for */
 		private void showValues() {
 			List<JsonNode> values = entity.getAll(field.name());
 			if (values.isEmpty()) {
 				addRow("");
 			} else {
-				values.forEach(v -> addRow(text(v)));
+				values.stream().limit(ROWS).forEach(this::addRow);
+				hidden.addAll(values.subList(Math.min(ROWS, values.size()), values.size()));
 			}
+			showMoreButton();
+		}
+
+		/** Show {@value #MORE} more of the values hidden */
+		private void showMore() {
+			List<JsonNode> next = List.copyOf(hidden.subList(0, Math.min(MORE, hidden.size())));
+			hidden.subList(0, next.size()).clear();
+			next.forEach(this::addRow);
+			showMoreButton();
+		}
+
+		private void showMoreButton() {
+			showMore.setText("Show " + Math.min(MORE, hidden.size()) + " more of " + hidden.size()
+					+ (hidden.size() == 1 ? " value" : " values"));
+			showMore.setVisible(!hidden.isEmpty());
+			showMore.setManaged(showMore.isVisible());
 		}
 
 		private boolean full() {
-			return field.maxCount().isPresent() && rows.size() >= field.maxCount().getAsInt();
+			return field.maxCount().isPresent() && rows.size() + hidden.size() >= field.maxCount().getAsInt();
 		}
 
 		private void linkPlace(GeoNames.Place found) {
@@ -1686,10 +1806,20 @@ public class EntityEditor extends ScrollPane {
 			addRow(current, rows.size());
 		}
 
-		/**
-		 * Add a row for a value at this position among the rows.
-		 */
+		/** A row showing a value of the entity's */
+		private void addRow(JsonNode value) {
+			addRow(text(value), rows.size(), value);
+		}
+
 		private void addRow(String current, int position) {
+			addRow(current, position, null);
+		}
+
+		/**
+		 * Add a row for a value at this position among the rows: the text
+		 * shown, and the value it shows, if any.
+		 */
+		private void addRow(String current, int position, JsonNode original) {
 			String rangeNames = field.range().stream().map(terms::name).collect(Collectors.joining(" or "));
 			Control control;
 			Supplier<String> text;
@@ -1746,8 +1876,9 @@ public class EntityEditor extends ScrollPane {
 				open.setOnAction(e -> crateEntity(combo.getEditor().getText().strip()).ifPresent(show));
 				rowNode.getChildren().add(1, open);
 			}
+			literalTag(original).ifPresent(tag -> rowNode.getChildren().add(1, tag));
 			rowNode.setAlignment(Pos.CENTER_LEFT);
-			Row row = new Row(rowNode, text);
+			Row row = new Row(rowNode, text, original);
 			remove.setOnAction(e -> {
 				rows.remove(row);
 				rowsBox.getChildren().remove(rowNode);
@@ -1822,14 +1953,24 @@ public class EntityEditor extends ScrollPane {
 		 * range (like Crate-O), filtered by @id and name while typing.
 		 */
 		private ComboBox<String> referenceCombo(FormField field, String rangeNames, String current) {
-			List<ClassDef> entityRange = field.range().stream().filter(c -> !schema.isDataType(c)).toList();
+			// The entities it may link to, by @id: only once opened or typed
+			// in, as a crate may have thousands, and a combo box lays out a
+			// cell for each item to size itself
 			Map<String, Entity> candidates = new LinkedHashMap<>();
-			crateEntities.get().stream().filter(e -> e != entity)
-					.filter(e -> entityRange.stream().anyMatch(range -> entityTypes.isA(e.getTypes(), range)))
-					.forEach(e -> candidates.put(e.getId(), e));
-			FilteredList<String> suggestions = new FilteredList<>(
-					FXCollections.observableArrayList(candidates.keySet()));
+			ObservableList<String> ids = FXCollections.observableArrayList();
+			Runnable offer = () -> {
+				if (!candidates.isEmpty() || !ids.isEmpty()) {
+					return;
+				}
+				List<ClassDef> entityRange = field.range().stream().filter(c -> !schema.isDataType(c)).toList();
+				crateEntities.get().stream().filter(e -> e != entity)
+						.filter(e -> entityRange.stream().anyMatch(range -> entityTypes.isA(e.getTypes(), range)))
+						.forEach(e -> candidates.put(e.getId(), e));
+				ids.setAll(candidates.keySet());
+			};
+			FilteredList<String> suggestions = new FilteredList<>(ids);
 			ComboBox<String> combo = new ComboBox<>(suggestions);
+			combo.setOnShowing(e -> offer.run());
 			combo.setEditable(true);
 			combo.setPromptText(field.kind() == ValueKind.REFERENCE ? "@id of " + rangeNames
 					: rangeNames + " (text, or @id of an entity)");
@@ -1854,6 +1995,7 @@ public class EntityEditor extends ScrollPane {
 				String query = typed.strip().toLowerCase(Locale.ROOT);
 				// Changing the list while the editor is being updated would reset it
 				Platform.runLater(() -> {
+					offer.run();
 					suggestions.setPredicate(id -> query.isEmpty() || id.toLowerCase(Locale.ROOT).contains(query)
 							|| candidates.get(id).getLabel().toLowerCase(Locale.ROOT).contains(query));
 					if (suggestions.isEmpty()) {
@@ -1864,7 +2006,10 @@ public class EntityEditor extends ScrollPane {
 				});
 			});
 			if (WORK_FIELDS.contains(field.name())) {
-				lookUpTypedDoi(combo, candidates.keySet());
+				lookUpTypedDoi(combo, () -> {
+					offer.run();
+					return candidates.keySet();
+				});
 			}
 			return combo;
 		}
@@ -1876,12 +2021,12 @@ public class EntityEditor extends ScrollPane {
 		 * it has one, else looked up, to describe the work if the user
 		 * chooses it. Each DOI is asked about once.
 		 */
-		private void lookUpTypedDoi(ComboBox<String> combo, Set<String> entityIds) {
+		private void lookUpTypedDoi(ComboBox<String> combo, Supplier<Set<String>> entityIds) {
 			Set<String> asked = new HashSet<>();
 			Runnable lookUp = () -> {
 				String typed = combo.getEditor().getText().strip();
 				Optional<String> doi = DOI.doiOf(typed);
-				if (doi.isEmpty() || entityIds.contains(typed)) {
+				if (doi.isEmpty() || entityIds.get().contains(typed)) {
 					return;
 				}
 				String iri = DOI.iri(doi.get());
@@ -1917,8 +2062,10 @@ public class EntityEditor extends ScrollPane {
 		 * Set all the field's values on the entity, skipping empty rows.
 		 */
 		private void update() {
-			entity.setAll(field.name(), rows.stream().map(r -> value(field, r.text().get()))
+			List<JsonNode> values = new ArrayList<>(rows.stream().map(r -> r.value(field))
 					.flatMap(Optional::stream).toList());
+			values.addAll(hidden);
+			entity.setAll(field.name(), values);
 			addValue.setDisable(full());
 			reloadOthers(field.name(), this);
 			onChange.run();
@@ -1932,10 +2079,43 @@ public class EntityEditor extends ScrollPane {
 		if (value.isValueNode()) {
 			return value.asText();
 		}
+		if (isLiteral(value)) {
+			return value.get("@value").asText();
+		}
 		if (value.isObject() && value.size() == 1 && value.has("@id")) {
 			return value.get("@id").asText();
 		}
 		return value.toString();
+	}
+
+	/**
+	 * Whether a value is a JSON-LD literal object, e.g. text in a language,
+	 * <code>{"@value": "Hei", "@language": "no"}</code>, or of a datatype
+	 */
+	static boolean isLiteral(JsonNode value) {
+		return value.isObject() && value.path("@value").isValueNode() && !value.path("@value").isNull();
+	}
+
+	/** A literal with the text typed, keeping its language or datatype */
+	static JsonNode edited(JsonNode literal, String typed) {
+		return ((ObjectNode) literal.deepCopy()).put("@value", typed);
+	}
+
+	/**
+	 * Beside a literal of a language or datatype, which it keeps when its
+	 * text is edited: e.g. "no", or "xsd:date"
+	 */
+	private static Optional<Label> literalTag(JsonNode value) {
+		if (value == null || !isLiteral(value) || !(value.has("@language") || value.has("@type"))) {
+			return Optional.empty();
+		}
+		String language = value.path("@language").asText("");
+		String type = value.path("@type").asText("");
+		Label tag = new Label(!language.isEmpty() ? language : type.replaceFirst("^.*[#/]", ""));
+		tag.getStyleClass().add("dim-text");
+		tag.setTooltip(new Tooltip(!language.isEmpty() ? "In the language " + language + ", kept when edited"
+				: "Of the datatype " + type + ", kept when edited"));
+		return Optional.of(tag);
 	}
 
 	/**

@@ -27,6 +27,7 @@ import org.junit.Test;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -219,7 +220,10 @@ public class TestEntityEditor extends UiTest {
 		crate.add("Person");
 		edit(crate.getRoot());
 		ComboBox<?> distribution = lookup("#value-distribution-0").queryAs(ComboBox.class);
+		// Offered once opened
+		interact(distribution::show);
 		assertEquals(List.of("#datadownload-1"), List.copyOf(distribution.getItems()));
+		interact(distribution::hide);
 		// Typing filters by @id and name
 		clickOn(distribution.getEditor()).write("zzz");
 		assertTrue(distribution.getItems().isEmpty());
@@ -323,9 +327,10 @@ public class TestEntityEditor extends UiTest {
 		Label label = lookup("#label-datePublished").queryAs(Label.class);
 		assertEquals("Date published", label.getText());
 		assertEquals("datePublished", label.getTooltip().getText());
-		Node description = lookup("#description-datePublished").query();
-		assertFalse(description.isVisible());
+		// Made when asked for
+		assertTrue(lookup("#description-datePublished").tryQuery().isEmpty());
 		clickOn("#help-datePublished");
+		Node description = lookup("#description-datePublished").query();
 		assertTrue(description.isVisible());
 		// As plain text, without schema.org's [[CreativeWork]] markup
 		String text = from(description).lookup(".label").queryAs(Label.class).getText();
@@ -333,6 +338,8 @@ public class TestEntityEditor extends UiTest {
 		assertFalse(text, text.contains("[["));
 		Hyperlink definition = lookup("#definition-datePublished").queryAs(Hyperlink.class);
 		assertEquals("schema.org/datePublished", definition.getText());
+		clickOn("#help-datePublished");
+		assertTrue(lookup("#description-datePublished").tryQuery().isEmpty());
 	}
 
 	/**
@@ -411,5 +418,113 @@ public class TestEntityEditor extends UiTest {
 		chooseType("SoftwareSourceCode");
 		assertTrue(lookup("#otherProperties").query().isVisible());
 		assertEquals("text/csv", value("fileFormat", 0).getText());
+	}
+
+	/**
+	 * A field of many values, e.g. a root's thousands of parts, shows the
+	 * first as rows and the others on asking; those not shown are kept as
+	 * they are when a row is changed, and a reference row offers the crate's
+	 * entities only once opened
+	 */
+	/**
+	 * A vocabulary's group of properties, opened as the entity uses some of
+	 * them, shows only those until asked for all; the search finds the
+	 * others
+	 */
+	@Test
+	public void groupInUseShowsThoseFirst() {
+		interact(() -> crate.getRoot().set("isBasedOn", Optional.of(ref("https://example.org/earlier"))));
+		edit(crate.getRoot());
+		assertTrue(visibleProperties().contains("isBasedOn"));
+		// Another of CreativeWork's, not made yet
+		assertTrue(lookup("#value-abstract-0").tryQuery().isEmpty());
+		Hyperlink all = lookup("#showAll-From_CreativeWork").queryAs(Hyperlink.class);
+		assertTrue(all.getText(), all.getText().matches("Show all \\d+ properties"));
+		interact(all::fire);
+		assertTrue(lookup("#value-abstract-0").tryQuery().isPresent());
+		assertTrue(visibleProperties().containsAll(List.of("isBasedOn", "abstract")));
+		assertTrue(lookup("#showAll-From_CreativeWork").tryQuery().isEmpty());
+
+		// Searching makes them all too
+		edit(crate.getRoot());
+		assertTrue(lookup("#value-abstract-0").tryQuery().isEmpty());
+		clickOn("#propertySearch").write("abstract");
+		assertTrue(visibleProperties().contains("abstract"));
+		assertFalse(visibleProperties().contains("isBasedOn"));
+	}
+
+	/**
+	 * Text in a language (or of a datatype) shows its text, with the
+	 * language beside it, kept when edited, and when another value of the
+	 * property is: it used to be saved as its JSON, as text
+	 */
+	@Test
+	public void literalsKeptWhenEdited() {
+		ObjectNode norwegian = JSON.objectNode().put("@value", "Et datasett").put("@language", "no");
+		ObjectNode dated = JSON.objectNode().put("@value", "2026").put("@type", "http://www.w3.org/2001/XMLSchema#gYear");
+		interact(() -> {
+			crate.getRoot().setAll("alternateName", List.of(norwegian, JSON.textNode("A dataset")));
+			crate.getRoot().set("name", Optional.of(JSON.objectNode().put("@value", "Navn").put("@language", "no")));
+			crate.getRoot().set("temporalCoverage", Optional.of(dated));
+		});
+		edit(crate.getRoot());
+		clickOn("#propertySearch").write("alternate");
+		assertEquals("Et datasett", value("alternateName", 0).getText());
+		assertTrue(lookup(".label").queryAllAs(Label.class).stream().anyMatch(l -> l.getText().equals("no")));
+		// Another value edited: this one kept as it is
+		interact(() -> value("alternateName", 1).setText("A data set"));
+		assertEquals(List.of(norwegian, JSON.textNode("A data set")), crate.getRoot().getAll("alternateName"));
+		// Edited: still in Norwegian
+		interact(() -> value("alternateName", 0).setText("Eit datasett"));
+		assertEquals(JSON.objectNode().put("@value", "Eit datasett").put("@language", "no"),
+				crate.getRoot().getAll("alternateName").get(0));
+		// The header's name too
+		TextField name = lookup("#header-name").queryAs(TextField.class);
+		assertTrue(name.isEditable());
+		assertEquals("Navn", name.getText());
+		interact(() -> name.setText("Namn"));
+		assertEquals(Optional.of(JSON.objectNode().put("@value", "Namn").put("@language", "no")),
+				crate.getRoot().get("name"));
+		// Of a datatype, kept
+		interact(() -> lookup("#propertySearch").queryAs(TextField.class).setText("temporalCoverage"));
+		assertEquals("2026", value("temporalCoverage", 0).getText());
+		interact(() -> value("temporalCoverage", 0).setText("2025"));
+		assertEquals(Optional.of(dated.deepCopy().put("@value", "2025")), crate.getRoot().get("temporalCoverage"));
+	}
+
+	@Test
+	public void manyValuesShownOnAsking() {
+		int many = EntityEditor.ROWS + 10;
+		List<JsonNode> parts = new java.util.ArrayList<>();
+		interact(() -> {
+			for (int i = 0; i < many; i++) {
+				Entity file = crate.add("File");
+				crate.rename(file, "data/" + i + ".csv");
+				parts.add(ref(file.getId()));
+			}
+			crate.getRoot().setAll("hasPart", parts);
+		});
+		// The root's parts, under its @id
+		edit(crate.getRoot());
+		assertTrue(lookup("#headerValue-hasPart-" + (EntityEditor.ROWS - 1)).tryQuery().isPresent());
+		assertTrue(lookup("#headerValue-hasPart-" + EntityEditor.ROWS).tryQuery().isEmpty());
+		Button more = lookup("#headerMore-hasPart").queryButton();
+		assertEquals("Show 10 more of 10 values", more.getText());
+		// Changing a row shown keeps those not shown, after it
+		interact(() -> ((ComboBox<?>) lookup("#headerValue-hasPart-0").query()).getEditor().setText("data/1.csv"));
+		List<JsonNode> now = crate.getRoot().getAll("hasPart");
+		assertEquals(many, now.size());
+		assertEquals(ref("data/1.csv"), now.get(0));
+		assertEquals(parts.subList(EntityEditor.ROWS, many), now.subList(EntityEditor.ROWS, many));
+		// Not filled until opened
+		@SuppressWarnings("unchecked")
+		ComboBox<String> first = lookup("#headerValue-hasPart-1").queryAs(ComboBox.class);
+		assertTrue(first.getItems().isEmpty());
+		interact(first::show);
+		assertEquals(many, first.getItems().size());
+		interact(first::hide);
+		interact(more::fire);
+		assertTrue(lookup("#headerValue-hasPart-" + (many - 2)).tryQuery().isPresent());
+		assertFalse(lookup("#headerMore-hasPart").query().isVisible());
 	}
 }

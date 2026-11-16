@@ -423,13 +423,12 @@
 .tree-view:focused > .virtual-flow > .clipped-container > .sheet > .tree-cell:filled:selected,
 .list-view:focused > .virtual-flow > .clipped-container > .sheet > .list-cell:filled:focused:selected,
 .tree-view:focused > .virtual-flow > .clipped-container > .sheet > .tree-cell:filled:focused:selected {
-    -fx-background-color: -win-subtle-selected;
-    -fx-background-insets: 1 0 1 0;
-    -fx-background-radius: 4;
-    -fx-border-color: transparent transparent transparent -win-accent;
-    -fx-border-width: 0 0 0 3;
-    -fx-border-insets: 10 0 10 1;
-    -fx-border-radius: 2;
+    /* The accent pill as a background, 3 px wide: as a border, its width and
+       insets made the row taller and moved its text when selected */
+    -fx-background-color: -win-subtle-selected,
+        linear-gradient(from 0px 0px to 4px 0px, -win-accent 99%, transparent 100%);
+    -fx-background-insets: 1 0 1 0, 10 0 10 1;
+    -fx-background-radius: 4, 2;
     -fx-text-fill: -win-text;
 }
 

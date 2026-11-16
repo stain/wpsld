@@ -28,6 +28,7 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -74,6 +75,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
@@ -87,6 +89,7 @@ import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Control;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.MultipleSelectionModel;
 import javafx.scene.control.Separator;
 import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.SeparatorMenuItem;
@@ -108,6 +111,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
@@ -127,6 +131,7 @@ import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.lookup.DOI;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.crate.EntityJson;
 import no.s11.wpsld.crate.Places;
 import no.s11.wpsld.lookup.GeoNames;
 import no.s11.wpsld.lookup.ORCID;
@@ -137,6 +142,7 @@ import no.s11.wpsld.lookup.WebAvailability;
 import no.s11.wpsld.lookup.EmbeddedMetadata;
 import no.s11.wpsld.lookup.FileMetadata;
 import no.s11.wpsld.lookup.SPDXLicenses;
+import no.s11.wpsld.crate.TermRepairs;
 import no.s11.wpsld.crate.UndoHistory;
 import no.s11.wpsld.crate.UndoHistory.Place;
 import no.s11.wpsld.crate.UndoHistory.Step;
@@ -481,30 +487,61 @@ public class CrateEditor extends Application {
 			private final EntityIcons.Icon icon = EntityIcons.forCell(this);
 			{
 				labels.addListener(new WeakInvalidationListener(relabel));
+				// As wide as the list, long names cut off with … (the sidebar
+				// can be widened): each cell its own width, the list measured
+				// more of its thousands each frame and resized them all again,
+				// laying out every frame, never done
+				setPrefWidth(0);
 			}
+
+			private final Tooltip tip = new Tooltip();
 
 			@Override
 			protected void updateItem(Entity entity, boolean empty) {
 				super.updateItem(entity, empty);
 				label(empty ? null : entity);
-				getStyleClass().removeAll("problem", "not-data");
+				// Changing only what differs: the list measures rows with a
+				// cell of its own, and each change made it lay out again on
+				// the next frame, every frame (in a crate of many problems)
 				if (empty || entity == null) {
 					setGraphic(null);
-					setTooltip(null);
+					show(null, null);
 				} else if (isNotInCrate(entity)) {
 					icon.set(EntityIcons.DOCUMENT);
 					setGraphic(icon);
-					getStyleClass().add("not-data");
-					setTooltip(new Tooltip("In the crate's folder, but not in the crate: Add to Has Part to add it"));
+					show("not-data", "In the crate's folder, but not in the crate: Add File(s) to Has Part to add it");
 				} else if (problems.containsKey(entity)) {
 					icon.set(EntityIcons.problem(entity, listing));
 					setGraphic(icon);
-					getStyleClass().add("problem");
-					setTooltip(new Tooltip(problems.get(entity)));
+					show("problem", problems.get(entity));
 				} else {
 					icon.set(EntityIcons.of(entity, listing));
 					setGraphic(icon);
-					setTooltip(null);
+					show(null, null);
+				}
+			}
+
+			/** The style class of a problem or a file not in the crate, if any, and the tooltip saying so */
+			private void show(String styleClass, String tooltip) {
+				for (String each : List.of("problem", "not-data")) {
+					boolean has = getStyleClass().contains(each);
+					if (each.equals(styleClass) && !has) {
+						getStyleClass().add(each);
+					} else if (!each.equals(styleClass) && has) {
+						getStyleClass().removeAll(each);
+					}
+				}
+				if (tooltip == null) {
+					if (getTooltip() != null) {
+						setTooltip(null);
+					}
+				} else {
+					if (!tooltip.equals(tip.getText())) {
+						tip.setText(tooltip);
+					}
+					if (getTooltip() != tip) {
+						setTooltip(tip);
+					}
 				}
 			}
 
@@ -520,20 +557,33 @@ public class CrateEditor extends Application {
 			}
 		});
 		entities.getSelectionModel().selectedItemProperty().addListener((obs, old, entity) -> {
-			// A file not in the crate is selected, but the form stays
-			if (entity != null && !relisting && !isNotInCrate(entity)) {
+			if (entity == null || relisting || selectingSeveral) {
+				return;
+			}
+			if (isNotInCrate(entity)) {
+				// A file not in the crate: what to do with it, rather than a form
+				notInCrate(CrateFolder.decode(entity.getId()), false);
+			} else {
 				entityEditor.edit(entity);
 				entityPreview.show(entity);
 			}
 		});
-		// A folder without an entity is selected, but the form stays
+		// A folder of entities (e.g. of a type) is selected, but the form stays
 		tree.getSelectionModel().selectedItemProperty().addListener((obs, old, item) -> {
-			if (item != null && !relisting) {
+			if (item == null || relisting || selectingSeveral) {
+				return;
+			}
+			EntityTree.Node node = item.getValue();
+			if (node.entity().isPresent()) {
 				// Not again for another place of the entity edited
-				item.getValue().entity().filter(entity -> entity != entityEditor.getEntity()).ifPresent(entity -> {
+				node.entity().filter(entity -> entity != entityEditor.getEntity()).ifPresent(entity -> {
 					entityEditor.edit(entity);
 					entityPreview.show(entity);
 				});
+			} else if (EntityTree.fileId(node).isPresent()) {
+				notInCrate(node.name(), false);
+			} else if (node.kind() == EntityTree.Kind.FOLDER) {
+				notInCrate(node.name(), true);
 			}
 		});
 		// Several to copy or remove; the last selected is edited
@@ -543,7 +593,13 @@ public class CrateEditor extends Application {
 				.addListener((ListChangeListener<TreeItem<EntityTree.Node>>) c -> select());
 		// Copy and paste entities, as Edit > Copy and Paste do in the list
 		entities.setContextMenu(entityMenu(stage));
-		tree.setContextMenu(entityMenu(stage));
+		// The tree's own too: open and close the folders selected
+		ContextMenu treeMenu = entityMenu(stage);
+		treeMenu.getItems().addAll(new SeparatorMenuItem(), treeItem("Expand", "contextExpand", () -> tree.expand(false)),
+				treeItem("Expand All", "contextExpandAll", () -> tree.expand(true)),
+				treeItem("Collapse", "contextCollapse", () -> tree.collapse(false)),
+				treeItem("Collapse All", "contextCollapseAll", () -> tree.collapse(true)));
+		tree.setContextMenu(treeMenu);
 
 		Button add = new Button("Add entity");
 		add.setId("addEntity");
@@ -560,24 +616,77 @@ public class CrateEditor extends Application {
 		sidebar = new VBox(new Label(" Entities"), entityType, entities, buttons);
 
 		preview.setId("preview");
-		preview.setEditable(false);
 		preview.setStyle("-fx-font-family: monospace;");
+		// Edited by hand (or pasted into), applied on leaving it or with Apply
+		preview.textProperty().addListener((obs, old, text) -> {
+			if (!settingJson) {
+				jsonEdited.set(true);
+			}
+		});
+		preview.focusedProperty().addListener((obs, was, focused) -> {
+			if (!focused) {
+				applyJson();
+			}
+		});
 
 		// On the right, a preview of the entity (with links to the entities it
-		// refers to, which open them) and the crate's JSON-LD
+		// refers to, which open them) and its JSON-LD
 		entityPreview = new EntityPreview(() -> crate, this::show,
 				address -> browse.accept(address), property -> entityEditor.label(property));
 		// Only an attached crate's relative @ids are files
 		entityPreview.setFolder(crateFile::folder);
 		// Text of properties that take URLs as links, by the form's fields
 		entityPreview.setTakesUrl(property -> entityEditor.takesUrl(property));
+		// The JSON-LD tab shows the entity shown
+		entityPreview.setOnShow(() -> {
+			if (jsonEdited.get() && jsonEntity != entityPreview.getEntity()) {
+				// Not applied, as it wasn't right
+				showNotice("Your changes to the JSON-LD of " + jsonEntity.getLabel() + " were not applied: "
+						+ jsonError.getText(), null, null);
+				jsonEdited.set(false);
+			}
+			jsonShown = false;
+			if (jsonTab != null && jsonTab.isSelected()) {
+				showJson();
+			}
+		});
 		// Beside the form's references and @id: show the entity, or open the address
 		entityEditor.setShow(this::show);
 		entityEditor.setAddress(entityPreview::address);
 		Tab previewTab = new Tab("Preview", entityPreview);
 		previewTab.setId("previewTab");
-		Tab jsonTab = new Tab("JSON-LD", preview);
+		jsonError.setId("jsonError");
+		jsonError.setWrapText(true);
+		jsonError.getStyleClass().add("error-text");
+		Button apply = new Button("Apply");
+		apply.setId("jsonApply");
+		// Not taking the focus, which would apply the changes, also on Revert
+		apply.setFocusTraversable(false);
+		apply.disableProperty().bind(jsonEdited.not());
+		apply.setOnAction(e -> applyJson());
+		Button revert = new Button("Revert");
+		revert.setId("jsonRevert");
+		revert.setFocusTraversable(false);
+		revert.disableProperty().bind(jsonEdited.not());
+		revert.setOnAction(e -> {
+			jsonEdited.set(false);
+			jsonShown = false;
+			showJson();
+		});
+		Region jsonSpace = new Region();
+		HBox.setHgrow(jsonSpace, Priority.ALWAYS);
+		HBox jsonButtons = new HBox(8, jsonError, jsonSpace, revert, apply);
+		jsonButtons.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+		jsonButtons.setPadding(new Insets(4));
+		VBox.setVgrow(preview, Priority.ALWAYS);
+		Tab jsonTab = new Tab("JSON-LD", new VBox(preview, jsonButtons));
 		jsonTab.setId("jsonTab");
+		this.jsonTab = jsonTab;
+		jsonTab.selectedProperty().addListener((o, was, selected) -> {
+			if (selected) {
+				showJson();
+			}
+		});
 		TabPane views = new TabPane(previewTab, jsonTab);
 		views.setId("views");
 		views.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
@@ -604,8 +713,19 @@ public class CrateEditor extends Application {
 		removed.forEach(crate::remove);
 		// The entities only they linked to the root are now mentioned
 		crate.mentionUnlinked();
+		if (removed.contains(entityEditor.getEntity())) {
+			entityEditor.editNone("No entity selected: select one in the list to edit it.");
+			entityPreview.show(null);
+		}
 		relist();
 		changed();
+	}
+
+	private static MenuItem treeItem(String text, String id, Runnable action) {
+		MenuItem item = new MenuItem(text);
+		item.setId(id);
+		item.setOnAction(e -> action.run());
+		return item;
 	}
 
 	private ContextMenu entityMenu(Stage stage) {
@@ -624,17 +744,30 @@ public class CrateEditor extends Application {
 		MenuItem showFiles = new MenuItem(FileManager.label(FileManager.System.current()));
 		showFiles.setId("contextShowInFiles");
 		showFiles.setOnAction(e -> selectedPath().ifPresent(path -> showInFiles(stage, path)));
+		MenuItem merge = new MenuItem("Merge…");
+		merge.setId("contextMerge");
+		merge.setOnAction(e -> mergeEntities(stage));
 		MenuItem fileMetadata = new MenuItem("Metadata from the File…");
 		fileMetadata.setId("contextFileMetadata");
-		fileMetadata.setOnAction(e -> metadataFromFile(stage));
+		fileMetadata.setOnAction(e -> {
+			Map<String, Path> files = selectedFiles();
+			if (files.size() > 1) {
+				metadataFromFiles(stage, files);
+			} else {
+				metadataFromFile(stage);
+			}
+		});
 		ContextMenu menu = new ContextMenu(copyEntity, pasteEntity, new SeparatorMenuItem());
 		menu.getItems().addAll(parts);
-		menu.getItems().addAll(new SeparatorMenuItem(), showFiles, fileMetadata, new SeparatorMenuItem(),
+		menu.getItems().addAll(new SeparatorMenuItem(), showFiles, fileMetadata, new SeparatorMenuItem(), merge,
 				removeEntity);
 		menu.setOnShowing(e -> {
 			enableParts(parts);
+			merge.setDisable(!canMerge());
 			showFiles.setDisable(selectedPath().isEmpty());
-			fileMetadata.setDisable(selectedFile().isEmpty());
+			int files = selectedFiles().size();
+			fileMetadata.setText(files > 1 ? "Metadata from the " + files + " Files…" : "Metadata from the File…");
+			fileMetadata.setDisable(files == 0);
 		});
 		return menu;
 	}
@@ -647,8 +780,7 @@ public class CrateEditor extends Application {
 	/** Keep up with the entities selected in the list or tree shown */
 	private void select() {
 		List<Entity> selected = byFolder ? tree.selectedEntities()
-				: new ArrayList<>(entities.getSelectionModel().getSelectedItems().stream()
-						.filter(e -> e != null && !isNotInCrate(e)).toList());
+				: new ArrayList<>(selectedInList().stream().filter(e -> !isNotInCrate(e)).toList());
 		if (!byFolder) {
 			Entity last = entities.getSelectionModel().getSelectedItem();
 			if (last != null && selected.remove(last)) {
@@ -818,8 +950,12 @@ public class CrateEditor extends Application {
 		edit.getItems().addAll(textEditing(stage));
 		edit.getItems().addAll(new SeparatorMenuItem(), preferences);
 		edit.setId("menuEdit");
-		Menu view = new Menu("_View", null, sidebarItem(), new SeparatorMenuItem());
+		Menu view = new Menu("_View");
 		view.getItems().addAll(listings());
+		MenuItem crateJson = new MenuItem("Crate _JSON-LD…");
+		crateJson.setId("menuCrateJson");
+		crateJson.setOnAction(e -> showCrateJson(stage));
+		view.getItems().addAll(new SeparatorMenuItem(), crateJson);
 		view.getItems().addAll(new SeparatorMenuItem(), styles(stage), colours(stage));
 		view.setId("menuView");
 
@@ -879,14 +1015,14 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * Add Dataset for Folder and Add to Has Part, for the Crate menu and the
+	 * Add Dataset for Folder and Add File(s) to Has Part, for the Crate menu and the
 	 * entities' right-click menu, with ids starting with this prefix
 	 */
 	private List<MenuItem> partItems(String prefix) {
 		MenuItem addDataset = new MenuItem("Add _Dataset for Folder");
 		addDataset.setId(prefix + "AddDataset");
 		addDataset.setOnAction(e -> addDatasets());
-		MenuItem addPart = new MenuItem("Add to Has _Part");
+		MenuItem addPart = new MenuItem("Add File(s) to Has _Part");
 		addPart.setId(prefix + "AddPart");
 		addPart.setOnAction(e -> addParts());
 		return List.of(addDataset, addPart);
@@ -1034,20 +1170,70 @@ public class CrateEditor extends Application {
 		return Optional.of(inBackground(stage, "Reading what “" + entity.getLabel() + "” says about itself", task));
 	}
 
+	/**
+	 * A file or folder in the crate's folder but not in the crate is
+	 * selected: no form nor preview, but what it is and the actions adding
+	 * it (as on the right-click menu), acting on the selection
+	 */
+	private void notInCrate(String name, boolean folder) {
+		Button add = new Button(folder ? "Add Dataset for Folder" : "Add File(s) to Has Part");
+		add.setId("addNotInCrate");
+		add.setOnAction(e -> {
+			if (folder) {
+				addDatasets();
+			} else {
+				addParts();
+			}
+		});
+		entityEditor.editNone("“" + name + "” is in the crate's folder, but not in the crate.", add);
+		entityPreview.show(null);
+	}
+
+	/**
+	 * The files selected that the crate describes and that are in its
+	 * folder, by @id
+	 */
+	private Map<String, Path> selectedFiles() {
+		Map<String, Path> all = crateFiles();
+		Map<String, Path> files = new LinkedHashMap<>();
+		selection.forEach(e -> Optional.ofNullable(all.get(e.getId())).ifPresent(f -> files.put(e.getId(), f)));
+		return files;
+	}
+
+	/**
+	 * Metadata from the Files… for several selected: read in the background
+	 * as one job, then a notice offers to fill in what their entities lack,
+	 * as one undo step (see {@link #readWhatFilesSay}), rather than a dialog
+	 * for each
+	 */
+	Task<Map<String, FileMetadata.Reading>> metadataFromFiles(Stage stage, Map<String, Path> files) {
+		return readWhatFilesSay(stage, files, "", false);
+	}
+
+	/** The kinds of files wpsld reads metadata from */
+	private static final String READ_FORMATS = """
+			Kinds of files wpsld reads metadata from:
+			• Office: Word, Excel and PowerPoint (.docx, .xlsx, .pptx)
+			• OpenDocument (.odt, .ods, .odp)
+			• PDF, PostScript and EPS, Photoshop (.psd), InDesign
+			• Images: JPEG, PNG, TIFF, WebP, HEIC, AVIF, GIF, BMP, camera raw
+			• Videos: MP4, MOV
+			• SVG drawings""";
+
 	/** What a file says about itself, read, to choose from and give its entity */
 	private void metadataFromFile(Stage stage, Entity entity, FileMetadata.Reading reading) {
 		// Not what it has already, e.g. the same author or licence
 		List<EmbeddedMetadata.Found> found = reading.found().stream()
 				.filter(f -> !entity.getAll(f.property()).contains(fileValue(f, false, entity))).toList();
 		if (found.isEmpty()) {
+			// A kind of file read, all of it in the crate; or another kind
+			boolean read = !reading.readers().isEmpty();
 			Alert none = new Alert(reading.problems().isEmpty() ? AlertType.INFORMATION : AlertType.WARNING,
-					"Office, OpenDocument and PDF files, photos and images (JPEG, PNG, TIFF, WebP, HEIC, AVIF,"
-							+ " GIF, raw), videos (MP4, MOV), SVGs, EPS and PSD files can say what they are, who"
-							+ " made them, when and under which licence; this one says nothing the crate doesn't."
-							+ problems(reading.problems()),
+					(read ? "Its entity has all that it says." : READ_FORMATS) + problems(reading.problems()),
 					ButtonType.OK);
 			none.initOwner(stage);
-			none.setHeaderText("Nothing new in “" + entity.getLabel() + "”");
+			none.setHeaderText(read ? "Everything in “" + entity.getLabel() + "” is in the crate"
+					: "wpsld reads metadata from other kinds of files");
 			none.setResizable(true);
 			none.showAndWait();
 			return;
@@ -1311,18 +1497,12 @@ public class CrateEditor extends Application {
 
 	/** Tell what Update File Details or Fill in updated, and what files couldn't be read */
 	private void showUpdated(Stage stage, List<String> done, List<String> problems) {
-		Alert alert = new Alert(problems.isEmpty() ? AlertType.INFORMATION : AlertType.WARNING,
-				(done.isEmpty() ? "The files' details were up to date."
-						: String.join("\n", done.stream().limit(30).toList()) + (done.size() > 30 ? "\n…" : ""))
+		report(stage, problems.isEmpty() ? AlertType.INFORMATION : AlertType.WARNING,
+				done.isEmpty() ? "Nothing to update"
+						: done.size() + (done.size() == 1 ? " file updated" : " files updated"),
+				(done.isEmpty() ? "The files' details were up to date." : String.join("\n", done))
 						+ (problems.isEmpty() ? "" : "\n\nNot all of what the files say could be read:\n"
-								+ String.join("\n", problems.stream().limit(30).toList())
-								+ (problems.size() > 30 ? "\n…" : "")),
-				ButtonType.OK);
-		alert.initOwner(stage);
-		alert.setHeaderText(done.isEmpty() ? "Nothing to update"
-				: done.size() + (done.size() == 1 ? " file updated" : " files updated"));
-		alert.setResizable(true);
-		alert.show();
+								+ String.join("\n", problems))).show();
 	}
 
 	/**
@@ -1721,8 +1901,7 @@ public class CrateEditor extends Application {
 			if (crate.get(id).isPresent()) {
 				continue;
 			}
-			Entity file = crate.add("File");
-			crate.rename(file, id);
+			Entity file = crate.add("File", id);
 			crateFile.folder().map(folder -> folder.resolve(CrateFolder.decode(id))).ifPresent(path -> {
 				CrateFolder.describe(file, path);
 				// By its content, then its name
@@ -1903,8 +2082,44 @@ public class CrateEditor extends Application {
 		showListed(added);
 	}
 
+	/**
+	 * At most how many entities to add or paste at once without first
+	 * showing the busy pointer (see {@link #busy})
+	 */
+	static final int QUICK = 200;
+
+	/**
+	 * Work on the crate that may take a while on the JavaFX thread, e.g.
+	 * pasting thousands of entities: when large, the busy pointer shown
+	 * first (the scene draws it on the next pulse), and the work done
+	 * after, as the next event (where dialogs may wait); otherwise done now
+	 */
+	private void busy(boolean large, Runnable work) {
+		if (!large) {
+			work.run();
+			return;
+		}
+		Scene scene = stage.getScene();
+		javafx.scene.Cursor was = scene.getCursor();
+		scene.setCursor(javafx.scene.Cursor.WAIT);
+		javafx.animation.PauseTransition shown = new javafx.animation.PauseTransition(
+				javafx.util.Duration.millis(50));
+		shown.setOnFinished(e -> Platform.runLater(() -> {
+			try {
+				work.run();
+			} finally {
+				scene.setCursor(was);
+			}
+		}));
+		shown.play();
+	}
+
 	/** The entities selected as parts of the datasets of their folders */
 	private void addParts() {
+		busy(selectedFileIds().size() + selection.size() > QUICK, this::addSelectedParts);
+	}
+
+	private void addSelectedParts() {
 		List<Entity> files = addSelectedFiles();
 		List<Entity> selected = new ArrayList<>(selection);
 		selected.addAll(files);
@@ -2018,7 +2233,81 @@ public class CrateEditor extends Application {
 		remove.setOnAction(e -> removeEntities());
 		// After Cut, Copy and Paste
 		items.add(3, remove);
+		MenuItem merge = new MenuItem("Mer_ge Entities…");
+		merge.setId("menuMerge");
+		merge.disableProperty().bind(Bindings.createBooleanBinding(() -> !canMerge(), selection));
+		merge.setOnAction(e -> mergeEntities(stage));
+		items.add(4, merge);
 		return items;
+	}
+
+	/**
+	 * Whether the entities selected can be merged: two or more; more than
+	 * two only of the same types, as one of others is likely selected by
+	 * accident (two of different types may be, e.g. a Person and a Thing
+	 * added for a reference)
+	 */
+	boolean canMerge() {
+		List<Entity> selected = selection.stream().filter(Objects::nonNull).toList();
+		return selected.size() == 2 || selected.size() > 2
+				&& selected.stream().map(e -> Set.copyOf(e.getTypes())).distinct().count() == 1;
+	}
+
+	/**
+	 * Edit > Merge Entities… (and Merge… on the right-click menu): merge
+	 * the entities selected into one, whose @id the user chooses (the root,
+	 * if it is one of them, as it stays; else one with an address, e.g. an
+	 * ORCID iD, rather than a local one): their types and values combined,
+	 * references to any of them pointing to it, as one undo step
+	 */
+	void mergeEntities(Stage stage) {
+		if (!canMerge()) {
+			return;
+		}
+		List<Entity> selected = crate.getEntities().stream().filter(selection::contains).toList();
+		ChoiceBox<Entity> keep = new ChoiceBox<>(FXCollections.observableArrayList(selected));
+		keep.setId("mergeKeep");
+		keep.setConverter(new javafx.util.StringConverter<>() {
+			@Override
+			public String toString(Entity e) {
+				return e == null ? "" : e.getLabel().equals(e.getId()) ? e.getId() : e.getId() + "  (" + e.getLabel() + ")";
+			}
+
+			@Override
+			public Entity fromString(String text) {
+				return null;
+			}
+		});
+		Entity edited = entityEditor.getEntity();
+		keep.setValue(selected.contains(crate.getRoot()) ? crate.getRoot()
+				: selected.stream().filter(e -> Crate.isAbsolute(e.getId())).findFirst()
+						.orElse(selected.contains(edited) ? edited : selected.get(0)));
+		keep.setDisable(selected.contains(crate.getRoot()));
+		Label about = new Label("Their types and values are combined into one entity, and references to any of"
+				+ " them point to it. Keep the @id of:");
+		about.setWrapText(true);
+		Dialog<ButtonType> dialog = new Dialog<>();
+		dialog.initOwner(stage);
+		dialog.setTitle("Merge Entities");
+		dialog.setHeaderText("Merge " + selected.size() + " entities into one?");
+		dialog.getDialogPane().setContent(new VBox(8, about, keep));
+		dialog.getDialogPane().setPrefWidth(480);
+		ButtonType merge = new ButtonType("Merge", ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().setAll(merge, ButtonType.CANCEL);
+		if (dialog.showAndWait().orElse(ButtonType.CANCEL) != merge) {
+			return;
+		}
+		// What was typed before is an undo step of its own
+		checkpoint();
+		Entity kept = keep.getValue();
+		selected.stream().filter(e -> e != kept).forEach(other -> crate.merge(kept, other));
+		// e.g. DataDownload and Thing become DataDownload
+		kept.setTypes(entityTypes.simplify(kept.getTypes()));
+		crate.mentionUnlinked();
+		show(kept);
+		entityEditor.edit(kept);
+		refresh();
+		checkpoint(placeOf(null), Optional.of("Merge Entities"));
 	}
 
 	/**
@@ -2057,16 +2346,64 @@ public class CrateEditor extends Application {
 	 */
 	private void showListed(List<Entity> shown) {
 		relist();
-		if (byFolder) {
-			tree.select(shown);
-			return;
+		if (shown.size() > 1) {
+			// Several, e.g. files added or entities pasted: selected at once,
+			// not each edited in turn (a form each, thousands in a large crate)
+			entityEditor.editNone(shown.size() + " entities selected: select one to edit it.");
+			entityPreview.show(null);
 		}
-		if (!entities.getItems().containsAll(shown)) {
-			entityType.setValue(null);
+		selectingSeveral = shown.size() > 1;
+		try {
+			if (byFolder) {
+				tree.select(shown);
+				return;
+			}
+			if (!new HashSet<>(entities.getItems()).containsAll(shown)) {
+				entityType.setValue(null);
+			}
+			entities.getSelectionModel().clearSelection();
+			selectInList(shown);
+		} finally {
+			selectingSeveral = false;
 		}
-		entities.getSelectionModel().clearSelection();
-		shown.stream().map(entities.getItems()::indexOf).forEach(entities.getSelectionModel()::select);
 	}
+
+	/**
+	 * The entities selected in the list, in its order: each row asked
+	 * whether it is, as the selection model's own lists count from their
+	 * start for each item, too slow with thousands selected (e.g. pasted)
+	 */
+	private List<Entity> selectedInList() {
+		MultipleSelectionModel<Entity> model = entities.getSelectionModel();
+		List<Entity> items = entities.getItems();
+		List<Entity> selected = new ArrayList<>();
+		for (int i = 0; i < items.size(); i++) {
+			if (model.isSelected(i) && items.get(i) != null) {
+				selected.add(items.get(i));
+			}
+		}
+		return selected;
+	}
+
+	/**
+	 * Select these entities in the list too, at once (one change, not one
+	 * for each), the last as the selected item; those not listed are left out
+	 */
+	private void selectInList(List<Entity> chosen) {
+		Map<Entity, Integer> index = new HashMap<>();
+		List<Entity> items = entities.getItems();
+		for (int i = 0; i < items.size(); i++) {
+			index.putIfAbsent(items.get(i), i);
+		}
+		int[] indices = chosen.stream().map(index::get).filter(Objects::nonNull).mapToInt(Integer::intValue)
+				.toArray();
+		if (indices.length > 0) {
+			entities.getSelectionModel().selectIndices(indices[0], Arrays.copyOfRange(indices, 1, indices.length));
+		}
+	}
+
+	/** Whether several entities are being selected at once, none of them to edit */
+	private boolean selectingSeveral;
 
 	/**
 	 * List the crate's entities again, root first, then by type, name and
@@ -2086,7 +2423,7 @@ public class CrateEditor extends Application {
 	 *                     no longer of the type chosen, not when choosing it
 	 */
 	private void relist(boolean followEdited) {
-		List<Entity> selected = List.copyOf(entities.getSelectionModel().getSelectedItems());
+		List<Entity> selected = selectedInList();
 		Entity edited = entityEditor.getEntity();
 		relisting = true;
 		try {
@@ -2112,9 +2449,10 @@ public class CrateEditor extends Application {
 				entities.getSelectionModel().clearSelection();
 				// Not others than the entity edited, unless it is listed too
 				if (edited != null && listed.contains(edited)) {
-					selected.stream().filter(e -> e != edited).map(listed::indexOf).filter(i -> i >= 0)
-							.forEach(entities.getSelectionModel()::select);
-					entities.getSelectionModel().select(edited);
+					List<Entity> again = new ArrayList<>(selected.stream().filter(e -> e != edited).toList());
+					// The one edited last, as the selected item
+					again.add(edited);
+					selectInList(again);
 				}
 			}
 			// The attached crate's folder, as it changes
@@ -2160,8 +2498,12 @@ public class CrateEditor extends Application {
 			alert.showAndWait();
 			return;
 		}
-		boolean sameCrate = clip.get().crate().filter(crateFile.base()::equals).isPresent();
-		Crate.Pasted pasted = crate.paste(clip.get().entities(), clip.get().referenced(), sameCrate);
+		busy(clip.get().entities().size() > QUICK, () -> paste(stage, clip.get()));
+	}
+
+	private void paste(Stage stage, EntityClipboard.Clip clip) {
+		boolean sameCrate = clip.crate().filter(crateFile.base()::equals).isPresent();
+		Crate.Pasted pasted = crate.paste(clip.entities(), clip.referenced(), sameCrate);
 		List<Entity> shown = new ArrayList<>(pasted.added());
 		List<Entity> merged = new ArrayList<>();
 		List<Entity> kept = new ArrayList<>();
@@ -2232,11 +2574,8 @@ public class CrateEditor extends Application {
 			header += ", with " + references + (references == 1 ? " reference" : " references")
 					+ " to an entity not copied";
 		}
-		Alert alert = new Alert(references > 0 ? AlertType.WARNING : AlertType.INFORMATION,
-				String.join("\n\n", notes), ButtonType.OK);
-		alert.initOwner(stage);
-		alert.setHeaderText(header);
-		alert.setResizable(true);
+		Alert alert = report(stage, references > 0 ? AlertType.WARNING : AlertType.INFORMATION, header,
+				String.join("\n\n", notes));
 		alert.initModality(javafx.stage.Modality.NONE);
 		alert.show();
 	}
@@ -2255,10 +2594,14 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * View > Entities by Type (the list) or by Folder (the tree).
+	 * View > No Sidebar, or the entities by Type (the list), by Folder or by
+	 * Part (the trees), in the sidebar.
 	 */
 	private List<MenuItem> listings() {
 		ToggleGroup group = new ToggleGroup();
+		RadioMenuItem noSidebar = new RadioMenuItem("No Side_bar");
+		noSidebar.setId("menuNoSidebar");
+		noSidebar.setToggleGroup(group);
 		RadioMenuItem byType = new RadioMenuItem("Entities by _Type");
 		byType.setId("menuListByType");
 		byType.setToggleGroup(group);
@@ -2270,10 +2613,25 @@ public class CrateEditor extends Application {
 		parts.setId("menuListByPart");
 		parts.setToggleGroup(group);
 		folderView = folders;
+		// The view shown in the sidebar, also while it is hidden
+		RadioMenuItem[] listed = { byType };
+		// Whether choosing No Sidebar just hid it (else it was hidden already)
+		boolean[] justHidden = { false };
 		group.selectedToggleProperty().addListener((obs, old, item) -> {
 			if (item == null) {
 				return;
 			}
+			if (item == noSidebar) {
+				justHidden[0] = true;
+				showSidebar(false);
+				return;
+			}
+			showSidebar(true);
+			if (item == listed[0]) {
+				// Shown again as it was
+				return;
+			}
+			listed[0] = (RadioMenuItem) item;
 			boolean logical = item == parts;
 			if (byFolder && item != byType && logical != byPart) {
 				// From one tree to the other
@@ -2286,6 +2644,18 @@ public class CrateEditor extends Application {
 				listByFolder(item != byType);
 			}
 		});
+		if (CrateFile.onMac()) {
+			// ⌃⌘S hides the sidebar, as on macOS, and shows it again
+			noSidebar.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN,
+					KeyCombination.CONTROL_DOWN));
+			noSidebar.setOnAction(e -> {
+				if (!justHidden[0]) {
+					// Chosen when already hidden: shown again
+					listed[0].setSelected(true);
+				}
+				justHidden[0] = false;
+			});
+		}
 		MenuItem refresh = new MenuItem("_Refresh");
 		refresh.setId("menuRefresh");
 		refresh.setAccelerator(new KeyCodeCombination(KeyCode.F5));
@@ -2312,35 +2682,11 @@ public class CrateEditor extends Application {
 				menu.addEventHandler(Menu.ON_SHOWING, e -> update.run());
 			}
 		});
-		return List.of(byType, folders, parts, files, refresh);
+		return List.of(noSidebar, byType, folders, parts, files, refresh);
 	}
 
 	/** View > Entities by Folder, chosen when opening a folder */
 	private RadioMenuItem folderView;
-
-	/**
-	 * View: show or hide the sidebar of entities. As the operating system
-	 * has it: on macOS an item that says what it will do (Hide Sidebar, Show
-	 * Sidebar, Control-Command-S), elsewhere a checked item.
-	 */
-	private MenuItem sidebarItem() {
-		if (CrateFile.onMac()) {
-			MenuItem item = new MenuItem("Hide Side_bar");
-			item.setId("menuSidebar");
-			item.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN,
-					KeyCombination.CONTROL_DOWN));
-			item.setOnAction(e -> {
-				showSidebar(!split.getItems().contains(sidebar));
-				item.setText(split.getItems().contains(sidebar) ? "Hide Side_bar" : "Show Side_bar");
-			});
-			return item;
-		}
-		CheckMenuItem item = new CheckMenuItem("Side_bar");
-		item.setId("menuSidebar");
-		item.setSelected(true);
-		item.selectedProperty().addListener((obs, old, show) -> showSidebar(show));
-		return item;
-	}
 
 	void showSidebar(boolean show) {
 		boolean shown = split.getItems().contains(sidebar);
@@ -2927,14 +3273,37 @@ public class CrateEditor extends Application {
 	}
 
 	/**
+	 * An identifier as the crate writes it: an ORCID iD, ROR identifier or
+	 * DOI in another form (e.g. a bare <code>0000-0002-1825-0097</code>,
+	 * <code>http://orcid.org/…</code> or <code>doi:10.…</code>) as its
+	 * <code>https://</code> address, so that one typed so is the same as one
+	 * imported (and merged with it); others as they are
+	 */
+	static String canonicalId(String id) {
+		return ORCID.idOf(id).map(i -> ORCID.NAMESPACE + i)
+				// A bare ROR identifier could be a local name
+				.or(() -> ROR.idOf(id).filter(i -> id.contains("ror.org")).map(i -> ROR.NAMESPACE + i))
+				.or(() -> DOI.doiOf(id).filter(d -> id.contains("doi") || id.equals(d)).map(DOI::iri)).orElse(id);
+	}
+
+	/**
 	 * Change an entity's @id, updating references to it. If another entity
 	 * already has that identifier, offer to merge the two.
 	 */
-	private void rename(Entity entity, String newId) {
+	private void rename(Entity entity, String typed) {
+		rename(entity, typed, Optional.empty());
+	}
+
+	/**
+	 * Rename, as {@link #rename(Entity, String)}, as part of a change of this
+	 * name, e.g. Edit JSON-LD, unless merging
+	 */
+	private void rename(Entity entity, String typed, Optional<String> name) {
+		String newId = canonicalId(typed.strip());
 		Optional<Entity> existing = crate.get(newId);
 		Entity edited = entity;
 		// Named, as its difference looks like removing an entity
-		Optional<String> change = Optional.empty();
+		Optional<String> change = name;
 		if (existing.isEmpty()) {
 			crate.rename(entity, newId);
 		} else {
@@ -3343,7 +3712,9 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * Crate > Repair Crate: add a Thing for each reference to an entity not in
+	 * Crate > Repair Crate: objects written in values without an @id made
+	 * entities of their own (see {@link Crate#flattenNested()}); add a Thing
+	 * for each reference to an entity not in
 	 * the crate, to be named and typed (see {@link Crate#addReferenced()});
 	 * no longer mention the entities linked otherwise from the root data
 	 * entity (see {@link Crate#unmentionLinked()}), and mention those not
@@ -3355,10 +3726,16 @@ public class CrateEditor extends Application {
 	 * for a media type that only one format has (see
 	 * {@link PRONOMFormats#repair}), and ORCID iDs, ROR identifiers and DOIs
 	 * written otherwise (see {@link ORCID#repair}, {@link ROR#repair} and
-	 * {@link DOI#repair}). One undoable step, then tells what was
-	 * done.
+	 * {@link DOI#repair}). Types written as IRIs get the names the RO-Crate
+	 * context gives them, and members of Enumerations written as text become
+	 * references to them (see {@link TermRepairs}), before references to
+	 * entities not in the crate are added. One undoable step, then tells
+	 * what was done.
 	 */
 	void repair(Stage stage) {
+		List<Entity> flattened = crate.flattenNested();
+		List<String> types = TermRepairs.typeNames(crate, terms);
+		List<String> members = TermRepairs.enumerationMembers(crate, terms);
 		List<String> licences = SPDXLicenses.bundled().repair(crate);
 		List<String> formats = PRONOMFormats.bundled().repair(crate);
 		List<String> people = ORCID.repair(crate);
@@ -3368,30 +3745,37 @@ public class CrateEditor extends Application {
 		List<Entity> unmentioned = crate.unmentionLinked();
 		List<Entity> mentioned = crate.mentionUnlinked();
 		List<String> done = new ArrayList<>();
+		if (!flattened.isEmpty()) {
+			done.add("Written in values without an @id, which flattened RO-Crate JSON-LD doesn't allow, now"
+					+ " entities of their own:\n" + list(flattened));
+		}
+		if (!types.isEmpty()) {
+			done.add("Types written by their names:\n" + types.stream().map(t -> "• " + t)
+					.collect(Collectors.joining("\n")));
+		}
+		if (!members.isEmpty()) {
+			done.add("Values of schema.org's lists (Enumerations), as references to them:\n"
+					+ members.stream().map(m -> "• " + m).collect(Collectors.joining("\n")));
+		}
 		if (!licences.isEmpty()) {
-			done.add("Licences of the SPDX License List:\n" + licences.stream().limit(LISTED).map(l -> "• " + l)
-					.collect(Collectors.joining("\n"))
-					+ (licences.size() > LISTED ? "\n• and " + (licences.size() - LISTED) + " more" : ""));
+			done.add("Licences of the SPDX License List:\n" + licences.stream().map(l -> "• " + l)
+					.collect(Collectors.joining("\n")));
 		}
 		if (!dois.isEmpty()) {
-			done.add("DOIs:\n" + dois.stream().limit(LISTED).map(f -> "• " + f)
-					.collect(Collectors.joining("\n"))
-					+ (dois.size() > LISTED ? "\n• and " + (dois.size() - LISTED) + " more" : ""));
+			done.add("DOIs:\n" + dois.stream().map(f -> "• " + f)
+					.collect(Collectors.joining("\n")));
 		}
 		if (!people.isEmpty()) {
-			done.add("ORCID iDs:\n" + people.stream().limit(LISTED).map(f -> "• " + f)
-					.collect(Collectors.joining("\n"))
-					+ (people.size() > LISTED ? "\n• and " + (people.size() - LISTED) + " more" : ""));
+			done.add("ORCID iDs:\n" + people.stream().map(f -> "• " + f)
+					.collect(Collectors.joining("\n")));
 		}
 		if (!organizations.isEmpty()) {
-			done.add("ROR identifiers:\n" + organizations.stream().limit(LISTED).map(f -> "• " + f)
-					.collect(Collectors.joining("\n"))
-					+ (organizations.size() > LISTED ? "\n• and " + (organizations.size() - LISTED) + " more" : ""));
+			done.add("ROR identifiers:\n" + organizations.stream().map(f -> "• " + f)
+					.collect(Collectors.joining("\n")));
 		}
 		if (!formats.isEmpty()) {
-			done.add("File formats of PRONOM:\n" + formats.stream().limit(LISTED).map(f -> "• " + f)
-					.collect(Collectors.joining("\n"))
-					+ (formats.size() > LISTED ? "\n• and " + (formats.size() - LISTED) + " more" : ""));
+			done.add("File formats of PRONOM:\n" + formats.stream().map(f -> "• " + f)
+					.collect(Collectors.joining("\n")));
 		}
 		if (!added.isEmpty()) {
 			done.add("Added as Thing, referred to but not in the crate:\n" + list(added)
@@ -3414,25 +3798,45 @@ public class CrateEditor extends Application {
 			refresh();
 			checkpoint(placeOf(null), Optional.of("Repair"));
 		}
-		Alert report = new Alert(AlertType.INFORMATION,
-				done.isEmpty() ? "Nothing to repair." : String.join("\n\n", done), ButtonType.OK);
-		report.initOwner(stage);
-		report.setHeaderText("Repair Crate");
-		report.showAndWait();
+		report(stage, AlertType.INFORMATION, "Repair Crate",
+				done.isEmpty() ? "Nothing to repair." : String.join("\n\n", done)).showAndWait();
 	}
 
 	/**
-	 * The entities, one per line, the first {@value #LISTED} of them.
+	 * The entities, one per line, all of them (in a report that scrolls,
+	 * see {@link #report})
 	 */
 	private static String list(List<Entity> listed) {
-		String list = listed.stream().limit(LISTED)
+		return listed.stream()
 				.map(e -> "• " + (e.getLabel().equals(e.getId()) ? e.getId() : e.getLabel() + " (" + e.getId() + ")"))
 				.collect(Collectors.joining("\n"));
-		return listed.size() > LISTED ? list + "\n… and " + (listed.size() - LISTED) + " more" : list;
 	}
 
-	/** How many entities {@link #repair} lists of each change */
-	private static final int LISTED = 10;
+	/** How many lines a report shows as text; more in a text area that scrolls */
+	private static final int REPORT_LINES = 15;
+
+	/**
+	 * A dialog reporting what was done, e.g. by Repair Crate: a long report
+	 * in a read-only text area that scrolls (and can be copied, e.g. to
+	 * check each change), so that the dialog fits on the screen
+	 */
+	static Alert report(Window owner, AlertType type, String header, String text) {
+		Alert alert = new Alert(type, text, ButtonType.OK);
+		alert.initOwner(owner);
+		alert.setHeaderText(header);
+		alert.setResizable(true);
+		long lines = text.lines().count();
+		if (lines > REPORT_LINES) {
+			TextArea area = new TextArea(text);
+			area.setId("report");
+			area.setEditable(false);
+			area.setWrapText(true);
+			area.setPrefColumnCount(70);
+			area.setPrefRowCount(REPORT_LINES + 5);
+			alert.getDialogPane().setContent(area);
+		}
+		return alert;
+	}
 
 	/**
 	 * Add the entities not linked from the root data entity to its
@@ -3595,16 +3999,167 @@ public class CrateEditor extends Application {
 	private void refresh() {
 		labels.set(labels.get() + 1);
 		if (entityPreview != null) {
-			entityPreview.refresh();
+			Node focused = stage == null || stage.getScene() == null ? null : stage.getScene().getFocusOwner();
+			if (focused instanceof TextInputControl) {
+				// While typing, once it pauses: a large entity's preview takes long
+				previewLater.playFromStart();
+			} else {
+				previewLater.stop();
+				entityPreview.refresh();
+			}
 		}
-		JsonNode json = crate.toJson();
-		try {
-			preview.setText(Crate.WRITER.writeValueAsString(json));
-		} catch (JsonProcessingException e) {
-			preview.setText(e.toString());
+		jsonShown = false;
+		if (jsonTab == null || jsonTab.isSelected()) {
+			// Once typing pauses, as a crate's JSON-LD may be megabytes
+			jsonLater.playFromStart();
 		}
 		if (stage != null) {
-			stage.setTitle(crateFile.title(json, CrateFile.onMac()));
+			stage.setTitle(crateFile.title(crate.toJson(), CrateFile.onMac()));
+		}
+	}
+
+	private final javafx.animation.PauseTransition previewLater = new javafx.animation.PauseTransition(
+			javafx.util.Duration.millis(300));
+	{
+		previewLater.setOnFinished(e -> entityPreview.refresh());
+	}
+
+	private Tab jsonTab;
+	/** Whether the JSON-LD tab shows the crate as it is */
+	private boolean jsonShown;
+	private final javafx.animation.PauseTransition jsonLater = new javafx.animation.PauseTransition(
+			javafx.util.Duration.millis(300));
+	{
+		jsonLater.setOnFinished(e -> showJson());
+	}
+
+	/**
+	 * The JSON-LD of the entity shown in its tab, if not shown already: not
+	 * the whole crate's, which may be megabytes to lay out again as each
+	 * pause in typing (see View > Crate JSON-LD)
+	 */
+	void showJson() {
+		Entity shown = entityPreview.getEntity();
+		if (jsonShown || jsonEdited.get() && jsonEntity == shown) {
+			// Not over changes being made to it
+			return;
+		}
+		jsonShown = true;
+		jsonEntity = shown;
+		jsonEdited.set(false);
+		jsonError.setText("");
+		settingJson = true;
+		try {
+			preview.setEditable(shown != null && crate.getEntities().contains(shown));
+			preview.setText(!preview.isEditable() ? "" : Crate.WRITER.writeValueAsString(shown.toJson()));
+		} catch (JsonProcessingException e) {
+			preview.setText(e.toString());
+		} finally {
+			settingJson = false;
+		}
+	}
+
+	/** The entity whose JSON-LD the tab shows */
+	private Entity jsonEntity;
+	/** Whether its JSON-LD was changed in the tab, not yet applied */
+	private final BooleanProperty jsonEdited = new SimpleBooleanProperty();
+	/** Whether the text is being set, not edited */
+	private boolean settingJson;
+	/** What is wrong with the JSON-LD typed, if anything */
+	private final Label jsonError = new Label();
+
+	/**
+	 * The entity's JSON-LD as changed in its tab, in place of its types and
+	 * values, and its @id renamed (with its references, or merged into
+	 * another of that @id), as one undo step; if not right, saying why
+	 * below it, and changing nothing
+	 */
+	private void applyJson() {
+		Entity entity = jsonEntity;
+		if (!jsonEdited.get() || entity == null || !crate.getEntities().contains(entity)) {
+			return;
+		}
+		EntityJson.Parsed parsed;
+		try {
+			parsed = EntityJson.parse(preview.getText());
+		} catch (IllegalArgumentException e) {
+			jsonError.setText(e.getMessage());
+			return;
+		}
+		jsonError.setText("");
+		jsonEdited.set(false);
+		EntityJson.Applied applied = EntityJson.apply(parsed, entity, crate);
+		if (!canonicalId(parsed.id().strip()).equals(entity.getId())) {
+			// Shows it, or the one merged into
+			rename(entity, parsed.id(), Optional.of("Edit JSON-LD"));
+			// Also if not, as merging was cancelled
+			refresh();
+		} else {
+			show(entity);
+			entityEditor.edit(entity);
+			refresh();
+		}
+		checkpoint(placeOf(null), Optional.of("Edit JSON-LD"));
+		jsonShown = false;
+		showJson();
+		// Entities written in it, now of their own
+		List<String> said = new ArrayList<>();
+		if (!applied.added().isEmpty()) {
+			said.add("added " + counted(applied.added().size()) + " written in it: " + names(applied.added()));
+		}
+		if (!applied.merged().isEmpty()) {
+			said.add("merged some written in it into " + names(applied.merged()) + ", of the same @id");
+		}
+		if (!applied.linked().isEmpty()) {
+			said.add("linked " + names(applied.linked()) + " to it, as written with @reverse");
+		}
+		if (!said.isEmpty()) {
+			showNotice("Applied, and " + String.join("; ", said) + ". Edit > Undo undoes it all.", null, null);
+		}
+	}
+
+	/** View > Crate JSON-LD, while open */
+	private Stage crateJsonWindow;
+
+	/**
+	 * View > Crate JSON-LD: the whole crate's JSON-LD, as it would be saved,
+	 * in a window of its own, made again with Refresh (not on each change,
+	 * as it may be megabytes)
+	 */
+	void showCrateJson(Stage stage) {
+		if (crateJsonWindow == null) {
+			TextArea text = new TextArea();
+			text.setId("crateJson");
+			text.setEditable(false);
+			text.setStyle("-fx-font-family: monospace;");
+			Button refresh = new Button("_Refresh");
+			refresh.setId("crateJsonRefresh");
+			refresh.setOnAction(e -> fillCrateJson(text));
+			Button close = new Button("Close");
+			close.setCancelButton(true);
+			Region space = new Region();
+			HBox.setHgrow(space, Priority.ALWAYS);
+			HBox buttons = new HBox(8, space, refresh, close);
+			VBox.setVgrow(text, Priority.ALWAYS);
+			VBox box = new VBox(8, text, buttons);
+			box.setPadding(new Insets(8));
+			crateJsonWindow = new Stage();
+			crateJsonWindow.initOwner(stage);
+			crateJsonWindow.setScene(new Scene(box, 700, 600));
+			close.setOnAction(e -> crateJsonWindow.hide());
+			crateJsonWindow.setOnHidden(e -> crateJsonWindow = null);
+		}
+		crateJsonWindow.setTitle("JSON-LD of " + crateFile.title(crate.toJson(), false));
+		fillCrateJson((TextArea) crateJsonWindow.getScene().lookup("#crateJson"));
+		crateJsonWindow.show();
+		crateJsonWindow.toFront();
+	}
+
+	private void fillCrateJson(TextArea text) {
+		try {
+			text.setText(Crate.WRITER.writeValueAsString(crate.toJson()));
+		} catch (JsonProcessingException e) {
+			text.setText(e.toString());
 		}
 	}
 

@@ -213,7 +213,8 @@ public class TestCrateReader {
 		assertEquals("en", x.get("name").orElseThrow().get("@language").asText());
 		// Nested, not flattened: reported, but not lost
 		assertEquals("Nested", x.get("author").orElseThrow().get("name").asText());
-		assertTrue(reports(document, Severity.WARNING, "#x author has a nested object"));
+		assertTrue(reports(document, Severity.WARNING, "#x author has an object written in it without an @id"));
+		assertTrue(reports(document, Severity.WARNING, "Crate > Repair Crate makes it an entity of its own"));
 		assertFalse(document.problems().toString(), reports(document, Severity.WARNING, "#x name"));
 	}
 
@@ -239,6 +240,30 @@ public class TestCrateReader {
 		assertEquals("Alice", alice.get("name").orElseThrow().asText());
 		assertTrue(reports(document, Severity.WARNING, "3 entities were nested in values"));
 		assertFalse(document.problems().toString(), reports(document, Severity.WARNING, "no @type"));
+	}
+
+	/**
+	 * Links written with @reverse are made links of the entities they come
+	 * from, as JSON-LD flattening does, rather than lost
+	 */
+	@Test
+	public void reverseLinksFlattened() {
+		CrateDocument document = graph(
+				"{\"@id\": \"data/\", \"@type\": \"Dataset\", \"@reverse\": {\"isPartOf\": [{\"@id\": \"a.csv\"},"
+						+ " {\"@id\": \"b.csv\", \"@type\": \"File\", \"name\": \"B\"}]}}",
+				"{\"@id\": \"a.csv\", \"@type\": \"File\", \"isPartOf\": {\"@id\": \"other/\"}}",
+				"{\"@id\": \"#c\", \"@type\": \"Thing\", \"@reverse\": {\"about\": {\"@id\": \"#undescribed\"}}}");
+		Entity a = document.entity("a.csv").orElseThrow();
+		assertEquals(List.of("{\"@id\":\"other/\"}", "{\"@id\":\"data/\"}"),
+				a.getAll("isPartOf").stream().map(Object::toString).toList());
+		Entity b = document.entity("b.csv").orElseThrow();
+		assertEquals("B", b.get("name").orElseThrow().asText());
+		assertEquals("{\"@id\":\"data/\"}", b.get("isPartOf").orElseThrow().toString());
+		assertTrue(document.entity("data/").orElseThrow().get("@reverse").isEmpty());
+		Entity undescribed = document.entity("#undescribed").orElseThrow();
+		assertEquals(List.of("Thing"), undescribed.getTypes());
+		assertEquals("{\"@id\":\"#c\"}", undescribed.get("about").orElseThrow().toString());
+		assertTrue(document.problems().toString(), reports(document, Severity.WARNING, "3 links were written with @reverse"));
 	}
 
 	@Test
