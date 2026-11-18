@@ -11,6 +11,8 @@ dependencies {
     implementation project(':lib')
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.23.0'
     implementation 'com.googlecode.lanterna:lanterna:3.1.2'
+    // wpsld-cli, a launcher of its own in the image and zip (see jlink)
+    runtimeOnly project(':bin')
 
     testImplementation 'junit:junit:4.13.2'
     testImplementation testFixtures(project(':lib'))
@@ -31,6 +33,41 @@ jlink {
     }
     launcher {
         name = 'wpsld-tui'
+    }
+    // wpsld-cli (the bin module), as in the ui image; added to the image, as
+    // nothing the viewer requires requires it
+    secondaryLauncher {
+        name = 'wpsld-cli'
+        moduleName = 'no.s11.wpsld.cli'
+        mainClass = 'no.s11.wpsld.cli.Main'
+        winConsole = true
+    }
+    addOptions('--add-modules', 'no.s11.wpsld.cli')
+}
+
+// The licence and the third-party notices (src/notices, which covers the
+// built application, not the source), in the zip
+def notices = files(rootProject.file('LICENSE.txt'), 'src/notices/THIRD-PARTY-NOTICES.txt')
+
+// The image of the platform Gradle runs on, as
+// build/image-zip/wpsld-tui-<version>-<platform>.zip, e.g. -Pplatform=linux-x64
+// Unlike jlinkZip, Gradle's Zip keeps the executable bits of the launchers.
+if (project.hasProperty('platform')) {
+    tasks.register('imageZip', Zip) {
+        dependsOn tasks.named('jlink')
+        from(layout.buildDirectory.dir('image')) {
+            // jlink writes the launchers for every platform; keep this one's
+            if (findProperty('platform').startsWith('windows')) {
+                exclude('bin/wpsld-tui', 'bin/wpsld-cli')
+            } else {
+                exclude('bin/*.bat')
+            }
+        }
+        from(notices)
+        into("wpsld-tui-${findProperty('platform')}")
+        archiveFileName = "wpsld-tui-${version}-${findProperty('platform')}.zip"
+        destinationDirectory = layout.buildDirectory.dir('image-zip')
+        useFileSystemPermissions()
     }
 }
 

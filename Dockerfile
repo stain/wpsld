@@ -2,9 +2,10 @@
 # for Linux and (cross-linked) Windows, which the conda-forge JDK can't
 # produce yet, see environment.yml.
 #
-# Build and test, exporting dist/wpsld-linux-x64.zip and
+# Build and test, exporting dist/wpsld-linux-x64.zip,
 # dist/wpsld-windows-x64.zip (unzip and run bin/wpsld or bin\wpsld.bat;
-# for native launchers on each platform see .github/workflows/release.yml):
+# for native launchers on each platform see .github/workflows/release.yml)
+# and dist/wpsld-tui-<version>-linux-x64.zip (the terminal viewer and wpsld-cli):
 #   podman build --network=host --output type=local,dest=dist .
 #
 # Use the build stage as a development shell with the project mounted:
@@ -54,10 +55,11 @@ COPY gradle gradle
 RUN ./gradlew --no-daemon --version
 
 COPY . .
-RUN ./gradlew --no-daemon build :ui:imageZips \
+RUN ./gradlew --no-daemon build :ui:imageZips :tui:imageZip -Pplatform=linux-x64 \
       -PjavafxJmods=/opt/javafx-jmods/linux \
       -PwindowsJdkHome=/opt/jdk-windows \
       -PwindowsJavafxJmods=/opt/javafx-jmods/windows
 
 FROM scratch AS export
 COPY --from=build /src/ui/build/image-zip/ /
+COPY --from=build /src/tui/build/image-zip/ /
