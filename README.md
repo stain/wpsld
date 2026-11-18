@@ -98,6 +98,41 @@ its folder that it doesn't describe), 1 if it has problems, and 2 if it
 can't be read. Run it from the source with `./gradlew :bin:run --args='check
 CRATE'`.
 
+### Experimental terminal viewer
+
+From the source, build a local JavaFX-free runtime image with
+`./gradlew :tui:jlink`, then run `tui/build/image/bin/wpsld-tui CRATE` in a
+terminal (on Windows, `tui\build\image\bin\wpsld-tui.bat`). `CRATE` is a
+crate folder or metadata file. Use the arrow keys and Enter to open an
+entity or follow a reference; Escape goes back or quits. On a property,
+PageUp and PageDown browse adjacent entities in the main list, or adjacent
+resolved references in the property from which the current entity was opened.
+Navigation stops at either end. In a nested view, `v` opens the current entity
+as a top-level view. Press `e` to edit a text value or choose existing
+referenced entities.
+In the chooser, type to filter by name or ID, Tab to the list and Space
+to select; Enter applies the selection. In the multiline text editor,
+Enter inserts a newline and Tab moves to Apply or Cancel. Press `s` to save.
+Available actions appear at the bottom, including in dialogs; save messages
+are replaced by the actions on the next key press. Unsaved changes are marked
+with `*` and quitting asks before discarding them.
+
+The viewer shows abbreviated property values, with referenced entities
+identified by their short ID, type and name. Reference choices follow the
+schema.org range and its subclasses; an unknown range offers all entities.
+Existing unresolved or out-of-range references are kept.
+Only existing text values and reference properties can be edited; adding
+entities and editing IDs, types or other value kinds are not supported.
+Saving is refused if the crate had read errors or its metadata file has
+changed on disk since opening.
+
+![Terminal viewer showing an author opened from the example crate](docs/screenshots/tui-properties.png)
+
+The image includes Java's desktop module, which Lanterna needs even in a
+terminal. It is not included in the release zips. Lanterna is
+LGPL-3.0-or-later; distributing the image needs its notices and licence
+requirements considered separately.
+
 ### The apps are not signed yet
 
 Windows and macOS mark files downloaded from the internet, and the mark

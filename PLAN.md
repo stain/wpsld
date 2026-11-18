@@ -50,6 +50,19 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
 
 ## Next steps
 
+### Terminal interface
+
+The experimental `tui` module uses Lanterna and `lib` to browse and edit
+existing crate values. View-specific actions and temporary save messages appear
+in a bottom status line, including in dialogs. PageUp and PageDown browse the
+main list or the references behind a nested view; `v` promotes a nested entity
+to the main list, and Escape closes nested views. See the README for its
+current keys and limits.
+
+- List the root first, then entities by type and name as in the JavaFX
+  list; filter by ID or name and by a type chosen from a searchable tree
+  of the crate's types and their parents.
+
 ### User help
 
 The audience includes researchers and research data managers who may not
