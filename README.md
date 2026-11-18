@@ -98,6 +98,75 @@ its folder that it doesn't describe), 1 if it has problems, and 2 if it
 can't be read. Run it from the source with `./gradlew :bin:run --args='check
 CRATE'`.
 
+### Experimental terminal viewer
+
+`wpsld-tui-<version>-linux-x64.zip` (built by the Dockerfile, see below) is a
+small image with only the terminal viewer and `wpsld-cli`, without JavaFX:
+run `wpsld-tui-linux-x64/bin/wpsld-tui CRATE` in a terminal. From the
+source, build a local image with `./gradlew :tui:jlink`, then run
+`tui/build/image/bin/wpsld-tui CRATE` (on Windows,
+`tui\build\image\bin\wpsld-tui.bat`). `CRATE` is a
+crate folder or metadata file. Use the arrow keys and Enter to open an
+entity or follow a reference; Escape goes back or quits. The entity list
+shows the root first, then sorts by type and name. Type to filter by name
+or ID, or press `/` to focus the search (needed for searches starting with
+`s` or `t`); Enter opens the selected result and Tab returns to the list.
+Press `t` in the list to choose a type or parent type from a searchable
+tree; choosing All types clears the type filter. PageUp and PageDown browse
+adjacent entities in the filtered main list, or adjacent
+resolved references in the property from which the current entity was opened.
+Navigation stops at either end. In a nested view, `v` opens the current entity
+as a top-level view, clearing filters if needed. Press `e` to edit a text
+value or choose existing referenced entities.
+In the chooser, type to filter by name or ID, Tab to the list and Space
+to select; Enter applies the selection. In the multiline text editor,
+Enter inserts a newline and Tab moves to Apply or Cancel. Press `s` to save.
+Available actions appear at the bottom, including in dialogs; save messages
+are replaced by the actions on the next key press. Unsaved changes are marked
+with `*` and quitting asks before discarding them.
+
+The viewer shows abbreviated property values, with referenced entities
+identified by their short ID, type and name. Reference choices follow the
+schema.org range and its subclasses; an unknown range offers all entities.
+Existing unresolved or out-of-range references are kept.
+Only existing text values and reference properties can be edited; adding
+entities and editing IDs, types or other value kinds are not supported.
+Saving is refused if the crate had read errors or its metadata file has
+changed on disk since opening.
+
+| | |
+|---|---|
+| ![The entities of the example crate](docs/screenshots/tui-entities.png) | ![An author opened from the example crate](docs/screenshots/tui-properties.png) |
+| The entities, root first | An author's properties; Enter opens a reference, `e` edits |
+| ![The entities filtered by a search](docs/screenshots/tui-search.png) | ![Choosing a type to filter the entities by](docs/screenshots/tui-type-filter.png) |
+| Type to filter by name or ID; Tab goes to the list | `t` chooses a type from the tree of the crate's types |
+| ![Editing a text value](docs/screenshots/tui-edit-text.png) | ![Choosing the entities a property refers to](docs/screenshots/tui-choose-reference.png) |
+| `e` on a text value: Enter inserts a newline, Tab goes to Apply | `e` on a reference: type to filter, Space selects |
+| ![The organization an author's affiliation refers to, opened from the author](docs/screenshots/tui-reference.png) | |
+| Enter on a reference opens it; Escape goes back | |
+
+The image includes Java's desktop module, which Lanterna needs even in a
+terminal. It is not included in the release zips of the editor, which don't
+carry Lanterna.
+
+Lanterna is LGPL-3.0-or-later. In the viewer's zip it is included unmodified,
+as a module of its own (`com.googlecode.lanterna`) in the runtime image, and
+not merged with the other libraries. To run the viewer with a modified or
+newer Lanterna, put its jar in a folder and start the image's Java with
+`--upgrade-module-path`, which replaces the module:
+
+    wpsld-tui-linux-x64/bin/java --upgrade-module-path FOLDER \
+        -m no.s11.wpsld.tui/no.s11.wpsld.tui.Main CRATE
+
+The zip's `THIRD-PARTY-NOTICES.txt` says this too, with the licences.
+
+The screenshots are made by
+[`ReadmeScreenshots`](tui/src/test/java/no/s11/wpsld/tui/ReadmeScreenshots.java),
+which runs the viewer on the example crate in a virtual terminal and draws it.
+Like the editor's, it only runs with `SCREENSHOTS` set:
+
+    SCREENSHOTS=$PWD/docs/screenshots ./gradlew :tui:test --tests '*ReadmeScreenshots' --rerun
+
 ### The apps are not signed yet
 
 Windows and macOS mark files downloaded from the internet, and the mark
@@ -212,7 +281,7 @@ platform it runs on. (conda-forge's OpenJDK 25 can't `jlink` yet; see
 
 The [`Dockerfile`](Dockerfile) builds and tests with Temurin. It also
 cross-links Linux and Windows x64 images with shell and `.bat` launchers,
-into `dist/`:
+and makes the terminal viewer's Linux zip, into `dist/`:
 
     podman build --network=host --output type=local,dest=dist .
 

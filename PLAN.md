@@ -50,6 +50,24 @@ model about 2.6 MB once the JSON is dropped; the editor is built in about
 
 ## Next steps
 
+### Terminal interface
+
+The experimental `tui` module uses Lanterna and `lib` to browse and edit
+existing crate values. View-specific actions and temporary save messages appear
+in a bottom status line, including in dialogs. PageUp and PageDown browse the
+main list or the references behind a nested view; `v` promotes a nested entity
+to the main list, and Escape closes nested views. The list is ordered as in
+the JavaFX list and can be filtered by ID, name or a type chosen from a
+searchable tree of the crate's types and their parents. See the README for
+its current keys and limits.
+
+The `ui` images and zips must not depend on `tui`, so that they carry neither
+Lanterna nor its LGPL requirements (see README). The `tui` module has a jlink
+setup of its own, for a smaller distribution with only `wpsld-tui` and
+`wpsld-cli` (no JavaFX, so no jmods needed), which the Dockerfile builds for
+Linux x64. To do: build and zip it in the release workflow for the other
+platforms, as `wpsld-tui-<version>-<platform>.zip`.
+
 ### User help
 
 The audience includes researchers and research data managers who may not
@@ -338,6 +356,25 @@ in `lib` (moving what is still in `ui` there first):
 - Others to weigh: describe a folder as a new crate; identify files'
   formats (PRONOM); a crate given as a URL or a zip, as the editor opens
   them.
+
+### Package managers *(TODO, investigate)*
+
+Find out how to get wpsld into the package systems people install software
+with, instead of only zips from the GitHub releases: a Debian package (`.deb`,
+and what Debian or Ubuntu themselves require to include it, given the
+bundled Java runtime and JavaFX), WinGet on Windows, and Homebrew on macOS
+(a cask for `wpsld.app`; the apps are not signed or notarised yet, see
+"Builds"). Also look at Flatpak and Scoop. For each: the packaging
+format, how an update is submitted and automated from the release workflow,
+and what its rules say about bundled runtimes, third-party notices and
+unsigned apps. The separate terminal viewer zip (`wpsld-tui`, see
+"Terminal interface") might be packaged separately, as it is small and has
+no JavaFX.
+
+Guix, for the reWIRE project, is probably extensive: Guix builds everything
+from source, so Java 25, JavaFX and the Gradle dependencies would all need
+packaging or porting first. The terminal viewer and `wpsld-cli`, without
+JavaFX, are the likelier first step.
 
 ### Testing
 

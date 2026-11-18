@@ -3,6 +3,8 @@
 .gradle
 **/build
 **/bin
+# but not the bin module (wpsld-cli)
+!/bin
 dist
 .vscode
 .settings
