@@ -115,12 +115,58 @@ rather than cut at 48 columns; test the viewer on Windows (Lanterna's text
 terminal in `cmd` and Windows Terminal, `wpsld-tui.bat`), which the README
 describes but nobody has tried; the release workflow (below).
 
+Mouse support: Lanterna can capture the mouse (`DefaultTerminalFactory`'s
+mouse capture mode, e.g. click and release, with the wheel), and its GUI
+already turns clicks into actions for its own components. Try it for
+clicking a row of the entity list or of the properties (a double click as
+Enter), the buttons and rows of the dialogs, the wheel to scroll, and the
+keys of the bottom line as buttons (`[s] Save`, `[c] Check`), which would
+also help where letters can't be keys (see below). Capturing the mouse
+takes it from the terminal's own text selection and copy (usually Shift
+and drag still works), so decide whether it is on by default, or by an
+option (`--mouse`/`--no-mouse`) or a key, and say so in the README. Test
+it on the virtual terminal as the keys are, and in Windows Terminal and
+the usual Linux and macOS terminals.
+
+Copy and paste, so that the viewer is as usable with the system clipboard
+as other terminal tools are, such as Claude Code. Copy: the selected value,
+an entity's ID or an entity (as JSON-LD, and in the format of the editor's
+clipboard, so that it can be pasted there, and the other way: `Crate.paste`
+in lib adds copied entities), to the system clipboard. Terminals that
+accept the OSC 52 escape sequence set the clipboard of the machine the
+terminal runs on, also over SSH; otherwise a tool of the platform
+(`wl-copy`, `xclip`, `pbcopy`, `clip.exe`) if found. Find out which
+terminals support OSC 52 (some ask or limit it) and say in the README what to
+set. Paste: terminals send pasted text as keys, so its newlines would act as
+Enter and its letters as shortcuts; turn on bracketed paste (`ESC [?2004h`)
+and take the text between `ESC [200~` and `ESC [201~` as one input for the
+focused text field, the search or the text editor, and for the entity list,
+a search (or, in a property, a value that is an ID of an entity). Lanterna
+doesn't do this for us, as far as I know: check, and if needed read the
+sequences in an input filter before the key decoding. It interacts with the
+mouse (above): with the mouse captured, selecting text with the mouse needs
+Shift, so copy by key matters more.
+
+Also, from using it: `s`, `t`, `c` and `r` in the entity list are keys, so a
+search can't start with them (`/` first); with more keys (add, delete, undo)
+consider another way, e.g. a command key that opens a menu of actions, or
+Ctrl combinations. The problems in Check's dialog are cut at the width: show
+the selected one in full, wrapped. Check can't fetch a profile yet (see 4).
+A smoke test of the built image in the Dockerfile (start `wpsld-tui`, run
+`wpsld-cli check` on the example crate, and `--upgrade-module-path` with
+Lanterna's jar), as so far it was tried by hand. The zip's
+`tui/src/notices/THIRD-PARTY-NOTICES.txt` was made from the `ui` notices and
+Lanterna's licences: keep it in step when the dependencies change, e.g. by a
+script or a test comparing the two.
+
 The `ui` images and zips must not depend on `tui`, so that they carry neither
 Lanterna nor its LGPL requirements (see README). The `tui` module has a jlink
 setup of its own, for a smaller distribution with only `wpsld-tui` and
 `wpsld-cli` (no JavaFX, so no jmods needed), which the Dockerfile builds for
 Linux x64. To do: build and zip it in the release workflow for the other
-platforms, as `wpsld-tui-<version>-<platform>.zip`.
+platforms (Linux arm64, macOS, Windows, with the `.bat` launchers), as
+`wpsld-tui-<version>-<platform>.zip`, and cross-link the Windows one in the
+Dockerfile as for the editor.
 
 ### User help
 
