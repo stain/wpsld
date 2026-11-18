@@ -70,7 +70,22 @@ public class ReadmeScreenshots {
 			try {
 				await(terminal, "[Enter] Open");
 				save(terminal, out.resolve("tui-entities.png"));
-				// Alice, the first person
+				// The type tree, and the list filtered by a search
+				terminal.addInput(new KeyStroke('t', false, false));
+				await(terminal, "Filter by type");
+				save(terminal, out.resolve("tui-type-filter.png"));
+				key(terminal, KeyType.Escape);
+				await(terminal, "[Esc] Quit");
+				for (char c : "ali".toCharArray()) {
+					terminal.addInput(new KeyStroke(c, false, false));
+				}
+				await(terminal, "\nali ");
+				save(terminal, out.resolve("tui-search.png"));
+				for (int i = 0; i < 3; i++) {
+					key(terminal, KeyType.Backspace);
+				}
+				await(terminal, "Bob Example");
+				// Alice, a person
 				for (int i = 0; i < 20 && !selectedRow(terminal).contains("#alice"); i++) {
 					key(terminal, KeyType.ArrowDown);
 				}
@@ -143,20 +158,19 @@ public class ReadmeScreenshots {
 		return text.toString();
 	}
 
-	/** The row drawn on a blue background, other than the last (the key bar). */
+	/** The text of the rows drawn on a blue background, other than the last (the key bar). */
 	private static String selectedRow(DefaultVirtualTerminal terminal) {
 		TerminalSize size = terminal.getTerminalSize();
+		StringBuilder text = new StringBuilder();
 		for (int row = 1; row < size.getRows() - 1; row++) {
-			TextCharacter first = terminal.getCharacter(0, row);
-			if (first.getBackgroundColor() == TextColor.ANSI.BLUE) {
-				StringBuilder text = new StringBuilder();
+			if (terminal.getCharacter(0, row).getBackgroundColor() == TextColor.ANSI.BLUE) {
 				for (int col = 0; col < size.getColumns(); col++) {
 					text.append(terminal.getCharacter(col, row).getCharacterString());
 				}
-				return text.toString();
+				text.append('\n');
 			}
 		}
-		return "";
+		return text.toString();
 	}
 
 	private static Color color(TextColor color, Color byDefault) {

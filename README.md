@@ -138,6 +138,8 @@ changed on disk since opening.
 |---|---|
 | ![The entities of the example crate](docs/screenshots/tui-entities.png) | ![An author opened from the example crate](docs/screenshots/tui-properties.png) |
 | The entities, root first | An author's properties; Enter opens a reference, `e` edits |
+| ![The entities filtered by a search](docs/screenshots/tui-search.png) | ![Choosing a type to filter the entities by](docs/screenshots/tui-type-filter.png) |
+| Type to filter by name or ID; Tab goes to the list | `t` chooses a type from the tree of the crate's types |
 | ![Editing a text value](docs/screenshots/tui-edit-text.png) | ![Choosing the entities a property refers to](docs/screenshots/tui-choose-reference.png) |
 | `e` on a text value: Enter inserts a newline, Tab goes to Apply | `e` on a reference: type to filter, Space selects |
 | ![The organization an author's affiliation refers to, opened from the author](docs/screenshots/tui-reference.png) | |
