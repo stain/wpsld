@@ -356,8 +356,8 @@ public class ViewerTest {
 
 	@Test
 	public void previewsAreSingleLineAndDoNotSplitUnicode() {
-		assertEquals("line one line two", Viewer.preview("line one\nline two", 30));
-		assertEquals("a😀...", Viewer.preview("a😀bcdef", 5));
+		assertEquals("line one line two", Values.preview("line one\nline two", 30));
+		assertEquals("a😀...", Values.preview("a😀bcdef", 5));
 	}
 
 	@Test
@@ -374,13 +374,13 @@ public class ViewerTest {
 				new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)), "test");
 		ObjectMapper mapper = new ObjectMapper();
 		assertEquals("ex:alice (Person, Author: Alice)",
-				Viewer.valueText(mapper.readTree("{\"@id\":\"ex:alice\"}"), document));
+				Values.valueText(mapper.readTree("{\"@id\":\"ex:alice\"}"), document));
 		assertEquals("unknown (Person)",
-				Viewer.valueText(mapper.readTree("{\"@id\":\"https://example.org/people/unknown\"}"), document));
-		assertEquals("missing", Viewer.valueText(mapper.readTree("{\"@id\":\"https://example.org/missing\"}"), document));
-		assertEquals("Hello (en)", Viewer.valueText(mapper.readTree("{\"@value\":\"Hello\",\"@language\":\"en\"}"), document));
-		assertEquals("one, 42", Viewer.valueText(mapper.readTree("[\"one\",42]"), document));
-		assertEquals("code: abc", Viewer.valueText(mapper.readTree("{\"code\":\"abc\"}"), document));
+				Values.valueText(mapper.readTree("{\"@id\":\"https://example.org/people/unknown\"}"), document));
+		assertEquals("missing", Values.valueText(mapper.readTree("{\"@id\":\"https://example.org/missing\"}"), document));
+		assertEquals("Hello (en)", Values.valueText(mapper.readTree("{\"@value\":\"Hello\",\"@language\":\"en\"}"), document));
+		assertEquals("one, 42", Values.valueText(mapper.readTree("[\"one\",42]"), document));
+		assertEquals("code: abc", Values.valueText(mapper.readTree("{\"code\":\"abc\"}"), document));
 	}
 
 	@Test
@@ -599,6 +599,110 @@ public class ViewerTest {
 		} finally {
 			executor.shutdownNow();
 		}
+	}
+
+	private interface Steps {
+		void run(DefaultVirtualTerminal terminal) throws Exception;
+	}
+
+	/** Run the viewer on a crate, do the steps, and quit from the entity list */
+	private void viewing(CrateSession session, Steps steps) throws Exception {
+		DefaultVirtualTerminal terminal = new DefaultVirtualTerminal(new TerminalSize(100, 24));
+		ExecutorService executor = Executors.newSingleThreadExecutor();
+		try (Screen screen = new TerminalScreen(terminal)) {
+			screen.startScreen();
+			Future<?> task = executor.submit(() -> new Viewer(screen, session).run());
+			try {
+				awaitBottom(terminal, "[Enter] Open");
+				steps.run(terminal);
+				terminal.addInput(new KeyStroke(KeyType.Escape));
+				task.get(5, TimeUnit.SECONDS);
+			} finally {
+				task.cancel(true);
+			}
+		} finally {
+			executor.shutdownNow();
+		}
+	}
+
+	private CrateSession crate(String name, String graph) throws Exception {
+		Path file = temporary.newFile(name).toPath();
+		Files.writeString(file, """
+				{"@context":"https://w3id.org/ro/crate/1.1/context","@graph":[
+				  {"@id":"ro-crate-metadata.json","@type":"CreativeWork",
+				   "about":{"@id":"./"},"conformsTo":{"@id":"https://w3id.org/ro/crate/1.1"}},
+				""" + graph + "]}");
+		return CrateSession.open(file);
+	}
+
+	@Test
+	public void checkListsProblemsAndOpensTheEntityOfOne() throws Exception {
+		CrateSession session = crate("ro-crate-metadata.json", """
+				{"@id":"./","@type":"Dataset","name":"Root"},
+				{"@id":"#alice","@type":"Person","name":"Alice"}
+				""");
+		viewing(session, terminal -> {
+			terminal.addInput(new KeyStroke('c', false, false));
+			await(terminal, "3 problems.");
+			assertTrue(contents(terminal).contains("• The root data entity must have a license"));
+			awaitBottom(terminal, "[Enter] Open the entity  [Esc] Close");
+			terminal.addInput(new KeyStroke(KeyType.Escape));
+			awaitBottom(terminal, "[Enter] Open  [s] Save  [Esc] Quit");
+			assertFalse(contents(terminal).contains("3 problems."));
+			terminal.addInput(new KeyStroke('c', false, false));
+			await(terminal, "3 problems.");
+			terminal.addInput(new KeyStroke(KeyType.Enter));
+			await(terminal, "Root [./] | Behind: entity list");
+			terminal.addInput(new KeyStroke(KeyType.Escape));
+			awaitBottom(terminal, "[Enter] Open  [s] Save  [Esc] Quit");
+		});
+	}
+
+	@Test
+	public void checkOfACrateThatPassesSaysSo() throws Exception {
+		CrateSession session = CrateSession.open(Path.of("..", "ui", "src", "test", "resources", "example-crate"));
+		viewing(session, terminal -> {
+			terminal.addInput(new KeyStroke('c', false, false));
+			await(terminal, "Passed.");
+			terminal.addInput(new KeyStroke(KeyType.Enter));
+			awaitBottom(terminal, "[Enter] Open  [s] Save  [Esc] Quit");
+			assertFalse(session.dirty());
+		});
+	}
+
+	@Test
+	public void repairShowsWhatItWouldDoAndAppliesItOnlyWhenAsked() throws Exception {
+		CrateSession session = crate("ro-crate-metadata.json", """
+				{"@id":"./","@type":"Dataset","name":"Root"},
+				{"@id":"#alice","@type":"Person","name":"Alice","affiliation":{"name":"Example University"}}
+				""");
+		var before = session.document().crate().orElseThrow().toJson().deepCopy();
+		viewing(session, terminal -> {
+			terminal.addInput(new KeyStroke('r', false, false));
+			await(terminal, "Repair Crate would do this");
+			awaitBottom(terminal, "[Esc] Cancel");
+			terminal.addInput(new KeyStroke(KeyType.Escape));
+			awaitBottom(terminal, "[Enter] Open  [s] Save  [Esc] Quit");
+			assertEquals(before, session.document().crate().orElseThrow().toJson());
+			assertFalse(session.dirty());
+			terminal.addInput(new KeyStroke('r', false, false));
+			await(terminal, "Repair Crate would do this");
+			assertEquals(before, session.document().crate().orElseThrow().toJson());
+			terminal.addInput(new KeyStroke(KeyType.Tab));
+			terminal.addInput(new KeyStroke(KeyType.Enter));
+			awaitBottom(terminal, "Repaired; [s] to save");
+			await(terminal, "Entities *");
+			assertTrue(session.dirty());
+			assertFalse(session.document().crate().orElseThrow().toJson().equals(before));
+			assertFalse(session.document().crate().orElseThrow().toJson().toString().contains("\"affiliation\":{\"name\""));
+			terminal.addInput(new KeyStroke('r', false, false));
+			await(terminal, "Nothing to repair.");
+			terminal.addInput(new KeyStroke(KeyType.Enter));
+			awaitBottom(terminal, "[Enter] Open  [s] Save  [Esc] Quit");
+			terminal.addInput(new KeyStroke('s', false, false));
+			awaitBottom(terminal, "Saved to ");
+			assertFalse(session.dirty());
+		});
 	}
 
 	private static void type(DefaultVirtualTerminal terminal, String text) {

@@ -59,7 +59,61 @@ main list or the references behind a nested view; `v` promotes a nested entity
 to the main list, and Escape closes nested views. The list is ordered as in
 the JavaFX list and can be filtered by ID, name or a type chosen from a
 searchable tree of the crate's types and their parents. See the README for
-its current keys and limits.
+its current keys and limits. `c` checks the crate and `r` runs Repair Crate
+(after showing what it would do), with the code of the editor and
+`wpsld-cli`, offline.
+
+The viewer's code is split by job: `Viewer` (the window and its keys),
+`Values` (how entities and values are worded on one line), `Status` (the
+bottom line), the dialogs (`TextDialog`, `ReferencePicker`, `TypePicker`,
+`CheckDialog`, `RepairDialog`), `CrateSession` (the file, saving) and
+`Maintenance` (check and repair).
+
+Next, in this order; none is started:
+
+1. **Add entities**: a new entity of a chosen type (searchable type tree as
+   for the filter) with an ID (suggested from the type and name, kept
+   unique; files and folders by their path), and linked from where it
+   belongs: the root's `hasPart` or `mentions`, or the property of the
+   entity it was added from. `Crate.add` and `Crate.addParts` do the
+   lib's side, as the editor's Add menu does.
+2. **Add properties not yet filled**: from the entity's types, the
+   properties of schema.org and, once there are profiles (4), those
+   the profile requires or recommends, searchable by name and with their
+   description; then a value of the kind the property takes (text, a
+   reference chosen as now, later dates, URLs and numbers). Empty
+   `license`, `description` and `datePublished` of the root, which Check
+   reports, are the first use.
+3. **Delete**: a value of a property (and the property when it was the
+   last), then an entity, with the references to it removed or kept as
+   unresolved, asked. Also add another value to a property that has some.
+4. **Profiles**: show which profile(s) the crate declares and matches
+   (`conformsTo`), choose or add one from those bundled or kept, and let the
+   profile drive which properties are offered, their labels and what is
+   required (see 2); and let Check fetch a declared profile that is not
+   kept, asked first, as the editor does.
+5. **Undo and redo**, perhaps first, since 1 to 3 need it (Check and Repair
+   don't, as Repair shows what it does first). Estimate: small to medium,
+   about a day or two with tests. `UndoHistory` in lib keeps snapshots of the
+   crate's JSON-LD at undo points, and the editor restores one by reading
+   the crate again (`CrateEditor.restore`). For the viewer that means:
+   (a) `CrateSession` owns a document that can be replaced, which `Viewer`,
+   `TypeFilter`, `ReferencePicker` and `Maintenance` now hold for good;
+   (b) the viewer holds `Entity` objects (`shown`, the list, the places in
+   `history`), which a restore makes stale, so hold identifiers and look
+   them up again; (c) a checkpoint after each edit, apply of a repair and
+   so on; (d) keys: `u` as a letter would search in the entity list, so
+   Ctrl-Z and Ctrl-Y, which Lanterna's raw terminal passes on; the
+   `*` mark already compares with the saved JSON, so undoing to the saved
+   state clears it.
+
+Smaller: show a property's label and description from the schema (or
+profile) in the bottom line; edit other value kinds (dates, URLs, numbers),
+and `@id` and `@type`; open a zip or a URL with `CrateRetriever`, and an
+entity-list-only start with no crate argument; values as wide as the terminal
+rather than cut at 48 columns; test the viewer on Windows (Lanterna's text
+terminal in `cmd` and Windows Terminal, `wpsld-tui.bat`), which the README
+describes but nobody has tried; the release workflow (below).
 
 The `ui` images and zips must not depend on `tui`, so that they carry neither
 Lanterna nor its LGPL requirements (see README). The `tui` module has a jlink
