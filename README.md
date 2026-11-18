@@ -104,12 +104,17 @@ From the source, build a local JavaFX-free runtime image with
 `./gradlew :tui:jlink`, then run `tui/build/image/bin/wpsld-tui CRATE` in a
 terminal (on Windows, `tui\build\image\bin\wpsld-tui.bat`). `CRATE` is a
 crate folder or metadata file. Use the arrow keys and Enter to open an
-entity or follow a reference; Escape goes back or quits. On a property,
-PageUp and PageDown browse adjacent entities in the main list, or adjacent
+entity or follow a reference; Escape goes back or quits. The entity list
+shows the root first, then sorts by type and name. Type to filter by name
+or ID, or press `/` to focus the search (needed for searches starting with
+`s` or `t`); Enter opens the selected result and Tab returns to the list.
+Press `t` in the list to choose a type or parent type from a searchable
+tree; choosing All types clears the type filter. PageUp and PageDown browse
+adjacent entities in the filtered main list, or adjacent
 resolved references in the property from which the current entity was opened.
 Navigation stops at either end. In a nested view, `v` opens the current entity
-as a top-level view. Press `e` to edit a text value or choose existing
-referenced entities.
+as a top-level view, clearing filters if needed. Press `e` to edit a text
+value or choose existing referenced entities.
 In the chooser, type to filter by name or ID, Tab to the list and Space
 to select; Enter applies the selection. In the multiline text editor,
 Enter inserts a newline and Tab moves to Apply or Cancel. Press `s` to save.

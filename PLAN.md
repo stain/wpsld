@@ -56,12 +56,10 @@ The experimental `tui` module uses Lanterna and `lib` to browse and edit
 existing crate values. View-specific actions and temporary save messages appear
 in a bottom status line, including in dialogs. PageUp and PageDown browse the
 main list or the references behind a nested view; `v` promotes a nested entity
-to the main list, and Escape closes nested views. See the README for its
-current keys and limits.
-
-- List the root first, then entities by type and name as in the JavaFX
-  list; filter by ID or name and by a type chosen from a searchable tree
-  of the crate's types and their parents.
+to the main list, and Escape closes nested views. The list is ordered as in
+the JavaFX list and can be filtered by ID, name or a type chosen from a
+searchable tree of the crate's types and their parents. See the README for
+its current keys and limits.
 
 ### User help
 

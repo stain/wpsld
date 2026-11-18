@@ -73,7 +73,7 @@ public class ViewerTest {
 				awaitBottom(terminal, "[Enter] Open  [s] Save  [Esc] Quit");
 				terminal.addInput(new KeyStroke('s', false, false));
 				awaitBottom(terminal, "No changes to save.");
-				terminal.addInput(new KeyStroke(KeyType.ArrowDown));
+				press(terminal, KeyType.ArrowDown, 3);
 				terminal.addInput(new KeyStroke(KeyType.Enter));
 				await(terminal, "#eve");
 				awaitBottom(terminal, "[Enter] Open  [e] Edit  [s] Save  [Esc] Back");
@@ -141,19 +141,18 @@ public class ViewerTest {
 				awaitBottom(terminal, "[PgUp/PgDn] Browse");
 				terminal.addInput(new KeyStroke(KeyType.PageUp));
 				terminal.addInput(new KeyStroke(KeyType.PageDown));
+				await(terminal, "ro-crate-metadata.json");
+				terminal.addInput(new KeyStroke(KeyType.PageDown));
 				await(terminal, "Alice [#alice] | Behind: entity list");
 				terminal.addInput(new KeyStroke(KeyType.PageDown));
 				await(terminal, "Bob [#bob] | Behind: entity list");
 				terminal.addInput(new KeyStroke(KeyType.PageDown));
-				await(terminal, "Behind: entity list");
-				await(terminal, "ro-crate-metadata.json");
-				terminal.addInput(new KeyStroke(KeyType.PageDown));
 				terminal.addInput(new KeyStroke(KeyType.PageUp));
-				await(terminal, "Bob [#bob] | Behind: entity list");
+				await(terminal, "Alice [#alice] | Behind: entity list");
 				terminal.addInput(new KeyStroke(KeyType.Escape));
 				await(terminal, "wpsld-tui | Entities");
 				terminal.addInput(new KeyStroke(KeyType.Enter));
-				await(terminal, "Bob [#bob] | Behind: entity list");
+				await(terminal, "Alice [#alice] | Behind: entity list");
 				terminal.addInput(new KeyStroke(KeyType.Escape));
 				terminal.addInput(new KeyStroke(KeyType.Escape));
 				task.get(5, TimeUnit.SECONDS);
@@ -232,6 +231,119 @@ public class ViewerTest {
 				terminal.addInput(new KeyStroke(KeyType.Enter));
 				await(terminal, "Bob [#bob] | Behind: entity list");
 				terminal.addInput(new KeyStroke(KeyType.Escape));
+				terminal.addInput(new KeyStroke(KeyType.Escape));
+				task.get(5, TimeUnit.SECONDS);
+			} finally {
+				task.cancel(true);
+			}
+		} finally {
+			executor.shutdownNow();
+		}
+	}
+
+	@Test
+	public void listsByRootTypeAndNameAndFiltersByTypeHierarchy() throws Exception {
+		CrateDocument document = new CrateReader().read(new ByteArrayInputStream("""
+				{"@context":["https://w3id.org/ro/crate/1.1/context",
+				  {"ex":"https://example.org/","human":"http://schema.org/Person"}],"@graph":[
+				  {"@id":"./","@type":"Dataset","name":"Root"},
+				  {"@id":"#z","@type":"human","name":"Zoe"},
+				  {"@id":"#unknown","@type":"ex:Custom","name":"Other"},
+				  {"@id":"#b","@type":"https://schema.org/Person","name":"Bob"},
+				  {"@id":"#org","@type":"CollegeOrUniversity","name":"College"},
+				  {"@id":"#file","@type":"File","name":"File"}
+				]}
+				""".getBytes(StandardCharsets.UTF_8)), "test");
+		TypeFilter filter = new TypeFilter(document, new SchemaFromJsonLd());
+		var all = document.crate().orElseThrow().getEntities();
+		var sorted = filter.ordered(all);
+		assertEquals("./", sorted.get(0).getId());
+		assertTrue(sorted.indexOf(document.entity("#file").orElseThrow())
+				< sorted.indexOf(document.entity("#b").orElseThrow()));
+		assertTrue(sorted.indexOf(document.entity("#b").orElseThrow())
+				< sorted.indexOf(document.entity("#z").orElseThrow()));
+		var choices = filter.choices(all, "university");
+		assertTrue(choices.stream().anyMatch(c -> c.type().name().equals("Thing") && c.depth() == 0));
+		var university = choices.stream().filter(c -> c.type().name().equals("CollegeOrUniversity"))
+				.findFirst().orElseThrow();
+		assertTrue(university.depth() > 0);
+		var organization = filter.choices(all, "Organization").stream()
+				.filter(c -> c.type().name().equals("Organization")).findFirst().orElseThrow().type();
+		assertTrue(filter.matches(document.entity("#org").orElseThrow(), organization));
+		assertFalse(filter.matches(document.entity("#b").orElseThrow(), organization));
+		var person = filter.choices(all, "Person").stream().filter(c -> c.type().name().equals("Person"))
+				.findFirst().orElseThrow().type();
+		assertTrue(filter.matches(document.entity("#z").orElseThrow(), person));
+		assertTrue(filter.matches(document.entity("#b").orElseThrow(), person));
+		var custom = filter.choices(all, "ex:custom").stream()
+				.filter(c -> c.type().name().equals("ex:Custom")).findFirst().orElseThrow().type();
+		assertTrue(filter.matches(document.entity("#unknown").orElseThrow(), custom));
+	}
+
+	@Test
+	public void filtersMainListAndCanPromoteAReferenceOutsideFilter() throws Exception {
+		Path file = temporary.newFile("filter.json").toPath();
+		Files.writeString(file, """
+				{"@context":"https://w3id.org/ro/crate/1.1/context","@graph":[
+				  {"@id":"./","@type":"Dataset","name":"Root"},
+				  {"@id":"#alice","@type":"Person","name":"Alice","affiliation":{"@id":"#org"}},
+				  {"@id":"#bob","@type":"Person","name":"Bob"},
+				  {"@id":"#org","@type":"Organization","name":"University"}
+				]}
+				""");
+		CrateSession session = CrateSession.open(file);
+		DefaultVirtualTerminal terminal = new DefaultVirtualTerminal(new TerminalSize(100, 24));
+		ExecutorService executor = Executors.newSingleThreadExecutor();
+		try (Screen screen = new TerminalScreen(terminal)) {
+			screen.startScreen();
+			Future<?> task = executor.submit(() -> new Viewer(screen, session).run());
+			try {
+				await(terminal, "Alice [#alice]");
+				terminal.addInput(new KeyStroke('t', false, false));
+				await(terminal, "Search types; Tab to list");
+				awaitBottom(terminal, "[Tab] List  [Enter] Choose  [Esc] Cancel");
+				type(terminal, "no-such-type");
+				terminal.addInput(new KeyStroke(KeyType.Enter));
+				await(terminal, "Search types; Tab to list");
+				terminal.addInput(new KeyStroke(KeyType.Escape));
+				await(terminal, "Type: All");
+				terminal.addInput(new KeyStroke('t', false, false));
+				await(terminal, "Search types; Tab to list");
+				type(terminal, "Person");
+				terminal.addInput(new KeyStroke(KeyType.Enter));
+				await(terminal, "Type: Person");
+				assertFalse(contents(terminal).contains("University [#org]"));
+				terminal.addInput(new KeyStroke('/', false, false));
+				type(terminal, "missing");
+				await(terminal, "missing");
+				terminal.addInput(new KeyStroke(KeyType.Enter));
+				terminal.addInput(new KeyStroke(KeyType.Escape));
+				await(terminal, "Alice [#alice]");
+				terminal.addInput(new KeyStroke('/', false, false));
+				type(terminal, "alice");
+				await(terminal, "alice");
+				terminal.addInput(new KeyStroke(KeyType.Enter));
+				await(terminal, "Alice [#alice] | Behind: entity list");
+				press(terminal, KeyType.ArrowDown, 3);
+				terminal.addInput(new KeyStroke(KeyType.Enter));
+				await(terminal, "University [#org] | Behind: Alice [#alice]");
+				terminal.addInput(new KeyStroke('v', false, false));
+				await(terminal, "University [#org] | Behind: entity list");
+				terminal.addInput(new KeyStroke(KeyType.Escape));
+				await(terminal, "Type: All");
+				terminal.addInput(new KeyStroke(KeyType.Enter));
+				await(terminal, "University [#org] | Behind: entity list");
+				terminal.addInput(new KeyStroke(KeyType.Escape));
+				await(terminal, "Type: All");
+				terminal.addInput(new KeyStroke('t', false, false));
+				await(terminal, "Search types; Tab to list");
+				type(terminal, "Organization");
+				terminal.addInput(new KeyStroke(KeyType.Enter));
+				await(terminal, "Type: Organization");
+				terminal.addInput(new KeyStroke('t', false, false));
+				await(terminal, "Search types; Tab to list");
+				terminal.addInput(new KeyStroke(KeyType.Enter));
+				await(terminal, "Type: All");
 				terminal.addInput(new KeyStroke(KeyType.Escape));
 				task.get(5, TimeUnit.SECONDS);
 			} finally {

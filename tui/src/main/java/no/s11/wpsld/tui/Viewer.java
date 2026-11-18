@@ -54,10 +54,16 @@ final class Viewer {
 	private final Screen screen;
 	private final CrateSession session;
 	private final CrateDocument document;
+	private final SchemaFromJsonLd schema = new SchemaFromJsonLd();
+	private final TypeFilter typeFilter;
 	private ReferencePicker picker;
 	private final BasicWindow window = new BasicWindow("wpsld-tui");
 	private final ActionListBox entities = new ActionListBox(new TerminalSize(50, 10));
+	private final TextBox search = new TextBox(new TerminalSize(40, 1));
 	private final Deque<Place> history = new ArrayDeque<>();
+	private List<Entity> listed = List.of();
+	private Optional<TypeFilter.Type> selectedType = Optional.empty();
+	private Label typeLabel;
 	private boolean showingEntity;
 	private Entity shown;
 	private Table<String> properties;
@@ -75,11 +81,30 @@ final class Viewer {
 		this.screen = screen;
 		this.session = session;
 		this.document = session.document();
+		this.typeFilter = new TypeFilter(document, schema);
+		search.setTextChangeListener((text, byUser) -> populateEntities());
 		window.setHints(List.of(Window.Hint.FULL_SCREEN, Window.Hint.NO_DECORATIONS));
 		window.addWindowListener(new WindowListenerAdapter() {
 			@Override
 			public void onInput(Window window, KeyStroke key, AtomicBoolean deliver) {
 				status.setText(actions);
+				if (!showingEntity && window.getFocusedInteractable() == search) {
+					if (key.getKeyType() == KeyType.Enter) {
+						deliver.set(false);
+						if (!listed.isEmpty()) entities.runSelectedItem();
+					} else if (key.getKeyType() == KeyType.Tab && !listed.isEmpty()) {
+						deliver.set(false);
+						focusEntities();
+					} else if (key.getKeyType() == KeyType.Escape) {
+						deliver.set(false);
+						if (!listed.isEmpty()) focusEntities();
+						else {
+							search.setText("");
+							if (!listed.isEmpty()) focusEntities();
+						}
+					}
+					return;
+				}
 				if (key.getKeyType() == KeyType.Escape) {
 					deliver.set(false);
 					if (showingEntity) {
@@ -100,6 +125,37 @@ final class Viewer {
 						&& !key.isAltDown() && key.getCharacter() == 's') {
 					deliver.set(false);
 					save();
+				} else if (!showingEntity && key.getKeyType() == KeyType.Character
+						&& !key.isCtrlDown() && !key.isAltDown() && key.getCharacter() == '/') {
+					deliver.set(false);
+					focusSearch();
+				} else if (!showingEntity && key.getKeyType() == KeyType.Character
+						&& !key.isCtrlDown() && !key.isAltDown() && key.getCharacter() == 't') {
+					deliver.set(false);
+					popupActions("[Tab] List  [Enter] Choose  [Esc] Cancel");
+					try {
+						new TypePicker(typeFilter).show(window.getTextGUI(), allEntities()).ifPresent(chosen -> {
+							selectedType = chosen;
+							typeLabel.setText(typeText());
+							populateEntities();
+							if (listed.isEmpty()) focusSearch();
+						});
+					} finally {
+						status.setText(actions);
+					}
+				} else if (!showingEntity && key.getKeyType() == KeyType.Character
+						&& !key.isCtrlDown() && !key.isAltDown()) {
+					deliver.set(false);
+					search.setText(search.getText() + key.getCharacter());
+					search.setCaretPosition(search.getText().length());
+					focusSearch();
+				} else if (!showingEntity && key.getKeyType() == KeyType.Tab) {
+					deliver.set(false);
+					focusSearch();
+				} else if (!showingEntity && key.getKeyType() == KeyType.Backspace && !search.getText().isEmpty()) {
+					deliver.set(false);
+					String text = search.getText();
+					search.setText(text.substring(0, text.offsetByCodePoints(text.length(), -1)));
 				} else if (showingEntity && key.getKeyType() == KeyType.Character
 						&& !key.isCtrlDown() && !key.isAltDown() && key.getCharacter() == 'e') {
 					deliver.set(false);
@@ -111,10 +167,14 @@ final class Viewer {
 				} else if (showingEntity && !history.isEmpty() && key.getKeyType() == KeyType.Character
 						&& !key.isCtrlDown() && !key.isAltDown() && key.getCharacter() == 'v') {
 					deliver.set(false);
-					int selected = allEntities().indexOf(shown);
-					if (selected >= 0) {
+					if (allEntities().contains(shown)) {
 						history.clear();
-						entities.setSelectedIndex(selected);
+						if (!filteredEntities().contains(shown)) {
+							selectedType = Optional.empty();
+							search.setText("");
+						}
+						populateEntities();
+						entities.setSelectedIndex(listed.indexOf(shown));
 						showEntity(shown, properties.getSelectedRow());
 					}
 				}
@@ -125,24 +185,49 @@ final class Viewer {
 
 	private void populateEntities() {
 		int selected = entities.getSelectedIndex();
+		Entity previous = selected >= 0 && selected < listed.size() ? listed.get(selected) : null;
 		entities.clearItems();
-		List<Entity> all = allEntities();
-		for (Entity entity : all) {
+		listed = filteredEntities();
+		for (Entity entity : listed) {
 			entities.addItem(oneLine(entity.getLabel()) + " [" + oneLine(entity.getId()) + "]",
 					() -> showEntity(entity, 0));
 		}
-		entities.setSelectedIndex(Math.max(0, Math.min(selected, all.size() - 1)));
+		if (!listed.isEmpty()) {
+			int index = listed.indexOf(previous);
+			entities.setSelectedIndex(index >= 0 ? index : 0);
+		}
 	}
 
 	private List<Entity> allEntities() {
 		List<Entity> all = new ArrayList<>(document.crate().orElseThrow().getEntities());
 		document.descriptor().ifPresent(all::add);
-		return all;
+		return typeFilter.ordered(all);
+	}
+
+	private List<Entity> filteredEntities() {
+		return allEntities().stream().filter(e -> selectedType.isEmpty() || typeFilter.matches(e, selectedType.get()))
+				.filter(e -> ReferencePicker.matchesQuery(e, search.getText())).toList();
+	}
+
+	private String typeText() {
+		return "Type: " + selectedType.map(TypeFilter.Type::name).orElse("All");
+	}
+
+	private void focusSearch() {
+		actions = "[Enter] Open  [Tab] List  [Esc] List";
+		status.setText(actions);
+		window.setFocusedInteractable(search);
+	}
+
+	private void focusEntities() {
+		actions = "[Enter] Open  [s] Save  [Esc] Quit  [/] Search  [t] Type";
+		status.setText(actions);
+		window.setFocusedInteractable(entities);
 	}
 
 	private void navigate(int direction) {
 		if (history.isEmpty()) {
-			List<Entity> all = allEntities();
+			List<Entity> all = filteredEntities();
 			int index = all.indexOf(shown);
 			int next = index + direction;
 			if (index >= 0 && next >= 0 && next < all.size()) {
@@ -214,14 +299,20 @@ final class Viewer {
 		showingEntity = false;
 		populateEntities();
 		Panel panel = new Panel(new BorderLayout());
-		panel.addComponent(new Label("wpsld-tui | Entities" + (session.dirty() ? " *" : "")
+		Panel heading = new Panel();
+		heading.addComponent(new Label("wpsld-tui | Entities" + (session.dirty() ? " *" : "")
 				+ (document.problems().isEmpty() ? ""
-						: " | Read problems: " + document.problems().size() + " (see terminal)")),
-				BorderLayout.Location.TOP);
+						: " | Read problems: " + document.problems().size() + " (see terminal)")));
+		typeLabel = new Label(typeText());
+		heading.addComponent(typeLabel);
+		heading.addComponent(new Label("Search ID or name:"));
+		heading.addComponent(search);
+		panel.addComponent(heading, BorderLayout.Location.TOP);
 		panel.addComponent(entities, BorderLayout.Location.CENTER);
-		addStatus(panel, "[Enter] Open  [s] Save  [Esc] Quit");
+		addStatus(panel, "[Enter] Open  [s] Save  [Esc] Quit  [/] Search  [t] Type");
 		window.setComponent(panel);
-		window.setFocusedInteractable(entities);
+		if (listed.isEmpty()) focusSearch();
+		else focusEntities();
 	}
 
 	private void showEntity(Entity entity, int selectedRow) {
@@ -313,7 +404,7 @@ final class Viewer {
 		}
 		if (row.value().isObject() && row.value().path("@id").isTextual()) {
 			if (picker == null) {
-				picker = new ReferencePicker(document, new SchemaFromJsonLd());
+				picker = new ReferencePicker(document, schema);
 			}
 			popupActions("[Tab] Focus  [Space] Select  [Enter] Apply  [Esc] Cancel");
 			try {
