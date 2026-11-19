@@ -115,9 +115,11 @@ schema.org's terms, which a crate only refers to, nor the root data
 entity's own identifier, which RO-Crate only asks to be `./` or an absolute
 address, with no say in what is at it. For a crate attached to a web address
 it asks the crate's `ro-crate-metadata.json` there instead, which has to
-work. Something that does not answer is a red problem if it belongs to a work
-(a file, dataset or software), and only a yellow warning if it belongs to
-anything else, such as a person or a defined term, as RO-Crate does not need
+work. Something that does not answer is a red problem, with a red plug icon,
+if it belongs to a work (a file, dataset or software), and only a yellow
+warning, with a warning triangle so that the two differ by more than their
+colour, if it belongs to anything else, such as a person or a defined term, as
+RO-Crate does not need
 any address to answer (a defined term's address may be in an outdated
 namespace, for instance, and only there for a person to follow). It needs an internet connection, and asks
 a few addresses at a time, in the background: the foot of the window
