@@ -239,6 +239,41 @@ public class TestWebCrate {
 		assertEquals(fetched.source(), again.source());
 	}
 
+	/**
+	 * Detaching: all the relative @ids, files and others, become absolute against any base, an anonymous arcp
+	 * one too, and the base can be kept as the @base of the context, which is undone by removing it
+	 */
+	@Test
+	public void detachWithAnArcpBase() {
+		Crate crate = crate();
+		// Relative: files, folders, nothing local (#alice) or absolute
+		assertEquals(List.of("data/", "data/counts.csv", "README.md"),
+				crate.relativeEntities().stream().map(Entity::getId).toList());
+		URI base = URI.create("arcp://uuid,d6be5c9b-132a-4a93-9837-3e02e06c08e6/");
+		Map<String, String> renamed = crate.absolutize(WebCrate.baseOf(base), false);
+		assertEquals("arcp://uuid,d6be5c9b-132a-4a93-9837-3e02e06c08e6/data/counts.csv", renamed.get("data/counts.csv"));
+		assertEquals(List.of(), crate.relativeEntities());
+		assertTrue(crate.get("#alice").isPresent());
+		assertEquals("./", crate.getRoot().getId());
+		// Outside the base too, as a base is not a folder the crate is attached to
+		assertEquals(Optional.of(URI.create("arcp://uuid,d6be5c9b-132a-4a93-9837-3e02e06c08e6/../x")
+				.normalize()), WebCrate.baseOf(base).resolve("../x"));
+
+		assertEquals(Optional.empty(), crate.getBase());
+		crate.setBase(Optional.of(base.toString()));
+		assertEquals(Optional.of(base.toString()), crate.getBase());
+		// An array of the RO-Crate context and the base
+		assertTrue(crate.getContext().toString(), crate.getContext().isArray() && crate.getContext().size() == 2);
+		assertEquals(base.toString(), crate.toJson().get("@context").get(1).get("@base").asText());
+		// Another base replaces it, none removes it, back to the context as it was
+		crate.setBase(Optional.of("https://example.org/c/"));
+		assertEquals(2, crate.getContext().size());
+		assertEquals(Optional.of("https://example.org/c/"), crate.getBase());
+		crate.setBase(Optional.empty());
+		assertEquals(Optional.empty(), crate.getBase());
+		assertTrue(crate.getContext().toString(), crate.getContext().isTextual());
+	}
+
 	@Test
 	public void adoptedBase() {
 		WebCrate api = of("https://data.example.com/api/export?id=abc");

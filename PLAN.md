@@ -2113,33 +2113,61 @@ extension. Next:
 
 ### Attached and detached crates
 
-- **Attached to detached** (Crate > Make Detached…), as the RO-Crate
-  specification suggests: the crate's files go "elsewhere", typically
-  published on the web (e.g. GitHub Pages, a repository, an institutional
-  web server). The user gives the base URI where they say the files now
-  are; wpsld checks that each file is there (in the background, as a job,
-  as Check Web Availability does: HEAD, sizes, perhaps checksums where
-  the server gives them) before rewriting each relative `@id` against it
-  (the root's `@id` the base URI itself, or a persistent identifier if
-  the user has one), and says which files were not found, leaving those
-  unchanged until they are. One undo step; the descriptor's `about` and
-  every reference follow the renamed `@id`s. *(TODO)* For a crate opened
-  from the web (see "A crate on the web" under "Crates as ZIP, BagIt and
-  on the web"), the base URI is its recorded web base, filled in, and
-  the files are expected there already; the rewriting is the same as the
-  Save As warning's Make Absolute, so share it (in lib, e.g.
-  `Crate.absolutize(URI base)`, returning the renames for undo). It is
-  also the repair for a detached crate's relative data entities.
+- **Attached to detached** (Crate > **Detach…**) *(done 2026-11-19 for the
+  rewriting, the base and the dialog: `DetachDialog`, `Detachment`,
+  `Crate.absolutize`, `Crate.setBase`; still to do: checking that the files
+  are there, below)*. What RO-Crate 1.2 says (checked): in a Detached RO-Crate
+  Package a File's `@id` "MUST be an Absolute URI" and all its File data
+  entities are web-based data entities (`data-entities.md`); the root
+  "SHOULD have an `@id` which is an absolute URL if it is available online;
+  if it is not yet, or will never be, `@id` MAY be any valid URI - including
+  `./`" and `#` ids of contextual entities remain allowed (`structure.md`);
+  the descriptor's `@id` stays `ro-crate-metadata.json` (`root-data-entity.md`).
+  **`@base` is not a substitute for absolute `@id`s**: the specification
+  mentions it only for reading a crate as a graph (the appendix on relative
+  URIs: a known web address of the root as the base for RDF tools, a fresh
+  `arcp://uuid,…/` as an anonymous one, and `{"@base": null}`, which a saved
+  crate SHOULD NOT have), and in its conversion from attached to detached
+  by JSON-LD flattening against a fresh arcp `@base` "the resulting `@base`
+  is harmless, but can be removed". So: rewrite the `@id`s, and keep the base
+  as `@base` only as an option (it lets the identifiers be made relative
+  again by search and replace, as the arcp section says). The dialog asks
+  for the base, filled in from where the crate is attached on the web or
+  what it says its root is (`WebCrate.rootsOf`), warns of a `file:` address
+  (and asks again) and has **New Anonymous Base**, a fresh
+  `arcp://uuid,<random UUID>/`, with `@base` kept by default for it; the
+  base is made a folder (a `/` is added when it has no query). Rewritten: every
+  entity but the root with a relative `@id`, files and folders (the
+  `hasPart` hierarchy) and other entities written with a path or a name,
+  not `#local`, `_:blank` or absolute ones, and every reference follows
+  (`Crate.absolutize`); the root becomes the base if it is a web address
+  (and stays `./` for arcp, which is not where the crate is online); one
+  undo step ("Detach"), with the context's `@base` in it. After it the crate
+  is attached to nothing, and the notice suggests saving it as
+  `<prefix>-ro-crate-metadata.json` (RO-Crate 1.2: the name that tells that
+  its file's presence does not make a folder an attached crate). To do: **check
+  each file is at the base before rewriting**, in the background as a job
+  as Check Web Availability does (HEAD, sizes, perhaps checksums where the
+  server gives them), saying which were not found and leaving the base to
+  the user, who may mean to publish them after (for an anonymous base they
+  are never there, so no check); the `identifier`/`cite-as` of the root
+  as a persistent identifier if the user has one (the root's `@id`, "or a
+  persistent identifier"); the files' `contentUrl` or `url` when they have
+  them (KU Leuven's do) as what to make `@id` instead of base plus path.
+  This also is what **Make Attached…** below undoes; the view-only
+  "detached" (nothing attached, `@id`s as they are) is in Crate > Attach….
 - **Detached to attached** (Crate > Make Attached…): choose a folder; the
   `@id`s under a base URI (the root's, or one the user gives) become
   relative paths in it, and files there are offered to download (each
   checked against `contentSize` and any checksum, as a job). Files not
   downloaded keep their absolute `@id`s, as RO-Crate allows web-based
   data entities in an attached crate.
-- **Attach… and Detach** (Crate menu) say what a crate's relative `@id`s
-  are relative to: a folder, a web address or a folder inside a zip, with
-  no change to the crate: see "Semi-detached" under "Crates as ZIP, BagIt
-  and on the web". They replace the toggle below.
+- **Attach…** (Crate menu) says what a crate's relative `@id`s are
+  relative to: a folder, a web address, nothing (detached, `@id`s as they
+  are) or a folder inside a zip, with no change to the crate: see
+  "Semi-detached" under "Crates as ZIP, BagIt and on the web". It replaces
+  the toggle below. **Detach…** is the other, which *does* change the
+  crate: it makes the relative `@id`s absolute (above).
 - **Attached to Folder** (the Crate menu's toggle) stays for crates
   merely opened from elsewhere, e.g. downloaded on their own.
 

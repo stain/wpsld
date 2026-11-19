@@ -148,6 +148,16 @@ public record WebCrate(URI source, Optional<URI> base, boolean attached, String 
 	}
 
 	/**
+	 * Only a base to resolve relative <code>@id</code>s against, as for making
+	 * a crate's identifiers absolute when detaching it: not an attached crate,
+	 * so a path may lead outside the base (<code>../x</code>), and the base may
+	 * be any address, such as an arcp one.
+	 */
+	public static WebCrate baseOf(URI base) {
+		return new WebCrate(base, Optional.of(base), false, "resolved against " + base, base, Optional.empty());
+	}
+
+	/**
 	 * The same crate attached by the user to a web address (see
 	 * {@link #attachedTo}): an attached crate, whose files are paths in it, not
 	 * outside, whatever it was before, e.g. after being detached.

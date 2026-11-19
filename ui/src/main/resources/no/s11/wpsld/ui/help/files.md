@@ -57,11 +57,27 @@ Choose **Crate > Attach...** to say what the crate's relative identifiers
   server may not allow it, or the files may be inside a zip). Check Web
   Availability then asks for the crate's relative files at that address
   too.
-- **Nothing**: detached, so relative identifiers lead nowhere. **Crate >
-  Detach** does the same.
+- **Nothing**: detached, so relative identifiers lead nowhere.
 
 Attaching does not change the crate, only where wpsld looks for its files:
 the identifiers stay as written.
+
+### Detach: a crate with no folder
+
+A detached crate has no folder, so RO-Crate requires the identifiers of its
+files to be absolute addresses. Choose **Crate > Detach...** to make them so:
+wpsld asks what the crate's relative identifiers (`data/table.csv`, and
+other entities written with a path or a name, but not `#local` ones) are
+relative to, and makes each absolute against that address, as one step you
+can undo. The address is filled in if it is known, from where the crate is
+attached on the web or what it says its root is. **New Anonymous Base**
+makes a fresh `arcp://uuid,...` address for a crate that is not published
+anywhere, and the address can also be kept as the `@base` of the crate's
+`@context`, so that the identifiers can later be made relative again. With a
+web address the crate's root (`./`) becomes that address too. A `file:`
+address only means something on this computer, so wpsld warns about it.
+Save the detached crate under another name, such as
+`survey-ro-crate-metadata.json`, as RO-Crate suggests.
 
 ### Crates written in other ways
 

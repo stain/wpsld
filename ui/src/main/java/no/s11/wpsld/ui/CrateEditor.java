@@ -1006,9 +1006,9 @@ public class CrateEditor extends Application {
 		MenuItem attach = new MenuItem("_Attach…");
 		attach.setId("menuAttach");
 		attach.setOnAction(e -> askToAttach(stage));
-		MenuItem detach = new MenuItem("D_etach");
+		MenuItem detach = new MenuItem("D_etach…");
 		detach.setId("menuDetach");
-		detach.setOnAction(e -> attach(Attachment.none()));
+		detach.setOnAction(e -> askToDetach(stage));
 		MenuItem details = new MenuItem("Update _File Details…");
 		details.setId("menuUpdateFiles");
 		details.setOnAction(e -> askToUpdateFiles(stage));
@@ -1020,7 +1020,8 @@ public class CrateEditor extends Application {
 		menu.setOnShowing(e -> {
 			enableParts(parts);
 			details.setDisable(!crateFile.isAttached());
-			detach.setDisable(crateFile.attachment().isNone());
+			// Something to make absolute, or attached to something to leave
+			detach.setDisable(crateFile.attachment().isNone() && crate.relativeEntities().isEmpty());
 		});
 		menu.setId("menuCrate");
 		return menu;
@@ -1850,6 +1851,57 @@ public class CrateEditor extends Application {
 					}
 					attach(chosen);
 				});
+	}
+
+	/**
+	 * Crate > Detach…: ask what the relative <code>@id</code>s are to be made
+	 * absolute against (see {@link DetachDialog}), and detach the crate.
+	 * Where it is attached on the web that is where to start from; a
+	 * <code>file:</code> address is asked about again, as it is for this
+	 * computer only.
+	 */
+	private void askToDetach(Stage stage) {
+		Optional<URI> known = crateFile.web().flatMap(WebCrate::base)
+				.or(() -> WebCrate.rootsOf(crate.getRoot()).stream().findFirst().map(WebCrate.Root::address));
+		new DetachDialog(stage, crate.relativeEntities(), known).showAndWait().ifPresent(chosen -> {
+			if (chosen.base().filter(DetachDialog::isFile).isPresent()) {
+				Alert sure = new Alert(AlertType.CONFIRMATION, chosen.base().get() + " only means something on this"
+						+ " computer. A detached crate is one whose files are somewhere others can reach.",
+						ButtonType.YES, ButtonType.NO);
+				sure.initOwner(stage);
+				sure.setHeaderText("Make the identifiers file: addresses anyway?");
+				if (sure.showAndWait().orElse(ButtonType.NO) != ButtonType.YES) {
+					return;
+				}
+			}
+			detach(chosen);
+		});
+	}
+
+	/**
+	 * Detach the crate: make its relative <code>@id</code>s, of files and
+	 * other entities, absolute against the base (see {@link Crate#absolutize}),
+	 * as RO-Crate requires of a detached crate, with the root data entity too
+	 * if the base is a web address, which it should be if it is available
+	 * online; and keep the base as the <code>@base</code> of the context if
+	 * asked. One undo step. It is no longer attached to a folder or an
+	 * address.
+	 */
+	void detach(Detachment detachment) {
+		int count = detachment.base().map(base -> crate.absolutize(WebCrate.baseOf(base),
+				base.getScheme().startsWith("http")).size()).orElse(0);
+		if (detachment.recordBase()) {
+			detachment.base().ifPresent(base -> crate.setBase(Optional.of(base.toString())));
+		}
+		crateFile.attach(Attachment.none());
+		listedFolder = Optional.empty();
+		relist();
+		show(crate.getRoot());
+		refresh();
+		checkpoint(placeOf(null), Optional.of("Detach"));
+		showNotice("Detached" + detachment.base().map(b -> ": " + count + (count == 1 ? " identifier" : " identifiers")
+				+ " made absolute against " + b + ".").orElse(".") + " Its file is best saved as "
+				+ detachedName(crate) + ", as RO-Crate suggests, not as ro-crate-metadata.json.", null, null);
 	}
 
 	/**
