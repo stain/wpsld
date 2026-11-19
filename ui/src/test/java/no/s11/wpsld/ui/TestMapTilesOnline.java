@@ -43,7 +43,7 @@ public class TestMapTilesOnline extends UiTest {
 
 	@Test
 	public void tile() throws Exception {
-		Optional<Image> tile = MapTiles.openStreetMap(CrateEditor.USER_AGENT).tile(0, 0, 0).get(30, TimeUnit.SECONDS);
+		Optional<Image> tile = MapTiles.openStreetMap().tile(0, 0, 0).get(30, TimeUnit.SECONDS);
 		assertTrue("No tile from tile.openstreetmap.org", tile.isPresent());
 		assertFalse(tile.get().isError());
 		assertEquals(256, tile.get().getWidth(), 0);

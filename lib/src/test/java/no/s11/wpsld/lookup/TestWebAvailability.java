@@ -75,8 +75,7 @@ public class TestWebAvailability {
 
 	@Test
 	public void check() throws Exception {
-		WebAvailability web = new WebAvailability(ProfileCache.httpClient(Duration.ofSeconds(5)), Duration.ofSeconds(5),
-				"wpsld-test");
+		WebAvailability web = new WebAvailability(ProfileCache.httpClient(Duration.ofSeconds(5)), Duration.ofSeconds(5));
 		List<WebAvailability.Result> results = web
 				.check(List.of(base + "/ok", base + "/moved", base + "/get-only", base + "/gone"));
 		assertEquals(List.of(true, true, true, false), results.stream().map(WebAvailability.Result::available).toList());

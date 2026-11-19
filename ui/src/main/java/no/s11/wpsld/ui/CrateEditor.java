@@ -149,6 +149,7 @@ import no.s11.wpsld.lookup.WebAvailability;
 import no.s11.wpsld.lookup.EmbeddedMetadata;
 import no.s11.wpsld.lookup.FileMetadata;
 import no.s11.wpsld.lookup.SPDXLicenses;
+import no.s11.wpsld.util.UserAgent;
 import no.s11.wpsld.crate.UndoHistory;
 import no.s11.wpsld.crate.WebCrate;
 import no.s11.wpsld.crate.UndoHistory.Place;
@@ -193,10 +194,9 @@ public class CrateEditor extends Application {
 	/** The window, once shown, whose title names the crate's file */
 	private Stage stage;
 	/** How wpsld names itself to web services, as their policies ask */
-	static final String USER_AGENT = "wpsld/" + AboutDialog.version() + " (https://github.com/stain/wpsld)";
-	private final MapTiles mapTiles = MapTiles.forApplication(USER_AGENT);
+	private final MapTiles mapTiles = MapTiles.forApplication();
 	private PlaceFinder.Search placeSearch = new GeoNames(ProfileCache.httpClient(Duration.ofSeconds(15)),
-			Duration.ofSeconds(20), USER_AGENT)::search;
+			Duration.ofSeconds(20))::search;
 	/** Undo points of this crate: after leaving a field, adding, removing, changing types or @ids */
 	private final UndoHistory history = new UndoHistory(crate.toJson());
 	private final BooleanProperty canUndo = new SimpleBooleanProperty();
@@ -1943,7 +1943,7 @@ public class CrateEditor extends Application {
 
 	/** Asks web resources whether they are available */
 	WebAvailability webAvailability = new WebAvailability(ProfileCache.httpClient(Duration.ofSeconds(15)),
-			Duration.ofSeconds(15), USER_AGENT);
+			Duration.ofSeconds(15));
 
 	/**
 	 * Crate > Check Web Availability: ask each part of the crate on the web
@@ -3385,10 +3385,10 @@ public class CrateEditor extends Application {
 	}
 
 	private PersonFinder.Search personSearch = new ORCID(ProfileCache.httpClient(Duration.ofSeconds(15)),
-			Duration.ofSeconds(20), USER_AGENT)::search;
+			Duration.ofSeconds(20))::search;
 
 	private WorkFinder.Search workSearch = new DOI(ProfileCache.httpClient(Duration.ofSeconds(15)),
-			Duration.ofSeconds(20), USER_AGENT)::search;
+			Duration.ofSeconds(20))::search;
 
 	/**
 	 * Look works up with this instead of Crossref and DataCite, e.g. in tests.
@@ -3398,7 +3398,7 @@ public class CrateEditor extends Application {
 	}
 
 	private OrganizationFinder.Search organizationSearch = new ROR(ProfileCache.httpClient(Duration.ofSeconds(15)),
-			Duration.ofSeconds(20), USER_AGENT)::search;
+			Duration.ofSeconds(20))::search;
 
 	/**
 	 * Look organisations up with this instead of ROR, e.g. in tests.

@@ -39,6 +39,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import no.s11.wpsld.util.UserAgent;
+
 /**
  * Finds and fetches the metadata document of an RO-Crate from a URL, as in
  * "Retrieving an RO-Crate" of the RO-Crate specification. A URL, such as a
@@ -72,7 +74,7 @@ public class CrateRetriever {
 	 * some persistent identifiers (e.g. w3id.org/ro/crate/1.3) only redirect
 	 * for HTML or JSON-LD, not for any type
 	 */
-	private static final String ACCEPT_ANY = "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8";
+	static final String ACCEPT_ANY = "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8";
 	/** Largest metadata document read, as anything fetched is untrusted */
 	public static final int MAX_BYTES = 16 * 1024 * 1024;
 	/** Most requests to retrieve one crate: links followed, then the folder */
@@ -309,7 +311,8 @@ public class CrateRetriever {
 				throw new IOException("Can't find the RO-Crate metadata of " + asked + ": followed "
 						+ requested.stream().map(r -> r.substring(r.indexOf(' ') + 1)).distinct().toList());
 			}
-			HttpRequest request = HttpRequest.newBuilder(uri).timeout(timeout).header("Accept", accept).GET().build();
+			HttpRequest request = HttpRequest.newBuilder(uri).timeout(timeout).header("Accept", accept)
+					.header("User-Agent", UserAgent.get()).GET().build();
 			HttpResponse<InputStream> response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
 			URI at = response.uri();
 			int status = response.statusCode();

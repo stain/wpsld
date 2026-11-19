@@ -38,6 +38,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.WebCrate;
+import no.s11.wpsld.util.UserAgent;
 
 /**
  * Whether a crate's web resources are available: each data entity with a
@@ -65,10 +66,10 @@ public class WebAvailability {
 	/**
 	 * @param http following redirects, e.g. ProfileCache's
 	 */
-	public WebAvailability(HttpClient http, Duration timeout, String userAgent) {
+	public WebAvailability(HttpClient http, Duration timeout) {
 		this.http = Objects.requireNonNull(http);
 		this.timeout = Objects.requireNonNull(timeout);
-		this.userAgent = Objects.requireNonNull(userAgent);
+		this.userAgent = UserAgent.get();
 	}
 
 	/** The data entities with web (http, https) addresses, to check */

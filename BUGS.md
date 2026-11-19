@@ -175,11 +175,17 @@ time. Mostly not wpsld's faults, but what wpsld says and does about them is.
   download the crate in a browser and open the file. **Never** retry with
   other headers to get past a refusal or a bot wall, or solve its challenge:
   they are the repositories' decisions.
-- **No `User-Agent` of our own** is sent by `CrateRetriever` (Java's
-  default), where `WebAvailability` and the lookups send
-  `wpsld-… (+https://github.com/stain/wpsld)`: send it for retrieving too, so
-  that repositories can tell wpsld, and its version, from other clients, as
-  they ask.
+- **No `User-Agent` of our own was sent by `CrateRetriever`**, the root probe
+  and the profile registries (Java's default instead) *(done 2026-11-19)*:
+  every request wpsld makes now sends `wpsld/<version> (https://github.com/stain/wpsld)`,
+  from one place (`no.s11.wpsld.util.UserAgent`, the version filled in by the
+  build from `gradle.properties`): retrieving crates and the link sets and
+  pages that leads to, after redirects too, looking for a crate's files, the
+  profile registries, ORCID, ROR, DOI, GeoNames, Check Web Availability and the
+  map tiles, and the update scripts' `curl`. The lookups no longer take
+  a user agent to be given another (`new ORCID(http, timeout)`), and tests
+  check each (`TestUserAgent`, `TestLookupsUserAgent`) and that the value is as
+  RFC 9110, section 10.1.5, has it, a product and a comment (`TestHttpHeaders`).
 - **RO-Crate 1.2's drafts are unknown contexts**: OneStop4WildLIVE's crate
   has the context `https://w3id.org/ro/crate/1.2-DRAFT/context`, not
   in `ContextCache.bundled()`, so every term warns "not defined by the

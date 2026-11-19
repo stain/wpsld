@@ -21,6 +21,11 @@
 
 set -eu
 
+# What this script calls itself to the sites it downloads from, as wpsld does
+# in its requests: its name and version, then where it is (RFC 9110, 10.1.5)
+WPSLD_VERSION=$(sed -n 's/^version=//p' "$(dirname "$0")/../gradle.properties")
+USER_AGENT="wpsld/${WPSLD_VERSION:-development} (https://github.com/stain/wpsld; update script)"
+
 SITE=https://pronom.nationalarchives.gov.uk
 DIR=$(dirname "$0")/../lib/src/main/resources/pronom
 
@@ -30,7 +35,7 @@ if [ $# -lt 1 ]; then
 fi
 VERSION=$1
 if [ "$VERSION" = latest ]; then
-    VERSION=$(curl -fsSL "$SITE/signatures.json" |
+    VERSION=$(curl -fsSL -A "$USER_AGENT" "$SITE/signatures.json" |
         python3 -I -c 'import json, sys; print(json.load(sys.stdin)["latest_signature"]["version"])')
 fi
 case "$VERSION" in
@@ -41,7 +46,7 @@ SOURCE=$SITE/signatures/DROID_SignatureFile_V$VERSION.xml
 TEMP=$(mktemp -d)
 trap 'rm -rf "$TEMP"' EXIT
 echo "Downloading $SOURCE"
-curl -fsSL -o "$TEMP/signatures.xml" "$SOURCE"
+curl -fsSL -A "$USER_AGENT" -o "$TEMP/signatures.xml" "$SOURCE"
 SHA256=$(sha256sum "$TEMP/signatures.xml" | cut -d' ' -f1)
 
 mkdir -p "$DIR"

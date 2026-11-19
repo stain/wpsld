@@ -20,6 +20,18 @@ as `ZipException: invalid LOC header`, or tests of half-edited files). So:
 - While debugging a failure, run the tests in this tree, in the
   foreground, as the changes are made here.
 
+## Outgoing requests
+
+Every request wpsld makes to the web names wpsld and its version in its
+`User-Agent`, `wpsld/<version> (https://github.com/stain/wpsld)`, from
+`no.s11.wpsld.util.UserAgent.get()`, as RFC 9110 (10.1.5) has it and
+sites such as OpenStreetMap, GeoNames and ORCID ask. A new client or
+request sets `.header("User-Agent", UserAgent.get())`; no constructor takes
+an agent to be given another. The JDK's `HttpClient` has no default
+headers, so add a test beside `TestUserAgent` that records the header, for
+whatever is new. Never retry a refused (403) or blocked (a bot wall)
+request with other headers.
+
 ## Commit messages
 
 A short subject line (at most 72 characters, no full stop) saying what

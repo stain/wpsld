@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import no.s11.wpsld.util.UserAgent;
+
 /**
  * Finds out, without asking the user, whether a candidate for the RO-Crate
  * Root of a semi-detached crate (see {@link WebCrate#suggestedRoots}) is where
@@ -110,8 +112,9 @@ public class RootProbe {
 	/** The status of a HEAD request, 0 if there is none */
 	private int status(URI uri) throws InterruptedException {
 		try {
-			return http.send(HttpRequest.newBuilder(uri).timeout(timeout).method("HEAD", HttpRequest.BodyPublishers.noBody())
-					.build(), HttpResponse.BodyHandlers.discarding()).statusCode();
+			return http.send(HttpRequest.newBuilder(uri).timeout(timeout).header("User-Agent", UserAgent.get())
+					.method("HEAD", HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.discarding())
+					.statusCode();
 		} catch (IOException e) {
 			return 0;
 		}
