@@ -48,7 +48,9 @@ final class EntityIcons {
 	enum Family {
 		CRATE, DATA, WORK, SOFTWARE, WEB, PERSON, ORGANIZATION, PLACE, EVENT, NATURE, PRODUCT, TERM, THING,
 		/** A file not found, or a web resource not available */
-		PROBLEM;
+		PROBLEM,
+		/** A web address that does not answer, of something RO-Crate does not need it for: a warning */
+		WARNING;
 
 		String styleClass() {
 			return "icon-" + name().toLowerCase();
@@ -79,8 +81,28 @@ final class EntityIcons {
 	/** A web resource not available */
 	static final Glyph UNAVAILABLE = Glyph.of(FluentUiRegularMZ.PLUG_DISCONNECTED_20, Family.PROBLEM);
 
+	/**
+	 * A web address not answering, for an entity that is not a work: yellow, not
+	 * red, and a warning sign, not the plug, so that the two are not told apart by
+	 * their colour alone
+	 */
+	static final Glyph UNAVAILABLE_WARNING = Glyph.of(FluentUiRegularMZ.WARNING_20, Family.WARNING);
+
 	/** The icon of an entity with a problem, by what it is */
 	static Glyph problem(Entity entity, EntityListing listing) {
+		return problem(entity, listing, false);
+	}
+
+	/**
+	 * The icon of an entity with a problem, by what it is
+	 *
+	 * @param warning Whether it is only a warning: a web address that does not
+	 *                answer, of an entity that is not a work
+	 */
+	static Glyph problem(Entity entity, EntityListing listing, boolean warning) {
+		if (warning) {
+			return UNAVAILABLE_WARNING;
+		}
 		if (Crate.isAbsolute(entity.getId())) {
 			return UNAVAILABLE;
 		}

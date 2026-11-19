@@ -64,6 +64,8 @@ class EntityTreeView extends TreeView<Node> {
 	private List<Object> made = List.of();
 	/** Entities with a problem, e.g. a file not found, and what it is */
 	private Map<Entity, String> problems = Map.of();
+	/** Those of the problems that are only warnings */
+	private Set<Entity> warnings = Set.of();
 	/** While selecting the other places of the entities selected */
 	private boolean selectingAlso;
 
@@ -91,7 +93,7 @@ class EntityTreeView extends TreeView<Node> {
 			}
 
 			private void show(Node node, boolean empty) {
-				getStyleClass().removeAll("not-data", "problem");
+				getStyleClass().removeAll("not-data", "problem", "warning");
 				if (empty || node == null) {
 					setText(null);
 					setGraphic(null);
@@ -103,11 +105,12 @@ class EntityTreeView extends TreeView<Node> {
 					setText(text);
 				}
 				Optional<String> problem = node.entity().map(problems::get);
-				icon.set(problem.isPresent() ? EntityIcons.problem(node.entity().get(), listing)
+				boolean warning = problem.isPresent() && warnings.contains(node.entity().get());
+				icon.set(problem.isPresent() ? EntityIcons.problem(node.entity().get(), listing, warning)
 						: EntityIcons.of(node, listing));
 				setGraphic(icon);
 				if (problem.isPresent()) {
-					getStyleClass().add("problem");
+					getStyleClass().add(warning ? "warning" : "problem");
 				} else if ((node.kind() == Kind.FILE || node.kind() == Kind.FOLDER) && !node.data()) {
 					getStyleClass().add("not-data");
 				}
@@ -401,8 +404,17 @@ class EntityTreeView extends TreeView<Node> {
 	 * what it is
 	 */
 	void setProblems(Map<Entity, String> problems) {
-		if (!problems.equals(this.problems)) {
+		setProblems(problems, Set.of());
+	}
+
+	/**
+	 * Mark these entities as having a problem, e.g. a file not found, saying
+	 * what it is; those of them that are in the set are only warnings
+	 */
+	void setProblems(Map<Entity, String> problems, Set<Entity> warnings) {
+		if (!problems.equals(this.problems) || !warnings.equals(this.warnings)) {
 			this.problems = Map.copyOf(problems);
+			this.warnings = Set.copyOf(warnings);
 			refresh();
 		}
 	}

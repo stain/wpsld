@@ -104,10 +104,34 @@ renamed since, is shown on a pale red background with a red icon, also
 in the list by type; its tooltip says what was not found. A detached
 crate's files are not looked for.
 
-**Crate > Check Web Availability...** asks each part of the crate on the
-web (under **External resources**) whether it is there, following
-redirects, and marks those that are not the same way, saying what they
-answered, until checked again. It needs an internet connection, and asks
+**Crate > Check Web Availability...** asks every web address of the crate
+whether it is there, following redirects, and marks the entities that have
+one that is not the same way, saying which (the identifier, `contentUrl` or
+`url`) and what it answered, until checked again. It asks every `contentUrl`
+and `url` of any entity, and every `@id` that is a web address, or would be one
+at the web address the crate is attached to (see [Opening and saving
+crates](files.md)) for files and folders; not the metadata descriptor, nor
+schema.org's terms, which a crate only refers to, nor the root data
+entity's own identifier, which RO-Crate only asks to be `./` or an absolute
+address, with no say in what is at it. For a crate attached to a web address
+it asks the crate's `ro-crate-metadata.json` there instead, which has to
+work. Something that does not answer is a red problem, with a red plug icon,
+if it belongs to a work (a file, dataset or software), and only a yellow
+warning, with a warning triangle so that the two differ by more than their
+colour, if it belongs to anything else, such as a person or a defined term, as
+RO-Crate does not need
+any address to answer (a defined term's address may be in an outdated
+namespace, for instance, and only there for a person to follow). An address
+that answers but does not look like what the crate says is a yellow warning
+too, for a file as for anything else: a `contentUrl` or identifier whose
+length is not the file's `contentSize`, or that is a web page (HTML) where
+another `encodingFormat` is said, which is usually a landing page, such as a
+DOI's or a repository's, where the file's own address is wanted.
+wpsld asks politely: HEAD first (a request for one byte of the file where a
+server does not do HEAD right), a few at a time and fewer to one server,
+pausing a server as long as it asks (`Retry-After`), trying again after a
+busy answer, and giving up on a server that does not answer, so that a
+server that is down does not take as many waits as it has addresses. It needs an internet connection, and asks
 a few addresses at a time, in the background: the foot of the window
 shows it, and **Show...** there brings up its progress, with **Cancel**.
 

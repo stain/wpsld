@@ -95,12 +95,12 @@ public class TestGeoNames {
 		});
 		server.start();
 		try {
-			GeoNames geoNames = new GeoNames(HttpClient.newHttpClient(), Duration.ofSeconds(5), "wpsld/test",
+			GeoNames geoNames = new GeoNames(HttpClient.newHttpClient(), Duration.ofSeconds(5),
 					URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/"));
 			List<Place> places = geoNames.search("Catalina Park", "someone");
 			assertEquals("Catalina Park", places.get(0).name());
 			assertEquals("/searchJSON?q=Catalina+Park&maxRows=25&style=MEDIUM&username=someone", asked.get());
-			assertEquals("wpsld/test", agent.get());
+			assertEquals(no.s11.wpsld.util.UserAgent.get(), agent.get());
 			assertThrows(GeoNamesException.class, () -> geoNames.search("Catalina Park", " "));
 		} finally {
 			server.stop(0);

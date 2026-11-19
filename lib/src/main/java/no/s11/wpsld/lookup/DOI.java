@@ -45,6 +45,7 @@ import com.fasterxml.jackson.databind.node.TextNode;
 
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.util.UserAgent;
 
 /**
  * Publications, datasets and software by their DOI, from the two agencies
@@ -139,8 +140,8 @@ public class DOI {
 	private final String userAgent;
 	private final Map<String, URI> services;
 
-	public DOI(HttpClient http, Duration timeout, String userAgent) {
-		this(http, timeout, userAgent, Map.of("crossref", CROSSREF, "datacite", DATACITE, "resolver", RESOLVER));
+	public DOI(HttpClient http, Duration timeout) {
+		this(http, timeout, Map.of("crossref", CROSSREF, "datacite", DATACITE, "resolver", RESOLVER));
 	}
 
 	/**
@@ -148,10 +149,10 @@ public class DOI {
 	 *                 <code>datacite</code> and <code>resolver</code>
 	 *                 (doi.org), e.g. a test server
 	 */
-	public DOI(HttpClient http, Duration timeout, String userAgent, Map<String, URI> services) {
+	public DOI(HttpClient http, Duration timeout, Map<String, URI> services) {
 		this.http = Objects.requireNonNull(http);
 		this.timeout = Objects.requireNonNull(timeout);
-		this.userAgent = Objects.requireNonNull(userAgent);
+		this.userAgent = UserAgent.get();
 		this.services = Map.copyOf(services);
 	}
 

@@ -50,6 +50,7 @@ import javafx.scene.text.TextFlow;
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.Places;
+import no.s11.wpsld.crate.WebCrate;
 import no.s11.wpsld.form.Markdown;
 
 /**
@@ -69,6 +70,8 @@ public class EntityPreview extends ScrollPane {
 	private final Function<String, String> label;
 	/** The folder of the crate, if it has one (opened from or saved to it) */
 	private Supplier<Optional<Path>> folder = Optional::empty;
+	/** Where the crate is on the web, if it was fetched from there */
+	private Supplier<Optional<WebCrate>> web = Optional::empty;
 	/** Whether a property takes URLs, if known */
 	private Function<String, Optional<Boolean>> takesUrl = property -> Optional.empty();
 	private final VBox content = new VBox(8);
@@ -92,6 +95,15 @@ public class EntityPreview extends ScrollPane {
 	 */
 	public void setFolder(Supplier<Optional<Path>> folder) {
 		this.folder = Objects.requireNonNull(folder);
+	}
+
+	/**
+	 * Where the crate is on the web, if it was fetched from there, to open
+	 * where its relative <code>@id</code>s lead there, though they stay as
+	 * written in the crate.
+	 */
+	public void setWeb(Supplier<Optional<WebCrate>> web) {
+		this.web = Objects.requireNonNull(web);
 	}
 
 	/**
@@ -427,12 +439,17 @@ public class EntityPreview extends ScrollPane {
 
 	/**
 	 * Where an <code>@id</code> leads, as {@link #identifier} links it: a
-	 * web address, or the address of the file or folder beside the crate;
-	 * none for others.
+	 * web address, the address of the file or folder beside the crate, or,
+	 * for a crate fetched from the web, where the relative <code>@id</code>
+	 * leads there; none for others.
 	 */
 	Optional<String> address(String id) {
 		String iri = crate.get().expandId(id);
-		return isWebAddress(iri) ? Optional.of(iri) : local(id).map(file -> file.toUri().toString());
+		if (isWebAddress(iri)) {
+			return Optional.of(iri);
+		}
+		return web.get().flatMap(w -> w.resolve(id)).map(URI::toString)
+				.or(() -> local(id).map(file -> file.toUri().toString()));
 	}
 
 	/**

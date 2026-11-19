@@ -47,6 +47,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+          # The latest 25.x, not one the runner has cached: the JDK's security fixes come between wpsld's releases
+          check-latest: true
           cache: gradle
 
       - name: Build and test

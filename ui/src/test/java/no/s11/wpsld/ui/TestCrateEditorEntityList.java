@@ -461,8 +461,7 @@ public class TestCrateEditorEntityList extends UiTest {
 		EntityTreeView tree = lookup("#entityTree").queryAs(EntityTreeView.class);
 		assertFalse(rows(tree).toString(), rows(tree).contains("  unrelated.pdf ~"));
 		// Attached after all, its folder's files are listed
-		interact(() -> ((javafx.scene.control.CheckMenuItem) menuItem("menuAttached")).setSelected(true));
-		interact(() -> menuItem("menuAttached").fire());
+		interact(() -> app.attach(Attachment.toFolder(folder)));
 		WaitForAsyncUtils.waitForFxEvents();
 		assertTrue(rows(tree).toString(), rows(tree).contains("  unrelated.pdf ~"));
 	}
@@ -542,10 +541,124 @@ public class TestCrateEditorEntityList extends UiTest {
 			assertEquals(List.of("  gone.csv", "  " + web + "/gone.csv"), problemRows(tree));
 
 			// Detached, its files are not looked for
-			interact(() -> ((javafx.scene.control.CheckMenuItem) menuItem("menuAttached")).setSelected(false));
-			interact(() -> menuItem("menuAttached").fire());
+			interact(() -> app.attach(Attachment.none()));
 			WaitForAsyncUtils.waitForFxEvents();
 			assertEquals(List.of("  " + web + "/gone.csv"), problemRows(tree));
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	/**
+	 * A web address that does not answer is a red problem for a work (a file, a
+	 * dataset) and only a yellow warning for anything else (a person's url, a
+	 * defined term's @id in an outdated namespace), as RO-Crate does not need an
+	 * address to answer
+	 */
+	@Test
+	public void unavailableIsAWarningForWhatIsNotAWork() throws Exception {
+		com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer
+				.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+		server.createContext("/there", exchange -> {
+			exchange.sendResponseHeaders(200, -1);
+			exchange.close();
+		});
+		server.start();
+		String web = "http://127.0.0.1:" + server.getAddress().getPort();
+		try {
+			Path folder = Files.createDirectories(temp.resolve("warnings"));
+			Files.writeString(folder.resolve("ro-crate-metadata.json"), """
+					{"@context": "https://w3id.org/ro/crate/1.3/context", "@graph": [
+					 {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"}},
+					 {"@id": "./", "@type": "Dataset", "name": "Survey", "author": {"@id": "#alice"},
+					  "hasPart": [{"@id": "WEB/gone.csv"}, {"@id": "WEB/gone-data/"}], "about": {"@id": "WEB/term"}},
+					 {"@id": "WEB/gone.csv", "@type": "File", "name": "A file"},
+					 {"@id": "WEB/gone-data/", "@type": "Dataset", "name": "A dataset"},
+					 {"@id": "#alice", "@type": "Person", "name": "Alice", "url": "WEB/alice"},
+					 {"@id": "#org", "@type": "Organization", "name": "An organisation", "url": "WEB/there"},
+					 {"@id": "WEB/term", "@type": "DefinedTerm", "name": "A term"}
+					]}""".replace("WEB", web));
+			Stage stage = (Stage) entities().getScene().getWindow();
+			assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, folder.resolve("ro-crate-metadata.json"))).get());
+			var task = WaitForAsyncUtils.asyncFx(() -> app.checkWeb(stage).orElseThrow()).get();
+			// The file, the dataset, the person's url, the organisation's url (there) and the term
+			assertEquals(5, task.get(10, TimeUnit.SECONDS).size());
+			WaitForAsyncUtils.waitForFxEvents();
+			java.util.Map<String, String> styles = new java.util.TreeMap<>();
+			java.util.Map<String, String> tips = new java.util.TreeMap<>();
+			for (var cell : lookup("#entities .list-cell").queryAllAs(javafx.scene.control.ListCell.class)) {
+				if (cell.getItem() instanceof no.s11.wpsld.crate.Entity entity) {
+					styles.put(entity.getId().replace(web, "WEB"), cell.getStyleClass().contains("problem") ? "problem"
+							: cell.getStyleClass().contains("warning") ? "warning" : "");
+					tips.put(entity.getId().replace(web, "WEB"), cell.getTooltip() == null ? "" : cell.getTooltip().getText());
+				}
+			}
+			assertEquals(java.util.Map.of("./", "", "WEB/gone.csv", "problem", "WEB/gone-data/", "problem",
+					"#alice", "warning", "#org", "", "WEB/term", "warning"), styles);
+			// The tooltip says which address, and what it answered
+			assertTrue(tips.toString(), tips.get("#alice").startsWith("url " + web + "/alice: Not available: HTTP 404"));
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	/**
+	 * A file that is there but not as the crate says, a landing page for a PDF or another length, is
+	 * a yellow warning, whatever the entity, with what is different as its tooltip
+	 */
+	@Test
+	public void contentThatIsNotWhatTheCrateSaysIsAWarning() throws Exception {
+		com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer
+				.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+		server.createContext("/", exchange -> {
+			String path = exchange.getRequestURI().getPath();
+			boolean head = exchange.getRequestMethod().equals("HEAD");
+			String type = path.equals("/landing") ? "text/html" : "application/pdf";
+			long length = path.equals("/ok.pdf") ? 100 : path.equals("/big.pdf") ? 5000 : 500;
+			exchange.getResponseHeaders().add("Content-Type", type);
+			if (head) {
+				exchange.getResponseHeaders().add("Content-Length", String.valueOf(length));
+				exchange.sendResponseHeaders(200, -1);
+			} else {
+				exchange.getResponseHeaders().add("Content-Range", "bytes 0-0/" + length);
+				exchange.sendResponseHeaders(206, 1);
+				exchange.getResponseBody().write('x');
+			}
+			exchange.close();
+		});
+		server.start();
+		String web = "http://127.0.0.1:" + server.getAddress().getPort();
+		try {
+			Path folder = Files.createDirectories(temp.resolve("content"));
+			Files.writeString(folder.resolve("ro-crate-metadata.json"), """
+					{"@context": "https://w3id.org/ro/crate/1.3/context", "@graph": [
+					 {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"}},
+					 {"@id": "./", "@type": "Dataset", "name": "Survey",
+					  "hasPart": [{"@id": "WEB/ok.pdf"}, {"@id": "WEB/landing"}, {"@id": "WEB/big.pdf"}]},
+					 {"@id": "WEB/ok.pdf", "@type": "File", "name": "Right", "contentSize": "100", "encodingFormat": "application/pdf"},
+					 {"@id": "WEB/landing", "@type": "File", "name": "A landing page", "encodingFormat": "application/pdf"},
+					 {"@id": "WEB/big.pdf", "@type": "File", "name": "Another length", "contentSize": "100", "encodingFormat": "application/pdf"}
+					]}""".replace("WEB", web));
+			Stage stage = (Stage) entities().getScene().getWindow();
+			assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, folder.resolve("ro-crate-metadata.json"))).get());
+			var task = WaitForAsyncUtils.asyncFx(() -> app.checkWeb(stage).orElseThrow()).get();
+			assertEquals(3, task.get(10, TimeUnit.SECONDS).size());
+			WaitForAsyncUtils.waitForFxEvents();
+			java.util.Map<String, String> styles = new java.util.TreeMap<>();
+			java.util.Map<String, String> tips = new java.util.TreeMap<>();
+			for (var cell : lookup("#entities .list-cell").queryAllAs(javafx.scene.control.ListCell.class)) {
+				if (cell.getItem() instanceof no.s11.wpsld.crate.Entity entity) {
+					String id = entity.getId().replace(web, "WEB");
+					styles.put(id, cell.getStyleClass().contains("problem") ? "problem"
+							: cell.getStyleClass().contains("warning") ? "warning" : "");
+					tips.put(id, cell.getTooltip() == null ? "" : cell.getTooltip().getText());
+				}
+			}
+			// All are there: a warning, of a file too, not a red problem, for the two that are not as the crate says
+			assertEquals(java.util.Map.of("./", "", "WEB/ok.pdf", "", "WEB/landing", "warning", "WEB/big.pdf", "warning"), styles);
+			assertTrue(tips.toString(), tips.get("WEB/landing").contains("it is a web page (text/html), not application/pdf"));
+			assertTrue(tips.toString(), tips.get("WEB/big.pdf").contains("it is 5,000 bytes, but contentSize says 100"));
+			assertTrue(lookup("2 do not look like what the crate says").tryQuery().isPresent());
 		} finally {
 			server.stop(0);
 		}

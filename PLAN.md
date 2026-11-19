@@ -877,6 +877,51 @@ all three OSes against the performance crates.
   fields know they are entities: reference fields paste a single entity's
   `@id`, other fields nothing. Paste in the list adds them (also from such
   a document, or the text), mentioned by the root.
+  0. **Paste a whole RO-Crate** *(TODO)*. When Paste finds a *full RO-Crate
+     metadata document* on the clipboard (text or `application/ld+json`: a
+     `@graph` with a metadata descriptor `about` a root data entity, as
+     the prober of "Retrieving" decides, `CrateProbe`; not a few entities
+     copied from a crate, whose document has no descriptor), it does not
+     just add its entities but **asks**, in a dialog:
+     - **Open as a new RO-Crate**: as if it had been opened from a URL with
+       no base, a detached crate in no file (Save is Save As), checked by
+       `CrateReader` as any crate is, with its problems shown, and the
+       current crate asked about first if it has unsaved changes. No web
+       base and no landing page, so a crate with relative `@id`s is
+       semi-detached and has the "Attach…" button (see "Semi-detached");
+       its `@context` is its own.
+     - **Add all its entities to this crate**: every entity but the pasted
+       crate's descriptor, and its root data entity as an entity of its own
+       (an ordinary Dataset, not this crate's root: its `hasPart` and the
+       rest kept; mentioned from this crate's root by `hasPart` only if the
+       user says so, or as `mentions`, to decide), under the rules for
+       pasted `@id`s below (a `#` id that is taken is renamed, absolute ones
+       merged). This needs **`@context` merging**: the pasted crate's terms
+       must mean the same in this one. Terms both contexts define the same
+       are as they are; a term the pasted context defines that this one
+       does not is **added to this crate's context** as an object (as
+       `{"term": "iri"}`, from the pasted context if it is inline, or, if
+       it is a context by address, that address added to the array and the
+       terms it defines kept if they clash with none); a term both define
+       *differently* is a clash, shown in the dialog (the entities using it
+       listed), to resolve by renaming it in the pasted entities (to a
+       prefixed or absolute IRI that means what the pasted context meant, so
+       never silently the wrong meaning) or by cancelling; `@vocab` and
+       `@base` that differ are clashes too (a pasted `@base` makes relative
+       `@id`s absolute first, as Detach does, `Crate.absolutize`). The
+       RO-Crate versions' own contexts (1.1, 1.2, 1.3 and the drafts) are
+       the same for this: terms a later one added just come with it, and
+       `conformsTo` of the pasted descriptor is not copied. The same
+       merging serves "Add the entities of a crate opened from a file or a
+       URL to this one" and entity paste from a document with another
+       context, now guarded by `EntityClipboard.guard`.
+     - Which is asked as the first thing Paste does in the list, with
+       **Cancel**, and the choice (and "don't ask again": always add, always
+       open) in Preferences. Pasting into a text field is unchanged.
+     - Tests: a crate on the clipboard (`application/ld+json` and text),
+       the dialog's three buttons, opening (no base, notice), adding with
+       the same context, with a context that adds a term, with a clash
+       (renamed, cancelled), undo of the add as one step.
   1. **Several entities** *(done)*. Select several in the entity list (multiple
      selection); Copy puts them all in one `@graph`; Paste adds them all
      and selects them. A shallow copy: references to entities outside the
@@ -1503,17 +1548,418 @@ extension. Next:
 
 ### Crates as ZIP, BagIt and on the web
 
-- **Open from the web, by dereferencing**: File > Open URL…, for a crate's
-  URL, DOI (`https://doi.org/…`) or other persistent identifier.
-  `CrateRetriever` (lib, not used by the editor yet) already follows
+- **Open from the web, by dereferencing**: File > Open URL… (done: a
+  window modal to the editor with Cancel while it is fetched, so that the
+  crate being edited can't change and is never swapped out unasked, and
+  that closes before the replacement, which can't be cancelled; a notice;
+  no recent files yet, and the failures shown
+  as the one message of the exception, not yet as every step tried), for
+  a crate's URL, DOI (`https://doi.org/…`) or other persistent
+  identifier. `CrateRetriever` already follows
   FAIR Signposting (`Link: <…>; rel="describedby"`), content negotiation
   (`Accept: application/ld+json;profile="https://w3id.org/ro/crate"`),
   `ro-crate-metadata.json` beside a landing page, and HTML previews
   linking their metadata; it limits sizes and requests, as all it fetches
-  is untrusted. Opened read-only, or as a detached crate whose relative
-  `@id`s are resolved against where it came from (RO-Crate's base URI for
-  a crate on the web), to save locally with Save As. Also an RO-Crate
-  zip at a URL (below), downloaded to a temporary folder.
+  is untrusted. Opened read-only, with its relative `@id`s resolved
+  against its web base (next item), to save locally with Save As. Also an
+  RO-Crate zip at a URL (below), downloaded to a temporary folder.
+- **A crate on the web: attached or detached, and its web base**
+  *(done for a crate opened by File > Open URL…: `WebCrate` in lib,
+  `CrateFile.web()`, `EntityPreview.setWeb`, the notice, and the Save As
+  warning with `Crate.absolutize`, tested in `TestWebCrate` and
+  `TestCrateEditorWebCrate`; still to do: the checks, the TUI and CLI,
+  Export as ZIP and copying entities, `Content-Location`, and choosing
+  among a record's items, see the list below this one)*. What RO-Crate 1.2 says
+  (`structure.md`, "Attached RO-Crate Package", "Detached RO-Crate
+  Package"; `appendix/relative-uris.md`):
+  - An Attached RO-Crate Package "can be stored and published in multiple
+    ways", among them "exposed as a Web resource within a folder
+    structure"; its metadata document "MUST be present in the RO-Crate
+    Root and it MUST be named `ro-crate-metadata.json`", and "the use of
+    relative URI references in the RO-Crate Metadata File ensures
+    identifiers of data entities work as they should" once its root
+    folder is on a web server. So a crate fetched from
+    `http://example.com/crate1/ro-crate-metadata.json` is an attached
+    crate whose RO-Crate Root is `http://example.com/crate1/`, and its
+    `hasPart` `file.txt` is `http://example.com/crate1/file.txt`.
+  - A Detached RO-Crate Package has no root folder; its metadata "is
+    accessed independently (e.g. as part of a programmatic API)", should
+    be named `${prefix}-ro-crate-metadata.json` if it is a file, its root
+    "SHOULD have an `@id` which is an absolute URL if it is available
+    online", and "any data entities ... MUST be Web-based Data Entities"
+    (absolute URIs); `#` local identifiers are still allowed for
+    contextual entities.
+
+  **Deciding**, in lib (e.g. `CrateRetriever.Retrieved#packaging()` or a
+  small `WebCrate` record beside it, so the TUI and CLI can use it too),
+  from `Retrieved.source()`, the URL the metadata document finally came
+  from *after all redirects* (not the URL the user typed, which may be a
+  DOI or a w3id.org redirect):
+  - the last path segment is `ro-crate-metadata.json` (or RO-Crate 1.0's
+    `ro-crate-metadata.jsonld`, as `CrateFile.isMetadataFile`): attached;
+    web base = the folder, `source.resolve("./")`, with query and
+    fragment dropped (a query means an API: detached, below);
+  - the path ends with `/` and the server answered with the crate itself
+    (content negotiation on a folder, as some servers do for
+    `index.html`/`ro-crate-metadata.json`): attached, base = that URL;
+  - anything else, e.g. `my-crate-ro-crate-metadata.json`, LDaCA's
+    `/api/object/…?meta=original`, ROHub's API, a DOI that negotiated
+    straight to JSON-LD at a record URL: detached, and **with no base**:
+    the address of the document says nothing of where files are (KU
+    Leuven's export has `Calibration.Trial26.enf`, which is not at
+    `https://rdr.kuleuven.be/api/datasets/Calibration.Trial26.enf`: the
+    DOI has gone from the path), so JSON-LD's way of resolving against the
+    document's address is *not* used, whatever the address; services
+    mangle relative paths, which is why attached or detached is decided
+    first. Only the context's `@base` gives such a crate a base;
+  - a `file:` URL is not a web crate: as now (`CrateFile`, by name).
+  - An `@base` in the document's own `@context`
+    (`JsonLdContext.getBase()`) wins over the URL for resolving, as
+    JSON-LD says; note it in the steps shown.
+  - `Content-Location` headers are ignored (rarely sent, and JSON-LD
+    1.1 uses the document URL); revisit if a repository needs it.
+  - Record the decision and why in `Retrieved.steps()`, e.g. "attached:
+    named ro-crate-metadata.json at http://example.com/crate1/", so the
+    window (and `wpsld-tui`'s status line) can say where relative paths
+    lead.
+
+  **Semi-detached** *(done: the notice; to do: the rest)*. A detached
+  crate with no `@base` that still has relative data entities (File or
+  Dataset with a relative `@id`: `Crate.unanchoredDataEntities`) is neither
+  fully detached (all absolute, as the specification wants) nor attached
+  (a folder to be relative to): the paths are most likely those of other
+  items of the same record, or of files inside an archive that is one of
+  its items, but there is no telling which. Such crates come from
+  repositories' exports, such as Dataverse's, and must open. Done: the
+  notice warns that it is neither, how many files and one example, that
+  they are not linked, and what its RO-Crate Root could be
+  (`WebCrate.suggestedRoots`), with the reason for each: the **landing
+  page** the metadata was found from (its address after the redirections,
+  `Retrieved.landing()`); the root's own `@id`, `identifier` and `cite-as`
+  when they are web addresses; and the folder beside the document, when
+  its address has no query. **Never an address earlier in the
+  redirections** that led there: not the DOI or Handle asked for
+  (`Retrieved.asked()`), nor any persistent identifier resolver's address
+  (`doi.org`, `hdl.handle.net`, `w3id.org`, `purl.org`, `identifiers.org`,
+  …), as they lead to the landing page and are not where files are.
+  Choosing among them is a heuristic, so it is the user's to do, *unless*
+  it can be checked: `RootProbe` (done) does one HTTP `HEAD` for the first
+  file of the root's `hasPart` (a `File` before a folder) beside each
+  candidate (four at most), and a `HEAD` of a made-up path that must not be
+  answered 200 (a server that has a page for any path says nothing); only if
+  the file is there is that candidate taken, in the background after
+  opening, saying so (`CrateEditor.findRoot`). Otherwise the user is left to
+  choose. **Not finding the files is not finding that there is no root**:
+  they may be inside a zip file (or other archive) among the record's items
+  that has not been looked into.
+  - **A root inside an archive** *(TODO)*: each `item` of the record that is
+    a zip (from the `Link` headers and the linkset, see Signposting) is
+    another candidate, "inside <name>", with the arcp base of the zip (see
+    "A zip, from disk or from the web"), and it is not taken without the
+    user. It can be checked without downloading the whole zip: a zip lists
+    its entries at its end, so an HTTP `Range` request for the last 64 kB
+    (`bytes=-65536`, and the next range if the central directory is
+    longer) gives the names of the entries (`206`; servers without ranges
+    answer `200` with the whole file, which is then not read), and the
+    first file of the crate, as a path in it (also under the zip's single
+    top folder, as the specification allows), is there or not. The zip
+    can be big, so a zip's size is shown and a download is the user's
+    choice.
+  - **Choosing a root where it can't be determined is attaching the
+    crate** *(done for a folder and a web address, 2026-11-19: `AttachDialog`,
+    `Attachment`, `CrateFile.attach`, Crate > Attach… and Detach, the notice's
+    Attach… button, and Check Web Availability asking the relative files
+    at the web base through `WebAvailability.targets`; the zip is still to
+    do; not yet remembered with the crate in the state folder)*: **Crate > Attach…**, also as the button of the notice that
+    warns of a semi-detached crate (`showNotice` takes an action), says
+    what the relative `@id`s are relative to. The target is one of:
+    1. **a folder** on disk (a directory chooser), e.g. the crate's files
+       downloaded and unzipped by hand, or kept beside it by another tool;
+       the crate is then attached to it as one opened from a folder is
+       (`CrateFile.folder()`: the files listed in Entities by Folder, the
+       links, adding files, the checks), after showing how many of its files
+       are there and how many are not, as Save As to a folder does
+       (`CrateFolder.match`), and not accepted if none are, unless the user
+       insists;
+    2. **a web address**: a field, with the suggestions of
+       `WebCrate.suggestedRoots` to pick from, each with why, and a Check
+       that runs `RootProbe` on it and says if the first file is there (not
+       there is allowed: the user may know better, with the warning that
+       links may then lead nowhere); the crate keeps it as its web base
+       (`WebCrate.withBase`), the JSON unchanged, and the Save As warning
+       applies to it;
+    3. **a zip** *(once zip support is there, see "A zip, from disk or from
+       the web")*: a zip file (chosen on disk, or one of the record's
+       `item`s that is one), and then **the folder inside it** that is the
+       root, from the zip's entries (the top of the zip, or its single top
+       folder, or another folder the user picks in a tree of the entries),
+       with the arcp base of the zip; the crate is attached to that folder
+       of the zip file system, read-only.
+    **None** (Crate > Detach) puts it back to detached. Attaching is how
+    the crate is *looked at*, not an edit of it: it is not an undo step and
+    changes no `@id` (so it differs from Crate > Make Attached…/Make
+    Detached… below, which rewrite `@id`s between relative and absolute,
+    and move or fetch files); it is remembered with the crate (the state
+    folder, as recent files are), not written into it. The existing
+    **Attached to Folder** toggle (for a crate opened from a file whose
+    files are in its folder or not, see "Attached and detached crates") is
+    the folder case of this, so it becomes this: the menu has Attach… and
+    Detach, and says in the window's notice and the Crate menu what the
+    crate is attached to, rather than a checkbox that can only be a folder.
+    Opening a crate from the web ends semi-detached, as it is not known
+    where its files are, until the user attaches it, or `RootProbe` finds
+    them (above).
+  - **use what the crate says about its files**: each File of such an
+    export has its own `url` or `contentUrl` (KU Leuven's: one or two
+    addresses, `https://rdr.kuleuven.be/api/access/datafile/129354`, for
+    two versions of the file), so the → beside a relative `@id` should open
+    that, as in an attached crate whose files are also on the web
+    ("Data entities in an attached RO-Crate that are also on the web"),
+    rather than nothing; several are listed in the preview;
+  - **match the paths to the record's items**: with Signposting's `item`
+    links (and the linkset's), a relative `@id` may be the name of an
+    item (`Calibration.Trial26.enf` at `…/files/Calibration.Trial26.enf`),
+    or a path inside the one archive item (see the zip item below, with the
+    arcp base): offer these as suggestions for the root as well, not
+    taken without the user's choice;
+  - relative `@id`s that are not paths at all (Dataverse's contact names,
+    `van der Have, Tuur`, as the `@id` of a Person) are not files: they
+    don't count, as only File and Dataset entities do, and a repair could
+    offer to make them local (`#…`) identifiers;
+  - **the array `@id`** of an entity in the same export (see Dataverse).
+
+  **Keeping it**: `CrateFile` gets `Optional<URI> webBase` (and the URL
+  asked for, `Optional<URI> openedFrom`, for the title, messages, recent
+  files and the persistent identifier below), set by `openWeb(Retrieved,
+  JsonNode)`, cleared by `open`/`openIn` and by a Save As to a local file
+  (after the warning below). A web crate has no `folder()`, `path` is
+  empty (Save becomes Save As), and `isAttached()` stays about a *local*
+  folder; add `isAttachedOnWeb()` for the decision above. The JSON is
+  not changed: no `@base` is added, the `@id`s stay relative as written,
+  so an unchanged crate saved is the crate as published.
+
+  **Using it** (the → beside a reference, the ↗ beside `@id`, and the
+  preview's links, all through `EntityPreview.address(String)` which
+  `EntityEditor.setAddress` already uses):
+  - a relative `@id` (not `#…`, not `_:…`; `./` included) resolves as
+    `webBase.resolve(id)` and opens in the browser, e.g. `file.txt` →
+    `http://example.com/crate1/file.txt`, `data/` → the folder's URL;
+    percent-encoded ids (`my%20file.txt`) stay encoded;
+  - for an attached web crate, not outside the root: `../other` resolves
+    to no link, as `local(...)` refuses paths outside the folder now, and
+    `CrateFolder`'s `rocrate:attached-outside` check applies to the URL
+    paths the same way;
+  - for a detached web crate, no link for a relative `@id`, unless the
+    context has an `@base` (done: `WebCrate.base()` is empty);
+  - absolute `@id`s and `#`/`_:` ids as now. No HEAD requests just to
+    show a link; checking that files are there is Check Web Availability
+    (see "Attached and detached crates").
+  - `wpsld-tui` shows the resolved URL beside a relative `@id` (it
+    cannot open a browser everywhere; copying is enough), and
+    `wpsld preview` of a web crate writes links the same way.
+
+  **Checks**: a detached web crate with relative `File`/`Dataset` `@id`s
+  gets a REQUIRED issue ("Detached crate: data entities must be
+  web-based", spec quote, the resolved URL as the suggested fix), with a
+  repair that absolutizes them (below). An attached web crate gets
+  `CrateFolder`'s checks except "missing": files can't be listed over
+  HTTP, so missing files are for Check Web Availability.
+
+  **Saving it locally** (Save As, the only way to save a web crate):
+  before writing, if the crate has a web base and any relative `@id` of a
+  data entity (or one referenced from `hasPart`, or the root `./`), warn
+  in a dialog of the usual style, listing up to five ids with where they
+  lead now, e.g. "`file.txt` → http://example.com/crate1/file.txt": *"N
+  identifiers are relative to http://example.com/crate1/. Saved as
+  `<target>`, they will name files beside it instead, which wpsld does not
+  download, and the links to the web copies are lost."* Buttons:
+  - **Make Absolute** (default): one undo step (`UndoHistory`, as
+    renames are), rewriting each relative `@id` of a data entity (and
+    every reference to it, as `Crate` renames do) to `webBase.resolve(id)`,
+    leaving `#` ids alone (they stay local, as the appendix allows); the
+    root `./` stays `./` when saved as `ro-crate-metadata.json` (attached
+    locally, with web-based data entities, which RO-Crate allows) and
+    becomes the base URL when saved under another name (detached);
+    where the root has no `identifier`, the base (or the persistent
+    identifier it was opened by) is offered as `identifier`/`cite-as`, as
+    "Keep the persistent identifier" says, and, as the appendix suggests
+    for a fork, `isBasedOn` if the user goes on to change it;
+  - **Keep Relative**: save as is, e.g. to download the files by hand
+    next to it; the crate then becomes attached to the local folder (when
+    named `ro-crate-metadata.json`), its `@id`s naming files there;
+  - **Cancel**.
+  After either save the web base is dropped: the crate is now the local
+  file's. The same warning for Export as ZIP, and for copying entities
+  to another crate (`EntityClipboard` already writes `@base`, which
+  should be the web base for a web crate, so pasted relative ids become
+  absolute there).
+
+  **Tests**: lib, with the JDK's `HttpServer` as `TestCrateRetriever`
+  does: `…/crate1/ro-crate-metadata.json` → attached, base
+  `…/crate1/`; a redirect from `/doi/x` to `/crate1/ro-crate-metadata.json`
+  → base after the redirect; `/crate1/` answering JSON → attached;
+  `/api/object?id=…` and `x-ro-crate-metadata.json` → detached; an
+  `@base` in the context; `../escape` → no address. ui: TestFX for → on a
+  relative `hasPart` opening `http://…/crate1/file.txt` (a recording
+  `browse`), and the Save As warning's three choices (undo restores the
+  relative ids). Help: a paragraph in the tutorial on opening a crate from
+  the web, with its screenshot (see AGENTS.md).
+- **Has the file diverged from what we edited? A checksum of the crate's
+  metadata that ignores how it is written, and a lineage of the files we
+  have seen** *(TODO, investigated 2026-11-19; to be built)*. The problem:
+  Save must not overwrite a `ro-crate-metadata.json` that is not ours without
+  saying so, and must not ask when it is. It arises when a crate that is
+  open (with unsaved changes) is saved over a file changed on disk by
+  another program (as now, `CrateFile.disk()` compares the file's time,
+  size and SHA-256 with what it was when opened or saved), and newly
+  when **a crate fetched from the web is attached to a folder that already
+  has a `ro-crate-metadata.json`** (Attach…, above): is that the crate we
+  opened, saved by another tool, or another crate altogether? The idea:
+  keep the checksum of every state of the file we have read or written, as
+  marks on the undo history (`UndoHistory`: the metadata document as fetched
+  or opened, and as saved by us at each Save), and at Save compare the
+  file on disk with them: **one we know is not diverged** (even if we have
+  since undone, as the file is then ahead of the crate, not different), so
+  Save goes on without asking; **an unknown one has diverged**, and the user
+  chooses (as `askBeforeOverwriting` does): save over it, Save As, reload
+  from it (losing changes), or Cancel, saying whose it is (its name and
+  `dateModified`, and how many entities it has, from reading it) and
+  not only that it differs.
+  What to checksum: the bytes' SHA-256 are exact but a different tool writing
+  the same crate (indented differently, entities in another order) differs,
+  so a second checksum of the *content*. What was found:
+  - **RFC 8785 JSON Canonicalization Scheme (JCS)**: a deterministic JSON text
+    (object keys sorted by UTF-16 code units, no whitespace, strings and
+    numbers as ECMAScript writes them), made for hashing and signing; it
+    keeps the order of arrays and the entities in `@graph`, so it alone
+    does not ignore their order.
+  - **RDF Dataset Canonicalization (RDFC-1.0, W3C Recommendation 2024, from
+    URDNA2015)**: for JSON-LD, converts to RDF quads and gives canonical
+    N-Quads that a hash is taken of, whatever the JSON's shape (compact or
+    expanded, prefixes, keys, `@graph` order, single or array, blank node
+    labels): semantic equality. Java: `com.apicatalog:titanium-rdfc`
+    2.0.0 (Apache-2.0, small: titanium-rdf-api and the N-Quads reader; it
+    takes quads, and has a ticker to stop a "poison graph"), with
+    `titanium-json-ld` 1.7.0 (`2.0.0-M2` is a milestone) and a Jakarta JSON
+    implementation to make the quads; Jena 6.2.0 has no RDFC. Data
+    Integrity's `eddsa-jcs-2022` and `eddsa-rdfc-2022` are these two.
+  - **Measured** (a Python prototype, `pyld` for URDNA2015, on the example
+    crate, WorkflowHub's Workflow RO-Crate 1.0 (126 entities) and KU Leuven's
+    (3,989 entities, 1.4 MB)): bytes: every change in the writing is a
+    difference. **A JCS of the content with the `@graph` entities sorted by
+    `@id` and a one-element array taken as its value**: the same for
+    reformatting, keys in another order, `@graph` shuffled and singletons
+    wrapped as arrays, different for any real change (a value edited, or the
+    **order of a value's array**, which is kept as authors' and parts' order
+    mean something to people though JSON-LD calls arrays unordered); 0 ms
+    for the small crates and 23-48 ms for KU Leuven's, with no network, and
+    **it works on an invalid crate** (KU Leuven's has an `@id` that is an
+    array). RDFC: the same for all of these *and* for value arrays
+    shuffled; 0.3-0.6 s for the small crates and 1.8 s for 28,451 quads of
+    KU Leuven's (Python), but **it cannot be taken of an invalid
+    crate** (`Could not convert input to RDF dataset`, that `@id` again),
+    and it fetches the `@context` (the RO-Crate contexts are bundled in
+    wpsld, so a loader for them).
+  - **So**: the lineage uses the JCS-of-content checksum (call it
+    `CrateChecksum`, in lib, over the `JsonNode` as `Crate.toJson` and the
+    file's parse give it; the bytes' SHA-256 as the quick first check, as now),
+    not RDFC, which is for a later "same data, written differently"
+    (compare two crates as graphs: Detect when a crate and a published one
+    are the same, or what changed) where its cost and its need for valid
+    JSON-LD are worth it. JCS needs ES number formatting for numbers that
+    are not integers (rare in a crate; `Double.toString` differs, so write
+    them as ECMAScript does or leave a note that such a crate is "diverged"
+    when in doubt: a false difference only asks, a false equality would
+    overwrite). The checksums are not written into the crate.
+  - Marks on the undo history rather than a set beside it, so that Undo and
+    Redo past a Save keep knowing which state the file is: the step of
+    each Save and of opening has the file's two checksums. A new
+    `CrateFile.disk()` (SAME, CHANGED, MISSING) becomes: SAME if the file's
+    bytes or content checksum is one of the marks, else CHANGED, and Save
+    for a crate with no file of its own (fetched from the web, attached
+    to a folder with a metadata file in it) asks as for CHANGED, rather than
+    sending the user to the file chooser's overwrite question. Opening a
+    crate from the web marks the checksums of the document as fetched
+    (the bytes in `Retrieved`), so that a copy of the same crate unpacked by
+    hand into the folder is recognised as the same starting point.
+- **A zip, from disk or from the web: its arcp base and a viewer of its
+  files** *(TODO, designed in outline; one mechanism for a zip chosen in
+  File > Open, a zip found by Signposting, and `.eln`)*. A crate in a zip
+  is an attached crate whose folder is inside the archive, so its relative
+  `@id`s need a base that maps to the inside of the zip, as RO-Crate's
+  "Establishing a base URI inside a zip file" has it: the arcp scheme,
+  `arcp://uuid,<uuid>/`, with the UUID **name-based (version 5, SHA-1) from
+  where the zip was loaded from**: `file:///home/…/crate.zip` for a file,
+  the address it was downloaded from (`https://…`, after redirects, with
+  its query: `…/ro_crate?version=5`) for the web, so that opening the same
+  zip again, from the same place, gives the same base, and a copy
+  elsewhere another. (`java.util.UUID.nameUUIDFromBytes` is version 3,
+  MD5, so write version 5: the namespace and the exact string to hash are
+  to be taken from the arcp specification, https://w3id.org/arcp, and
+  tested against its examples; `no.s11.wpsld.arcp` has `arcp:` paths and a
+  file system, mostly stubs, see Storage backends.) The base is kept in
+  `CrateFile` as the web base is (not written into the JSON, or only as the
+  `@base` of the context when copying entities, as `EntityClipboard`
+  does), `WebCrate` is not used for it: a zip's `@id`s lead into the
+  archive, and a zip fetched from the web leads nowhere there.
+
+  There is no "Open Folder" for an archive, so the zip is opened with the
+  JDK's zip file system (`jdk.zipfs`, `FileSystems.newFileSystem`) and wpsld
+  gets a viewer of its own for what is in it, in Java: iterating the
+  entries as `Path`s of the zip file system, which `CrateFolder` (what the
+  crate describes and what the folder has, Entities by Folder), the checks
+  and the file metadata readers already take (they take a `Path`, so
+  check each that reads only; those that need a real file, such as
+  external readers, get a copy extracted to a temporary folder, as does
+  opening a file in the browser or another program, since a `jar:` or
+  zip-file-system URI means nothing outside the process). Whether it can be
+  saved back depends on where the zip is: see "What Save does" below. Checks against zip slip, entry
+  sizes and counts (zip bombs), names with `..` and absolute paths, and
+  duplicate entries; a single top-level folder is the root of the crate, as
+  the specification allows. A zip from the web is downloaded to a
+  temporary file as a job within size limits (the same Cancel window as
+  Open URL while it comes, no swapping out of the crate being edited
+  until it is here), then opened as a local zip with the web address as
+  its location.
+- **What Save does, by where the crate is** *(TODO; the first row is
+  done)*. The crate's place decides, and **a crate is never saved to a place
+  it can't be written back to, or to a copy that is lost**:
+  | The crate is | Save | Save As |
+  |---|---|---|
+  | a file on disk, or a folder | the file, as now | as now |
+  | **fetched from the web** (Open URL, a web base) | **can't write back**: there is no general authentication, so no PUT or POST to a server. Save is never offered as writing there: it is **Save As, as for a new crate** (done: no path, so Save asks where; consider showing the menu item as "Save As…" and saying why in its tooltip, rather than "Save" that opens a chooser), and the web-ids warning applies (done) | a file or folder on disk, the web base dropped |
+  | **in a local zip** (opened from disk, e.g. `.crate.zip`, `.eln`) | **in place**, through the zip file system, which can write (`FileSystems.newFileSystem(zip)` and changes written when it is closed; to check: it rewrites the whole zip, so a big zip is a job with progress and Cancel, written to a temporary file beside it and then moved over it, as `SafeSave` does, never half written, and the file changed on disk by another program since it was opened asked about, as for a metadata file) | a zip elsewhere (a copy), or Extract to Folder… |
+  | **in a zip that was downloaded** (from the web, in a temporary file) | **never modifies the temporary zip** (which would be lost, in `/tmp` or the state folder): Save first asks where to save *the zip* (a zip file on disk), copies it there and goes on in that copy as a local zip, or extracts it to a folder (below) | the same |
+  | a folder inside a zip (Attach… to a folder of a zip, see above) | as its zip | as its zip |
+  The window's title and notice say where the crate is (a web address, a
+  zip and the folder in it) so that what Save will do is not a surprise,
+  and a crate with unsaved changes opened from the web asks before it is
+  closed or replaced as any other does (done).
+- **Zip handling goes both ways** *(TODO, with the zip item above, for zips
+  from disk as much as from the web)*:
+  - **Unpack to a folder**: Crate > Extract to Folder… (and the choice when
+    a zip is opened or downloaded) writes the zip's files into a folder the
+    user chooses (an empty or new one, never into one with other files
+    without asking, never outside it: zip slip), as a job with progress and
+    Cancel, checking entry sizes and counts as above, and then attaches the
+    crate to that folder (as Attach… does) and saves it there as a folder
+    crate; the zip itself is not changed or deleted. A single top-level
+    folder of the zip is the root: its contents, not the folder, go into
+    the chosen folder, saying so.
+  - **Turn an open folder into a zip**: File > Export as ZIP… (see "Save as
+    ZIP" below, there for an attached crate's folder; here also for a crate
+    attached to a folder with Attach…, and for one fetched from the web
+    whose files were attached to a folder): the folder's files and
+    `ro-crate-metadata.json` into a zip file the user names (`.crate.zip`
+    is suggested, as it is what repositories such as WorkflowHub use), at
+    the top or inside a single folder as chosen, skipping the hidden files
+    and, as it is for sharing, the crate's own `ro-crate-preview.html`
+    only if it is the crate's preview and wanted; through a temporary file
+    and then moved, never half written. The crate stays open on its folder
+    (a copy was made), with the option to open the zip (as a local zip, in
+    place).
+  - A **BagIt** zip and a BagIt folder in the same two directions (see
+    BagIt below).
 - **Save as ZIP and open ZIP**: File > Export as ZIP… writes an attached
   crate's folder as a zip, `ro-crate-metadata.json` at its top (or in a
   single folder, as RO-Crate allows), with the preview, skipping hidden
@@ -1544,7 +1990,8 @@ extension. Next:
   detached crate, fetching nothing. Manifests checked: SHA-512 (as
   RFC 8493 recommends) and SHA-256 (common); others reported as not
   checked.
-- **Open URL/PID defensively** (many ways to fail): repositories such as
+- **Open URL/PID defensively** *(TODO: the editor shows only the
+  exception's message so far)* (many ways to fail): repositories such as
   Zenodo, a common home of crates, link their files with
   `rel="item"` Signposting but without the RO-Crate profile, and a record
   may have several items (zips, JSON, other files): offer them for the
@@ -1567,6 +2014,415 @@ extension. Next:
   Publish): LDaCA and other Oni repositories, and others found (ROHub,
   WorkflowHub's `/ro_crate` zips), each turning a page's address into its
   crate's.
+- **FAIR Signposting: what `CrateRetriever` does, and what is missing**
+  *(explored 2026-11-19 against RO-Crate 1.2's "Retrieving an RO-Crate"
+  and https://signposting.org/FAIR/, and by trying real repositories)*.
+  Done and tested only in its parts (`linkHeader`, `htmlLink`, `folder`;
+  `retrieve()` itself has no test in lib, only the editor's, for a
+  redirect and a plain document):
+  - the order of the specification: redirects without content negotiation
+    (a browser's `Accept`, as some PIDs only redirect for HTML), then
+    Signposting from the `Link` header (RFC 8288, several headers and
+    values, parameters) or `<link>` in HTML, then content negotiation for
+    the RO-Crate media type, then `ro-crate-metadata.json` beside the
+    resolved address; the first `describedby` link with the RO-Crate
+    `profile` wins over a JSON(-LD) one;
+  - size and request limits, a loop guard, and `Retrieved.steps()`.
+
+  **`rel="linkset"` started** (2026-11-19: `Linkset`, tested by
+  `TestLinksetRetrieval`): when the `Link` header and the HTML give no
+  `describedby`, a link to a link set (`rel="linkset"` in either, JSON first
+  and `application/linkset` text second, two at most) is fetched once, and the
+  `describedby` links of the entries that are about the page are ranked as any
+  are; the step is "linkset". **Which entries are the page's**: those whose
+  `anchor` is its address as asked, after redirects (also with or without a
+  final `/` or a fragment), or (for a link set whose links come with no
+  anchor, as in the text format) all; else, as ROHub's is anchored at the
+  API address of what the page describes, the only entry that has any
+  `describedby` or `item`; never the links of other anchors (Zenodo's files'
+  own `collection` links back, another page's metadata). Not yet: the
+  `item`s (the zip of a crate, a deposited `ro-crate-metadata.json`), the
+  `cite-as` and `license`, a link set merged with the header's links rather
+  than tried only when they give none, `Content-Location`, and the
+  prober; see below.
+
+  Missing, found by running it on the real thing (the probe is in the
+  session notes: `java -cp lib/build/classes/java/main:… Probe <url>`):
+  1. **`rel="item"` is ignored**, so WorkflowHub's DOI
+     (`https://doi.org/10.48546/workflowhub.workflow.120.5`) fails: its
+     only crate is `<…/workflows/120/ro_crate?version=5>; rel="item";
+     type="application/zip"; profile="https://w3id.org/ro/crate"`, and its
+     `describedby` links go to the landing page itself (a bioschemas
+     JSON-LD of the workflow, not a crate). The error then lists part of
+     the `Accept` header as an address: `get()` cuts each request key at
+     its first space, and the header has spaces (cosmetic bug, fix with
+     the failure messages).
+  2. **`rel="linkset"` is not followed.** Zenodo's landing page (e.g.
+     `https://zenodo.org/records/24059872`) has only `rel="linkset";
+     type="application/linkset+json"` in its `Link` header (the record's
+     files are in the linkset, RFC 9264, `{"linkset": [{"anchor": …,
+     "item": [{"href", "type"}], "describedby": […], "cite-as": […],
+     "license": […]}]}`, with other anchors for the files' own
+     `collection` links, which are not the record's: use the entry whose
+     `anchor` is the resolved landing page); plain `application/linkset`
+     (the `Link` header's own syntax) too, and a linkset linked from HTML.
+  3. **A `describedby` link is taken without checking what it leads
+     to.** Zenodo's `describedby` links (`application/ld+json`, also
+     `application/json`, DCAT) go to the record's own metadata at
+     `https://zenodo.org/api/records/<id>`, which `retrieve()` returns as
+     "the crate" (`steps: [Link header]`), and the editor then rejects as
+     not an RO-Crate. As the specification's last step says, a candidate
+     is only the crate if it is valid JSON-LD with a root data entity (a
+     metadata descriptor `about` a root dataset): check each, and if not,
+     go on to the next candidate instead of stopping, noting why in the
+     steps. DataCite's content negotiation giving its own JSON-LD (the
+     specification's tip) is the same case.
+  4. **Archives and the choice among items** (the two items above and
+     below): the result of retrieving is no longer always a document, but
+     one of a document (`source`, `content`, `steps`), an archive to
+     download (zip or BagIt, from an `item` with the RO-Crate profile, or
+     the only zip, or a `ro-crate-metadata.json` item), or a list of
+     choices (`Item(href, type, profile, name, size)`, ranked: the RO-Crate
+     profile, then a JSON that passed the probe, then `.crate.zip`/`.eln`,
+     then other zips, with a clearer label than the URL) for the editor to offer
+     and the user to pick; never opening a file the user has not chosen out
+     of several. An `item` of another type (PDF, CSV) is not a crate; one
+     that may be JSON is probed (see Decisions), as Zenodo lists the
+     crate's `ro-crate-metadata.json` among the files, flagged as data.
+  5. **`cite-as` and `license` are not read** (they are what "Keep the
+     persistent identifier" below needs): return them with the result, from
+     the same response as the document came from, or the linkset's entry.
+  6. **Tests of `retrieve()` itself**, against the JDK's `HttpServer`, one
+     canned repository for each case (as headers captured from the real
+     ones, no network in tests): WorkflowHub's (zip item with the profile,
+     `describedby` to the landing page), Zenodo's (linkset only, record
+     JSON-LD as a decoy, several items), w3id.org's (content negotiation
+     redirect), a folder with no Signposting, a loop, a 404, a page
+     that is HTML without links, a JSON that is not a crate. Also the
+     `Link` parsing of quoted commas, `anchor`s and relative `href`s.
+
+  **Decisions** (2026-11-19):
+  - **Prefer JSON-LD online to an archive**, as it is the faster: so, after
+    the links with the RO-Crate `profile` (the specification's own
+    preference, either `describedby` or `item`) are put first among their
+    own kind, a JSON(-LD) link that the prober (below) shows to be a crate
+    comes before an `item` zip, even a zip with the profile. A
+    `describedby` that fails the probe (WorkflowHub's, Zenodo's) is
+    dropped, and the zip is next. **The JSON-LD may be an `item`, not a
+    `describedby`**: a repository such as Zenodo does not know that a
+    deposited `ro-crate-metadata.json` is metadata, not data, so it lists it
+    with the other files, as `rel="item"; type="application/json"` (or
+    `application/ld+json`, or `text/plain`, or no type at all), and only the
+    prober can tell. So the JSON candidates are the `describedby` links to
+    JSON(-LD) *and* the `item`s that may be JSON (by type, or by a name
+    ending in `.json` or `.jsonld`, when the type is missing or generic),
+    in one tier, ranked: the profile first, then by name
+    (`ro-crate-metadata.json`, `ro-crate-metadata.jsonld`,
+    `<prefix>-ro-crate-metadata.json`, `*.crate.json`), then others. A
+    record with many JSON data files must not be fetched whole: the named
+    candidates are probed first, with the full size limit; if none passes,
+    the others, at most five, each read only up to a smaller limit (about
+    1 MB, saying "not read to the end" if it was cut), as data files
+    seldom start as a crate's `@graph`. Candidates are listed
+    from the `Link` header, the HTML, *and the linkset*, and the same
+    `href` is tried once however many types it is listed with (Zenodo
+    lists its record five times).
+  - **Level 2 is needed: traverse the linkset**, not only the headers. A
+    `rel="linkset"` link (the `Link` header or `<link>`; Zenodo has only
+    that) is fetched with `Accept: application/linkset+json` (RFC 9264;
+    also `application/linkset`, the `Link` header's syntax, when a
+    server has only that), within the same limits, once (a linkset does
+    not lead to another). Its entries are taken for the page when their
+    `anchor` is the address of the landing page (as resolved after
+    redirects), the address asked for, or its `cite-as`; other anchors,
+    such as a file's own `collection` link back, are not the page's. The
+    links of the headers and of the linkset are merged and listed once.
+  - **Probe each candidate; pick when there is more than one.** A prober
+    (`CrateProbe` in lib, with `CrateReader` sharing its list of
+    descriptor `@id`s, `DESCRIPTOR_IDS`) answers whether a fetched
+    document is an RO-Crate metadata document, cheaply: it is JSON (a
+    `Content-Type` of `text/plain` or `application/octet-stream` is
+    fine, and HTML is not), an object with an `@graph` array, and the
+    array has the metadata descriptor of the specification's "Finding the
+    Root Data Entity": an entity whose `@id` is `ro-crate-metadata.json`,
+    or RO-Crate 0.2 and 1.0's `ro-crate-metadata.jsonld` (even when the
+    file itself is named `<prefix>-ro-crate-metadata.json`, as a detached
+    crate's may be), with an `about` that has an `@id`. Its
+    `conformsTo` is returned (`https://w3id.org/ro/crate/<version>`,
+    any version) but not required, and whether the root it is about
+    exists is for `CrateReader` to say, so that the probe stays one pass
+    over the `@graph` (streamed with Jackson, stopping at the
+    descriptor, within the size limit given for the candidate) and says
+    why when it fails ("HTML
+    page", "JSON, but not an RO-Crate: no metadata descriptor in its
+    @graph", "DataCite's JSON-LD"). The JSON candidates are fetched
+    together (a few at a time, and the same limits for each) and
+    probed. **One that passes is opened. Several that pass are a choice**
+    for the user (two versions of the crate, or its own and a copy's, or
+    a `describedby` and a JSON `item` that are the same file at two
+    addresses: those with the same content are one, by their checksum).
+    **None that pass, and zip (or BagIt) items:** one with the RO-Crate
+    profile is the candidate; several are a choice, and a single one
+    without the profile is asked about too, as it may be data and big
+    (shown with its type and size). The choice window lists each with
+    what it is (name, type, size where known, why it is a candidate)
+    and never opens one unasked out of several.
+
+  Order to work in: the prober and the tests of `retrieve()` first, as
+  they make today's failures say the truth and cost little; then the
+  linkset (JSON) and `cite-as`/`license`; then the choice among several;
+  then the archives, with the zip handling below.
+
+- **Dataverse** *(checked 2026-11-19)*: Dataverse installations give each
+  dataset's metadata in several export formats, one of which can be an
+  RO-Crate (`rocrate_json`, in the installation's list of exporters at
+  `/api/info/exportFormats`), but it is an optional exporter and very few
+  have it on. Of the 151 installations in
+  https://github.com/IQSS/dataverse-installations (`data/data.json`),
+  108 could be asked (the list of exporters, or else a search for a
+  dataset and a try of the exporters' names on it) and **one has RO-Crate
+  enabled: KU Leuven RDR, `rdr.kuleuven.be` (Dataverse 6.7.1)**; **DataverseNO
+  (`dataverse.no`, 6.11, the only Norwegian one in the list) does not**: it
+  lists OAI_ORE, DataCite, Dublin Core, schema.org, DDI, Croissant and
+  Dataverse's own JSON, and answers any other exporter's name, an
+  RO-Crate's too, as it does a made-up one, with HTTP 403. The other 43
+  (older versions, or an API that is not open) could not be checked. Try
+  again later: `scripts/` has no tool for it yet (the check is a few lines
+  of Python over `data.json`), add one if installations are to be
+  followed. What it means for retrieval:
+  - Dataverse's landing pages have FAIR Signposting of both levels: a
+    `Link` header with `cite-as`, `license`, `type`, a `describedby` for
+    each exporter, *and* a `rel="linkset"` to
+    `/api/datasets/:persistentId/versions/<version>/linkset?persistentId=…`
+    (`application/linkset+json`). The RO-Crate is a `describedby` like the
+    others: `…/api/datasets/export?exporter=rocrate_json&persistentId=doi:…`
+    with `type="application/json"`, no `profile`, nothing to tell it from
+    `OAI_ORE` and `dataverse_json` that have the same type. Today
+    `CrateRetriever` takes the first, so DataverseNO's DOI
+    (`10.18710/CVQPYG`) gives the OAI_ORE export, not a crate. This is why
+    the prober and the ranking above are needed: for Dataverse, a link
+    whose address names an exporter containing `crate` (`rocrate_json`) is
+    a named candidate and probed first; where there is none (DataverseNO),
+    the other JSON `describedby`s are probed only within the limits above
+    (five, about 1 MB each, `OAI_ORE` of a big dataset is not), and the
+    answer is a clear failure: "no RO-Crate among the 12 metadata formats
+    this repository gives; it has: …", rather than opening one that isn't.
+  - A crate exported by Dataverse is a *detached* crate with no files
+    beside it (RO-Crate 1.1, `./` the dataset, `identifier` the DOI,
+    files as `File` entities with Dataverse's download addresses), so
+    `WebCrate` takes it as detached whatever its address
+    (`…/export?exporter=rocrate_json&…` has a query); its data entities
+    should be absolute web addresses already, which the detached checks
+    will say.
+  - **The trust store, not the server**: in this container (conda-forge
+    OpenJDK 25.0.2) Java refused `rdr.kuleuven.be` (`PKIX path building
+    failed`) while `curl` and Firefox were fine. The server sends its whole
+    chain (leaf, GEANT TLS RSA 1, signed by *HARICA TLS RSA Root CA
+    2021*, which `openssl` verifies); the JDK's `cacerts` has only
+    HARICA's 2015 roots, and the system's has the 2021 one. So an
+    application built on a JDK without the root fails for every site under
+    it (many European academic repositories: GEANT TLS is common), and the
+    runtime image `jlink` makes carries the JDK's store: check which JDK
+    the release workflow builds with and that its `cacerts` has
+    `HARICA TLS RSA Root CA 2021` and `HARICA TLS ECC Root CA 2021`
+    (`keytool -list -cacerts | grep -i harica`). The failure should say
+    the certificate is not trusted by this Java and by whom it was signed,
+    not "not found"; whether to use the operating system's store
+    (`Windows-ROOT`, `KeychainStore`) is for Preferences, not a quiet
+    change.
+  - **KU Leuven's crate is not valid JSON-LD**: 3,989 entities, of which
+    one, a folder named with spaces, has `"@id": ["New%20Patient%20Classification%201/", "New Patient Classification 1/"]`,
+    an array (its name encoded and not), where an `@id` is one string.
+    `CrateReader` drops that entity as an error and the editor refuses to
+    open the crate (`hasErrors`), and says "has no @id", which is not what
+    is wrong. To decide: (a) say what is wrong (`@id` is an array of 2
+    strings) in the message; (b) for Dataverse's export, and any crate
+    whose only errors are entities that can be dropped, open it with the
+    errors shown as warnings, listing what was dropped, rather than not at
+    all; (c) take the first string as the `@id` and the others as
+    `sameAs`, written back as one (as Repair Crate does for other
+    shapes). Tell Dataverse's exporter project when decided (see
+    `TestCrateRetrieverOnline`, which expects this one fault).
+  - **Integration test**: `TestCrateRetrieverOnline` (`./gradlew
+    onlineTest`, not in the build): DOI `10.48804/XES6PY`, as
+    `https://doi.org/…` and as `https://hdl.handle.net/…`, through the
+    redirects to the landing page, its Signposting (`cite-as`, the
+    `rocrate_json` `describedby`, the other exports, the linkset), then the
+    crate (RO-Crate 1.1, detached by `WebCrate`). It passes today because
+    the `rocrate_json` link comes before the other JSON exports in the
+    header and the first of equal rank is taken, not because it is known
+    to be a crate: the test then needs the prober to keep passing if
+    the order changes.
+- **Repositories tried** *(2026-11-19; the first column is how
+  `CrateRetriever` fares today, from the DOI, Handle or address given)*:
+
+  | Repository (identifier) | Today | What it has, and what is needed |
+  |---|---|---|
+  | KU Leuven RDR (Dataverse), `doi:10.48804/XES6PY` | opens, by luck of order | `Link` header: `describedby` for each export, `rocrate_json` first; a linkset; crate is detached, with an array `@id` error (see Dataverse above). Tested: `TestCrateRetrieverOnline`. |
+  | DataverseNO, `doi:10.18710/CVQPYG` | wrong document (OAI_ORE) | no RO-Crate exporter; needs the prober to say so. |
+  | **OneStop4WildLIVE**, `https://wildlive.senckenberg.de/captureevent/wildlive/963d905b946c6119ed5f` | **opens** | `Link` header `describedby` to `/api/call?…method=getAsROCrate`: a detached crate with absolute `@id`s, `contentUrl`s on its files, RO-Crate **1.2-DRAFT**, whose context is not one we know: its terms warn. Tested. To do: treat `https://w3id.org/ro/crate/1.2-DRAFT/context` (and other drafts and release candidates) as the bundled 1.2 context. |
+  | **MLentory**, `https://mlentory.zbmed.de/mlentory_graph/bb23…582a` | **opens** | an HTML `<link rel="describedby">` to `…/ro-crate-metadata.json` in a folder: an attached crate on the web. Its own faults: `@dcterms` (not a keyword) in the context, `@vocab` set to the context's address, an entity nested in a value. Tested. To do: `CrateReader` warns "More than one metadata descriptor" because the root's `@id` is an absolute address that *ends* with `/ro-crate-metadata.json`: that is the root (the descriptor's `about`), not a descriptor, so it should not count. |
+  | **UK CEH** (EIDC), `doi:10.5285/3970a138-c035-40ac-bf1d-a2f8a464644a` | "opens" a **non-crate** | no Signposting, no `Link` headers; content negotiation answers `application/ld+json;profile="https://w3id.org/ro/crate"` with CEH's own metadata JSON (`accessLimitation`, `authors`, …), which has no `@graph`: the case the specification's tip warns of. Its page offers `format=ttl`, `schema.org`, `bib`, `ris`, `gemini`, `json`, no crate. Tested as is: the prober must say "no RO-Crate here: it claims the profile but is not one". |
+  | **RADAR** (KIT), `https://dx.doi.org/10.35097/1054` | fails, HTTP 403 | the landing page's `Link` headers have `describedby … type="application/ld+json"; profile="https://w3id.org/ro/crate/1.1/context"` (`…/exportrocrate`), a tar `item` and others; the crate export itself answers **403 Forbidden** to non-browser clients, whatever the `User-Agent`. **Not to be got round** (no pretending to be a browser): the failure should say it was refused, by which address, and suggest downloading the crate from the page in a browser and opening the file. The same 403 for a second RADAR dataset (`…/radar/de/export/7j69dwbftunf1egw/exportrocrate`), so it is the export and not one dataset. Note the profile is the *context's* address, not `https://w3id.org/ro/crate`: it already ranks as the profile (`contains`); a tar item is not a zip. |
+  | **HUN-REN ARP** (Dataverse 6.9), `hdl:21.15109/ARP/2DHQF1` | fails, "Invalid redirection" | the landing page is behind **Anubis**, a proof-of-work bot wall: a `302` with no `Location`, and its own cookies. Not to be solved or got round; the failure should say that the site's bot protection stopped a program, not "invalid redirection". Its API works (version 6.9, exporters: Datacite, OAI_ORE, dataverse_json, dcterms, ddi, html, oai_datacite, oai_dc, oai_ddi, schema.org): **no RO-Crate export**, so there is no crate either way. |
+  | **ROHub**, `https://w3id.org/ro-id/2176fd9b-bef8-486a-b414-fef7edb37732` | fails, timeout | the landing page (www.rohub.org) has only `rel="linkset"` (`application/linkset` and `application/linkset+json`, at `api.rohub.org/api/ros/<id>/json/`), whose one `describedby` is `…/crate/download/` (`application/ld+json`) and which has 114 `item`s (`…/resources/<id>/download`, no type). Today `crate/download/` answers **504 Gateway Time-out** after 30 s (the crate of 114 resources is slow to make), and content negotiation on the identifier answers 503, which is what timed out the retriever (20 s). Linkset traversal is done (it now goes on to `crate/download/` and fails there with the 504, naming the address); still needs a timeout that says which address did not answer, and to look again for the zip. The zip you said it has was not in the linkset today: look again (the item `type`s are missing, so only their addresses say). |
+  | Zenodo, `doi:10.5281/zenodo.24059872` | "opens" a **non-crate** | a `rel="linkset"` only; its `describedby` are Zenodo's own metadata. Needs linkset and prober. |
+  | WorkflowHub, `doi:10.48546/workflowhub.workflow.120.5` | fails | the crate only as `rel="item"` zip with the profile. Needs items and zips. |
+
+  From these: **three kinds of failure are not the same and should not read
+  the same**: *not a crate* (CEH, Zenodo's metadata, DataverseNO's exports),
+  *refused* (RADAR's 403, HUN-REN's bot wall: say who refused, and offer the
+  way a person can do it themselves, never a way round), and *did not
+  answer* (ROHub: which address, after how long). A refused or blocked
+  response must not be retried with other headers. With `Retrieved.steps`,
+  each failure lists what was tried in order. The online tests are in
+  `TestCrateRetrieverRepositoriesOnline` (WildLIVE, MLentory, CEH); RADAR,
+  HUN-REN and ROHub are not tested as they fail by the repositories' choice.
+- **Check Web Availability: manners, and what it says of the content**
+  *(in progress, 2026-11-19: `WebAvailability` rewritten and tested
+  (`TestWebAvailabilityManners`, 11 tests) and used by the editor)*.
+
+  Measured first (18 real addresses from the crates tried, HEAD against a GET
+  for one byte): both agree on every 404 and on success; **the one real
+  difference is KU Leuven's file addresses, HEAD 403 and GET 206**; the rest
+  of the differences are 200 against 206 (the range honoured). So **HEAD first,
+  and a `GET` with `Range: bytes=0-0` (body closed unread, so that no file is
+  downloaded) where HEAD says a 4xx that may only be a server that does not do
+  HEAD right** (400, 403, 404, 405, 406, 501; not 401, which needs a login, nor
+  410, which is final, nor 429 or 503, which say to wait); 206 and 416 (a range
+  of an empty file) count as found. **`https://w3id.org/ro/crate/1.1` answers
+  404 to `Accept: */*`** (as to Java's, which sends none) and 303 to a
+  browser's: the check now sends `text/html,application/xhtml+xml;q=0.9,*/*;q=0.8`,
+  or every crate's `conformsTo` address would be reported as not there.
+
+  Done in the rewrite: **`Retry-After`** (RFC 9110, 10.2.3: seconds or an HTTP
+  date) on a 429 or 503 pauses **all** requests to that host, from every
+  thread, until then; longer than `longestWait` (2 min) and the host is given
+  up on, saying what it asked; **retries** of a 429, 5xx or failed connection,
+  3 tries with 1 s then 2 s between (`Manners`), a timeout tried once more;
+  **a host that does not answer** (3 timeouts or refused connections running,
+  from any address) is not asked any more, so 40 addresses on a server that is
+  down cost a few waits, not 40 ("Could not check: host is not asked any
+  more, as …"); at most 4 at once, 2 to a host.
+
+  **Connections** (measured, JDK 25.0.2): the JDK's client keeps them and
+  negotiates **HTTP/2 by itself** (ORCID, schema.org, GitHub, doi.org, SPDX,
+  creativecommons.org and WildLIVE answered `HTTP_2`; Zenodo and KU Leuven only
+  speak HTTP/1.1): 20 sequential requests of one client are 1 connection, a
+  check of 40 addresses 4, and **a new client for each request is one
+  connection each**, so the editor must keep its one client (it does).
+  **HTTP/3 is not in JDK 25's client** (JEP 517 is JDK 26's, and opt-in; only
+  schema.org and doi.org advertise it of those tried): leave it, the gain is a
+  connection set-up per host.
+
+  **The content** (`WebAvailability.mismatches`, `expectations`): for an
+  `@id` or `contentUrl` of an entity that says `contentSize` (bytes) or
+  `encodingFormat` (a media type), **warn** (yellow) if the server's length is
+  not the size (a HEAD that says 0 or the page's is confirmed by a GET for a
+  byte, whose `Content-Range` has the whole length) or the answer is a web
+  page (`text/html`) where another kind is said: "it is 32,790 bytes, but
+  contentSize says 1,234" / "it is a web page (text/html), not application/pdf:
+  a landing page, not the file?", as RO-Crate's note on `File` `@id`s asks (a
+  DOI or repository page is not the file). Not for `url`, which may be a page
+  about it, nor a size like "1.2 MB".
+
+  **Done 2026-11-19**: the three tests that were ignored are fixed and none is
+  (a skipped address keeps its own failure, "Not available: no answer within
+  1.0 s, and not asked again, as …"; "tried N times" is the tries made; the
+  closed port is a `ServerSocket`'s; and a host given up on is asked at most by
+  those already on their way, as the permit is let go before the reply is
+  classified), and `TestWebAvailability.check` has fast pauses.
+
+  **Measured 2026-11-19 on the real checker, and fixed**: a **certificate** error
+  (badssl.com's expired, self-signed and wrong-host) was retried 3 times (4 s)
+  with Java's raw text and then said the host "did not answer"; it is now
+  final, in words (expired; for another host name; issued by an authority this
+  Java does not trust, "which may be this Java's lack, not the site's", as
+  with HARICA), and ends asking that host (`secureProblem`). **Timeouts**: a
+  server that never answers cost three waits (6 addresses at 2 s took 6 s, so
+  45 s at the editor's 15 s): two timeouts running now give a host up
+  (`Manners.DEFAULT`), so one wait. **GET never downloads a big file**: a server
+  that ignored `Range` and sent 500 MB got 2.6 MB (socket buffers) out in 31 ms,
+  as the body is closed unread; the connection is then not reused, so the next
+  request to that host opens a new one.
+
+  **To do, in this order:**
+  1. **Use it in the editor** *(done 2026-11-19: `CrateEditor.checkWeb` passes
+     `expectations`, keeps `mismatches` as `suspicious` by `@id`, shows them as
+     yellow warnings whatever the type and says how many "do not look like what
+     the crate says"; the help in `views.md`; `contentThatIsNotWhatTheCrateSaysIsAWarning`)*.
+     **Cancel and progress done**: the job's Cancel interrupts the checking
+     thread, which stops every request in flight and wait and ends the workers
+     (`cancelStopsAtOnce`); `WebAvailability.Progress` says "Asked 12 of 40 web
+     addresses: example.org asked to wait 30 s before it is asked again" / "Not
+     asking … any more, as …" in the job's line and bar (`progressSaysHowItGoes`).
+     Still to do: the summary should count the addresses "could not be checked"
+     (a host given up on) separately from those not available, as it counts both
+     as not available now.
+  2. **`RootProbe`** (one HEAD per candidate, and one for a made-up path) and
+     `CrateRetriever` should share these manners: the `Accept`, and, for the
+     retriever, `Retry-After` on a 429 or 503 (waiting up to a few seconds,
+     not a host given up on), the message naming the address that did not
+     answer, and the three kinds of failure of "Repositories tried".
+  3. **Smaller** (the deprecated Jackson call in `Linkset` is done): send `Accept-Encoding: identity` (RFC 9110, 12.5.3: the JDK
+     client does not decompress); decode an HTML page by its `charset`, not
+     always UTF-8; a check of thousands of addresses (KU Leuven's has about
+     8,000) needs a way to skip a host.
+
+- **The JDK of the release, its trust store, and Java security fixes**
+  *(checked 2026-11-19)*. The release is built with Temurin 25
+  (`actions/setup-java@v6`, `distribution: temurin`, `java-version: '25'`), and
+  `jlink` carries that JDK's runtime and `lib/security/cacerts` into the
+  distribution. **The latest Temurin 25 is 25.0.5.1+2** (released 2026-11-18),
+  whose `cacerts` has both `HARICA TLS RSA Root CA 2021` and the ECC one: with
+  it KU Leuven's, DataverseNO's, Zenodo's and ORCID's chains validate (HTTP 200).
+  The failure was only the development container's conda-forge OpenJDK
+  25.0.2 (January 2026), which has HARICA's 2015 roots only: it needs its
+  `environment.yml`/image updated to the current 25.x (not done: the image is
+  the user's). Done: `check-latest: true` in both workflows, so that the
+  release is built with the latest 25.x and not one the runner has cached,
+  and a step in `release.yml` that prints the JDK and **fails the release if its
+  trust store lacks the HARICA TLS RSA root 2021**; `TestWebAvailabilityOnline`
+  (certificate errors in words, and `theJdkTrustsHaricasRoots`, which fails on
+  the old JDK) and the existing online tests pass with Temurin's store.
+  **CVE-2026-114938** (NVD, published 2026-11-17, Oracle Java SE, component
+  *Compiler*, CVSS 3.1 8.1 HIGH, network, no authentication; affected include
+  Oracle Java SE 25.0.5.0.3, 21.0.13.0.3, 17.0.21.0.3): the record does *not*
+  mention base64 (if that is from another source, add it here with the
+  source); a JDK built after it, 25.0.5.1, is the first release after the
+  affected 25.0.5, so a release built now with `check-latest` has it, but
+  the record does not say 25.0.5.1 is the fix: confirm from Oracle's or
+  Adoptium's advisory before saying so, and consider failing the release for a
+  JDK older than a version set in the workflow.
+  **The Dockerfile pins Temurin 25.0.5+8**, the affected release (it builds
+  the `dist/` zips and needs the Windows jmods of exactly its JDK build, with
+  their SHA-256, for cross-linking), while the GitHub workflows float to the
+  latest. 25.0.5.1+2 (an out-of-cycle release, 2026-11-18) was published
+  **without a Windows x64 JDK or jmods, and Docker Hub has no 25.0.5.1 image
+  yet (its newest tag is `25.0.5_8`)**, so the Dockerfile cannot move today.
+  To do, when they appear (check `https://api.github.com/repos/adoptium/temurin25-binaries/releases/tags/jdk-25.0.5.1%2B2`
+  for `OpenJDK25U-jmods_x64_windows_hotspot_25.0.5.1_2.zip`, and the tag
+  `eclipse-temurin:25.0.5.1_2-jdk`): set `TEMURIN_VERSION=25.0.5.1`,
+  `TEMURIN_BUILD=2` and `TEMURIN_WINDOWS_JMODS_SHA256` to the zip's `sha256sum`
+  (the method was checked on the current pin: it gives the Dockerfile's value,
+  `09a8df20…`), and build the image (`podman build --network=host
+  --output type=local,dest=dist .`, in a clone, as AGENTS.md says). A check
+  in CI that the Dockerfile's pin is the latest published 25.x would stop this
+  being found by hand. JavaFX **27.0.1.1** (Maven Central
+  2026-11-17, "Nov 2026 CSPU": two commits on 27.0.1, a version bump and an update
+  of the bundled libxml2 to 2.15.4 in `javafx.web`, a module wpsld does not use,
+  so the risk is small) is **adopted** in `release.yml` (with the five jmods'
+  SHA-256s, checked by hashing the pinned 27.0.1's linux zip first), the
+  Dockerfile (linux and windows) and `ui/build.gradle`; build them (the
+  Dockerfile and the release workflow are not run here).
+  **The development container's JDK stays 25.0.2**: conda-forge has OpenJDK
+  25.0.5.1, but it needs libcups >=2.4.20 and libharfbuzz >=15.1 and every gtk3
+  build needs libcups <2.4, so they do not install together (tried 2026-11-19:
+  `conda env update --prune` dropped gtk3 and pango without an error, and 193 UI
+  tests failed with `no javafx_font_pango`; reverted, see `environment.yml` and
+  AGENTS.md). Try again when gtk3 is rebuilt, with a dry run first. The release is
+  built with Temurin, whose `cacerts` has HARICA's 2021 roots; conda-forge's, at
+  25.0.5.1 as at 25.0.2, has only the 2015 ones.
 - **A zip by FAIR Signposting**: `CrateRetriever` also follows
   `rel="item"` links to an RO-Crate zip (`type="application/zip"`, with
   the RO-Crate profile), as "Retrieving an RO-Crate" allows: downloaded
@@ -1589,23 +2445,82 @@ extension. Next:
 
 ### Attached and detached crates
 
-- **Attached to detached** (Crate > Make Detached…), as the RO-Crate
-  specification suggests: the crate's files go "elsewhere", typically
-  published on the web (e.g. GitHub Pages, a repository, an institutional
-  web server). The user gives the base URI where they say the files now
-  are; wpsld checks that each file is there (in the background, as a job,
-  as Check Web Availability does: HEAD, sizes, perhaps checksums where
-  the server gives them) before rewriting each relative `@id` against it
-  (the root's `@id` the base URI itself, or a persistent identifier if
-  the user has one), and says which files were not found, leaving those
-  unchanged until they are. One undo step; the descriptor's `about` and
-  every reference follow the renamed `@id`s.
+- **Attached to detached** (Crate > **Detach…**) *(done 2026-11-19 for the
+  rewriting, the base and the dialog: `DetachDialog`, `Detachment`,
+  `Crate.absolutize`, `Crate.setBase`; still to do: checking that the files
+  are there, below)*. What RO-Crate 1.2 says (checked): in a Detached RO-Crate
+  Package a File's `@id` "MUST be an Absolute URI" and all its File data
+  entities are web-based data entities (`data-entities.md`); the root
+  "SHOULD have an `@id` which is an absolute URL if it is available online;
+  if it is not yet, or will never be, `@id` MAY be any valid URI - including
+  `./`" and `#` ids of contextual entities remain allowed (`structure.md`);
+  the descriptor's `@id` stays `ro-crate-metadata.json` (`root-data-entity.md`).
+  **`@base` is not a substitute for absolute `@id`s**: the specification
+  mentions it only for reading a crate as a graph (the appendix on relative
+  URIs: a known web address of the root as the base for RDF tools, a fresh
+  `arcp://uuid,…/` as an anonymous one, and `{"@base": null}`, which a saved
+  crate SHOULD NOT have), and in its conversion from attached to detached
+  by JSON-LD flattening against a fresh arcp `@base` "the resulting `@base`
+  is harmless, but can be removed". So: rewrite the `@id`s, and keep the base
+  as `@base` only as an option (it lets the identifiers be made relative
+  again by search and replace, as the arcp section says). The dialog asks
+  for the base, filled in from where the crate is attached on the web or
+  what it says its root is (`WebCrate.rootsOf`), warns of a `file:` address
+  (and asks again) and has **New Anonymous Base**, a fresh
+  `arcp://uuid,<random UUID>/`, with `@base` kept by default for it; the
+  base is made a folder (a `/` is added when it has no query). Rewritten: every
+  entity but the root with a relative `@id`, files and folders (the
+  `hasPart` hierarchy) and other entities written with a path or a name,
+  not `#local`, `_:blank` or absolute ones, and every reference follows
+  (`Crate.absolutize`); the root becomes the base if it is a web address
+  (and stays `./` for arcp, which is not where the crate is online); one
+  undo step ("Detach"), with the context's `@base` in it. After it the crate
+  is attached to nothing, and the notice suggests saving it as
+  `<prefix>-ro-crate-metadata.json` (RO-Crate 1.2: the name that tells that
+  its file's presence does not make a folder an attached crate). Done
+  2026-11-19: **Check Web Availability afterwards**, a tick-box (on for a
+  web base, unavailable for an anonymous or `file:` one, as no files are
+  there), and **use a file's own `contentUrl` (or `url`)** as its `@id`
+  (`Crate.downloadAddress`: exactly one web address, `contentUrl` first;
+  several, as KU Leuven's two versions, say nothing, so the path is used).
+  **Check Web Availability asks across all entities**
+  (`WebAvailability.targetsOf`): every `contentUrl` and `url` (relative ones
+  against the web base), and every `@id` that is a web address, of any
+  entity, but not the descriptor or schema.org terms; plus, with a web base,
+  the relative `@id`s of files and folders at the address they lead to (not
+  other entities' names). A failure says which property it was in.
+  **Not the root's own `@id`**: RO-Crate only says it SHOULD be `./` or an
+  absolute URI (`root-data-entity.md`, "Root Data Entity identifier"), and
+  RECOMMENDS that a persistent identifier resolves to the crate (by
+  content negotiation or Signposting, with `cite-as`), but no representation
+  of a folder is required, and a folder may have no page; what must work for
+  an attached crate on the web is its `ro-crate-metadata.json` beside it,
+  which is asked instead (as of the root) when the crate is attached to a web
+  address. **Severity**: the specification requires no `@id` to resolve (a
+  DefinedTerm's `@id` in an outdated namespace, with a `url` as a fall-back for
+  people), so an address of a work (a CreativeWork or any kind of one: files,
+  datasets, software) that does not answer is a red problem, and of anything
+  else (people, organisations, terms, places) only a yellow warning (the row
+  and its icon; `warnings` in `CrateEditor`, `EntityTreeView`). To
+  do: the root's `identifier`/`cite-as` as a persistent identifier if the
+  user has one (the root's `@id`, "or a persistent identifier"); progress for
+  the availability job, which asks four addresses at a time, so a crate of
+  thousands (KU Leuven's has about 8,000) takes long, and a way to skip
+  those on one host.
+  This also is what **Make Attached…** below undoes; the view-only
+  "detached" (nothing attached, `@id`s as they are) is in Crate > Attach….
 - **Detached to attached** (Crate > Make Attached…): choose a folder; the
   `@id`s under a base URI (the root's, or one the user gives) become
   relative paths in it, and files there are offered to download (each
   checked against `contentSize` and any checksum, as a job). Files not
   downloaded keep their absolute `@id`s, as RO-Crate allows web-based
   data entities in an attached crate.
+- **Attach…** (Crate menu) says what a crate's relative `@id`s are
+  relative to: a folder, a web address, nothing (detached, `@id`s as they
+  are) or a folder inside a zip, with no change to the crate: see
+  "Semi-detached" under "Crates as ZIP, BagIt and on the web". It replaces
+  the toggle below. **Detach…** is the other, which *does* change the
+  crate: it makes the relative `@id`s absolute (above).
 - **Attached to Folder** (the Crate menu's toggle) stays for crates
   merely opened from elsewhere, e.g. downloaded on their own.
 
@@ -1914,3 +2829,73 @@ wpsld is in English only. Translating it means more than the UI's labels:
     `profile-documentation.md`, opened in the editor like any crate and
     usable at once as a profile for other crates. One example is not
     enough to infer value patterns (regexes); leave those to editing.
+- **Load vocabularies into a crate** *(TODO, designed in outline)*: for
+  the terms a crate (often a profile crate) uses or defines, read a
+  published vocabulary, e.g. Insert > Vocabulary from URL or File…, for an
+  address (content negotiation or `Link` headers as `CrateRetriever` does,
+  for JSON-LD, Turtle, RDF/XML) or a file in:
+  - RDFS (`rdfs:Class`, `rdf:Property`, `rdfs:label`, `rdfs:comment`,
+    `rdfs:subClassOf`, `rdfs:subPropertyOf`, `rdfs:domain`, `rdfs:range`,
+    `rdfs:seeAlso`, `rdfs:isDefinedBy`), and schema.org's way of saying
+    the same (`domainIncludes`, `rangeIncludes`, `supersededBy`);
+  - OWL (`owl:Class`, `owl:ObjectProperty`, `owl:DatatypeProperty`,
+    `owl:AnnotationProperty`, `owl:equivalentClass`, `owl:deprecated`,
+    `owl:Ontology` for the vocabulary's own name, version and licence),
+    taking the few elements needed, not reasoning (restrictions are shown
+    as text or left out, with a note);
+  - SKOS (`skos:ConceptScheme`, `skos:Concept`, `skos:prefLabel`,
+    `altLabel`, `definition`, `broader`/`narrower`, `inScheme`,
+    `hasTopConcept`, `notation`), for controlled vocabularies, as EDAM's
+    and many thesauri are.
+
+  What it becomes, chosen in a dialog like the profile inference's (which
+  terms to keep, a search and a filter by type, how many there are, as the
+  files' finders show):
+  - as **contextual entities** for use in an ordinary crate: a SKOS scheme
+    or a vocabulary's list of terms as a `DefinedTermSet` (`name`,
+    `description`, `url`, the `@id` the vocabulary's own), each concept as
+    a `DefinedTerm` (`name` from `prefLabel`, `description` from
+    `definition`, `termCode` from `notation`, `inDefinedTermSet`, `url`
+    its IRI, `alternateName` from `altLabel`), and, where the crate says
+    what a term is, classes as `rdfs:Class` and properties as `rdf:Property`
+    entities as RO-Crate's "Extending RO-Crate" describes, with `@id` the
+    term's IRI or a prefixed `@id` and the vocabulary's prefix added to the
+    crate's `@context` (kept, not renamed; check it for clashes with the
+    context's own terms, and the vocabulary's namespace for `@vocab`);
+  - as **rules of a profile crate** (MASP): a class becomes a class rule
+    (`rdfs:Class`, `prov:specializationOf` the class's IRI), a property a
+    property rule (`domainIncludes` the classes it is the domain of,
+    `rangeIncludes` its range, `rdfs:label`/`rdfs:comment` from the
+    vocabulary), `owl:Restriction` cardinalities as `sh:minCount` and
+    `sh:maxCount` where simple (`owl:minCardinality`, `owl:cardinality`),
+    and a SKOS scheme as a `DefinedTermSet` rule or an `ItemList` of the
+    values a property may take (see MASP.md), so a profile can be made
+    from a vocabulary rather than by hand;
+  - as **choices of a form** (the profile in use): a concept scheme
+    becomes the values to choose from for a property, as `ItemList` rules
+    do now, searchable by label and synonym, as the format finders are.
+  Keep where each term came from (`isDefinedBy`/`sameAs` the vocabulary's
+  IRI, its version or `dateModified`, and `retrieved`) so that a loaded
+  vocabulary can be checked for updates and its terms refreshed, merging
+  rather than duplicating (as pasting entities does); big vocabularies
+  (EDAM, NCIt) are loaded as a job, with a limit and a subset chosen
+  before anything is added, as the XML or Turtle parsing is untrusted
+  (sizes, entity expansion, no network from inside the parser; for Turtle
+  and RDF/XML check what the JDK can do alone, else a small reader, or
+  Jena only if it is accepted, as for file formats above).
+- **Editing profile crates**: more is probably needed to edit a profile
+  crate well, beyond the vocabularies, to be worked out as profile crates
+  are written. For example: a Profile mode of the editor choosing what the
+  forms show for a crate that *is* a profile (the MASP profile's own
+  classes and properties, as `rdfs:Class`, `rdf:Property`, `ItemList`,
+  `DefinedTermSet` and `PropertyValue` entities, with their cardinalities
+  and ranges); adding a class rule and its properties in one step; picking
+  a range from the classes of the profile and of schema.org; checking the
+  profile as a MASP profile (every property has a domain and a range, no
+  class without a label, every `domainIncludes` found, rules that clash)
+  and previewing the form it gives, as one using it would see it; creating
+  the profile's `profile-documentation.md`, `index.html` and
+  `crate-o-mode.json` with the profile; versioning (`version`,
+  `isBasedOn` the profile it extends, `supersededBy`), and publishing it
+  with a persistent identifier that its `conformsTo` users can load (see
+  Publishing).

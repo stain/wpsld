@@ -29,6 +29,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import javafx.scene.image.Image;
+import no.s11.wpsld.util.UserAgent;
 
 /**
  * The square images a map is drawn from, 256 pixels each, by zoom level and
@@ -76,8 +77,8 @@ public interface MapTiles {
 	 *
 	 * @see <a href="https://operations.osmfoundation.org/policies/tiles/">OSM tile usage policy</a>
 	 */
-	static MapTiles openStreetMap(String userAgent) {
-		return new OpenStreetMap(userAgent);
+	static MapTiles openStreetMap() {
+		return new OpenStreetMap();
 	}
 
 	/**
@@ -85,8 +86,8 @@ public interface MapTiles {
 	 * property <code>wpsld.mapTiles</code> is <code>none</code> (as in the
 	 * tests).
 	 */
-	static MapTiles forApplication(String userAgent) {
-		return "none".equals(System.getProperty("wpsld.mapTiles")) ? NONE : openStreetMap(userAgent);
+	static MapTiles forApplication() {
+		return "none".equals(System.getProperty("wpsld.mapTiles")) ? NONE : openStreetMap();
 	}
 
 	final class OpenStreetMap implements MapTiles {
@@ -95,7 +96,6 @@ public interface MapTiles {
 		private static final int CACHED = 512;
 		private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10))
 				.followRedirects(HttpClient.Redirect.NORMAL).build();
-		private final String userAgent;
 		private final Map<String, CompletableFuture<Optional<Image>>> cache = new LinkedHashMap<>(64, 0.75f, true) {
 			private static final long serialVersionUID = 1L;
 
@@ -105,8 +105,7 @@ public interface MapTiles {
 			}
 		};
 
-		private OpenStreetMap(String userAgent) {
-			this.userAgent = userAgent;
+		private OpenStreetMap() {
 		}
 
 		@Override
@@ -117,7 +116,7 @@ public interface MapTiles {
 				return cached;
 			}
 			HttpRequest request = HttpRequest.newBuilder(URI.create("https://tile.openstreetmap.org/" + key + ".png"))
-					.timeout(Duration.ofSeconds(20)).header("User-Agent", userAgent).GET().build();
+					.timeout(Duration.ofSeconds(20)).header("User-Agent", UserAgent.get()).GET().build();
 			CompletableFuture<Optional<Image>> tile = http.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray())
 					.thenApply(response -> {
 						if (response.statusCode() != 200) {

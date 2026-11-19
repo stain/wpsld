@@ -45,7 +45,7 @@ concurrency:
 
 env:
   # Keep in sync with javafx.version in ui/build.gradle and the Dockerfile
-  JAVAFX_VERSION: 27.0.1
+  JAVAFX_VERSION: 27.0.1.1
 
 jobs:
   # Run by hand with a version: the release's commits and tag, made by
@@ -106,19 +106,19 @@ jobs:
         include:
           - platform: linux-x64
             runner: ubuntu-24.04
-            jmods-sha256: 323ceb45b938485f6921d7c31c994cc649adb1f75b16192580ff84a3119694ba
+            jmods-sha256: 1a20903dc231f98d01a29c6eafa2cf7cb98d3dca2dcd0603462ca89d9c631dcc
           - platform: linux-aarch64
             runner: ubuntu-24.04-arm
-            jmods-sha256: 0cc7436da8f57452370ea6ec47132b5111c1866efa1e384277e5d18824440fb2
+            jmods-sha256: 544c62d2e56de8c16a38cf75ace5184cb59c741096160b25be9a269626497224
           - platform: osx-x64
             runner: macos-15-intel
-            jmods-sha256: 65217e4ae9fd58aa2c888463a16a68ca8b3eaf435e0bc695d0b35d97d2d95124
+            jmods-sha256: bd4dc19c8acb4dad9636c312e9e426e4a0654a5f4147bdf76140b883d755689b
           - platform: osx-aarch64
             runner: macos-15
-            jmods-sha256: e7ae63514188b5fe2f1f5913e00c6af15d6f753657ce14a41ebc593c67cec3e0
+            jmods-sha256: a9bceb43a2b098435d996eee2b7e828d81d0e9e8bc183b7e8718ad100211d266
           - platform: windows-x64
             runner: windows-2025
-            jmods-sha256: 5c2a69a7ab42da347b0e8bb244a819e94af75d9f21ae4d129695a3ebc81e3979
+            jmods-sha256: 3778bc30311a535d879f50c02146a785563910b41e0025986eda903625052dcb
     runs-on: ${{ matrix.runner }}
     defaults:
       run:
@@ -138,6 +138,18 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+          # The latest 25.x, not one the runner has cached: the JDK's security fixes come between wpsld's releases
+          check-latest: true
+
+      # What is released carries this JDK's runtime and its trust store: say which, and stop if it lacks the
+      # roots that sites wpsld reads crates from are issued under (HARICA's 2021 roots, under which GEANT TLS
+      # issues, as for KU Leuven's repository), as the JDK of the development container did
+      - name: The JDK of the release
+        run: |
+          java -version
+          keytool -list -cacerts -storepass changeit | grep -i harica
+          keytool -list -cacerts -storepass changeit | grep -qiE 'harica.?tls.?rsa.?root.?ca.?2021' \
+            || { echo "::error::This JDK's trust store has no HARICA TLS RSA Root CA 2021"; exit 1; }
 
       # The version committed in gradle.properties (see scripts/release.sh);
       # a tag must name the same, so that a build of the tagged commit

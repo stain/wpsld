@@ -17,6 +17,7 @@
  */
 package no.s11.wpsld.ui;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -82,6 +83,7 @@ import javafx.scene.control.Dialog;
 import javafx.scene.control.ButtonBar.ButtonData;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
@@ -100,6 +102,7 @@ import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.ToolBar;
 import javafx.scene.control.Tooltip;
@@ -113,6 +116,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.util.StringConverter;
@@ -128,11 +132,13 @@ import no.s11.wpsld.crate.FileCopy;
 import no.s11.wpsld.crate.SafeSave;
 import no.s11.wpsld.crate.CrateDocument.Problem;
 import no.s11.wpsld.crate.CrateReader;
+import no.s11.wpsld.crate.CrateRetriever;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.lookup.CrateRepair;
 import no.s11.wpsld.lookup.DOI;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.EntityJson;
+import no.s11.wpsld.crate.RootProbe;
 import no.s11.wpsld.crate.Places;
 import no.s11.wpsld.lookup.GeoNames;
 import no.s11.wpsld.lookup.ORCID;
@@ -143,7 +149,9 @@ import no.s11.wpsld.lookup.WebAvailability;
 import no.s11.wpsld.lookup.EmbeddedMetadata;
 import no.s11.wpsld.lookup.FileMetadata;
 import no.s11.wpsld.lookup.SPDXLicenses;
+import no.s11.wpsld.util.UserAgent;
 import no.s11.wpsld.crate.UndoHistory;
+import no.s11.wpsld.crate.WebCrate;
 import no.s11.wpsld.crate.UndoHistory.Place;
 import no.s11.wpsld.crate.UndoHistory.Step;
 import no.s11.wpsld.form.EntityListing;
@@ -186,10 +194,9 @@ public class CrateEditor extends Application {
 	/** The window, once shown, whose title names the crate's file */
 	private Stage stage;
 	/** How wpsld names itself to web services, as their policies ask */
-	static final String USER_AGENT = "wpsld/" + AboutDialog.version() + " (https://github.com/stain/wpsld)";
-	private final MapTiles mapTiles = MapTiles.forApplication(USER_AGENT);
+	private final MapTiles mapTiles = MapTiles.forApplication();
 	private PlaceFinder.Search placeSearch = new GeoNames(ProfileCache.httpClient(Duration.ofSeconds(15)),
-			Duration.ofSeconds(20), USER_AGENT)::search;
+			Duration.ofSeconds(20))::search;
 	/** Undo points of this crate: after leaving a field, adding, removing, changing types or @ids */
 	private final UndoHistory history = new UndoHistory(crate.toJson());
 	private final BooleanProperty canUndo = new SimpleBooleanProperty();
@@ -512,9 +519,10 @@ public class CrateEditor extends Application {
 					setGraphic(icon);
 					show("not-data", "In the crate's folder, but not in the crate: Add File(s) to Has Part to add it");
 				} else if (problems.containsKey(entity)) {
-					icon.set(EntityIcons.problem(entity, listing));
+					boolean warning = warnings.contains(entity);
+					icon.set(EntityIcons.problem(entity, listing, warning));
 					setGraphic(icon);
-					show("problem", problems.get(entity));
+					show(warning ? "warning" : "problem", problems.get(entity));
 				} else {
 					icon.set(EntityIcons.of(entity, listing));
 					setGraphic(icon);
@@ -524,7 +532,7 @@ public class CrateEditor extends Application {
 
 			/** The style class of a problem or a file not in the crate, if any, and the tooltip saying so */
 			private void show(String styleClass, String tooltip) {
-				for (String each : List.of("problem", "not-data")) {
+				for (String each : List.of("problem", "warning", "not-data")) {
 					boolean has = getStyleClass().contains(each);
 					if (each.equals(styleClass) && !has) {
 						getStyleClass().add(each);
@@ -636,6 +644,8 @@ public class CrateEditor extends Application {
 				address -> browse.accept(address), property -> entityEditor.label(property));
 		// Only an attached crate's relative @ids are files
 		entityPreview.setFolder(crateFile::folder);
+		// A crate fetched from the web: they lead there
+		entityPreview.setWeb(crateFile::web);
 		// Text of properties that take URLs as links, by the form's fields
 		entityPreview.setTakesUrl(property -> entityEditor.takesUrl(property));
 		// The JSON-LD tab shows the entity shown
@@ -900,6 +910,10 @@ public class CrateEditor extends Application {
 		openFolder.setAccelerator(new KeyCodeCombination(KeyCode.O, KeyCombination.SHORTCUT_DOWN,
 				KeyCombination.SHIFT_DOWN));
 		openFolder.setOnAction(e -> askToOpenFolder(stage));
+		MenuItem openUrl = new MenuItem("Open _URL…");
+		openUrl.setId("menuOpenUrl");
+		openUrl.setAccelerator(new KeyCodeCombination(KeyCode.L, KeyCombination.SHORTCUT_DOWN));
+		openUrl.setOnAction(e -> askToOpenUrl(stage));
 		MenuItem close = new MenuItem("_Close Window");
 		close.setId("menuClose");
 		close.setAccelerator(new KeyCodeCombination(KeyCode.W, KeyCombination.SHORTCUT_DOWN));
@@ -926,7 +940,7 @@ public class CrateEditor extends Application {
 		MenuItem showFiles = new MenuItem(FileManager.label(FileManager.System.current()));
 		showFiles.setId("menuShowInFiles");
 		showFiles.setOnAction(e -> crateFolderPath().ifPresent(path -> showInFiles(stage, path)));
-		Menu file = new Menu("_File", null, newCrate, open, openFolder, close, new SeparatorMenuItem(), save, saveAs,
+		Menu file = new Menu("_File", null, newCrate, open, openFolder, openUrl, close, new SeparatorMenuItem(), save, saveAs,
 				showFiles, new SeparatorMenuItem(), load, new SeparatorMenuItem(), exit);
 		file.setOnShowing(e -> showFiles.setDisable(crateFolderPath().isEmpty()));
 		file.setId("menuFile");
@@ -990,13 +1004,12 @@ public class CrateEditor extends Application {
 		MenuItem repair = new MenuItem("Repa_ir Crate");
 		repair.setId("menuRepair");
 		repair.setOnAction(e -> repair(stage));
-		CheckMenuItem attached = new CheckMenuItem("A_ttached to Folder");
-		attached.setId("menuAttached");
-		attached.setOnAction(e -> {
-			crateFile.setAttached(attached.isSelected());
-			relist();
-			refresh();
-		});
+		MenuItem attach = new MenuItem("_Attach…");
+		attach.setId("menuAttach");
+		attach.setOnAction(e -> askToAttach(stage));
+		MenuItem detach = new MenuItem("D_etach…");
+		detach.setId("menuDetach");
+		detach.setOnAction(e -> askToDetach(stage));
 		MenuItem details = new MenuItem("Update _File Details…");
 		details.setId("menuUpdateFiles");
 		details.setOnAction(e -> askToUpdateFiles(stage));
@@ -1004,12 +1017,12 @@ public class CrateEditor extends Application {
 		web.setId("menuCheckWeb");
 		web.setOnAction(e -> checkWeb(stage));
 		Menu menu = new Menu("_Crate", null, parts.toArray(MenuItem[]::new));
-		menu.getItems().addAll(new SeparatorMenuItem(), attached, new SeparatorMenuItem(), details, web, repair);
+		menu.getItems().addAll(new SeparatorMenuItem(), attach, detach, new SeparatorMenuItem(), details, web, repair);
 		menu.setOnShowing(e -> {
 			enableParts(parts);
-			attached.setSelected(crateFile.isAttached());
 			details.setDisable(!crateFile.isAttached());
-			attached.setDisable(!crateFile.canAttach());
+			// Something to make absolute, or attached to something to leave
+			detach.setDisable(crateFile.attachment().isNone() && crate.relativeEntities().isEmpty());
 		});
 		menu.setId("menuCrate");
 		return menu;
@@ -1433,7 +1446,7 @@ public class CrateEditor extends Application {
 	 * page.html#t2, the file); and the web resources found unavailable by
 	 * Crate > Check Web Availability
 	 */
-	private Map<Entity, String> problems() {
+	private Map<Entity, String> problems(Set<Entity> warnings) {
 		Map<Entity, String> found = new HashMap<>();
 		crateFile.folder().ifPresent(folder -> {
 			for (Entity entity : crate.getEntities()) {
@@ -1444,14 +1457,36 @@ public class CrateEditor extends Application {
 				}
 			}
 		});
-		unavailable.forEach((id, problem) -> crate.get(id).ifPresent(entity -> found.put(entity, problem)));
+		Set<Entity> notFound = new HashSet<>(found.keySet());
+		// What is there, but not as the crate says: only a warning, of a file or anything else
+		suspicious.forEach((id, text) -> crate.get(id).ifPresent(entity -> {
+			if (!found.containsKey(entity)) {
+				found.put(entity, text);
+				warnings.add(entity);
+			}
+		}));
+		unavailable.forEach((id, problem) -> crate.get(id).ifPresent(entity -> {
+			found.put(entity, problem);
+			// RO-Crate does not need an address to answer, which a person's or a defined term's, e.g. in an outdated
+			// namespace, is given for a human to follow: a warning, unless it is a work (a file, dataset, software)
+			if (!notFound.contains(entity) && !listing.isA(entity, "CreativeWork")) {
+				warnings.add(entity);
+			} else {
+				// Not there is a problem, whatever else is said of what was
+				warnings.remove(entity);
+			}
+		}));
 		return found;
 	}
 
-	/** The entities with a problem shown, see {@link #problems()} */
+	/** The entities with a problem shown, see {@link #problems(Set)} */
 	private Map<Entity, String> problems = Map.of();
+	/** Those of them with only a warning: not works, with a web address that does not answer */
+	private Set<Entity> warnings = Set.of();
 	/** Web resources found unavailable, by @id, and why */
 	private Map<String, String> unavailable = Map.of();
+	/** Web resources that are there but do not look like what the crate says (a landing page, another length), by @id */
+	private Map<String, String> suspicious = Map.of();
 
 	/**
 	 * Crate > Update File Details: choose what to update of the files of an
@@ -1815,9 +1850,112 @@ public class CrateEditor extends Application {
 		return done;
 	}
 
+	/**
+	 * Crate > Attach…: ask where the crate's files are (see
+	 * {@link AttachDialog}) and attach it there; a folder with none of its
+	 * files is only attached to if the user insists.
+	 */
+	private void askToAttach(Stage stage) {
+		List<WebCrate.Root> suggestions = crateFile.web().map(w -> w.suggestedRoots(crate.getRoot()))
+				.orElseGet(() -> WebCrate.rootsOf(crate.getRoot()));
+		new AttachDialog(stage, crate, crateFile.attachment(), suggestions,
+				crateFile.path().map(p -> p.toAbsolutePath().getParent()), rootProbe, MAX_FILES).showAndWait()
+				.ifPresent(chosen -> {
+					if (chosen.folder().isPresent()
+							&& CrateFolder.match(crate, chosen.folder().get(), MAX_FILES).elsewhere()) {
+						Alert sure = new Alert(AlertType.CONFIRMATION, "None of the crate's files are in "
+								+ chosen.folder().get() + ". Its files will not be found there until they are.",
+								ButtonType.YES, ButtonType.NO);
+						sure.initOwner(stage);
+						sure.setHeaderText("Attach to this folder anyway?");
+						if (sure.showAndWait().orElse(ButtonType.NO) != ButtonType.YES) {
+							return;
+						}
+					}
+					attach(chosen);
+				});
+	}
+
+	/**
+	 * Crate > Detach…: ask what the relative <code>@id</code>s are to be made
+	 * absolute against (see {@link DetachDialog}), and detach the crate.
+	 * Where it is attached on the web that is where to start from; a
+	 * <code>file:</code> address is asked about again, as it is for this
+	 * computer only.
+	 */
+	private void askToDetach(Stage stage) {
+		Optional<URI> known = crateFile.web().flatMap(WebCrate::base)
+				.or(() -> WebCrate.rootsOf(crate.getRoot()).stream().findFirst().map(WebCrate.Root::address));
+		new DetachDialog(stage, crate.relativeEntities(), known).showAndWait().ifPresent(chosen -> {
+			if (chosen.base().filter(DetachDialog::isFile).isPresent()) {
+				Alert sure = new Alert(AlertType.CONFIRMATION, chosen.base().get() + " only means something on this"
+						+ " computer. A detached crate is one whose files are somewhere others can reach.",
+						ButtonType.YES, ButtonType.NO);
+				sure.initOwner(stage);
+				sure.setHeaderText("Make the identifiers file: addresses anyway?");
+				if (sure.showAndWait().orElse(ButtonType.NO) != ButtonType.YES) {
+					return;
+				}
+			}
+			detach(stage, chosen);
+		});
+	}
+
+	/** Detach the crate (see {@link #detach(Detachment)}), and if asked, then check its web addresses */
+	void detach(Stage stage, Detachment detachment) {
+		detach(detachment);
+		if (detachment.checkAvailability()) {
+			checkWeb(stage);
+		}
+	}
+
+	/**
+	 * Detach the crate: make its relative <code>@id</code>s, of files and
+	 * other entities, absolute against the base (see {@link Crate#absolutize}),
+	 * as RO-Crate requires of a detached crate, with the root data entity too
+	 * if the base is a web address, which it should be if it is available
+	 * online; and keep the base as the <code>@base</code> of the context if
+	 * asked. One undo step. It is no longer attached to a folder or an
+	 * address.
+	 */
+	void detach(Detachment detachment) {
+		int count = detachment.base().map(base -> crate.absolutize(WebCrate.baseOf(base),
+				base.getScheme().startsWith("http"), detachment.useDownloadAddresses()).size()).orElse(0);
+		if (detachment.recordBase()) {
+			detachment.base().ifPresent(base -> crate.setBase(Optional.of(base.toString())));
+		}
+		crateFile.attach(Attachment.none());
+		listedFolder = Optional.empty();
+		relist();
+		show(crate.getRoot());
+		refresh();
+		checkpoint(placeOf(null), Optional.of("Detach"));
+		showNotice("Detached" + detachment.base().map(b -> ": " + count + (count == 1 ? " identifier" : " identifiers")
+				+ " made absolute against " + b + ".").orElse(".") + " Its file is best saved as "
+				+ detachedName(crate) + ", as RO-Crate suggests, not as ro-crate-metadata.json.", null, null);
+	}
+
+	/**
+	 * Say what the crate's relative <code>@id</code>s are relative to (see
+	 * {@link CrateFile#attach}). Its files are listed again, and its links lead
+	 * there. Not a change to the crate, so not an undo step.
+	 */
+	void attach(Attachment attachment) {
+		crateFile.attach(attachment);
+		listedFolder = Optional.empty();
+		relist();
+		refresh();
+		Entity shown = entityEditor.getEntity();
+		show(shown == null || crate.get(shown.getId()).isEmpty() ? crate.getRoot() : shown);
+		showNotice(attachment.isNone() ? "Detached: the relative identifiers lead nowhere."
+				: "Attached to " + attachment + (attachment.web().isPresent()
+						? ": relative identifiers lead there, though they are saved as written."
+						: ": its files are found there."), null, null);
+	}
+
 	/** Asks web resources whether they are available */
 	WebAvailability webAvailability = new WebAvailability(ProfileCache.httpClient(Duration.ofSeconds(15)),
-			Duration.ofSeconds(15), USER_AGENT);
+			Duration.ofSeconds(15));
 
 	/**
 	 * Crate > Check Web Availability: ask each part of the crate on the web
@@ -1828,22 +1966,42 @@ public class CrateEditor extends Application {
 	 * @return The check, running, if there is anything to check
 	 */
 	Optional<Task<List<WebAvailability.Result>>> checkWeb(Stage stage) {
-		List<String> addresses = WebAvailability.addresses(crate);
+		// Every contentUrl and url, and every @id that is a web address, or is one at the web address the crate
+		// is attached to, of any entity
+		List<WebAvailability.Target> targets = WebAvailability.targetsOf(crate, crateFile.web());
+		List<String> addresses = WebAvailability.addresses(targets);
 		if (addresses.isEmpty()) {
-			Alert none = new Alert(AlertType.INFORMATION, "The crate has no parts on the web, under External"
-					+ " resources in View > Entities by Folder, to check.", ButtonType.OK);
+			Alert none = new Alert(AlertType.INFORMATION, "The crate has no web addresses (identifiers, contentUrl or"
+					+ " url) to check.", ButtonType.OK);
 			none.initOwner(stage);
 			none.setHeaderText("Nothing to check");
 			none.show();
 			return Optional.empty();
 		}
 		Object checked = opened;
+		// What the crate says of each file (its size and kind), to compare with what the server says: taken here,
+		// as the crate is not read from the thread that asks
+		Map<String, WebAvailability.Expectation> expectations = WebAvailability.expectations(crate, targets);
 		Task<List<WebAvailability.Result>> task = new Task<>() {
 			@Override
 			protected List<WebAvailability.Result> call() throws InterruptedException {
 				updateMessage("Asking " + addresses.size() + (addresses.size() == 1 ? " web address" : " web addresses")
 						+ " whether they are available…");
-				return webAvailability.check(addresses);
+				java.util.concurrent.atomic.AtomicReference<String> note = new java.util.concurrent.atomic.AtomicReference<>("");
+				// Cancel interrupts this thread: the requests in flight and the waits stop at once
+				return webAvailability.check(addresses, expectations, new WebAvailability.Progress() {
+					@Override
+					public void done(int done, int total) {
+						updateProgress(done, total);
+						updateMessage("Asked " + done + " of " + total + " web addresses" + note.get());
+					}
+
+					@Override
+					public void note(String what) {
+						note.set(": " + what);
+						updateMessage("Asking " + addresses.size() + " web addresses" + note.get());
+					}
+				});
 			}
 		};
 		task.setOnSucceeded(e -> {
@@ -1852,16 +2010,34 @@ public class CrateEditor extends Application {
 			}
 			List<WebAvailability.Result> results = task.getValue();
 			Map<String, String> found = new HashMap<>();
-			results.stream().filter(r -> !r.available()).forEach(r -> found.put(r.address(), r.problem().get()));
+			// By the @id of the entity, which may be relative, and what it was in it that was not available
+			Map<String, String> failed = new HashMap<>();
+			results.stream().filter(r -> !r.available()).forEach(r -> failed.put(r.address(), r.problem().get()));
+			for (WebAvailability.Target target : targets) {
+				String problem = failed.get(target.address());
+				if (problem != null) {
+					found.merge(target.id(), target.property().equals("@id") ? problem
+							: target.property() + " " + target.address() + ": " + problem, (a, b) -> a + "; " + b);
+				}
+			}
+			// What is there but does not look like what the crate says: a landing page for a file, another length
+			Map<String, String> suspect = new HashMap<>();
+			Map<WebAvailability.Target, String> looksWrong = WebAvailability.mismatches(crate, targets, results);
+			looksWrong.forEach((target, text) -> suspect.merge(target.id(), text, (a, b) -> a + "; " + b));
 			unavailable = found;
+			suspicious = suspect;
 			relist();
-			Alert done = new Alert(found.isEmpty() ? AlertType.INFORMATION : AlertType.WARNING,
-					results.stream().filter(r -> !r.available()).map(r -> r.address() + ": " + r.problem().get())
-							.collect(Collectors.joining("\n")),
+			boolean fine = found.isEmpty() && suspect.isEmpty();
+			Alert done = new Alert(fine ? AlertType.INFORMATION : AlertType.WARNING,
+					Stream.concat(results.stream().filter(r -> !r.available()).map(r -> r.address() + ": " + r.problem().get()),
+							looksWrong.values().stream()).collect(Collectors.joining("\n")),
 					ButtonType.OK);
 			done.initOwner(stage);
-			done.setHeaderText(found.isEmpty() ? "All " + results.size() + " web resources are available"
-					: found.size() + " of " + results.size() + " web resources are not available");
+			done.setHeaderText(fine ? "All " + results.size() + " web resources are available"
+					: (found.isEmpty() ? "" : found.size() + " of " + results.size() + " web resources are not available")
+							+ (found.isEmpty() || suspect.isEmpty() ? "" : ", and ")
+							+ (suspect.isEmpty() ? "" : suspect.size() + (suspect.size() == 1 ? " does" : " do")
+									+ " not look like what the crate says"));
 			done.setResizable(true);
 			done.show();
 		});
@@ -2458,12 +2634,14 @@ public class CrateEditor extends Application {
 			}
 			// The attached crate's folder, as it changes
 			folderWatch.watch(crateFile.folder());
-			Map<Entity, String> found = problems();
-			if (!found.equals(problems)) {
+			Set<Entity> soft = new HashSet<>();
+			Map<Entity, String> found = problems(soft);
+			if (!found.equals(problems) || !soft.equals(warnings)) {
 				problems = found;
+				warnings = soft;
 				entities.refresh();
 			}
-			tree.setProblems(problems);
+			tree.setProblems(problems, warnings);
 			if (byFolder) {
 				List<String> onDisk = showingFiles() ? filesOnDisk() : List.of();
 				List<EntityTree.Node> nodes = new ArrayList<>(
@@ -2803,6 +2981,7 @@ public class CrateEditor extends Application {
 		crate = other;
 		hideNotice();
 		unavailable = Map.of();
+		suspicious = Map.of();
 		previewAsked = false;
 		keepPreview = false;
 		notInCrate.clear();
@@ -2835,6 +3014,223 @@ public class CrateEditor extends Application {
 		if (file != null) {
 			open(stage, file.toPath());
 		}
+	}
+
+	/** Looks for where a semi-detached crate's files are, see {@link #findRoot} */
+	private final RootProbe rootProbe = new RootProbe(ProfileCache.httpClient(ProfileCache.DEFAULT_TIMEOUT),
+			ProfileCache.DEFAULT_TIMEOUT);
+
+	/** Fetches crates from the web, see {@link #openUrl} */
+	private final CrateRetriever retriever = new CrateRetriever(ProfileCache.httpClient(ProfileCache.DEFAULT_TIMEOUT),
+			ProfileCache.DEFAULT_TIMEOUT);
+
+	/**
+	 * File > Open URL: ask for the address of a crate, a persistent
+	 * identifier (a DOI) or a page that leads to one, and open it (see
+	 * {@link #openUrl}), after asking whether to discard the changes to this
+	 * crate.
+	 */
+	private void askToOpenUrl(Stage stage) {
+		if (!mayClose(stage)) {
+			return;
+		}
+		TextInputDialog dialog = new TextInputDialog();
+		dialog.initOwner(stage);
+		dialog.setTitle("Open URL");
+		dialog.setHeaderText("Open an RO-Crate from the web");
+		dialog.setContentText("Address or DOI:");
+		dialog.getEditor().setId("openUrlField");
+		dialog.getEditor().setPromptText("https://example.com/crate/ro-crate-metadata.json");
+		dialog.getEditor().setPrefColumnCount(40);
+		dialog.showAndWait().map(String::strip).filter(text -> !text.isEmpty()).ifPresent(text -> {
+			Optional<URI> address = webAddress(text);
+			if (address.isPresent()) {
+				openUrl(stage, address.get());
+			} else {
+				Alert error = new Alert(AlertType.ERROR, "Give an https: or http: address, or a DOI such as"
+						+ " 10.5281/zenodo.1234 or https://doi.org/10.5281/zenodo.1234.", ButtonType.OK);
+				error.initOwner(stage);
+				error.setHeaderText("Not a web address: " + text);
+				error.show();
+			}
+		});
+	}
+
+	/**
+	 * What the user typed as a web address: an http: or https: URL, or a DOI,
+	 * with or without <code>doi:</code>, as its https://doi.org/ address.
+	 */
+	static Optional<URI> webAddress(String text) {
+		String doi = text.replaceFirst("(?i)^doi:\\s*", "");
+		if (doi.matches("10\\.\\d{4,}(\\.\\d+)*/\\S+")) {
+			text = "https://doi.org/" + doi;
+		}
+		try {
+			URI uri = new URI(text);
+			String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+			return (scheme.equals("https") || scheme.equals("http")) && uri.getHost() != null ? Optional.of(uri)
+					: Optional.empty();
+		} catch (URISyntaxException e) {
+			return Optional.empty();
+		}
+	}
+
+	/**
+	 * Fetch a crate from the web, and open it when it is there (see
+	 * {@link #openRetrieved}); what went wrong is said in a window. While it
+	 * is fetched a window of its own, modal to the editor, says so and has
+	 * Cancel, so that the crate being edited can't be changed meanwhile, and
+	 * does not suddenly give way to the other. Once the crate is fetched the
+	 * window closes and it replaces the crate in one step, which can't be
+	 * cancelled.
+	 */
+	void openUrl(Stage stage, URI address) {
+		Task<CrateRetriever.Retrieved> task = new Task<>() {
+			@Override
+			protected CrateRetriever.Retrieved call() throws IOException, InterruptedException {
+				updateMessage("Fetching " + address);
+				return retriever.retrieve(address);
+			}
+		};
+		Dialog<Void> waiting = new Dialog<>();
+		waiting.initOwner(stage);
+		waiting.initModality(Modality.WINDOW_MODAL);
+		waiting.setTitle("Open URL");
+		waiting.setHeaderText("Opening " + address);
+		Label status = new Label();
+		status.setId("openUrlStatus");
+		status.textProperty().bind(task.messageProperty());
+		ProgressBar progress = new ProgressBar(ProgressBar.INDETERMINATE_PROGRESS);
+		progress.setPrefWidth(360);
+		Label explanation = new Label("This crate stays as it is until the other is here. Cancel to keep editing it.");
+		explanation.setWrapText(true);
+		explanation.setMaxWidth(360);
+		VBox content = new VBox(8, status, progress, explanation);
+		content.setId("openUrlProgress");
+		waiting.getDialogPane().setContent(content);
+		waiting.getDialogPane().getButtonTypes().setAll(ButtonType.CANCEL);
+		// Closing the window or Cancel stops fetching; after it is fetched, closing it does nothing
+		waiting.setOnHidden(e -> task.cancel(true));
+		task.setOnSucceeded(e -> {
+			waiting.close();
+			// From here on it replaces this crate, and can't be cancelled
+			openRetrieved(stage, address, task.getValue());
+		});
+		task.setOnFailed(e -> {
+			waiting.close();
+			Alert error = new Alert(AlertType.ERROR, String.valueOf(task.getException().getMessage()), ButtonType.OK);
+			error.initOwner(stage);
+			error.setHeaderText("Can't open " + address);
+			error.setResizable(true);
+			error.show();
+		});
+		jobs.start(jobs.job("Open " + address, opened, true), task);
+		waiting.show();
+	}
+
+	/**
+	 * Open a crate fetched from the web, in no file, so that Save is Save As.
+	 * Whether it is an attached or a detached crate, and so where its relative
+	 * <code>@id</code>s lead, follows from the address it came from in the end
+	 * (see {@link WebCrate}); they stay as written. A notice says so.
+	 *
+	 * @param asked The address the user gave, which may have been a DOI
+	 * @return Whether it was opened
+	 */
+	boolean openRetrieved(Stage stage, URI asked, CrateRetriever.Retrieved retrieved) {
+		CrateDocument document = new CrateReader().read(new ByteArrayInputStream(retrieved.content()),
+				retrieved.source().toString());
+		if (document.crate().isEmpty() || document.hasErrors()) {
+			Alert error = new Alert(AlertType.ERROR, document.problems().stream().map(Problem::toString)
+					.collect(Collectors.joining("\n")), ButtonType.OK);
+			error.initOwner(stage);
+			error.setHeaderText("Not an RO-Crate: " + retrieved.source());
+			error.setResizable(true);
+			error.show();
+			return false;
+		}
+		Optional<WebCrate> web = WebCrate.of(retrieved, document.context().getBase());
+		edit(document.crate().get(), Optional.empty());
+		web.ifPresent(w -> crateFile.openWeb(w, asked, crate.toJson()));
+		chooseProfile(document);
+		refresh();
+		List<String> notes = document.problems().stream().map(Problem::toString).toList();
+		showNotice("Opened from " + retrieved.source() + web.map(w -> webNotice(w, crate)).orElse(".")
+				+ (notes.isEmpty() ? "" : " " + notes.size() + (notes.size() == 1 ? " warning" : " warnings")
+						+ ": " + String.join(" ", notes)),
+				web.filter(w -> !crate.unanchoredDataEntities(w).isEmpty()).isPresent() ? "Attach…" : null,
+				() -> askToAttach(stage));
+		web.filter(w -> !crate.unanchoredDataEntities(w).isEmpty()).ifPresent(this::findRoot);
+		return true;
+	}
+
+	/**
+	 * For a semi-detached crate (see {@link WebCrate}), look in the background
+	 * for where its files are: the first of them, by HEAD, beside each of the
+	 * places its root could be (see {@link RootProbe}). Only if it is found
+	 * is the base taken, as the crate is not changed and nothing was guessed;
+	 * else the user is left to choose, as it may be in a zip that has not
+	 * been looked into.
+	 */
+	private void findRoot(WebCrate web) {
+		Optional<String> file = RootProbe.firstFile(crate);
+		List<WebCrate.Root> candidates = web.suggestedRoots(crate.getRoot());
+		if (file.isEmpty() || candidates.isEmpty()) {
+			return;
+		}
+		Object token = opened;
+		Task<Optional<WebCrate.Root>> task = new Task<>() {
+			@Override
+			protected Optional<WebCrate.Root> call() throws InterruptedException {
+				updateMessage("Looking for " + file.get());
+				return rootProbe.find(file.get(), candidates);
+			}
+		};
+		task.setOnSucceeded(e -> {
+			// Another crate may be open by now
+			if (token != opened || task.getValue().isEmpty()) {
+				return;
+			}
+			WebCrate.Root root = task.getValue().get();
+			crateFile.web().ifPresent(current -> {
+				crateFile.setWeb(current.withBase(root.address(), file.get() + " found beside " + root.address()));
+				Entity shown = entityEditor.getEntity();
+				show(shown == null || crate.get(shown.getId()).isEmpty() ? crate.getRoot() : shown);
+				showNotice("Found the files beside " + root.address() + " (" + root.why() + "): " + file.get()
+						+ " is there, so relative identifiers lead there, though they are saved as written.", null,
+						null);
+			});
+		});
+		jobs.start(jobs.job("Look for the files of " + web.source(), opened, false), task);
+	}
+
+	/**
+	 * What to tell about a crate fetched from the web: attached, with where its
+	 * relative identifiers lead; detached, and then, if it still has relative
+	 * files, that it is semi-detached: there is no telling where they are.
+	 */
+	static String webNotice(WebCrate web, Crate crate) {
+		if (web.base().isPresent()) {
+			return (web.attached() ? " as an attached crate: its" : " as a detached crate with an @base: its")
+					+ " relative identifiers lead to " + web.base().get()
+					+ ", though they are saved as written. Save As keeps a copy here.";
+		}
+		List<Entity> unanchored = crate.unanchoredDataEntities(web);
+		if (unanchored.isEmpty()) {
+			return " as a detached crate, with no folder, so no relative identifiers to lead anywhere.";
+		}
+		List<WebCrate.Root> roots = web.suggestedRoots(crate.getRoot());
+		return " as a detached crate, with no folder, but " + unanchored.size()
+				+ (unanchored.size() == 1 ? " file has" : " files have") + " relative identifiers, e.g. "
+				+ unanchored.get(0).getId() + ": neither fully detached nor attached. There is no telling where they"
+				+ " are, perhaps other files of the same record, or inside a zip file among its files that has not"
+				+ " been looked into, so they are not linked"
+				+ " (the files' own addresses, if they have any, are)."
+				+ (roots.isEmpty() ? ""
+						: " Its RO-Crate Root could be "
+								+ roots.stream().map(r -> r.address() + " (" + r.why() + ")")
+										.collect(Collectors.joining(", or "))
+								+ ".");
 	}
 
 	/**
@@ -3028,10 +3424,10 @@ public class CrateEditor extends Application {
 	}
 
 	private PersonFinder.Search personSearch = new ORCID(ProfileCache.httpClient(Duration.ofSeconds(15)),
-			Duration.ofSeconds(20), USER_AGENT)::search;
+			Duration.ofSeconds(20))::search;
 
 	private WorkFinder.Search workSearch = new DOI(ProfileCache.httpClient(Duration.ofSeconds(15)),
-			Duration.ofSeconds(20), USER_AGENT)::search;
+			Duration.ofSeconds(20))::search;
 
 	/**
 	 * Look works up with this instead of Crossref and DataCite, e.g. in tests.
@@ -3041,7 +3437,7 @@ public class CrateEditor extends Application {
 	}
 
 	private OrganizationFinder.Search organizationSearch = new ROR(ProfileCache.httpClient(Duration.ofSeconds(15)),
-			Duration.ofSeconds(20), USER_AGENT)::search;
+			Duration.ofSeconds(20))::search;
 
 	/**
 	 * Look organisations up with this instead of ROR, e.g. in tests.
@@ -3507,6 +3903,9 @@ public class CrateEditor extends Application {
 	 * @return Whether it was saved
 	 */
 	boolean saveAsChecked(Stage stage, Path file) {
+		if (!askAboutWebIds(stage, file)) {
+			return false;
+		}
 		Path folder = file.toAbsolutePath().getParent();
 		if (!CrateFile.isMetadataFile(file) || crateFile.folder().equals(Optional.of(folder))) {
 			return saveTo(stage, file);
@@ -3551,6 +3950,53 @@ public class CrateEditor extends Application {
 			return other != null && saveTo(stage, other.toPath());
 		}
 		return false;
+	}
+
+	/**
+	 * Before a crate fetched from the web is saved to a file: its relative
+	 * <code>@id</code>s lead to the web copies of its files, which saved
+	 * elsewhere they no longer do, but name files beside the saved one. Say
+	 * so, giving a few, and offer to make them absolute (one undo step, see
+	 * {@link Crate#absolutize}), or to keep them relative, e.g. to download
+	 * the files next to it.
+	 *
+	 * @return Whether to go on and save
+	 */
+	private boolean askAboutWebIds(Stage stage, Path file) {
+		Optional<WebCrate> web = crateFile.web();
+		if (web.isEmpty()) {
+			return true;
+		}
+		List<Entity> relative = crate.relativeEntities(web.get());
+		if (relative.isEmpty()) {
+			return true;
+		}
+		StringBuilder text = new StringBuilder();
+		text.append(relative.size()).append(relative.size() == 1 ? " identifier is" : " identifiers are")
+				.append(" relative to ").append(web.get().base().orElseThrow()).append(", e.g. ")
+				.append(relative.stream().limit(3).map(e -> e.getId() + " \u2192 " + web.get().resolve(e.getId()).get())
+						.collect(Collectors.joining(", ")))
+				.append(".\n\nSaved as ").append(file.getFileName()).append(", they will name files beside it instead,"
+						+ " which wpsld doesn't download, and the links to the copies on the web are lost. Making them"
+						+ " absolute keeps them, as a crate whose files are on the web: a detached crate's data entities"
+						+ " are web addresses.");
+		ButtonType absolute = new ButtonType("Make Absolute", ButtonData.YES);
+		ButtonType keep = new ButtonType("Keep Relative", ButtonData.NO);
+		Alert alert = new Alert(AlertType.WARNING, text.toString(), absolute, keep, ButtonType.CANCEL);
+		alert.initOwner(stage);
+		alert.setHeaderText("The crate's files are on the web, not beside " + file.getFileName());
+		alert.setResizable(true);
+		ButtonType chosen = alert.showAndWait().orElse(ButtonType.CANCEL);
+		if (chosen == absolute) {
+			// A crate saved as ro-crate-metadata.json is attached to its folder, whose root is ./
+			crate.absolutize(web.get(), !CrateFile.isMetadataFile(file));
+			show(entityEditor.getEntity() == null || crate.get(entityEditor.getEntity().getId()).isEmpty()
+					? crate.getRoot()
+					: entityEditor.getEntity());
+			refresh();
+			checkpoint(placeOf(null), Optional.of("Make Identifiers Absolute"));
+		}
+		return chosen == absolute || chosen == keep;
 	}
 
 	/** Whether the user was asked about another tool's HTML preview of this crate */

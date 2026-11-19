@@ -1,0 +1,35 @@
+{
+  "@context": "https://w3id.org/ro/crate/1.2/context",
+  "@graph": [
+    {
+      "@id": "example-ro-crate-metadata.json",
+      "@type": "CreativeWork",
+      "about": {"@id": "./"},
+      "conformsTo": {"@id": "https://w3id.org/ro/crate/1.2"}
+    },
+    {
+      "@id": "./",
+      "@type": "Dataset",
+      "name": "A detached crate, as a service gives it",
+      "description": "Its data entities should be absolute, as it has no folder; data/counts.csv is relative on purpose, and the second one is absolute.",
+      "datePublished": "2026-11-19",
+      "license": {"@id": "https://creativecommons.org/licenses/by/4.0/"},
+      "hasPart": [{"@id": "data/counts.csv"}, {"@id": "https://example.org/data/other.csv"}]
+    },
+    {
+      "@id": "data/counts.csv",
+      "@type": "File",
+      "name": "Counts, relative to wherever this document is"
+    },
+    {
+      "@id": "https://example.org/data/other.csv",
+      "@type": "File",
+      "name": "Another table, on the web"
+    },
+    {
+      "@id": "https://creativecommons.org/licenses/by/4.0/",
+      "@type": "CreativeWork",
+      "name": "CC BY 4.0"
+    }
+  ]
+}

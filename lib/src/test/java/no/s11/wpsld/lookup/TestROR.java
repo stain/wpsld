@@ -116,7 +116,7 @@ public class TestROR {
 		});
 		server.start();
 		try {
-			ROR ror = new ROR(HttpClient.newHttpClient(), Duration.ofSeconds(5), "wpsld/test",
+			ROR ror = new ROR(HttpClient.newHttpClient(), Duration.ofSeconds(5),
 					URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/"));
 			assertEquals("University of Oslo", ror.search("Universitetet i Oslo").get(0).name());
 			assertEquals("/organizations?query=Universitetet+i+Oslo", asked.get());

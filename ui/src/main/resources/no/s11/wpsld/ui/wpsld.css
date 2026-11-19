@@ -205,6 +205,7 @@
 .entity-icon.icon-term { -icon-line: #a3337f; -icon-fill: #f5a3d8; } /* terms and values: magenta */
 .entity-icon.icon-thing { -icon-line: #6b6b6b; -icon-fill: #d0d0d0; } /* anything else: grey */
 .entity-icon.icon-problem { -icon-line: #c42b1c; -icon-fill: #ff6b5e; } /* not found, not available: red */
+.entity-icon.icon-warning { -icon-line: #9a6700; -icon-fill: #ffd54f; } /* not available, of what need not be: yellow */
 
 .colours-dark .entity-icon.icon-crate { -icon-line: #d9a66b; -icon-fill: #7a4f22; }
 .colours-dark .entity-icon.icon-data { -icon-line: #f0c050; -icon-fill: #8a6000; }
@@ -219,6 +220,7 @@
 .colours-dark .entity-icon.icon-product { -icon-line: #d8c76a; -icon-fill: #6b5d1a; }
 .colours-dark .entity-icon.icon-term { -icon-line: #f28fd0; -icon-fill: #8c2c6e; }
 .colours-dark .entity-icon.icon-problem { -icon-line: #ff99a4; -icon-fill: #c42b1c; }
+.colours-dark .entity-icon.icon-warning { -icon-line: #ffd166; -icon-fill: #7a5b00; }
 .colours-dark .entity-icon.icon-thing { -icon-line: #b0b0b0; -icon-fill: #5a5a5a; }
 
 /*
@@ -239,6 +241,27 @@
 }
 
 .list-view:focused .list-cell.problem:filled:selected, .tree-view:focused .tree-cell.problem:filled:selected {
+    -fx-background-color: -fx-selection-bar;
+}
+
+/*
+ * A warning: a web address that does not answer, of an entity that is not a
+ * work (a person, an organisation, a defined term), which RO-Crate does not
+ * need to answer: a pale yellow row, with a yellow icon
+ */
+.list-cell.warning, .tree-cell.warning {
+    -fx-background-color: #fff4d0;
+}
+
+.colours-dark .list-cell.warning, .colours-dark .tree-cell.warning {
+    -fx-background-color: #4d4220;
+}
+
+.list-cell.warning:filled:selected, .tree-cell.warning:filled:selected {
+    -fx-background-color: -fx-selection-bar-non-focused;
+}
+
+.list-view:focused .list-cell.warning:filled:selected, .tree-view:focused .tree-cell.warning:filled:selected {
     -fx-background-color: -fx-selection-bar;
 }
 

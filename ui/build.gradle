@@ -155,7 +155,7 @@ crossTargets.keySet().each { target ->
 }
 
 javafx {
-    version = "27.0.1"
+    version = "27.0.1.1"
     modules = [ 'javafx.controls' ]
 }
 

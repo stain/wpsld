@@ -13,6 +13,77 @@ and may show warnings about a file it did open. It also tries to choose a
 declared [profile](profiles.md). Choose **File > Open Folder...** to open
 a folder as a crate (see [Folders and files](folders.md)).
 
+### Crates on the web
+
+Choose **File > Open URL...** and give the address of a crate: of its
+`ro-crate-metadata.json`, of the folder it is in, of a page that leads to
+it, or a DOI (`10.5281/zenodo.1234`). A window says it is being fetched,
+and Cancel keeps the crate you are editing, which stays as it is until the
+other is here; then it is opened in its place, in no file, so Save asks
+where to save it.
+
+A crate whose metadata file is named `ro-crate-metadata.json` is an
+attached crate published on the web: its relative identifiers, such as
+`data/table.csv`, are paths in that folder, so with the crate at
+`http://example.com/crate1/ro-crate-metadata.json` the arrow beside it
+opens `http://example.com/crate1/data/table.csv` in the browser. This is
+worked out from where the crate was found in the end, after any redirects,
+and the notice at the foot of the window says where identifiers lead.
+Another name (`my-ro-crate-metadata.json`), or a service's address with a
+query, is a detached crate, which has no folder: its files should have
+web addresses of their own. wpsld does not guess where a detached crate's
+relative identifiers lead from the address it came from, as a service's
+address says nothing of where the files are. If it still has relative
+identifiers for files (neither detached nor attached, as repositories'
+exports often are), the notice says so and gives what its root could be.
+
+The identifiers stay as written in the crate. Saving it to a file would
+make them name files beside the saved one instead, so wpsld asks first
+whether to **Make Absolute** (each becomes the web address it leads to,
+one step you can undo), **Keep Relative** or Cancel.
+
+### Attach: where the crate's files are
+
+Choose **Crate > Attach...** to say what the crate's relative identifiers
+(`data/table.csv`) are relative to, if wpsld doesn't know or has it wrong:
+
+- **A folder on disk**, such as the crate's files downloaded and unpacked
+  by hand. wpsld says how many of the crate's files are in it. The crate
+  is then the folder's: its files are listed, its links open them, and a
+  crate fetched from the web is saved in that folder.
+- **A web address**, which can be one the crate suggests (its landing
+  page, or its own identifier) or one you type. **Check** asks the server
+  whether the crate's first file is there, which it can't always say (a
+  server may not allow it, or the files may be inside a zip). Check Web
+  Availability then asks for the crate's relative files at that address
+  too.
+- **Nothing**: detached, so relative identifiers lead nowhere.
+
+Attaching does not change the crate, only where wpsld looks for its files:
+the identifiers stay as written.
+
+### Detach: a crate with no folder
+
+A detached crate has no folder, so RO-Crate requires the identifiers of its
+files to be absolute addresses. Choose **Crate > Detach...** to make them so:
+wpsld asks what the crate's relative identifiers (`data/table.csv`, and
+other entities written with a path or a name, but not `#local` ones) are
+relative to, and makes each absolute against that address, as one step you
+can undo. The address is filled in if it is known, from where the crate is
+attached on the web or what it says its root is. **New Anonymous Base**
+makes a fresh `arcp://uuid,...` address for a crate that is not published
+anywhere, and the address can also be kept as the `@base` of the crate's
+`@context`, so that the identifiers can later be made relative again. With a
+web address the crate's root (`./`) becomes that address too. A `file:`
+address only means something on this computer, so wpsld warns about it.
+Two options: **Use a file's own contentUrl (or url)** gives a file that says
+where it can be downloaded from that address as its identifier, instead of
+the base and its path (not if it says several, as there is no telling
+which); and **Check Web Availability afterwards**, on by default for a web
+address, asks whether every web address of the crate is there once it is
+detached (see [Views](views.md)). Save the detached crate under another name, such as
+`survey-ro-crate-metadata.json`, as RO-Crate suggests.
+
 ### Crates written in other ways
 
 RO-Crate's JSON-LD is *flattened*: each entity is written once in the

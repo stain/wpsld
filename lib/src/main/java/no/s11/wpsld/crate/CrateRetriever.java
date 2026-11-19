@@ -39,6 +39,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import no.s11.wpsld.util.UserAgent;
+
 /**
  * Finds and fetches the metadata document of an RO-Crate from a URL, as in
  * "Retrieving an RO-Crate" of the RO-Crate specification. A URL, such as a
@@ -72,7 +74,7 @@ public class CrateRetriever {
 	 * some persistent identifiers (e.g. w3id.org/ro/crate/1.3) only redirect
 	 * for HTML or JSON-LD, not for any type
 	 */
-	private static final String ACCEPT_ANY = "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8";
+	static final String ACCEPT_ANY = "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8";
 	/** Largest metadata document read, as anything fetched is untrusted */
 	public static final int MAX_BYTES = 16 * 1024 * 1024;
 	/** Most requests to retrieve one crate: links followed, then the folder */
@@ -91,10 +93,21 @@ public class CrateRetriever {
 	 * @param steps   How it was found from the URL asked for, e.g. "Link
 	 *                header", "HTML link", "content negotiation", "folder";
 	 *                empty if the URL gave it
+	 * @param asked   The address asked for, which may be a DOI or a Handle that
+	 *                redirected (and so is not a place for files)
+	 * @param landing The page the document was found from, where it was after
+	 *                redirects, e.g. a repository's landing page whose
+	 *                Signposting <code>Link</code> header (or HTML) pointed to
+	 *                it; none if the address gave the document itself
 	 */
-	public record Retrieved(URI source, byte[] content, List<String> steps) {
+	public record Retrieved(URI source, byte[] content, List<String> steps, URI asked, Optional<URI> landing) {
 		public Retrieved {
 			steps = List.copyOf(steps);
+		}
+
+		/** Asked for by the address it came from, with no landing page */
+		public Retrieved(URI source, byte[] content, List<String> steps) {
+			this(source, content, steps, source, Optional.empty());
 		}
 	}
 
@@ -164,6 +177,8 @@ public class CrateRetriever {
 		private final URI asked;
 		private final Set<String> requested = new LinkedHashSet<>();
 		private final List<String> steps = new ArrayList<>();
+		/** The first page that led to the document, see {@link Retrieved#landing()} */
+		private URI landing;
 
 		Attempt(URI asked) {
 			this.asked = asked;
@@ -207,6 +222,7 @@ public class CrateRetriever {
 				steps.add("folder");
 				Response metadata = get(folder.get(), ACCEPT);
 				if (metadata.ok()) {
+					landing = plain.at();
 					// Not recognised as JSON: let CrateReader say what is wrong
 					return retrieved(metadata);
 				}
@@ -227,9 +243,17 @@ public class CrateRetriever {
 				step = "HTML link";
 			}
 			if (described.isEmpty()) {
+				// FAIR Signposting level 2: only a link to a link set, which lists the rest
+				described = viaLinkset(response);
+				step = "linkset";
+			}
+			if (described.isEmpty()) {
 				return Optional.empty();
 			}
 			steps.add(step);
+			if (landing == null) {
+				landing = response.at();
+			}
 			Response target = get(described.get(), ACCEPT);
 			if (target.json()) {
 				return Optional.of(retrieved(target));
@@ -248,8 +272,38 @@ public class CrateRetriever {
 			throw new IOException("Can't load " + target.at() + ": HTTP " + target.status());
 		}
 
+		/**
+		 * The best <code>describedby</code> link of a page's link set (see
+		 * {@link Linkset}), if it has one: fetched once, within the same limits,
+		 * and not followed any further. A link set that can't be had or read is
+		 * not an error, as the page may still lead to its crate otherwise.
+		 */
+		private Optional<URI> viaLinkset(Response page) throws IOException, InterruptedException {
+			String html = page.html() ? new String(page.body(), StandardCharsets.UTF_8) : "";
+			Set<URI> addresses = new LinkedHashSet<>(List.of(page.at(), asked));
+			for (Linkset.Reference reference : Linkset.discover(page.headers(), html, page.at()).stream().limit(2).toList()) {
+				Response set = get(reference.href(), Linkset.ACCEPT);
+				if (!set.ok()) {
+					continue;
+				}
+				URI best = null;
+				int bestRank = 0;
+				for (Linkset.Link link : Linkset.about(Linkset.parse(set.body(), set.type(), set.at()), addresses)) {
+					int rank = rank(link.params());
+					if (rank > bestRank) {
+						best = link.href();
+						bestRank = rank;
+					}
+				}
+				if (best != null) {
+					return Optional.of(best);
+				}
+			}
+			return Optional.empty();
+		}
+
 		private Retrieved retrieved(Response response) {
-			return new Retrieved(response.at(), response.body(), steps);
+			return new Retrieved(response.at(), response.body(), steps, asked, Optional.ofNullable(landing));
 		}
 
 		private Response get(URI uri, String accept) throws IOException, InterruptedException {
@@ -257,7 +311,8 @@ public class CrateRetriever {
 				throw new IOException("Can't find the RO-Crate metadata of " + asked + ": followed "
 						+ requested.stream().map(r -> r.substring(r.indexOf(' ') + 1)).distinct().toList());
 			}
-			HttpRequest request = HttpRequest.newBuilder(uri).timeout(timeout).header("Accept", accept).GET().build();
+			HttpRequest request = HttpRequest.newBuilder(uri).timeout(timeout).header("Accept", accept)
+					.header("User-Agent", UserAgent.get()).GET().build();
 			HttpResponse<InputStream> response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
 			URI at = response.uri();
 			int status = response.statusCode();
@@ -314,7 +369,7 @@ public class CrateRetriever {
 	 * metadata: <code>rel</code> describedby, and the RO-Crate profile or a
 	 * JSON(-LD) type. Those with the profile come first.
 	 */
-	private static int rank(Map<String, String> params) {
+	static int rank(Map<String, String> params) {
 		List<String> rels = List.of(params.getOrDefault("rel", "").toLowerCase(Locale.ROOT).split("\\s+"));
 		if (!rels.contains("describedby")) {
 			return 0;
