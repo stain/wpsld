@@ -138,6 +138,18 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+          # The latest 25.x, not one the runner has cached: the JDK's security fixes come between wpsld's releases
+          check-latest: true
+
+      # What is released carries this JDK's runtime and its trust store: say which, and stop if it lacks the
+      # roots that sites wpsld reads crates from are issued under (HARICA's 2021 roots, under which GEANT TLS
+      # issues, as for KU Leuven's repository), as the JDK of the development container did
+      - name: The JDK of the release
+        run: |
+          java -version
+          keytool -list -cacerts -storepass changeit | grep -i harica
+          keytool -list -cacerts -storepass changeit | grep -qiE 'harica.?tls.?rsa.?root.?ca.?2021' \
+            || { echo "::error::This JDK's trust store has no HARICA TLS RSA Root CA 2021"; exit 1; }
 
       # The version committed in gradle.properties (see scripts/release.sh);
       # a tag must name the same, so that a build of the tagged commit

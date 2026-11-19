@@ -2233,28 +2233,70 @@ extension. Next:
   those already on their way, as the permit is let go before the reply is
   classified), and `TestWebAvailability.check` has fast pauses.
 
+  **Measured 2026-11-19 on the real checker, and fixed**: a **certificate** error
+  (badssl.com's expired, self-signed and wrong-host) was retried 3 times (4 s)
+  with Java's raw text and then said the host "did not answer"; it is now
+  final, in words (expired; for another host name; issued by an authority this
+  Java does not trust, "which may be this Java's lack, not the site's", as
+  with HARICA), and ends asking that host (`secureProblem`). **Timeouts**: a
+  server that never answers cost three waits (6 addresses at 2 s took 6 s, so
+  45 s at the editor's 15 s): two timeouts running now give a host up
+  (`Manners.DEFAULT`), so one wait. **GET never downloads a big file**: a server
+  that ignored `Range` and sent 500 MB got 2.6 MB (socket buffers) out in 31 ms,
+  as the body is closed unread; the connection is then not reused, so the next
+  request to that host opens a new one.
+
   **To do, in this order:**
-  1. **Use it in the editor** *(done 2026-11-19 for the check, the warnings and
-     the summary: `CrateEditor.checkWeb` passes `expectations`, keeps `mismatches`
-     as `suspicious` by `@id`, shows them as yellow warnings whatever the type
-     and says how many "do not look like what the crate says"; the help in
-     `views.md`; `contentThatIsNotWhatTheCrateSaysIsAWarning`)*. Still to do:
-     the job should say what it is at (the host, "waiting 30 s as example.org
-     asked") and have **Cancel** that stops at once; the summary should count
-     separately the addresses "could not be checked" (a host given up on) from
-     those not available, as it now counts both as not available.
+  1. **Use it in the editor** *(done 2026-11-19: `CrateEditor.checkWeb` passes
+     `expectations`, keeps `mismatches` as `suspicious` by `@id`, shows them as
+     yellow warnings whatever the type and says how many "do not look like what
+     the crate says"; the help in `views.md`; `contentThatIsNotWhatTheCrateSaysIsAWarning`)*.
+     **Cancel and progress done**: the job's Cancel interrupts the checking
+     thread, which stops every request in flight and wait and ends the workers
+     (`cancelStopsAtOnce`); `WebAvailability.Progress` says "Asked 12 of 40 web
+     addresses: example.org asked to wait 30 s before it is asked again" / "Not
+     asking … any more, as …" in the job's line and bar (`progressSaysHowItGoes`).
+     Still to do: the summary should count the addresses "could not be checked"
+     (a host given up on) separately from those not available, as it counts both
+     as not available now.
   2. **`RootProbe`** (one HEAD per candidate, and one for a made-up path) and
      `CrateRetriever` should share these manners: the `Accept`, and, for the
      retriever, `Retry-After` on a 429 or 503 (waiting up to a few seconds,
      not a host given up on), the message naming the address that did not
      answer, and the three kinds of failure of "Repositories tried".
-  3. **Smaller**: send `Accept-Encoding: identity` (RFC 9110, 12.5.3: the JDK
+  3. **Smaller** (the deprecated Jackson call in `Linkset` is done): send `Accept-Encoding: identity` (RFC 9110, 12.5.3: the JDK
      client does not decompress); decode an HTML page by its `charset`, not
      always UTF-8; a check of thousands of addresses (KU Leuven's has about
-     8,000) needs a progress count and a way to skip a host; `Linkset` uses
-     Jackson's deprecated `JsonNode.fields()` (the build says so): use
-     `properties()`.
+     8,000) needs a way to skip a host.
 
+- **The JDK of the release, its trust store, and Java security fixes**
+  *(checked 2026-11-19)*. The release is built with Temurin 25
+  (`actions/setup-java@v6`, `distribution: temurin`, `java-version: '25'`), and
+  `jlink` carries that JDK's runtime and `lib/security/cacerts` into the
+  distribution. **The latest Temurin 25 is 25.0.5.1+2** (released 2026-11-18),
+  whose `cacerts` has both `HARICA TLS RSA Root CA 2021` and the ECC one: with
+  it KU Leuven's, DataverseNO's, Zenodo's and ORCID's chains validate (HTTP 200).
+  The failure was only the development container's conda-forge OpenJDK
+  25.0.2 (January 2026), which has HARICA's 2015 roots only: it needs its
+  `environment.yml`/image updated to the current 25.x (not done: the image is
+  the user's). Done: `check-latest: true` in both workflows, so that the
+  release is built with the latest 25.x and not one the runner has cached,
+  and a step in `release.yml` that prints the JDK and **fails the release if its
+  trust store lacks the HARICA TLS RSA root 2021**; `TestWebAvailabilityOnline`
+  (certificate errors in words, and `theJdkTrustsHaricasRoots`, which fails on
+  the old JDK) and the existing online tests pass with Temurin's store.
+  **CVE-2026-114938** (NVD, published 2026-11-17, Oracle Java SE, component
+  *Compiler*, CVSS 3.1 8.1 HIGH, network, no authentication; affected include
+  Oracle Java SE 25.0.5.0.3, 21.0.13.0.3, 17.0.21.0.3): the record does *not*
+  mention base64 (if that is from another source, add it here with the
+  source); a JDK built after it, 25.0.5.1, is the first release after the
+  affected 25.0.5, so a release built now with `check-latest` has it, but
+  the record does not say 25.0.5.1 is the fix: confirm from Oracle's or
+  Adoptium's advisory before saying so, and consider failing the release for a
+  JDK older than a version set in the workflow. JavaFX: 27.0.1.1 is on Maven
+  Central above the 27.0.1 pinned in `release.yml`, `ui/build.gradle` and the
+  Dockerfile (with the jmods' SHA-256s): see what 27.0.1.1 fixes and update
+  them together if it is a security fix.
 - **A zip by FAIR Signposting**: `CrateRetriever` also follows
   `rel="item"` links to an RO-Crate zip (`type="application/zip"`, with
   the RO-Crate profile), as "Retrieving an RO-Crate" allows: downloaded

@@ -432,6 +432,120 @@ public class TestWebAvailabilityManners {
 		assertTrue("connections: " + connections, connections <= FAST.perHost());
 	}
 
+	/** A certificate that is not accepted is said in words, and is not a failure to try again; a reset connection is */
+	@Test
+	public void certificateProblemsAreFinalAndSaidInWords() {
+		java.security.cert.CertificateException cause = new java.security.cert.CertificateException("x");
+		javax.net.ssl.SSLHandshakeException expired = new javax.net.ssl.SSLHandshakeException(
+				"(certificate_expired) PKIX path validation failed: validity check failed");
+		expired.initCause(cause);
+		assertEquals("its certificate has expired", WebAvailability.secureProblem(expired).get());
+		javax.net.ssl.SSLHandshakeException other = new javax.net.ssl.SSLHandshakeException("No subject alternative DNS name matching a.example found.");
+		other.initCause(cause);
+		assertEquals("its certificate is for another host name", WebAvailability.secureProblem(other).get());
+		javax.net.ssl.SSLHandshakeException untrusted = new javax.net.ssl.SSLHandshakeException(
+				"(certificate_unknown) PKIX path building failed: unable to find valid certification path to requested target");
+		untrusted.initCause(cause);
+		assertTrue(WebAvailability.secureProblem(untrusted).get().contains("authority this Java does not trust"));
+		// Only reset: no certificate in it, so it is tried again like any failed connection
+		assertEquals(Optional.empty(), WebAvailability.secureProblem(new javax.net.ssl.SSLHandshakeException("Remote host terminated the handshake")));
+		assertEquals(Optional.empty(), WebAvailability.secureProblem(new java.net.ConnectException()));
+		assertEquals(2, Manners.DEFAULT.failuresBeforeGivingUp());
+	}
+
+	/**
+	 * Where HEAD is not done and the file is big and Range is not honoured, the GET that is asked for a byte
+	 * is closed unread: the server gets a few megabytes of buffers out, not the file
+	 */
+	@Test
+	public void aBigFileIsNotDownloadedByTheGetThatChecksIt() throws Exception {
+		java.util.concurrent.atomic.AtomicLong sent = new java.util.concurrent.atomic.AtomicLong();
+		long total = 400L * 1024 * 1024;
+		URI site = serve(exchange -> {
+			if (exchange.getRequestMethod().equals("HEAD")) {
+				status(exchange, 405);
+				return;
+			}
+			// Range ignored: the whole of it
+			exchange.sendResponseHeaders(200, total);
+			byte[] chunk = new byte[64 * 1024];
+			try (var out = exchange.getResponseBody()) {
+				for (long sentSoFar = 0; sentSoFar < total; sentSoFar += chunk.length) {
+					out.write(chunk);
+					sent.addAndGet(chunk.length);
+				}
+			} catch (IOException closed) {
+				// The client closed it, as it should
+			}
+		});
+		long t = System.nanoTime();
+		WebAvailability.Result result = web(FAST).check(site.resolve("/huge.bin").toString());
+		long took = (System.nanoTime() - t) / 1_000_000;
+		Thread.sleep(500);
+		assertTrue(result.problem().toString(), result.available());
+		assertEquals("bytes=0-0", seen.stream().filter(s -> s.method().equals("GET")).findFirst().orElseThrow().range());
+		assertTrue("took " + took + " ms", took < 3000);
+		assertTrue("the server sent " + sent.get() / 1048576 + " MB", sent.get() < 64L * 1024 * 1024);
+	}
+
+	/** Interrupting the thread that checks, as Cancel does, stops every request and wait, and the workers end */
+	@Test
+	public void cancelStopsAtOnce() throws Exception {
+		URI site = serve(exchange -> release.await());
+		WebAvailability web = new WebAvailability(HttpClient.newHttpClient(), Duration.ofSeconds(30), FAST);
+		java.util.concurrent.atomic.AtomicReference<Throwable> ended = new java.util.concurrent.atomic.AtomicReference<>();
+		Thread asking = new Thread(() -> {
+			try {
+				web.check(addresses(site, "/f", 20));
+			} catch (Throwable t) {
+				ended.set(t);
+			}
+		});
+		asking.start();
+		Thread.sleep(300);
+		long t = System.nanoTime();
+		asking.interrupt();
+		asking.join(3000);
+		assertFalse("still asking", asking.isAlive());
+		assertTrue(String.valueOf(ended.get()), ended.get() instanceof InterruptedException);
+		assertTrue("took " + (System.nanoTime() - t) / 1_000_000 + " ms", (System.nanoTime() - t) < 2_000_000_000L);
+		// And its workers do not go on: none of the threads that ask is left, once they have seen it
+		Thread.sleep(500);
+		long left = Thread.getAllStackTraces().keySet().stream().filter(th -> th.getName().equals("Web availability") && th.isAlive()).count();
+		assertEquals(0, left);
+	}
+
+	/** What is shown while it goes: how many are done, and when a server asks to wait or is not asked any more */
+	@Test
+	public void progressSaysHowItGoes() throws Exception {
+		AtomicInteger count = new AtomicInteger();
+		URI site = serve(exchange -> {
+			if (count.incrementAndGet() == 1) {
+				exchange.getResponseHeaders().add("Retry-After", "1");
+				status(exchange, 429);
+			} else {
+				status(exchange, 200);
+			}
+		});
+		List<String> notes = new CopyOnWriteArrayList<>();
+		List<Integer> dones = new CopyOnWriteArrayList<>();
+		web(new Manners(1, 3, Duration.ofMillis(20), Duration.ofSeconds(10), 3)).check(addresses(site, "/f", 4), Map.of(),
+				new WebAvailability.Progress() {
+					@Override
+					public void done(int done, int total) {
+						assertEquals(4, total);
+						dones.add(done);
+					}
+
+					@Override
+					public void note(String what) {
+						notes.add(what);
+					}
+				});
+		assertEquals(List.of(1, 2, 3, 4), dones.stream().sorted().toList());
+		assertEquals(List.of("127.0.0.1 asked to wait 1.0 s before it is asked again"), notes);
+	}
+
 	@Test
 	public void mannersAreChecked() {
 		assertThrows(IllegalArgumentException.class, () -> new Manners(0, 3, Duration.ZERO, Duration.ZERO, 3));

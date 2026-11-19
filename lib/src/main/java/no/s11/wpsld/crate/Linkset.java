@@ -144,7 +144,7 @@ final class Linkset {
 		for (JsonNode entry : root.path("linkset")) {
 			Optional<URI> anchor = resolve(base, entry.path("anchor").asText(""));
 			List<Link> links = new ArrayList<>();
-			entry.fields().forEachRemaining(field -> {
+			entry.properties().forEach(field -> {
 				if (field.getKey().equals("anchor")) {
 					return;
 				}

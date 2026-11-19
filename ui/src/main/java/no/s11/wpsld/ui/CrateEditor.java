@@ -1987,7 +1987,21 @@ public class CrateEditor extends Application {
 			protected List<WebAvailability.Result> call() throws InterruptedException {
 				updateMessage("Asking " + addresses.size() + (addresses.size() == 1 ? " web address" : " web addresses")
 						+ " whether they are available…");
-				return webAvailability.check(addresses, expectations);
+				java.util.concurrent.atomic.AtomicReference<String> note = new java.util.concurrent.atomic.AtomicReference<>("");
+				// Cancel interrupts this thread: the requests in flight and the waits stop at once
+				return webAvailability.check(addresses, expectations, new WebAvailability.Progress() {
+					@Override
+					public void done(int done, int total) {
+						updateProgress(done, total);
+						updateMessage("Asked " + done + " of " + total + " web addresses" + note.get());
+					}
+
+					@Override
+					public void note(String what) {
+						note.set(": " + what);
+						updateMessage("Asking " + addresses.size() + " web addresses" + note.get());
+					}
+				});
 			}
 		};
 		task.setOnSucceeded(e -> {

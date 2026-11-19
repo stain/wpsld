@@ -112,7 +112,8 @@ public class WebAvailability {
 	 */
 	public record Manners(int perHost, int attempts, Duration backoff, Duration longestWait,
 			int failuresBeforeGivingUp) {
-		public static final Manners DEFAULT = new Manners(2, 3, Duration.ofSeconds(1), Duration.ofMinutes(2), 3);
+		// Two timeouts running, as two asked together give, is enough to give a host up: one wait, not three
+		public static final Manners DEFAULT = new Manners(2, 3, Duration.ofSeconds(1), Duration.ofMinutes(2), 2);
 
 		public Manners {
 			if (perHost < 1 || attempts < 1 || failuresBeforeGivingUp < 1) {
@@ -133,6 +134,29 @@ public class WebAvailability {
 		boolean disagrees(OptionalLong size) {
 			return !sizes.isEmpty() && size.isPresent() && !sizes.contains(size.getAsLong());
 		}
+	}
+
+	/**
+	 * What is being done, for the job that shows it and can be cancelled (which interrupts the thread that
+	 * asks, and so every request in flight and every wait): how many addresses are done of how many, and
+	 * what is being waited for or given up on (a server that asked to wait, one not asked any more).
+	 */
+	public interface Progress {
+		Progress NONE = new Progress() {
+			@Override
+			public void done(int done, int total) {
+			}
+
+			@Override
+			public void note(String what) {
+			}
+		};
+
+		/** Called, from any thread, as each address is answered */
+		void done(int done, int total);
+
+		/** Called, from any thread, when a host asks to wait or is given up on */
+		void note(String what);
 	}
 
 	/** At most this many asked at once, in all */
@@ -347,7 +371,17 @@ public class WebAvailability {
 	 */
 	public List<Result> check(List<String> addresses, Map<String, Expectation> expectations)
 			throws InterruptedException {
-		Run run = new Run();
+		return check(addresses, expectations, Progress.NONE);
+	}
+
+	/**
+	 * As {@link #check(List, Map)}, saying how it goes. Interrupting the thread that calls it stops it
+	 * at once: the requests in flight and the waits are interrupted, and it throws InterruptedException.
+	 */
+	public List<Result> check(List<String> addresses, Map<String, Expectation> expectations, Progress progress)
+			throws InterruptedException {
+		Run run = new Run(progress);
+		java.util.concurrent.atomic.AtomicInteger done = new java.util.concurrent.atomic.AtomicInteger();
 		ExecutorService pool = Executors.newFixedThreadPool(AT_ONCE, runnable -> {
 			Thread thread = new Thread(runnable, "Web availability");
 			thread.setDaemon(true);
@@ -355,7 +389,11 @@ public class WebAvailability {
 		});
 		try {
 			List<Future<Result>> checks = addresses.stream()
-					.map(a -> pool.submit(() -> run.check(a, expectations.getOrDefault(a, Expectation.NONE)))).toList();
+					.map(a -> pool.submit(() -> {
+						Result result = run.check(a, expectations.getOrDefault(a, Expectation.NONE));
+						progress.done(done.incrementAndGet(), addresses.size());
+						return result;
+					})).toList();
 			List<Result> results = new ArrayList<>();
 			for (Future<Result> check : checks) {
 				try {
@@ -372,7 +410,7 @@ public class WebAvailability {
 
 	/** Check one address */
 	public Result check(String address) throws InterruptedException {
-		return new Run().check(address, Expectation.NONE);
+		return new Run(Progress.NONE).check(address, Expectation.NONE);
 	}
 
 	/** What a request came to: a status, or why there is none; and what the server said of the content */
@@ -391,6 +429,11 @@ public class WebAvailability {
 	/** Asking one set of addresses: what is known of each host, from what it has answered */
 	private final class Run {
 		private final Map<String, Host> hosts = new ConcurrentHashMap<>();
+		private final Progress progress;
+
+		Run(Progress progress) {
+			this.progress = progress;
+		}
 
 		Result check(String address, Expectation expected) throws InterruptedException {
 			URI uri;
@@ -402,7 +445,7 @@ public class WebAvailability {
 			if (uri.getHost() == null) {
 				return new Result(address, 0, Optional.of("Not a web address"));
 			}
-			Host host = hosts.computeIfAbsent(uri.getHost().toLowerCase(Locale.ROOT), Host::new);
+			Host host = hosts.computeIfAbsent(uri.getHost().toLowerCase(Locale.ROOT), n -> new Host(n, progress));
 			Optional<String> last = Optional.empty();
 			int status = 0;
 			int tries = 0;
@@ -431,6 +474,12 @@ public class WebAvailability {
 				Optional<Duration> pause;
 				if (reply.error().isPresent()) {
 					IOException e = reply.error().get();
+					// A certificate that is not accepted is not accepted again, nor for any address of the host
+					Optional<String> secure = secureProblem(e);
+					if (secure.isPresent()) {
+						host.giveUp("its secure connection is not accepted: " + secure.get());
+						return new Result(address, 0, Optional.of("Not available: the secure connection failed: " + secure.get()));
+					}
 					boolean timedOut = e instanceof HttpTimeoutException;
 					last = Optional.of(timedOut ? "no answer within " + seconds(timeout) : message(e));
 					host.failed(timedOut ? "its requests time out" : "it can't be reached");
@@ -531,13 +580,15 @@ public class WebAvailability {
 	/** One host: how many are asked at once, and when to leave it be */
 	private final class Host {
 		final String name;
+		private final Progress progress;
 		private final Semaphore turns = new Semaphore(manners.perHost());
 		private long notBefore;
 		private int failures;
 		private Optional<String> gaveUp = Optional.empty();
 
-		Host(String name) {
+		Host(String name, Progress progress) {
 			this.name = name;
+			this.progress = progress;
 		}
 
 		synchronized Optional<String> gaveUp() {
@@ -547,12 +598,14 @@ public class WebAvailability {
 		synchronized void giveUp(String why) {
 			if (gaveUp.isEmpty()) {
 				gaveUp = Optional.of(why);
+				progress.note("Not asking " + name + " any more, as " + why);
 			}
 		}
 
 		/** No requests to this host until then, from any thread: what a Retry-After asks */
 		synchronized void pause(Duration wait) {
 			notBefore = Math.max(notBefore, System.nanoTime() + wait.toNanos());
+			progress.note(name + " asked to wait " + seconds(wait) + " before it is asked again");
 		}
 
 		private synchronized long waitNanos() {
@@ -592,6 +645,39 @@ public class WebAvailability {
 				giveUp("it did not answer: " + why + " " + failures + " times running");
 			}
 		}
+	}
+
+	/**
+	 * What is wrong with a host's certificate, in words, if that is what the failure was (an
+	 * <code>SSLException</code> caused by a <code>CertificateException</code>): that it is expired, for another
+	 * host name, or from an authority this Java does not trust, which may be wpsld's Java lacking it and not
+	 * the site's fault. Not for a secure connection that was only reset, which may be tried again.
+	 */
+	static Optional<String> secureProblem(IOException e) {
+		if (!(e instanceof javax.net.ssl.SSLException)) {
+			return Optional.empty();
+		}
+		boolean certificate = false;
+		for (Throwable t = e; t != null && !certificate; t = t.getCause() == t ? null : t.getCause()) {
+			certificate = t instanceof java.security.cert.CertificateException
+					|| t instanceof java.security.cert.CertPathValidatorException
+					|| t instanceof javax.net.ssl.SSLPeerUnverifiedException;
+		}
+		if (!certificate) {
+			return Optional.empty();
+		}
+		String text = String.valueOf(e.getMessage());
+		if (text.contains("validity check failed") || text.contains("certificate_expired") || text.contains("NotAfter")) {
+			return Optional.of("its certificate has expired");
+		}
+		if (text.contains("No subject alternative") || text.contains("does not match")) {
+			return Optional.of("its certificate is for another host name");
+		}
+		if (text.contains("unable to find valid certification path") || text.contains("PKIX path building failed")) {
+			return Optional.of("its certificate was issued by an authority this Java does not trust (a self-signed"
+					+ " certificate, or one this Java does not know, which may be this Java's lack and not the site's)");
+		}
+		return Optional.of("its certificate was not accepted: " + text);
 	}
 
 	private static final Pattern DELAY = Pattern.compile("[0-9]{1,9}");
