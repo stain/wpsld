@@ -1787,6 +1787,55 @@ extension. Next:
   linkset (JSON) and `cite-as`/`license`; then the choice among several;
   then the archives, with the zip handling below.
 
+- **Dataverse** *(checked 2026-11-19)*: Dataverse installations give each
+  dataset's metadata in several export formats, one of which can be an
+  RO-Crate (`rocrate_json`, in the installation's list of exporters at
+  `/api/info/exportFormats`), but it is an optional exporter and very few
+  have it on. Of the 151 installations in
+  https://github.com/IQSS/dataverse-installations (`data/data.json`),
+  108 could be asked (the list of exporters, or else a search for a
+  dataset and a try of the exporters' names on it) and **one has RO-Crate
+  enabled: KU Leuven RDR, `rdr.kuleuven.be` (Dataverse 6.7.1)**; **DataverseNO
+  (`dataverse.no`, 6.11, the only Norwegian one in the list) does not**: it
+  lists OAI_ORE, DataCite, Dublin Core, schema.org, DDI, Croissant and
+  Dataverse's own JSON, and answers any other exporter's name, an
+  RO-Crate's too, as it does a made-up one, with HTTP 403. The other 43
+  (older versions, or an API that is not open) could not be checked. Try
+  again later: `scripts/` has no tool for it yet (the check is a few lines
+  of Python over `data.json`), add one if installations are to be
+  followed. What it means for retrieval:
+  - Dataverse's landing pages have FAIR Signposting of both levels: a
+    `Link` header with `cite-as`, `license`, `type`, a `describedby` for
+    each exporter, *and* a `rel="linkset"` to
+    `/api/datasets/:persistentId/versions/<version>/linkset?persistentId=…`
+    (`application/linkset+json`). The RO-Crate is a `describedby` like the
+    others: `…/api/datasets/export?exporter=rocrate_json&persistentId=doi:…`
+    with `type="application/json"`, no `profile`, nothing to tell it from
+    `OAI_ORE` and `dataverse_json` that have the same type. Today
+    `CrateRetriever` takes the first, so DataverseNO's DOI
+    (`10.18710/CVQPYG`) gives the OAI_ORE export, not a crate. This is why
+    the prober and the ranking above are needed: for Dataverse, a link
+    whose address names an exporter containing `crate` (`rocrate_json`) is
+    a named candidate and probed first; where there is none (DataverseNO),
+    the other JSON `describedby`s are probed only within the limits above
+    (five, about 1 MB each, `OAI_ORE` of a big dataset is not), and the
+    answer is a clear failure: "no RO-Crate among the 12 metadata formats
+    this repository gives; it has: …", rather than opening one that isn't.
+  - A crate exported by Dataverse is a *detached* crate with no files
+    beside it (RO-Crate 1.1, `./` the dataset, `identifier` the DOI,
+    files as `File` entities with Dataverse's download addresses), so
+    `WebCrate` takes it as detached whatever its address
+    (`…/export?exporter=rocrate_json&…` has a query); its data entities
+    should be absolute web addresses already, which the detached checks
+    will say.
+  - Java did not trust `rdr.kuleuven.be`'s certificate chain in this
+    container (`PKIX path building failed`, while `curl` was fine): a
+    server that sends no intermediate certificate. wpsld cannot fix the
+    server; the failure should say so (the certificate, not "not found"),
+    and whether to trust the operating system's store (`-Djavax.net.ssl.trustStoreType`
+    on Windows and macOS, `Windows-ROOT`, `KeychainStore`) is for Preferences
+    to decide, not a quiet change. Try again from the real application
+    before treating it as a bug.
 - **A zip by FAIR Signposting**: `CrateRetriever` also follows
   `rel="item"` links to an RO-Crate zip (`type="application/zip"`, with
   the RO-Crate profile), as "Retrieving an RO-Crate" allows: downloaded
