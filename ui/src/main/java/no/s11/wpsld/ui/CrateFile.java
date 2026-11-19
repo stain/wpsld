@@ -18,6 +18,7 @@
 package no.s11.wpsld.ui;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -31,6 +32,7 @@ import java.util.UUID;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import no.s11.wpsld.crate.Crate;
+import no.s11.wpsld.crate.WebCrate;
 
 /**
  * The RO-Crate Metadata File being edited: where it is, once opened or
@@ -76,6 +78,13 @@ final class CrateFile {
 	private Optional<Path> newIn = Optional.empty();
 	/** Whether the crate is its folder's, see {@link #folder()} */
 	private boolean attached;
+	/**
+	 * Where the crate was fetched from on the web, and what its relative
+	 * <code>@id</code>s mean there, until it is saved to a file
+	 */
+	private Optional<WebCrate> web = Optional.empty();
+	/** The address asked for when it was fetched, e.g. a DOI, which led to {@link WebCrate#source()} */
+	private Optional<URI> openedFrom = Optional.empty();
 
 	/**
 	 * @param saved A new crate, not saved anywhere yet
@@ -92,8 +101,34 @@ final class CrateFile {
 		base = newBase();
 		newIn = Optional.empty();
 		attached = false;
+		web = Optional.empty();
+		openedFrom = Optional.empty();
 		this.path = Optional.empty();
 		reset(path, saved);
+	}
+
+	/**
+	 * A crate fetched from the web: in no file yet, so Save is Save As, with
+	 * its relative <code>@id</code>s leading where the {@link WebCrate} says,
+	 * until it is saved to a file. Its JSON is not changed.
+	 *
+	 * @param openedFrom The address asked for, which may lead to the crate's
+	 *                   after redirects
+	 */
+	void openWeb(WebCrate crate, URI openedFrom, JsonNode saved) {
+		open(Optional.empty(), saved);
+		web = Optional.of(crate);
+		this.openedFrom = Optional.of(openedFrom);
+	}
+
+	/** The crate's place on the web, if fetched from there and not saved to a file since */
+	Optional<WebCrate> web() {
+		return web;
+	}
+
+	/** The address the crate on the web was asked for by */
+	Optional<URI> openedFrom() {
+		return openedFrom;
 	}
 
 	/**
@@ -163,6 +198,11 @@ final class CrateFile {
 	void reset(Optional<Path> path, JsonNode saved) {
 		if (this.path.isPresent() && !this.path.equals(path)) {
 			base = newBase();
+		}
+		// Saved to a file, it is no longer the one on the web
+		if (path.isPresent()) {
+			web = Optional.empty();
+			openedFrom = Optional.empty();
 		}
 		// Attached by its name when first in a file, or in another; else as it was
 		if (path.isPresent() && !path.equals(this.path)) {
@@ -293,8 +333,23 @@ final class CrateFile {
 	 * the same name; "Untitled" for a new crate.
 	 */
 	String name() {
+		if (web.isPresent() && saveTarget().isEmpty()) {
+			return webName(web.get().source());
+		}
 		return saveTarget().map(p -> p.getParent() == null || p.getParent().getFileName() == null ? p.getFileName()
 				: p.getParent().getFileName().resolve(p.getFileName())).map(Path::toString).orElse(UNTITLED);
+	}
+
+	/** The folder and name of a crate's address, as for a file: <code>crate1/ro-crate-metadata.json</code> */
+	private static String webName(URI source) {
+		String[] segments = Optional.ofNullable(source.getPath()).orElse("").split("/");
+		String name = segments.length > 0 ? segments[segments.length - 1] : "";
+		if (name.isEmpty()) {
+			return Optional.ofNullable(source.getHost()).orElse(source.toString());
+		}
+		String query = source.getRawQuery() == null ? "" : "?" + source.getRawQuery();
+		return (segments.length > 1 && !segments[segments.length - 2].isEmpty()
+				? segments[segments.length - 2] + "/" : "") + name + query;
 	}
 
 	/**

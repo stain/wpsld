@@ -17,6 +17,7 @@
  */
 package no.s11.wpsld.ui;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -100,6 +101,7 @@ import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.ToolBar;
 import javafx.scene.control.Tooltip;
@@ -128,6 +130,7 @@ import no.s11.wpsld.crate.FileCopy;
 import no.s11.wpsld.crate.SafeSave;
 import no.s11.wpsld.crate.CrateDocument.Problem;
 import no.s11.wpsld.crate.CrateReader;
+import no.s11.wpsld.crate.CrateRetriever;
 import no.s11.wpsld.crate.CrateTerms;
 import no.s11.wpsld.lookup.CrateRepair;
 import no.s11.wpsld.lookup.DOI;
@@ -144,6 +147,7 @@ import no.s11.wpsld.lookup.EmbeddedMetadata;
 import no.s11.wpsld.lookup.FileMetadata;
 import no.s11.wpsld.lookup.SPDXLicenses;
 import no.s11.wpsld.crate.UndoHistory;
+import no.s11.wpsld.crate.WebCrate;
 import no.s11.wpsld.crate.UndoHistory.Place;
 import no.s11.wpsld.crate.UndoHistory.Step;
 import no.s11.wpsld.form.EntityListing;
@@ -636,6 +640,8 @@ public class CrateEditor extends Application {
 				address -> browse.accept(address), property -> entityEditor.label(property));
 		// Only an attached crate's relative @ids are files
 		entityPreview.setFolder(crateFile::folder);
+		// A crate fetched from the web: they lead there
+		entityPreview.setWeb(crateFile::web);
 		// Text of properties that take URLs as links, by the form's fields
 		entityPreview.setTakesUrl(property -> entityEditor.takesUrl(property));
 		// The JSON-LD tab shows the entity shown
@@ -900,6 +906,10 @@ public class CrateEditor extends Application {
 		openFolder.setAccelerator(new KeyCodeCombination(KeyCode.O, KeyCombination.SHORTCUT_DOWN,
 				KeyCombination.SHIFT_DOWN));
 		openFolder.setOnAction(e -> askToOpenFolder(stage));
+		MenuItem openUrl = new MenuItem("Open _URL…");
+		openUrl.setId("menuOpenUrl");
+		openUrl.setAccelerator(new KeyCodeCombination(KeyCode.L, KeyCombination.SHORTCUT_DOWN));
+		openUrl.setOnAction(e -> askToOpenUrl(stage));
 		MenuItem close = new MenuItem("_Close Window");
 		close.setId("menuClose");
 		close.setAccelerator(new KeyCodeCombination(KeyCode.W, KeyCombination.SHORTCUT_DOWN));
@@ -926,7 +936,7 @@ public class CrateEditor extends Application {
 		MenuItem showFiles = new MenuItem(FileManager.label(FileManager.System.current()));
 		showFiles.setId("menuShowInFiles");
 		showFiles.setOnAction(e -> crateFolderPath().ifPresent(path -> showInFiles(stage, path)));
-		Menu file = new Menu("_File", null, newCrate, open, openFolder, close, new SeparatorMenuItem(), save, saveAs,
+		Menu file = new Menu("_File", null, newCrate, open, openFolder, openUrl, close, new SeparatorMenuItem(), save, saveAs,
 				showFiles, new SeparatorMenuItem(), load, new SeparatorMenuItem(), exit);
 		file.setOnShowing(e -> showFiles.setDisable(crateFolderPath().isEmpty()));
 		file.setId("menuFile");
@@ -2835,6 +2845,123 @@ public class CrateEditor extends Application {
 		if (file != null) {
 			open(stage, file.toPath());
 		}
+	}
+
+	/** Fetches crates from the web, see {@link #openUrl} */
+	private final CrateRetriever retriever = new CrateRetriever(ProfileCache.httpClient(ProfileCache.DEFAULT_TIMEOUT),
+			ProfileCache.DEFAULT_TIMEOUT);
+
+	/**
+	 * File > Open URL: ask for the address of a crate, a persistent
+	 * identifier (a DOI) or a page that leads to one, and open it (see
+	 * {@link #openUrl}), after asking whether to discard the changes to this
+	 * crate.
+	 */
+	private void askToOpenUrl(Stage stage) {
+		if (!mayClose(stage)) {
+			return;
+		}
+		TextInputDialog dialog = new TextInputDialog();
+		dialog.initOwner(stage);
+		dialog.setTitle("Open URL");
+		dialog.setHeaderText("Open an RO-Crate from the web");
+		dialog.setContentText("Address or DOI:");
+		dialog.getEditor().setId("openUrlField");
+		dialog.getEditor().setPromptText("https://example.com/crate/ro-crate-metadata.json");
+		dialog.getEditor().setPrefColumnCount(40);
+		dialog.showAndWait().map(String::strip).filter(text -> !text.isEmpty()).ifPresent(text -> {
+			Optional<URI> address = webAddress(text);
+			if (address.isPresent()) {
+				openUrl(stage, address.get());
+			} else {
+				Alert error = new Alert(AlertType.ERROR, "Give an https: or http: address, or a DOI such as"
+						+ " 10.5281/zenodo.1234 or https://doi.org/10.5281/zenodo.1234.", ButtonType.OK);
+				error.initOwner(stage);
+				error.setHeaderText("Not a web address: " + text);
+				error.show();
+			}
+		});
+	}
+
+	/**
+	 * What the user typed as a web address: an http: or https: URL, or a DOI,
+	 * with or without <code>doi:</code>, as its https://doi.org/ address.
+	 */
+	static Optional<URI> webAddress(String text) {
+		String doi = text.replaceFirst("(?i)^doi:\\s*", "");
+		if (doi.matches("10\\.\\d{4,}(\\.\\d+)*/\\S+")) {
+			text = "https://doi.org/" + doi;
+		}
+		try {
+			URI uri = new URI(text);
+			String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+			return (scheme.equals("https") || scheme.equals("http")) && uri.getHost() != null ? Optional.of(uri)
+					: Optional.empty();
+		} catch (URISyntaxException e) {
+			return Optional.empty();
+		}
+	}
+
+	/**
+	 * Fetch a crate from the web as a job, and open it when it is there (see
+	 * {@link #openRetrieved}); what went wrong is said in a window.
+	 */
+	void openUrl(Stage stage, URI address) {
+		Task<CrateRetriever.Retrieved> task = new Task<>() {
+			@Override
+			protected CrateRetriever.Retrieved call() throws IOException, InterruptedException {
+				updateMessage("Fetching " + address);
+				return retriever.retrieve(address);
+			}
+		};
+		task.setOnSucceeded(e -> {
+			if (mayClose(stage)) {
+				openRetrieved(stage, address, task.getValue());
+			}
+		});
+		task.setOnFailed(e -> {
+			Alert error = new Alert(AlertType.ERROR, String.valueOf(task.getException().getMessage()), ButtonType.OK);
+			error.initOwner(stage);
+			error.setHeaderText("Can't open " + address);
+			error.setResizable(true);
+			error.show();
+		});
+		inBackground(stage, "Open " + address, task);
+	}
+
+	/**
+	 * Open a crate fetched from the web, in no file, so that Save is Save As.
+	 * Whether it is an attached or a detached crate, and so where its relative
+	 * <code>@id</code>s lead, follows from the address it came from in the end
+	 * (see {@link WebCrate}); they stay as written. A notice says so.
+	 *
+	 * @param asked The address the user gave, which may have been a DOI
+	 * @return Whether it was opened
+	 */
+	boolean openRetrieved(Stage stage, URI asked, CrateRetriever.Retrieved retrieved) {
+		CrateDocument document = new CrateReader().read(new ByteArrayInputStream(retrieved.content()),
+				retrieved.source().toString());
+		if (document.crate().isEmpty() || document.hasErrors()) {
+			Alert error = new Alert(AlertType.ERROR, document.problems().stream().map(Problem::toString)
+					.collect(Collectors.joining("\n")), ButtonType.OK);
+			error.initOwner(stage);
+			error.setHeaderText("Not an RO-Crate: " + retrieved.source());
+			error.setResizable(true);
+			error.show();
+			return false;
+		}
+		Optional<WebCrate> web = WebCrate.of(retrieved.source(), document.context().getBase());
+		edit(document.crate().get(), Optional.empty());
+		web.ifPresent(w -> crateFile.openWeb(w, asked, crate.toJson()));
+		chooseProfile(document);
+		refresh();
+		List<String> notes = document.problems().stream().map(Problem::toString).toList();
+		showNotice("Opened from " + retrieved.source() + web.map(w -> (w.attached() ? " as an attached crate: its"
+				: " as a detached crate: its") + " relative identifiers lead to " + w.base()
+				+ ", though they are saved as written. Save As keeps a copy here.").orElse(".")
+				+ (notes.isEmpty() ? "" : " " + notes.size() + (notes.size() == 1 ? " warning" : " warnings")
+						+ ": " + String.join(" ", notes)), null, null);
+		return true;
 	}
 
 	/**
