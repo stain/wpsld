@@ -76,7 +76,12 @@ anywhere, and the address can also be kept as the `@base` of the crate's
 `@context`, so that the identifiers can later be made relative again. With a
 web address the crate's root (`./`) becomes that address too. A `file:`
 address only means something on this computer, so wpsld warns about it.
-Save the detached crate under another name, such as
+Two options: **Use a file's own contentUrl (or url)** gives a file that says
+where it can be downloaded from that address as its identifier, instead of
+the base and its path (not if it says several, as there is no telling
+which); and **Check Web Availability afterwards**, on by default for a web
+address, asks whether every web address of the crate is there once it is
+detached (see [Views](views.md)). Save the detached crate under another name, such as
 `survey-ro-crate-metadata.json`, as RO-Crate suggests.
 
 ### Crates written in other ways

@@ -88,11 +88,15 @@ public class TestCrateEditorWebCrate extends UiTest {
 
 	/** The example crate at /crate1/ro-crate-metadata.json and, by another name, at /x-ro-crate-metadata.json */
 	private URI serve() throws IOException {
+		server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+		String site = "http://127.0.0.1:" + server.getAddress().getPort();
 		byte[] crate;
 		try (var in = getClass().getResourceAsStream("/example-crate/ro-crate-metadata.json")) {
-			crate = in.readAllBytes();
+			// Its organisation's url and its licence are on this server too, as every web address is checked
+			crate = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)
+					.replace("https://www.example.org/", site + "/org").replace("http://spdx.org/licenses/CC-BY-4.0", site + "/licence")
+					.getBytes(java.nio.charset.StandardCharsets.UTF_8);
 		}
-		server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
 		server.createContext("/", exchange -> {
 			String path = exchange.getRequestURI().getPath();
 			if (path.equals("/doi/x")) {
@@ -110,7 +114,8 @@ public class TestCrateEditorWebCrate extends UiTest {
 				exchange.getResponseHeaders().add("Content-Type", "application/ld+json");
 				exchange.sendResponseHeaders(200, crate.length);
 				exchange.getResponseBody().write(crate);
-			} else if ((path.equals("/README.md") && readmeThere) || path.equals("/files/README.md")) {
+			} else if ((path.equals("/README.md") && readmeThere) || path.equals("/files/README.md") || path.equals("/org")
+					|| path.equals("/licence")) {
 				exchange.sendResponseHeaders(200, -1);
 			} else {
 				exchange.sendResponseHeaders(404, -1);
@@ -228,11 +233,12 @@ public class TestCrateEditorWebCrate extends UiTest {
 		clickOn("#openId");
 		assertEquals(List.of(site.resolve("/files/README.md").toString()), opened);
 
-		// Its files are asked for at that address: README.md is there, the other two (data/ and its file) are not
+		// Its files are asked for at that address: README.md is there, the other two (data/ and its file) are not;
+		// and the organisation's url and the licence's @id, which are there
 		var task = WaitForAsyncUtils.asyncFx(() -> app.checkWeb(stage).orElseThrow()).get();
-		assertEquals(3, task.get(10, java.util.concurrent.TimeUnit.SECONDS).size());
+		assertEquals(5, task.get(10, java.util.concurrent.TimeUnit.SECONDS).size());
 		WaitForAsyncUtils.waitForFxEvents();
-		assertTrue(lookup("2 of 3 web resources are not available").tryQuery().isPresent());
+		assertTrue(lookup("2 of 5 web resources are not available").tryQuery().isPresent());
 
 		// Detached, nowhere to ask
 		interact(() -> app.attach(Attachment.none()));

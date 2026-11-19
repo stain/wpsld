@@ -209,6 +209,95 @@ public class TestCrateEditorDetach extends UiTest {
 		interact(dialog::close);
 	}
 
+	private static final String WITH_ADDRESSES = """
+			{"@context": "https://w3id.org/ro/crate/1.3/context", "@graph": [
+			 {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+			  "conformsTo": {"@id": "https://w3id.org/ro/crate/1.3"}},
+			 {"@id": "./", "@type": "Dataset", "name": "Survey", "description": "d", "datePublished": "2026-01-01",
+			  "license": {"@id": "SITE/licence"},
+			  "hasPart": [{"@id": "README.md"}, {"@id": "missing.csv"}, {"@id": "other.csv"}]},
+			 {"@id": "README.md", "@type": "File", "name": "Read me", "contentUrl": "SITE/files/readme-download"},
+			 {"@id": "missing.csv", "@type": "File", "name": "Missing"},
+			 {"@id": "other.csv", "@type": "File", "name": "Two", "url": ["SITE/files/one", "SITE/files/two"]},
+			 {"@id": "SITE/licence", "@type": "CreativeWork", "name": "A licence"}
+			]}""";
+
+	/** The dialog's two options: use a file's own contentUrl, and check the addresses afterwards (not for a base that is no place) */
+	@Test
+	public void detachDialogOptions() throws Exception {
+		Stage stage = window();
+		Crate crate = new CrateReader().read(new ByteArrayInputStream(WITH_ADDRESSES.replace("SITE", "https://x.example")
+				.getBytes(StandardCharsets.UTF_8)), "test").crate().orElseThrow();
+		DetachDialog dialog = onFx(() -> new DetachDialog(stage, crate.relativeEntities(),
+				Optional.of(URI.create("https://example.org/survey/"))));
+		interact(dialog::show);
+		// Three files, one that says where it is (the one with two urls does not say which)
+		CheckBox use = lookup("#detachUseContentUrl").queryAs(CheckBox.class);
+		assertTrue(use.getText(), use.getText().endsWith("(1 of 3)"));
+		assertFalse(use.isDisabled());
+		assertFalse(use.isSelected());
+		// A web address: checked afterwards, by default
+		CheckBox check = lookup("#detachCheck").queryAs(CheckBox.class);
+		assertTrue(check.isSelected());
+		assertTrue(dialog.detachment().orElseThrow().checkAvailability());
+		assertFalse(dialog.detachment().orElseThrow().useDownloadAddresses());
+		interact(use::fire);
+		assertTrue(dialog.detachment().orElseThrow().useDownloadAddresses());
+		assertEquals("README.md would be https://x.example/files/readme-download",
+				lookup("#detachExample").queryAs(Label.class).getText());
+		// An anonymous base is nowhere the files can be asked for
+		clickOn("#detachAnonymous");
+		assertTrue(lookup("#detachCheck").queryAs(CheckBox.class).isDisabled());
+		assertFalse(lookup("#detachCheck").queryAs(CheckBox.class).isSelected());
+		assertFalse(dialog.detachment().orElseThrow().checkAvailability());
+		// Back to a web address: chosen for them again, unless they chose
+		interact(() -> lookup("#detachBase").queryAs(TextField.class).setText("https://example.org/again/"));
+		assertTrue(lookup("#detachCheck").queryAs(CheckBox.class).isSelected());
+		interact(() -> lookup("#detachCheck").queryAs(CheckBox.class).fire());
+		interact(() -> lookup("#detachBase").queryAs(TextField.class).setText("https://example.org/third/"));
+		assertFalse(lookup("#detachCheck").queryAs(CheckBox.class).isSelected());
+		interact(dialog::close);
+	}
+
+	/** The files' own addresses as their @ids, then every web address asked about (contentUrl and url too) */
+	@Test
+	public void detachUsingContentUrlThenCheck() throws Exception {
+		com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(
+				new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+		java.util.Set<String> there = java.util.Set.of("/survey/", "/licence", "/files/readme-download", "/files/one");
+		server.createContext("/", exchange -> {
+			exchange.sendResponseHeaders(there.contains(exchange.getRequestURI().getPath()) ? 200 : 404, -1);
+			exchange.close();
+		});
+		server.start();
+		try {
+			URI site = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
+			Stage stage = window();
+			Path folder = Files.createDirectories(Files.createTempDirectory("detach").resolve("survey"));
+			Files.writeString(folder.resolve("README.md"), "x\n");
+			Files.writeString(folder.resolve("missing.csv"), "x\n");
+			Files.writeString(folder.resolve("other.csv"), "x\n");
+			Files.writeString(folder.resolve("ro-crate-metadata.json"), WITH_ADDRESSES.replace("SITE", site.toString()));
+			assertTrue(WaitForAsyncUtils.asyncFx(() -> app.open(stage, folder.resolve("ro-crate-metadata.json"))).get());
+			WaitForAsyncUtils.waitForFxEvents();
+			interact(() -> app.detach(stage, new Detachment(Optional.of(site.resolve("/survey/")), false, true, true)));
+			// README.md is its own contentUrl; missing.csv and other.csv (two urls: no telling) are at the base.
+			// Asked about: the root (the base), the licence and readme-download (there), missing.csv and other.csv
+			// (not), and both urls of other.csv, of which one is there
+			waitForFx(60, () -> lookup(".dialog-pane").tryQuery().isPresent());
+			javafx.scene.control.DialogPane pane = lookup(".dialog-pane").queryAs(javafx.scene.control.DialogPane.class);
+			assertTrue(pane.getHeaderText(), pane.getHeaderText().contains("web resources are not available"));
+			String content = pane.getContentText();
+			assertTrue(content, content.contains(site + "/survey/missing.csv"));
+			assertTrue(content, content.contains(site + "/survey/other.csv"));
+			assertTrue(content, content.contains(site + "/files/two"));
+			assertFalse(content, content.contains("readme-download"));
+			assertFalse(content, content.contains(site + "/files/one"));
+		} finally {
+			server.stop(0);
+		}
+	}
+
 	@Test
 	public void bases() {
 		assertEquals(Optional.of(URI.create("https://example.org/a/")), DetachDialog.baseOf("https://example.org/a"));

@@ -33,6 +33,7 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.sun.net.httpserver.HttpServer;
 
 import no.s11.wpsld.crate.Crate;
+import no.s11.wpsld.crate.CrateReader;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.WebCrate;
 import no.s11.wpsld.masp.ProfileCache;
@@ -101,34 +102,52 @@ public class TestWebAvailability {
 	}
 
 	/**
-	 * With a web base the relative files are checked too, at the address they
-	 * lead to, and by the @id they are written with
+	 * Across all entities, not only files: every contentUrl and url, every
+	 * absolute @id, and, with a web base, the relative @ids of files and
+	 * folders at the address they lead to; not the descriptor, schema.org's
+	 * terms, other entities' relative @ids nor #local ones
 	 */
 	@Test
-	public void targetsOfACrateOnTheWeb() throws Exception {
-		Crate crate = new Crate();
-		for (String id : List.of("https://example.com/a.csv", "ok", "gone", "#alice")) {
-			Entity entity = crate.add("File");
-			crate.rename(entity, id);
-		}
-		crate.getRoot().setAll("hasPart", List.of(
-				JsonNodeFactory.instance.objectNode().put("@id", "https://example.com/a.csv"),
-				JsonNodeFactory.instance.objectNode().put("@id", "ok"),
-				JsonNodeFactory.instance.objectNode().put("@id", "gone")));
-		// Without a base, as before
-		assertEquals(java.util.Map.of("https://example.com/a.csv", "https://example.com/a.csv"),
-				WebAvailability.targets(crate, Optional.empty()));
-		WebCrate attached = WebCrate.attachedTo(URI.create(base + "/"));
-		java.util.Map<String, String> targets = WebAvailability.targets(crate, Optional.of(attached));
-		assertEquals(List.of("https://example.com/a.csv", base + "/ok", base + "/gone"), List.copyOf(targets.keySet()));
-		assertEquals(List.of("https://example.com/a.csv", "ok", "gone"), List.copyOf(targets.values()));
-		// Detached, with no base, there is nothing to resolve them against
-		assertEquals(java.util.Set.of("https://example.com/a.csv"),
-				WebAvailability.targets(crate, Optional.of(attached.withoutBase())).keySet());
-		// And they are found as the files of the server
-		WebAvailability web = new WebAvailability(ProfileCache.httpClient(Duration.ofSeconds(5)), Duration.ofSeconds(5),
-				"wpsld-test");
-		List<WebAvailability.Result> results = web.check(List.of(base + "/ok", base + "/gone"));
-		assertEquals(List.of(true, false), results.stream().map(WebAvailability.Result::available).toList());
+	public void targetsAcrossAllEntities() throws Exception {
+		Crate crate = new CrateReader().read(new java.io.ByteArrayInputStream("""
+				{"@context": "https://w3id.org/ro/crate/1.1/context",
+				 "@graph": [
+				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"}},
+				  {"@id": "./", "@type": "Dataset", "name": "D", "url": "https://example.org/dataset",
+				   "author": {"@id": "https://orcid.org/0000-0002-1825-0097"}, "license": {"@id": "https://creativecommons.org/licenses/by/4.0/"},
+				   "hasPart": [{"@id": "ok"}, {"@id": "https://example.com/a.csv"}, {"@id": "by-url.csv"}]},
+				  {"@id": "ok", "@type": "File", "contentUrl": "https://example.com/ok-download", "url": ["https://example.com/ok-page", {"@id": "rel/page"}]},
+				  {"@id": "https://example.com/a.csv", "@type": "File"},
+				  {"@id": "by-url.csv", "@type": "File", "url": "https://example.com/by-url"},
+				  {"@id": "https://orcid.org/0000-0002-1825-0097", "@type": "Person", "name": "Josiah", "url": "https://example.edu/~josiah"},
+				  {"@id": "https://creativecommons.org/licenses/by/4.0/", "@type": "CreativeWork", "name": "CC BY"},
+				  {"@id": "van der Have, Tuur", "@type": "Person", "name": "Tuur"},
+				  {"@id": "#alice", "@type": "Person", "name": "Alice"},
+				  {"@id": "http://schema.org/Thing", "@type": "Thing"}]}""".getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+				"test").crate().orElseThrow();
+		java.util.function.Function<List<WebAvailability.Target>, List<String>> shown = targets -> targets.stream()
+				.map(t -> t.property() + " " + t.address() + " of " + t.id()).toList();
+		// Without a base: absolute addresses only, whatever the entity (the relative url has no base to lead from)
+		assertEquals(java.util.Set.of("url https://example.org/dataset of ./",
+				"@id https://orcid.org/0000-0002-1825-0097 of https://orcid.org/0000-0002-1825-0097",
+				"url https://example.edu/~josiah of https://orcid.org/0000-0002-1825-0097",
+				"@id https://creativecommons.org/licenses/by/4.0/ of https://creativecommons.org/licenses/by/4.0/",
+				"@id https://example.com/a.csv of https://example.com/a.csv",
+				"contentUrl https://example.com/ok-download of ok", "url https://example.com/ok-page of ok",
+				"url https://example.com/by-url of by-url.csv"),
+				java.util.Set.copyOf(shown.apply(WebAvailability.targetsOf(crate, Optional.empty()))));
+		// With a base: the files' relative @ids and the relative url too, not the person's name
+		List<String> withBase = shown.apply(WebAvailability.targetsOf(crate,
+				Optional.of(WebCrate.attachedTo(URI.create("https://files.example.org/c/")))));
+		assertTrue(withBase.toString(), withBase.contains("@id https://files.example.org/c/ok of ok"));
+		assertTrue(withBase.toString(), withBase.contains("url https://files.example.org/c/rel/page of ok"));
+		assertTrue(withBase.toString(), withBase.contains("@id https://files.example.org/c/by-url.csv of by-url.csv"));
+		assertFalse(withBase.toString(), withBase.stream().anyMatch(t -> t.contains("van%20der") || t.contains("schema.org")
+				|| t.contains("#alice") || t.contains("ro-crate-metadata")));
+		// An address several entities have is asked once, for each
+		WebAvailability.Target one = new WebAvailability.Target("https://x.example/a", "a", "@id");
+		assertEquals(List.of("https://x.example/a"), WebAvailability.addresses(List.of(one,
+				new WebAvailability.Target("https://x.example/a", "b", "url"))));
 	}
 }

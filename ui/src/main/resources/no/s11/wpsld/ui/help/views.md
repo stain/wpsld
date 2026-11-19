@@ -104,10 +104,14 @@ renamed since, is shown on a pale red background with a red icon, also
 in the list by type; its tooltip says what was not found. A detached
 crate's files are not looked for.
 
-**Crate > Check Web Availability...** asks each part of the crate on the
-web (under **External resources**) whether it is there, following
-redirects, and marks those that are not the same way, saying what they
-answered, until checked again. It needs an internet connection, and asks
+**Crate > Check Web Availability...** asks every web address of the crate
+whether it is there, following redirects, and marks the entities that have
+one that is not the same way, saying which (the identifier, `contentUrl` or
+`url`) and what it answered, until checked again. It asks every `contentUrl`
+and `url` of any entity, and every `@id` that is a web address, or would be one
+at the web address the crate is attached to (see [Opening and saving
+crates](files.md)) for files and folders; not the metadata descriptor, nor
+schema.org's terms, which a crate only refers to. It needs an internet connection, and asks
 a few addresses at a time, in the background: the foot of the window
 shows it, and **Show...** there brings up its progress, with **Cancel**.
 

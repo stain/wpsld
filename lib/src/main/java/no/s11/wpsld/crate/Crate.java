@@ -548,6 +548,45 @@ public class Crate {
 	 * @return The <code>@id</code>s as they were, and as they are now
 	 */
 	public Map<String, String> absolutize(WebCrate web, boolean root) {
+		return absolutize(web, root, false);
+	}
+
+	/**
+	 * The address a file says it can be downloaded from, if it says one: its
+	 * <code>contentUrl</code>, else its <code>url</code>, when it has exactly
+	 * one web address (<code>http:</code> or <code>https:</code>) as that
+	 * property. Not when it has several (e.g. for several versions of the file),
+	 * as there is no telling which.
+	 */
+	public static Optional<URI> downloadAddress(Entity entity) {
+		for (String property : List.of("contentUrl", "url")) {
+			List<String> addresses = entity.getAll(property).stream()
+					.map(v -> v.isTextual() ? v.asText() : v.path("@id").asText("")).map(String::strip)
+					.filter(a -> a.startsWith("http://") || a.startsWith("https://")).distinct().toList();
+			if (addresses.size() == 1) {
+				try {
+					return Optional.of(new URI(addresses.get(0)));
+				} catch (java.net.URISyntaxException e) {
+					return Optional.empty();
+				}
+			}
+			if (addresses.size() > 1) {
+				return Optional.empty();
+			}
+		}
+		return Optional.empty();
+	}
+
+	/**
+	 * As {@link #absolutize(WebCrate, boolean)}, optionally giving each entity
+	 * that says where it can be downloaded from (see {@link #downloadAddress})
+	 * that address as its <code>@id</code>, rather than where its path leads
+	 * from the base: the address its own metadata gives is more likely to be
+	 * where the file is. The root data entity has its path's address.
+	 *
+	 * @param downloadAddresses Whether to use them
+	 */
+	public Map<String, String> absolutize(WebCrate web, boolean root, boolean downloadAddresses) {
 		Map<String, String> renamed = new LinkedHashMap<>();
 		List<Entity> relative = new ArrayList<>(relativeEntities(web));
 		if (root && web.resolve(getRoot().getId()).isPresent()) {
@@ -555,7 +594,8 @@ public class Crate {
 		}
 		for (Entity entity : relative) {
 			String oldId = entity.getId();
-			URI address = web.resolve(oldId).orElseThrow();
+			URI address = (downloadAddresses && entity != getRoot() ? downloadAddress(entity) : Optional.<URI>empty())
+					.orElseGet(() -> web.resolve(oldId).orElseThrow());
 			if (get(address.toString()).isEmpty()) {
 				rename(entity, address.toString());
 				renamed.put(oldId, address.toString());

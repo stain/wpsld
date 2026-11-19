@@ -25,8 +25,15 @@ import java.util.Optional;
  * <code>@id</code>s are made absolute against, and whether to keep it as the
  * <code>@base</code> of the crate's <code>@context</code>.
  *
- * @param base       None if the crate has no relative <code>@id</code>s to make absolute
- * @param recordBase Whether to keep the base as <code>@base</code>
+ * @param base                None if the crate has no relative <code>@id</code>s to make absolute
+ * @param recordBase          Whether to keep the base as <code>@base</code>
+ * @param useDownloadAddresses Whether a file that says where it can be downloaded from, with its
+ *                            <code>contentUrl</code> or <code>url</code>, has that as its <code>@id</code>
+ * @param checkAvailability   Whether to check the web addresses of the crate afterwards
  */
-record Detachment(Optional<URI> base, boolean recordBase) {
+record Detachment(Optional<URI> base, boolean recordBase, boolean useDownloadAddresses, boolean checkAvailability) {
+	/** Just the base, and whether to keep it as @base */
+	Detachment(Optional<URI> base, boolean recordBase) {
+		this(base, recordBase, false, false);
+	}
 }

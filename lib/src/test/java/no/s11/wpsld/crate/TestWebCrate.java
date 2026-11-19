@@ -274,6 +274,34 @@ public class TestWebCrate {
 		assertTrue(crate.getContext().toString(), crate.getContext().isTextual());
 	}
 
+	/** A file's own download address as its @id, where it says one clearly, else where its path leads */
+	@Test
+	public void detachUsingDownloadAddresses() {
+		Crate crate = new CrateReader().read(new ByteArrayInputStream("""
+				{"@context": "https://w3id.org/ro/crate/1.1/context",
+				 "@graph": [
+				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"}},
+				  {"@id": "./", "@type": "Dataset", "name": "D", "url": "https://example.org/landing",
+				   "hasPart": [{"@id": "a.csv"}, {"@id": "b.csv"}, {"@id": "c.csv"}, {"@id": "d.csv"}]},
+				  {"@id": "a.csv", "@type": "File", "contentUrl": "https://files.example.org/a"},
+				  {"@id": "b.csv", "@type": "File", "url": {"@id": "https://files.example.org/b"}},
+				  {"@id": "c.csv", "@type": "File", "url": ["https://files.example.org/c1", "https://files.example.org/c2"]},
+				  {"@id": "d.csv", "@type": "File"}]}""".getBytes(StandardCharsets.UTF_8)), "test").crate().orElseThrow();
+		assertEquals(Optional.of(URI.create("https://files.example.org/a")), Crate.downloadAddress(crate.get("a.csv").orElseThrow()));
+		assertEquals(Optional.of(URI.create("https://files.example.org/b")), Crate.downloadAddress(crate.get("b.csv").orElseThrow()));
+		// Several: no telling which, so none
+		assertEquals(Optional.empty(), Crate.downloadAddress(crate.get("c.csv").orElseThrow()));
+		assertEquals(Optional.empty(), Crate.downloadAddress(crate.get("d.csv").orElseThrow()));
+		Map<String, String> renamed = crate.absolutize(WebCrate.baseOf(URI.create("https://base.example.org/c/")), true, true);
+		assertEquals("https://files.example.org/a", renamed.get("a.csv"));
+		assertEquals("https://files.example.org/b", renamed.get("b.csv"));
+		assertEquals("https://base.example.org/c/c.csv", renamed.get("c.csv"));
+		assertEquals("https://base.example.org/c/d.csv", renamed.get("d.csv"));
+		// The root is its path's address, not its url, which is its landing page
+		assertEquals("https://base.example.org/c/", crate.getRoot().getId());
+	}
+
 	@Test
 	public void adoptedBase() {
 		WebCrate api = of("https://data.example.com/api/export?id=abc");

@@ -36,6 +36,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
+import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.WebCrate;
 
@@ -56,6 +57,10 @@ final class DetachDialog extends Dialog<Detachment> {
 	private final Label warning = new Label();
 	private final Label example = new Label();
 	private final CheckBox recordBase = new CheckBox("Also keep it as @base in the crate's @context");
+	private final CheckBox useDownloadAddresses = new CheckBox();
+	private final CheckBox checkAvailability = new CheckBox("Check Web Availability afterwards");
+	/** Whether the user chose to check or not, so that the base's kind no longer chooses for them */
+	private boolean checkChosen;
 
 	/**
 	 * @param relative The entities with relative <code>@id</code>s, other than the root
@@ -93,6 +98,15 @@ final class DetachDialog extends Dialog<Detachment> {
 		example.setWrapText(true);
 		example.setMaxWidth(520);
 		recordBase.setId("detachRecordBase");
+		long withAddress = relative.stream().filter(e -> Crate.downloadAddress(e).isPresent()).count();
+		useDownloadAddresses.setId("detachUseContentUrl");
+		useDownloadAddresses.setText("Use a file's own contentUrl (or url) as its identifier, where it has one"
+				+ " (" + withAddress + " of " + relative.size() + ")");
+		useDownloadAddresses.setDisable(withAddress == 0);
+		useDownloadAddresses.setWrapText(true);
+		useDownloadAddresses.setMaxWidth(520);
+		checkAvailability.setId("detachCheck");
+		checkAvailability.setOnAction(e -> checkChosen = true);
 		Label help = new Label("With a web address, the crate's root (./) becomes that address too, as RO-Crate wants of"
 				+ " a crate that is available online. An anonymous base, arcp://uuid,…/, is for a crate that is not"
 				+ " published anywhere: its identifiers are unique to it, and the base can later be used to make them"
@@ -101,7 +115,8 @@ final class DetachDialog extends Dialog<Detachment> {
 		help.setMaxWidth(520);
 		VBox content = new VBox(8, intro);
 		if (!relative.isEmpty()) {
-			content.getChildren().addAll(new HBox(4, baseField, anonymous), warning, example, recordBase, help);
+			content.getChildren().addAll(new HBox(4, baseField, anonymous), warning, example, recordBase,
+					useDownloadAddresses, checkAvailability, help);
 		}
 		content.setPadding(new Insets(8, 0, 0, 0));
 		getDialogPane().setContent(content);
@@ -110,6 +125,7 @@ final class DetachDialog extends Dialog<Detachment> {
 		getDialogPane().lookupButton(detach).setId("detachOk");
 		prefill.ifPresent(b -> baseField.setText(b.toString()));
 		baseField.textProperty().addListener((o, was, text) -> update());
+		useDownloadAddresses.setOnAction(e -> update());
 		update();
 		setResultConverter(button -> button == detach ? detachment().orElse(null) : null);
 	}
@@ -152,7 +168,8 @@ final class DetachDialog extends Dialog<Detachment> {
 		if (relative.isEmpty()) {
 			return Optional.of(new Detachment(Optional.empty(), false));
 		}
-		return baseOf(baseField.getText()).map(b -> new Detachment(Optional.of(b), recordBase.isSelected()));
+		return baseOf(baseField.getText()).map(b -> new Detachment(Optional.of(b), recordBase.isSelected(),
+				useDownloadAddresses.isSelected(), checkAvailability.isSelected() && !checkAvailability.isDisabled()));
 	}
 
 	private void update() {
@@ -164,7 +181,15 @@ final class DetachDialog extends Dialog<Detachment> {
 				+ " Anonymous Base.").orElse(text.isEmpty() || base.isPresent() ? ""
 						: "Not an https:, http: or arcp: address."));
 		example.setText(base.isEmpty() || relative.isEmpty() ? ""
-				: relative.get(0).getId() + " would be " + WebCrate.baseOf(base.get()).resolve(relative.get(0).getId())
-						.map(URI::toString).orElse("(nothing)"));
+				: relative.get(0).getId() + " would be " + (useDownloadAddresses.isSelected()
+						? Crate.downloadAddress(relative.get(0)).map(URI::toString) : Optional.<String>empty())
+						.or(() -> WebCrate.baseOf(base.get()).resolve(relative.get(0).getId()).map(URI::toString))
+						.orElse("(nothing)"));
+		// Only a web address is somewhere the files can be: not an anonymous base, or one for this computer
+		boolean web = base.filter(b -> b.getScheme().startsWith("http")).isPresent();
+		checkAvailability.setDisable(!web);
+		if (!checkChosen) {
+			checkAvailability.setSelected(web);
+		}
 	}
 }

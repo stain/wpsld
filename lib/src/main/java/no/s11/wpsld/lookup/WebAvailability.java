@@ -33,6 +33,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.WebCrate;
@@ -75,26 +77,59 @@ public class WebAvailability {
 	}
 
 	/**
-	 * What to check, by address and the <code>@id</code> of the data entity
-	 * it is for: the data entities with web addresses, and, for a crate with a
-	 * web base (see {@link WebCrate}), those with relative <code>@id</code>s,
-	 * at the address they lead to there, as they would be in an attached crate
-	 * published on the web. Several entities at one address are checked once,
-	 * for the first.
+	 * A web address to check and what it is for.
+	 *
+	 * @param address  The address, absolute
+	 * @param id       The <code>@id</code> of the entity it belongs to
+	 * @param property <code>@id</code> if the entity's own <code>@id</code> is
+	 *                 it (or leads to it, relative to the crate's web base),
+	 *                 else <code>contentUrl</code> or <code>url</code>
+	 */
+	public record Target(String address, String id, String property) {
+	}
+
+	/**
+	 * What to check in a crate, across all its entities, not only files: every
+	 * <code>contentUrl</code> and <code>url</code> that is a web address (or
+	 * relative to the crate's web base, if it has one), and every
+	 * <code>@id</code> that is a web address, or, according to the web base
+	 * (see {@link WebCrate}), would be one: the latter only for files and
+	 * folders, as other entities' relative <code>@id</code>s (a person's name)
+	 * are not paths. Not the metadata descriptor, nor the schema.org terms a
+	 * crate refers to without describing them. An address several entities have
+	 * is listed for each, to be asked once (see {@link #addresses(List)}).
 	 *
 	 * @param web Where the crate is on the web, if anywhere
 	 */
-	public static Map<String, String> targets(Crate crate, Optional<WebCrate> web) {
-		Map<String, String> targets = new LinkedHashMap<>();
-		for (Entity entity : crate.dataEntities()) {
+	public static List<Target> targetsOf(Crate crate, Optional<WebCrate> web) {
+		java.util.Set<Target> targets = new java.util.LinkedHashSet<>();
+		java.util.Set<Entity> data = new java.util.HashSet<>(crate.dataEntities());
+		for (Entity entity : crate.getEntities()) {
 			String id = entity.getId();
 			if (isWeb(id)) {
-				targets.putIfAbsent(id, id);
-			} else {
-				web.flatMap(w -> w.resolve(id)).ifPresent(address -> targets.putIfAbsent(address.toString(), id));
+				if (!Crate.isTerm(id)) {
+					targets.add(new Target(id, id, "@id"));
+				}
+			} else if (data.contains(entity)) {
+				web.flatMap(w -> w.resolve(id)).ifPresent(a -> targets.add(new Target(a.toString(), id, "@id")));
+			}
+			for (String property : List.of("contentUrl", "url")) {
+				for (JsonNode value : entity.getAll(property)) {
+					String text = value.isTextual() ? value.asText() : value.path("@id").asText("");
+					if (isWeb(text)) {
+						targets.add(new Target(text, id, property));
+					} else if (!text.isEmpty()) {
+						web.flatMap(w -> w.resolve(text)).ifPresent(a -> targets.add(new Target(a.toString(), id, property)));
+					}
+				}
 			}
 		}
-		return targets;
+		return List.copyOf(targets);
+	}
+
+	/** The addresses of targets, each once, in order */
+	public static List<String> addresses(List<Target> targets) {
+		return targets.stream().map(Target::address).distinct().toList();
 	}
 
 	private static boolean isWeb(String id) {

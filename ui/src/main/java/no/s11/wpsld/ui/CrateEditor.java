@@ -1874,8 +1874,16 @@ public class CrateEditor extends Application {
 					return;
 				}
 			}
-			detach(chosen);
+			detach(stage, chosen);
 		});
+	}
+
+	/** Detach the crate (see {@link #detach(Detachment)}), and if asked, then check its web addresses */
+	void detach(Stage stage, Detachment detachment) {
+		detach(detachment);
+		if (detachment.checkAvailability()) {
+			checkWeb(stage);
+		}
 	}
 
 	/**
@@ -1889,7 +1897,7 @@ public class CrateEditor extends Application {
 	 */
 	void detach(Detachment detachment) {
 		int count = detachment.base().map(base -> crate.absolutize(WebCrate.baseOf(base),
-				base.getScheme().startsWith("http")).size()).orElse(0);
+				base.getScheme().startsWith("http"), detachment.useDownloadAddresses()).size()).orElse(0);
 		if (detachment.recordBase()) {
 			detachment.base().ifPresent(base -> crate.setBase(Optional.of(base.toString())));
 		}
@@ -1935,12 +1943,13 @@ public class CrateEditor extends Application {
 	 * @return The check, running, if there is anything to check
 	 */
 	Optional<Task<List<WebAvailability.Result>>> checkWeb(Stage stage) {
-		// Also the relative files, at the web address the crate is attached to, if it is
-		Map<String, String> targets = WebAvailability.targets(crate, crateFile.web());
-		List<String> addresses = List.copyOf(targets.keySet());
+		// Every contentUrl and url, and every @id that is a web address, or is one at the web address the crate
+		// is attached to, of any entity
+		List<WebAvailability.Target> targets = WebAvailability.targetsOf(crate, crateFile.web());
+		List<String> addresses = WebAvailability.addresses(targets);
 		if (addresses.isEmpty()) {
-			Alert none = new Alert(AlertType.INFORMATION, "The crate has no parts on the web, under External"
-					+ " resources in View > Entities by Folder, to check.", ButtonType.OK);
+			Alert none = new Alert(AlertType.INFORMATION, "The crate has no web addresses (identifiers, contentUrl or"
+					+ " url) to check.", ButtonType.OK);
 			none.initOwner(stage);
 			none.setHeaderText("Nothing to check");
 			none.show();
@@ -1961,9 +1970,16 @@ public class CrateEditor extends Application {
 			}
 			List<WebAvailability.Result> results = task.getValue();
 			Map<String, String> found = new HashMap<>();
-			// By the @id of the entity, which may be relative
-			results.stream().filter(r -> !r.available())
-					.forEach(r -> found.put(targets.getOrDefault(r.address(), r.address()), r.problem().get()));
+			// By the @id of the entity, which may be relative, and what it was in it that was not available
+			Map<String, String> failed = new HashMap<>();
+			results.stream().filter(r -> !r.available()).forEach(r -> failed.put(r.address(), r.problem().get()));
+			for (WebAvailability.Target target : targets) {
+				String problem = failed.get(target.address());
+				if (problem != null) {
+					found.merge(target.id(), target.property().equals("@id") ? problem
+							: target.property() + " " + target.address() + ": " + problem, (a, b) -> a + "; " + b);
+				}
+			}
 			unavailable = found;
 			relist();
 			Alert done = new Alert(found.isEmpty() ? AlertType.INFORMATION : AlertType.WARNING,
