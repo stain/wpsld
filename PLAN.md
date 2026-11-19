@@ -1604,6 +1604,81 @@ extension. Next:
   Publish): LDaCA and other Oni repositories, and others found (ROHub,
   WorkflowHub's `/ro_crate` zips), each turning a page's address into its
   crate's.
+- **FAIR Signposting: what `CrateRetriever` does, and what is missing**
+  *(explored 2026-11-19 against RO-Crate 1.2's "Retrieving an RO-Crate"
+  and https://signposting.org/FAIR/, and by trying real repositories)*.
+  Done and tested only in its parts (`linkHeader`, `htmlLink`, `folder`;
+  `retrieve()` itself has no test in lib, only the editor's, for a
+  redirect and a plain document):
+  - the order of the specification: redirects without content negotiation
+    (a browser's `Accept`, as some PIDs only redirect for HTML), then
+    Signposting from the `Link` header (RFC 8288, several headers and
+    values, parameters) or `<link>` in HTML, then content negotiation for
+    the RO-Crate media type, then `ro-crate-metadata.json` beside the
+    resolved address; the first `describedby` link with the RO-Crate
+    `profile` wins over a JSON(-LD) one;
+  - size and request limits, a loop guard, and `Retrieved.steps()`.
+
+  Missing, found by running it on the real thing (the probe is in the
+  session notes: `java -cp lib/build/classes/java/main:… Probe <url>`):
+  1. **`rel="item"` is ignored**, so WorkflowHub's DOI
+     (`https://doi.org/10.48546/workflowhub.workflow.120.5`) fails: its
+     only crate is `<…/workflows/120/ro_crate?version=5>; rel="item";
+     type="application/zip"; profile="https://w3id.org/ro/crate"`, and its
+     `describedby` links go to the landing page itself (a bioschemas
+     JSON-LD of the workflow, not a crate). The error then lists part of
+     the `Accept` header as an address: `get()` cuts each request key at
+     its first space, and the header has spaces (cosmetic bug, fix with
+     the failure messages).
+  2. **`rel="linkset"` is not followed.** Zenodo's landing page (e.g.
+     `https://zenodo.org/records/24059872`) has only `rel="linkset";
+     type="application/linkset+json"` in its `Link` header (the record's
+     files are in the linkset, RFC 9264, `{"linkset": [{"anchor": …,
+     "item": [{"href", "type"}], "describedby": […], "cite-as": […],
+     "license": […]}]}`, with other anchors for the files' own
+     `collection` links, which are not the record's: use the entry whose
+     `anchor` is the resolved landing page); plain `application/linkset`
+     (the `Link` header's own syntax) too, and a linkset linked from HTML.
+  3. **A `describedby` link is taken without checking what it leads
+     to.** Zenodo's `describedby` links (`application/ld+json`, also
+     `application/json`, DCAT) go to the record's own metadata at
+     `https://zenodo.org/api/records/<id>`, which `retrieve()` returns as
+     "the crate" (`steps: [Link header]`), and the editor then rejects as
+     not an RO-Crate. As the specification's last step says, a candidate
+     is only the crate if it is valid JSON-LD with a root data entity (a
+     metadata descriptor `about` a root dataset): check each, and if not,
+     go on to the next candidate instead of stopping, noting why in the
+     steps. DataCite's content negotiation giving its own JSON-LD (the
+     specification's tip) is the same case.
+  4. **Archives and the choice among items** (the two items above and
+     below): the result of retrieving is no longer always a document, but
+     one of a document (`source`, `content`, `steps`), an archive to
+     download (zip or BagIt, from an `item` with the RO-Crate profile, or
+     the only zip, or a `ro-crate-metadata.json` item), or a list of
+     choices (`Item(href, type, profile, name, size)`, ranked: the RO-Crate
+     profile, then `.crate.zip`/`.eln`, then `ro-crate-metadata.json`, then
+     other zips, with a clearer label than the URL) for the editor to offer
+     and the user to pick; never opening a file the user has not chosen out
+     of several. An `item` of another type (PDF, CSV) is not a crate.
+  5. **`cite-as` and `license` are not read** (they are what "Keep the
+     persistent identifier" below needs): return them with the result, from
+     the same response as the document came from, or the linkset's entry.
+  6. **Tests of `retrieve()` itself**, against the JDK's `HttpServer`, one
+     canned repository for each case (as headers captured from the real
+     ones, no network in tests): WorkflowHub's (zip item with the profile,
+     `describedby` to the landing page), Zenodo's (linkset only, record
+     JSON-LD as a decoy, several items), w3id.org's (content negotiation
+     redirect), a folder with no Signposting, a loop, a 404, a page
+     that is HTML without links, a JSON that is not a crate. Also the
+     `Link` parsing of quoted commas, `anchor`s and relative `href`s.
+
+  Order to work in: (3) first, as it makes today's failures say the truth
+  and costs little; then (6) with it; then (2) and (5) (JSON only; the
+  text linkset only if a repository needs it); then (4) with the zip
+  download and the editor's choice window. A crate that came from a zip is
+  not "on the web" for `WebCrate`: its relative `@id`s are paths in the
+  archive, so it has no web base (the address it came from is kept as
+  where it was fetched, for the title and `cite-as`).
 - **A zip by FAIR Signposting**: `CrateRetriever` also follows
   `rel="item"` links to an RO-Crate zip (`type="application/zip"`, with
   the RO-Crate profile), as "Retrieving an RO-Crate" allows: downloaded
