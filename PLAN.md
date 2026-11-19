@@ -2091,6 +2091,31 @@ extension. Next:
     header and the first of equal rank is taken, not because it is known
     to be a crate: the test then needs the prober to keep passing if
     the order changes.
+- **Repositories tried** *(2026-11-19; the first column is how
+  `CrateRetriever` fares today, from the DOI, Handle or address given)*:
+
+  | Repository (identifier) | Today | What it has, and what is needed |
+  |---|---|---|
+  | KU Leuven RDR (Dataverse), `doi:10.48804/XES6PY` | opens, by luck of order | `Link` header: `describedby` for each export, `rocrate_json` first; a linkset; crate is detached, with an array `@id` error (see Dataverse above). Tested: `TestCrateRetrieverOnline`. |
+  | DataverseNO, `doi:10.18710/CVQPYG` | wrong document (OAI_ORE) | no RO-Crate exporter; needs the prober to say so. |
+  | **OneStop4WildLIVE**, `https://wildlive.senckenberg.de/captureevent/wildlive/963d905b946c6119ed5f` | **opens** | `Link` header `describedby` to `/api/call?…method=getAsROCrate`: a detached crate with absolute `@id`s, `contentUrl`s on its files, RO-Crate **1.2-DRAFT**, whose context is not one we know: its terms warn. Tested. To do: treat `https://w3id.org/ro/crate/1.2-DRAFT/context` (and other drafts and release candidates) as the bundled 1.2 context. |
+  | **MLentory**, `https://mlentory.zbmed.de/mlentory_graph/bb23…582a` | **opens** | an HTML `<link rel="describedby">` to `…/ro-crate-metadata.json` in a folder: an attached crate on the web. Its own faults: `@dcterms` (not a keyword) in the context, `@vocab` set to the context's address, an entity nested in a value. Tested. To do: `CrateReader` warns "More than one metadata descriptor" because the root's `@id` is an absolute address that *ends* with `/ro-crate-metadata.json`: that is the root (the descriptor's `about`), not a descriptor, so it should not count. |
+  | **UK CEH** (EIDC), `doi:10.5285/3970a138-c035-40ac-bf1d-a2f8a464644a` | "opens" a **non-crate** | no Signposting, no `Link` headers; content negotiation answers `application/ld+json;profile="https://w3id.org/ro/crate"` with CEH's own metadata JSON (`accessLimitation`, `authors`, …), which has no `@graph`: the case the specification's tip warns of. Its page offers `format=ttl`, `schema.org`, `bib`, `ris`, `gemini`, `json`, no crate. Tested as is: the prober must say "no RO-Crate here: it claims the profile but is not one". |
+  | **RADAR** (KIT), `https://dx.doi.org/10.35097/1054` | fails, HTTP 403 | the landing page's `Link` headers have `describedby … type="application/ld+json"; profile="https://w3id.org/ro/crate/1.1/context"` (`…/exportrocrate`), a tar `item` and others; the crate export itself answers **403 Forbidden** to non-browser clients, whatever the `User-Agent`. **Not to be got round** (no pretending to be a browser): the failure should say it was refused, by which address, and suggest downloading the crate from the page in a browser and opening the file. Note the profile is the *context's* address, not `https://w3id.org/ro/crate`: it already ranks as the profile (`contains`); a tar item is not a zip. |
+  | **HUN-REN ARP** (Dataverse 6.9), `hdl:21.15109/ARP/2DHQF1` | fails, "Invalid redirection" | the landing page is behind **Anubis**, a proof-of-work bot wall: a `302` with no `Location`, and its own cookies. Not to be solved or got round; the failure should say that the site's bot protection stopped a program, not "invalid redirection". Its API works (version 6.9, exporters: Datacite, OAI_ORE, dataverse_json, dcterms, ddi, html, oai_datacite, oai_dc, oai_ddi, schema.org): **no RO-Crate export**, so there is no crate either way. |
+  | **ROHub**, `https://w3id.org/ro-id/2176fd9b-bef8-486a-b414-fef7edb37732` | fails, timeout | the landing page (www.rohub.org) has only `rel="linkset"` (`application/linkset` and `application/linkset+json`, at `api.rohub.org/api/ros/<id>/json/`), whose one `describedby` is `…/crate/download/` (`application/ld+json`) and which has 114 `item`s (`…/resources/<id>/download`, no type). Today `crate/download/` answers **504 Gateway Time-out** after 30 s (the crate of 114 resources is slow to make), and content negotiation on the identifier answers 503, which is what timed out the retriever (20 s). Needs linkset traversal, and a timeout that says which address did not answer. The zip you said it has was not in the linkset today: look again (the item `type`s are missing, so only their addresses say). |
+  | Zenodo, `doi:10.5281/zenodo.24059872` | "opens" a **non-crate** | a `rel="linkset"` only; its `describedby` are Zenodo's own metadata. Needs linkset and prober. |
+  | WorkflowHub, `doi:10.48546/workflowhub.workflow.120.5` | fails | the crate only as `rel="item"` zip with the profile. Needs items and zips. |
+
+  From these: **three kinds of failure are not the same and should not read
+  the same**: *not a crate* (CEH, Zenodo's metadata, DataverseNO's exports),
+  *refused* (RADAR's 403, HUN-REN's bot wall: say who refused, and offer the
+  way a person can do it themselves, never a way round), and *did not
+  answer* (ROHub: which address, after how long). A refused or blocked
+  response must not be retried with other headers. With `Retrieved.steps`,
+  each failure lists what was tried in order. The online tests are in
+  `TestCrateRetrieverRepositoriesOnline` (WildLIVE, MLentory, CEH); RADAR,
+  HUN-REN and ROHub are not tested as they fail by the repositories' choice.
 - **A zip by FAIR Signposting**: `CrateRetriever` also follows
   `rel="item"` links to an RO-Crate zip (`type="application/zip"`, with
   the RO-Crate profile), as "Retrieving an RO-Crate" allows: downloaded
