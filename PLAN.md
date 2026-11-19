@@ -2145,15 +2145,25 @@ extension. Next:
   undo step ("Detach"), with the context's `@base` in it. After it the crate
   is attached to nothing, and the notice suggests saving it as
   `<prefix>-ro-crate-metadata.json` (RO-Crate 1.2: the name that tells that
-  its file's presence does not make a folder an attached crate). To do: **check
-  each file is at the base before rewriting**, in the background as a job
-  as Check Web Availability does (HEAD, sizes, perhaps checksums where the
-  server gives them), saying which were not found and leaving the base to
-  the user, who may mean to publish them after (for an anonymous base they
-  are never there, so no check); the `identifier`/`cite-as` of the root
-  as a persistent identifier if the user has one (the root's `@id`, "or a
-  persistent identifier"); the files' `contentUrl` or `url` when they have
-  them (KU Leuven's do) as what to make `@id` instead of base plus path.
+  its file's presence does not make a folder an attached crate). Done
+  2026-11-19: **Check Web Availability afterwards**, a tick-box (on for a
+  web base, unavailable for an anonymous or `file:` one, as no files are
+  there), and **use a file's own `contentUrl` (or `url`)** as its `@id`
+  (`Crate.downloadAddress`: exactly one web address, `contentUrl` first;
+  several, as KU Leuven's two versions, say nothing, so the path is used).
+  **Check Web Availability asks across all entities**
+  (`WebAvailability.targetsOf`): every `contentUrl` and `url` (relative ones
+  against the web base), and every `@id` that is a web address, of any
+  entity, but not the descriptor or schema.org terms; plus, with a web base,
+  the relative `@id`s of files and folders at the address they lead to (not
+  other entities' names). A failure says which property it was in. The
+  root's `@id` is asked about once it is the base, a folder that may have
+  no index page: to decide whether a folder address should be asked. To
+  do: the root's `identifier`/`cite-as` as a persistent identifier if the
+  user has one (the root's `@id`, "or a persistent identifier"); progress for
+  the availability job, which asks four addresses at a time, so a crate of
+  thousands (KU Leuven's has about 8,000) takes long, and a way to skip
+  those on one host.
   This also is what **Make Attached…** below undoes; the view-only
   "detached" (nothing attached, `@id`s as they are) is in Crate > Attach….
 - **Detached to attached** (Crate > Make Attached…): choose a folder; the
