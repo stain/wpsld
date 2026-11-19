@@ -1521,7 +1521,11 @@ extension. Next:
     can be big, so a zip's size is shown and a download is the user's
     choice.
   - **Choosing a root where it can't be determined is attaching the
-    crate**: **Crate > Attach…**, also as the button of the notice that
+    crate** *(done for a folder and a web address, 2026-11-19: `AttachDialog`,
+    `Attachment`, `CrateFile.attach`, Crate > Attach… and Detach, the notice's
+    Attach… button, and Check Web Availability asking the relative files
+    at the web base through `WebAvailability.targets`; the zip is still to
+    do; not yet remembered with the crate in the state folder)*: **Crate > Attach…**, also as the button of the notice that
     warns of a semi-detached crate (`showNotice` takes an action), says
     what the relative `@id`s are relative to. The target is one of:
     1. **a folder** on disk (a directory chooser), e.g. the crate's files
@@ -1655,6 +1659,84 @@ extension. Next:
   `browse`), and the Save As warning's three choices (undo restores the
   relative ids). Help: a paragraph in the tutorial on opening a crate from
   the web, with its screenshot (see AGENTS.md).
+- **Has the file diverged from what we edited? A checksum of the crate's
+  metadata that ignores how it is written, and a lineage of the files we
+  have seen** *(TODO, investigated 2026-11-19; to be built)*. The problem:
+  Save must not overwrite a `ro-crate-metadata.json` that is not ours without
+  saying so, and must not ask when it is. It arises when a crate that is
+  open (with unsaved changes) is saved over a file changed on disk by
+  another program (as now, `CrateFile.disk()` compares the file's time,
+  size and SHA-256 with what it was when opened or saved), and newly
+  when **a crate fetched from the web is attached to a folder that already
+  has a `ro-crate-metadata.json`** (Attach…, above): is that the crate we
+  opened, saved by another tool, or another crate altogether? The idea:
+  keep the checksum of every state of the file we have read or written, as
+  marks on the undo history (`UndoHistory`: the metadata document as fetched
+  or opened, and as saved by us at each Save), and at Save compare the
+  file on disk with them: **one we know is not diverged** (even if we have
+  since undone, as the file is then ahead of the crate, not different), so
+  Save goes on without asking; **an unknown one has diverged**, and the user
+  chooses (as `askBeforeOverwriting` does): save over it, Save As, reload
+  from it (losing changes), or Cancel, saying whose it is (its name and
+  `dateModified`, and how many entities it has, from reading it) and
+  not only that it differs.
+  What to checksum: the bytes' SHA-256 are exact but a different tool writing
+  the same crate (indented differently, entities in another order) differs,
+  so a second checksum of the *content*. What was found:
+  - **RFC 8785 JSON Canonicalization Scheme (JCS)**: a deterministic JSON text
+    (object keys sorted by UTF-16 code units, no whitespace, strings and
+    numbers as ECMAScript writes them), made for hashing and signing; it
+    keeps the order of arrays and the entities in `@graph`, so it alone
+    does not ignore their order.
+  - **RDF Dataset Canonicalization (RDFC-1.0, W3C Recommendation 2024, from
+    URDNA2015)**: for JSON-LD, converts to RDF quads and gives canonical
+    N-Quads that a hash is taken of, whatever the JSON's shape (compact or
+    expanded, prefixes, keys, `@graph` order, single or array, blank node
+    labels): semantic equality. Java: `com.apicatalog:titanium-rdfc`
+    2.0.0 (Apache-2.0, small: titanium-rdf-api and the N-Quads reader; it
+    takes quads, and has a ticker to stop a "poison graph"), with
+    `titanium-json-ld` 1.7.0 (`2.0.0-M2` is a milestone) and a Jakarta JSON
+    implementation to make the quads; Jena 6.2.0 has no RDFC. Data
+    Integrity's `eddsa-jcs-2022` and `eddsa-rdfc-2022` are these two.
+  - **Measured** (a Python prototype, `pyld` for URDNA2015, on the example
+    crate, WorkflowHub's Workflow RO-Crate 1.0 (126 entities) and KU Leuven's
+    (3,989 entities, 1.4 MB)): bytes: every change in the writing is a
+    difference. **A JCS of the content with the `@graph` entities sorted by
+    `@id` and a one-element array taken as its value**: the same for
+    reformatting, keys in another order, `@graph` shuffled and singletons
+    wrapped as arrays, different for any real change (a value edited, or the
+    **order of a value's array**, which is kept as authors' and parts' order
+    mean something to people though JSON-LD calls arrays unordered); 0 ms
+    for the small crates and 23-48 ms for KU Leuven's, with no network, and
+    **it works on an invalid crate** (KU Leuven's has an `@id` that is an
+    array). RDFC: the same for all of these *and* for value arrays
+    shuffled; 0.3-0.6 s for the small crates and 1.8 s for 28,451 quads of
+    KU Leuven's (Python), but **it cannot be taken of an invalid
+    crate** (`Could not convert input to RDF dataset`, that `@id` again),
+    and it fetches the `@context` (the RO-Crate contexts are bundled in
+    wpsld, so a loader for them).
+  - **So**: the lineage uses the JCS-of-content checksum (call it
+    `CrateChecksum`, in lib, over the `JsonNode` as `Crate.toJson` and the
+    file's parse give it; the bytes' SHA-256 as the quick first check, as now),
+    not RDFC, which is for a later "same data, written differently"
+    (compare two crates as graphs: Detect when a crate and a published one
+    are the same, or what changed) where its cost and its need for valid
+    JSON-LD are worth it. JCS needs ES number formatting for numbers that
+    are not integers (rare in a crate; `Double.toString` differs, so write
+    them as ECMAScript does or leave a note that such a crate is "diverged"
+    when in doubt: a false difference only asks, a false equality would
+    overwrite). The checksums are not written into the crate.
+  - Marks on the undo history rather than a set beside it, so that Undo and
+    Redo past a Save keep knowing which state the file is: the step of
+    each Save and of opening has the file's two checksums. A new
+    `CrateFile.disk()` (SAME, CHANGED, MISSING) becomes: SAME if the file's
+    bytes or content checksum is one of the marks, else CHANGED, and Save
+    for a crate with no file of its own (fetched from the web, attached
+    to a folder with a metadata file in it) asks as for CHANGED, rather than
+    sending the user to the file chooser's overwrite question. Opening a
+    crate from the web marks the checksums of the document as fetched
+    (the bytes in `Retrieved`), so that a copy of the same crate unpacked by
+    hand into the folder is recognised as the same starting point.
 - **A zip, from disk or from the web: its arcp base and a viewer of its
   files** *(TODO, designed in outline; one mechanism for a zip chosen in
   File > Open, a zip found by Signposting, and `.eln`)*. A crate in a zip

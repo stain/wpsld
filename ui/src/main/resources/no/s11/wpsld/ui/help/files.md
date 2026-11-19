@@ -42,6 +42,27 @@ make them name files beside the saved one instead, so wpsld asks first
 whether to **Make Absolute** (each becomes the web address it leads to,
 one step you can undo), **Keep Relative** or Cancel.
 
+### Attach: where the crate's files are
+
+Choose **Crate > Attach...** to say what the crate's relative identifiers
+(`data/table.csv`) are relative to, if wpsld doesn't know or has it wrong:
+
+- **A folder on disk**, such as the crate's files downloaded and unpacked
+  by hand. wpsld says how many of the crate's files are in it. The crate
+  is then the folder's: its files are listed, its links open them, and a
+  crate fetched from the web is saved in that folder.
+- **A web address**, which can be one the crate suggests (its landing
+  page, or its own identifier) or one you type. **Check** asks the server
+  whether the crate's first file is there, which it can't always say (a
+  server may not allow it, or the files may be inside a zip). Check Web
+  Availability then asks for the crate's relative files at that address
+  too.
+- **Nothing**: detached, so relative identifiers lead nowhere. **Crate >
+  Detach** does the same.
+
+Attaching does not change the crate, only where wpsld looks for its files:
+the identifiers stay as written.
+
 ### Crates written in other ways
 
 RO-Crate's JSON-LD is *flattened*: each entity is written once in the
