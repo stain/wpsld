@@ -20,8 +20,10 @@ package no.s11.wpsld.lookup;
 import static org.junit.Assert.*;
 
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.After;
 import org.junit.Before;
@@ -32,6 +34,7 @@ import com.sun.net.httpserver.HttpServer;
 
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.crate.WebCrate;
 import no.s11.wpsld.masp.ProfileCache;
 
 /** Against a web server of the test's own, offline */
@@ -95,5 +98,37 @@ public class TestWebAvailability {
 				JsonNodeFactory.instance.objectNode().put("@id", "https://example.com/a.csv"),
 				JsonNodeFactory.instance.objectNode().put("@id", "data.csv")));
 		assertEquals(List.of("https://example.com/a.csv"), WebAvailability.addresses(crate));
+	}
+
+	/**
+	 * With a web base the relative files are checked too, at the address they
+	 * lead to, and by the @id they are written with
+	 */
+	@Test
+	public void targetsOfACrateOnTheWeb() throws Exception {
+		Crate crate = new Crate();
+		for (String id : List.of("https://example.com/a.csv", "ok", "gone", "#alice")) {
+			Entity entity = crate.add("File");
+			crate.rename(entity, id);
+		}
+		crate.getRoot().setAll("hasPart", List.of(
+				JsonNodeFactory.instance.objectNode().put("@id", "https://example.com/a.csv"),
+				JsonNodeFactory.instance.objectNode().put("@id", "ok"),
+				JsonNodeFactory.instance.objectNode().put("@id", "gone")));
+		// Without a base, as before
+		assertEquals(java.util.Map.of("https://example.com/a.csv", "https://example.com/a.csv"),
+				WebAvailability.targets(crate, Optional.empty()));
+		WebCrate attached = WebCrate.attachedTo(URI.create(base + "/"));
+		java.util.Map<String, String> targets = WebAvailability.targets(crate, Optional.of(attached));
+		assertEquals(List.of("https://example.com/a.csv", base + "/ok", base + "/gone"), List.copyOf(targets.keySet()));
+		assertEquals(List.of("https://example.com/a.csv", "ok", "gone"), List.copyOf(targets.values()));
+		// Detached, with no base, there is nothing to resolve them against
+		assertEquals(java.util.Set.of("https://example.com/a.csv"),
+				WebAvailability.targets(crate, Optional.of(attached.withoutBase())).keySet());
+		// And they are found as the files of the server
+		WebAvailability web = new WebAvailability(ProfileCache.httpClient(Duration.ofSeconds(5)), Duration.ofSeconds(5),
+				"wpsld-test");
+		List<WebAvailability.Result> results = web.check(List.of(base + "/ok", base + "/gone"));
+		assertEquals(List.of(true, false), results.stream().map(WebAvailability.Result::available).toList());
 	}
 }

@@ -1003,13 +1003,12 @@ public class CrateEditor extends Application {
 		MenuItem repair = new MenuItem("Repa_ir Crate");
 		repair.setId("menuRepair");
 		repair.setOnAction(e -> repair(stage));
-		CheckMenuItem attached = new CheckMenuItem("A_ttached to Folder");
-		attached.setId("menuAttached");
-		attached.setOnAction(e -> {
-			crateFile.setAttached(attached.isSelected());
-			relist();
-			refresh();
-		});
+		MenuItem attach = new MenuItem("_Attach…");
+		attach.setId("menuAttach");
+		attach.setOnAction(e -> askToAttach(stage));
+		MenuItem detach = new MenuItem("D_etach");
+		detach.setId("menuDetach");
+		detach.setOnAction(e -> attach(Attachment.none()));
 		MenuItem details = new MenuItem("Update _File Details…");
 		details.setId("menuUpdateFiles");
 		details.setOnAction(e -> askToUpdateFiles(stage));
@@ -1017,12 +1016,11 @@ public class CrateEditor extends Application {
 		web.setId("menuCheckWeb");
 		web.setOnAction(e -> checkWeb(stage));
 		Menu menu = new Menu("_Crate", null, parts.toArray(MenuItem[]::new));
-		menu.getItems().addAll(new SeparatorMenuItem(), attached, new SeparatorMenuItem(), details, web, repair);
+		menu.getItems().addAll(new SeparatorMenuItem(), attach, detach, new SeparatorMenuItem(), details, web, repair);
 		menu.setOnShowing(e -> {
 			enableParts(parts);
-			attached.setSelected(crateFile.isAttached());
 			details.setDisable(!crateFile.isAttached());
-			attached.setDisable(!crateFile.canAttach());
+			detach.setDisable(crateFile.attachment().isNone());
 		});
 		menu.setId("menuCrate");
 		return menu;
@@ -1828,6 +1826,50 @@ public class CrateEditor extends Application {
 		return done;
 	}
 
+	/**
+	 * Crate > Attach…: ask where the crate's files are (see
+	 * {@link AttachDialog}) and attach it there; a folder with none of its
+	 * files is only attached to if the user insists.
+	 */
+	private void askToAttach(Stage stage) {
+		List<WebCrate.Root> suggestions = crateFile.web().map(w -> w.suggestedRoots(crate.getRoot()))
+				.orElseGet(() -> WebCrate.rootsOf(crate.getRoot()));
+		new AttachDialog(stage, crate, crateFile.attachment(), suggestions,
+				crateFile.path().map(p -> p.toAbsolutePath().getParent()), rootProbe, MAX_FILES).showAndWait()
+				.ifPresent(chosen -> {
+					if (chosen.folder().isPresent()
+							&& CrateFolder.match(crate, chosen.folder().get(), MAX_FILES).elsewhere()) {
+						Alert sure = new Alert(AlertType.CONFIRMATION, "None of the crate's files are in "
+								+ chosen.folder().get() + ". Its files will not be found there until they are.",
+								ButtonType.YES, ButtonType.NO);
+						sure.initOwner(stage);
+						sure.setHeaderText("Attach to this folder anyway?");
+						if (sure.showAndWait().orElse(ButtonType.NO) != ButtonType.YES) {
+							return;
+						}
+					}
+					attach(chosen);
+				});
+	}
+
+	/**
+	 * Say what the crate's relative <code>@id</code>s are relative to (see
+	 * {@link CrateFile#attach}). Its files are listed again, and its links lead
+	 * there. Not a change to the crate, so not an undo step.
+	 */
+	void attach(Attachment attachment) {
+		crateFile.attach(attachment);
+		listedFolder = Optional.empty();
+		relist();
+		refresh();
+		Entity shown = entityEditor.getEntity();
+		show(shown == null || crate.get(shown.getId()).isEmpty() ? crate.getRoot() : shown);
+		showNotice(attachment.isNone() ? "Detached: the relative identifiers lead nowhere."
+				: "Attached to " + attachment + (attachment.web().isPresent()
+						? ": relative identifiers lead there, though they are saved as written."
+						: ": its files are found there."), null, null);
+	}
+
 	/** Asks web resources whether they are available */
 	WebAvailability webAvailability = new WebAvailability(ProfileCache.httpClient(Duration.ofSeconds(15)),
 			Duration.ofSeconds(15), USER_AGENT);
@@ -1841,7 +1883,9 @@ public class CrateEditor extends Application {
 	 * @return The check, running, if there is anything to check
 	 */
 	Optional<Task<List<WebAvailability.Result>>> checkWeb(Stage stage) {
-		List<String> addresses = WebAvailability.addresses(crate);
+		// Also the relative files, at the web address the crate is attached to, if it is
+		Map<String, String> targets = WebAvailability.targets(crate, crateFile.web());
+		List<String> addresses = List.copyOf(targets.keySet());
 		if (addresses.isEmpty()) {
 			Alert none = new Alert(AlertType.INFORMATION, "The crate has no parts on the web, under External"
 					+ " resources in View > Entities by Folder, to check.", ButtonType.OK);
@@ -1865,7 +1909,9 @@ public class CrateEditor extends Application {
 			}
 			List<WebAvailability.Result> results = task.getValue();
 			Map<String, String> found = new HashMap<>();
-			results.stream().filter(r -> !r.available()).forEach(r -> found.put(r.address(), r.problem().get()));
+			// By the @id of the entity, which may be relative
+			results.stream().filter(r -> !r.available())
+					.forEach(r -> found.put(targets.getOrDefault(r.address(), r.address()), r.problem().get()));
 			unavailable = found;
 			relist();
 			Alert done = new Alert(found.isEmpty() ? AlertType.INFORMATION : AlertType.WARNING,
@@ -2991,7 +3037,9 @@ public class CrateEditor extends Application {
 		List<String> notes = document.problems().stream().map(Problem::toString).toList();
 		showNotice("Opened from " + retrieved.source() + web.map(w -> webNotice(w, crate)).orElse(".")
 				+ (notes.isEmpty() ? "" : " " + notes.size() + (notes.size() == 1 ? " warning" : " warnings")
-						+ ": " + String.join(" ", notes)), null, null);
+						+ ": " + String.join(" ", notes)),
+				web.filter(w -> !crate.unanchoredDataEntities(w).isEmpty()).isPresent() ? "Attach…" : null,
+				() -> askToAttach(stage));
 		web.filter(w -> !crate.unanchoredDataEntities(w).isEmpty()).ifPresent(this::findRoot);
 		return true;
 	}

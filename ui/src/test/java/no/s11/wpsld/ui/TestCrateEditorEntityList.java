@@ -461,8 +461,7 @@ public class TestCrateEditorEntityList extends UiTest {
 		EntityTreeView tree = lookup("#entityTree").queryAs(EntityTreeView.class);
 		assertFalse(rows(tree).toString(), rows(tree).contains("  unrelated.pdf ~"));
 		// Attached after all, its folder's files are listed
-		interact(() -> ((javafx.scene.control.CheckMenuItem) menuItem("menuAttached")).setSelected(true));
-		interact(() -> menuItem("menuAttached").fire());
+		interact(() -> app.attach(Attachment.toFolder(folder)));
 		WaitForAsyncUtils.waitForFxEvents();
 		assertTrue(rows(tree).toString(), rows(tree).contains("  unrelated.pdf ~"));
 	}
@@ -542,8 +541,7 @@ public class TestCrateEditorEntityList extends UiTest {
 			assertEquals(List.of("  gone.csv", "  " + web + "/gone.csv"), problemRows(tree));
 
 			// Detached, its files are not looked for
-			interact(() -> ((javafx.scene.control.CheckMenuItem) menuItem("menuAttached")).setSelected(false));
-			interact(() -> menuItem("menuAttached").fire());
+			interact(() -> app.attach(Attachment.none()));
 			WaitForAsyncUtils.waitForFxEvents();
 			assertEquals(List.of("  " + web + "/gone.csv"), problemRows(tree));
 		} finally {

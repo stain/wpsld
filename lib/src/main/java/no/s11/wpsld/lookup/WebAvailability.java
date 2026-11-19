@@ -23,7 +23,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
@@ -33,6 +35,7 @@ import java.util.concurrent.Future;
 
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.crate.WebCrate;
 
 /**
  * Whether a crate's web resources are available: each data entity with a
@@ -69,6 +72,29 @@ public class WebAvailability {
 	/** The data entities with web (http, https) addresses, to check */
 	public static List<String> addresses(Crate crate) {
 		return crate.dataEntities().stream().map(Entity::getId).filter(WebAvailability::isWeb).distinct().toList();
+	}
+
+	/**
+	 * What to check, by address and the <code>@id</code> of the data entity
+	 * it is for: the data entities with web addresses, and, for a crate with a
+	 * web base (see {@link WebCrate}), those with relative <code>@id</code>s,
+	 * at the address they lead to there, as they would be in an attached crate
+	 * published on the web. Several entities at one address are checked once,
+	 * for the first.
+	 *
+	 * @param web Where the crate is on the web, if anywhere
+	 */
+	public static Map<String, String> targets(Crate crate, Optional<WebCrate> web) {
+		Map<String, String> targets = new LinkedHashMap<>();
+		for (Entity entity : crate.dataEntities()) {
+			String id = entity.getId();
+			if (isWeb(id)) {
+				targets.putIfAbsent(id, id);
+			} else {
+				web.flatMap(w -> w.resolve(id)).ifPresent(address -> targets.putIfAbsent(address.toString(), id));
+			}
+		}
+		return targets;
 	}
 
 	private static boolean isWeb(String id) {

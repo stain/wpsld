@@ -139,6 +139,20 @@ public record WebCrate(URI source, Optional<URI> base, boolean attached, String 
 	}
 
 	/**
+	 * A crate attached by the user to a web address, one that was not fetched
+	 * from it: its relative <code>@id</code>s are relative to the address.
+	 */
+	public static WebCrate attachedTo(URI base) {
+		return new WebCrate(base, Optional.of(base), true, "attached to " + base + " by the user", base,
+				Optional.empty());
+	}
+
+	/** The same crate with no base for its relative <code>@id</code>s, detached by the user */
+	public WebCrate withoutBase() {
+		return new WebCrate(source, Optional.empty(), false, reason + "; detached by the user", asked, landing);
+	}
+
+	/**
 	 * The same crate with a base chosen for its relative <code>@id</code>s, by
 	 * the user or found by {@link RootProbe}, not changing what it is
 	 * otherwise (a detached crate stays one).
@@ -176,19 +190,6 @@ public record WebCrate(URI source, Optional<URI> base, boolean attached, String 
 	 */
 	public List<Root> suggestedRoots(Entity root) {
 		Map<URI, Root> found = new LinkedHashMap<>();
-		BiConsumer<String, String> add = (text, why) -> {
-			try {
-				URI uri = new URI(text.strip());
-				String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
-				String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
-				if ((scheme.equals("http") || scheme.equals("https")) && !host.isEmpty() && !RESOLVERS.contains(host)
-						&& !uri.equals(asked) && !uri.equals(source)) {
-					found.putIfAbsent(uri, new Root(uri, why));
-				}
-			} catch (java.net.URISyntaxException e) {
-				// Not an address
-			}
-		};
 		// The landing page is where the redirections ended, even if it was asked for
 		landing.ifPresent(page -> {
 			String host = page.getHost() == null ? "" : page.getHost().toLowerCase(Locale.ROOT);
@@ -196,16 +197,45 @@ public record WebCrate(URI source, Optional<URI> base, boolean attached, String 
 				found.putIfAbsent(page, new Root(page, "the landing page the metadata was found from"));
 			}
 		});
+		rootsOf(root).forEach(r -> {
+			if (!r.address().equals(asked) && !r.address().equals(source)) {
+				found.putIfAbsent(r.address(), r);
+			}
+		});
+		if (source.getRawQuery() == null) {
+			URI folder = source.resolve("./");
+			found.putIfAbsent(folder, new Root(folder, "the folder beside the metadata document"));
+		}
+		return List.copyOf(found.values());
+	}
+
+	/**
+	 * What the crate itself says its RO-Crate Root could be, for any crate, not
+	 * only one fetched from the web: the root data entity's own
+	 * <code>@id</code>, its <code>identifier</code> and <code>cite-as</code>,
+	 * when they are web addresses, but not a persistent identifier resolver's
+	 * (a DOI), which only redirects to where the files may be.
+	 */
+	public static List<Root> rootsOf(Entity root) {
+		Map<URI, Root> found = new LinkedHashMap<>();
+		BiConsumer<String, String> add = (text, why) -> {
+			try {
+				URI uri = new URI(text.strip());
+				String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+				String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+				if ((scheme.equals("http") || scheme.equals("https")) && !host.isEmpty() && !RESOLVERS.contains(host)) {
+					found.putIfAbsent(uri, new Root(uri, why));
+				}
+			} catch (java.net.URISyntaxException e) {
+				// Not an address
+			}
+		};
 		add.accept(root.getId(), "the root data entity's own @id");
 		for (String property : List.of("identifier", "cite-as")) {
 			for (var value : root.getAll(property)) {
 				add.accept(value.isTextual() ? value.asText() : value.path("@id").asText(""),
 						"the crate's " + property + ", the dataset as published");
 			}
-		}
-		if (source.getRawQuery() == null) {
-			URI folder = source.resolve("./");
-			found.putIfAbsent(folder, new Root(folder, "the folder beside the metadata document"));
 		}
 		return List.copyOf(found.values());
 	}

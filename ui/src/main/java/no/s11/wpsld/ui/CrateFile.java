@@ -79,6 +79,11 @@ final class CrateFile {
 	/** Whether the crate is its folder's, see {@link #folder()} */
 	private boolean attached;
 	/**
+	 * A folder the user attached the crate to (Crate > Attach…), other than the
+	 * one its file is in: its relative <code>@id</code>s are paths in it
+	 */
+	private Optional<Path> attachedTo = Optional.empty();
+	/**
 	 * Where the crate was fetched from on the web, and what its relative
 	 * <code>@id</code>s mean there, until it is saved to a file
 	 */
@@ -101,6 +106,7 @@ final class CrateFile {
 		base = newBase();
 		newIn = Optional.empty();
 		attached = false;
+		attachedTo = Optional.empty();
 		web = Optional.empty();
 		openedFrom = Optional.empty();
 		this.path = Optional.empty();
@@ -163,6 +169,9 @@ final class CrateFile {
 	 * are paths in; none for a detached crate.
 	 */
 	Optional<Path> folder() {
+		if (attachedTo.isPresent()) {
+			return attachedTo;
+		}
 		if (!attached) {
 			return Optional.empty();
 		}
@@ -186,7 +195,43 @@ final class CrateFile {
 	 * downloaded on its own, whose files are elsewhere.
 	 */
 	void setAttached(boolean attached) {
+		attachedTo = Optional.empty();
 		this.attached = attached && canAttach();
+	}
+
+	/**
+	 * Say what the crate's relative <code>@id</code>s are relative to: a folder
+	 * of the user's choice, a web address, or nothing. The crate is not
+	 * changed. Attached to a folder, a crate fetched from the web is no
+	 * longer attached on the web (its files are the folder's), and attached
+	 * to a web address, a crate is not to a folder. Detached, a crate fetched
+	 * from the web goes on being one, with no base for its relative
+	 * <code>@id</code>s.
+	 */
+	void attach(Attachment attachment) {
+		if (attachment.folder().isPresent()) {
+			attachedTo = attachment.folder();
+			attached = true;
+			web = Optional.empty();
+		} else if (attachment.web().isPresent()) {
+			URI address = attachment.web().get();
+			attachedTo = Optional.empty();
+			attached = false;
+			web = Optional.of(web.map(w -> w.withBase(address, "attached to " + address + " by the user"))
+					.orElseGet(() -> WebCrate.attachedTo(address)));
+		} else {
+			attachedTo = Optional.empty();
+			attached = false;
+			web = web.map(WebCrate::withoutBase);
+		}
+	}
+
+	/** What the crate is attached to now, as {@link #attach} takes it */
+	Attachment attachment() {
+		if (folder().isPresent()) {
+			return Attachment.toFolder(folder().get());
+		}
+		return web.flatMap(WebCrate::base).map(Attachment::toWeb).orElse(Attachment.none());
 	}
 
 	/**
@@ -194,7 +239,7 @@ final class CrateFile {
 	 * crate's folder's <code>ro-crate-metadata.json</code>.
 	 */
 	Optional<Path> saveTarget() {
-		return path.or(() -> newIn.map(folder -> folder.resolve(Crate.RO_CRATE_METADATA_JSON)));
+		return path.or(() -> newIn.or(() -> attachedTo).map(folder -> folder.resolve(Crate.RO_CRATE_METADATA_JSON)));
 	}
 
 	/**
@@ -208,13 +253,14 @@ final class CrateFile {
 			base = newBase();
 		}
 		// Saved to a file, it is no longer the one on the web
-		if (path.isPresent()) {
+		if (path.isPresent() && !path.equals(this.path)) {
 			web = Optional.empty();
 			openedFrom = Optional.empty();
 		}
 		// Attached by its name when first in a file, or in another; else as it was
 		if (path.isPresent() && !path.equals(this.path)) {
 			attached = isMetadataFile(path.get());
+			attachedTo = Optional.empty();
 			newIn = Optional.empty();
 		}
 		this.path = path;
