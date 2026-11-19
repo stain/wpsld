@@ -81,8 +81,12 @@ final class EntityIcons {
 	/** A web resource not available */
 	static final Glyph UNAVAILABLE = Glyph.of(FluentUiRegularMZ.PLUG_DISCONNECTED_20, Family.PROBLEM);
 
-	/** A web address not answering, for an entity that is not a work: yellow, not red */
-	static final Glyph UNAVAILABLE_WARNING = Glyph.of(FluentUiRegularMZ.PLUG_DISCONNECTED_20, Family.WARNING);
+	/**
+	 * A web address not answering, for an entity that is not a work: yellow, not
+	 * red, and a warning sign, not the plug, so that the two are not told apart by
+	 * their colour alone
+	 */
+	static final Glyph UNAVAILABLE_WARNING = Glyph.of(FluentUiRegularMZ.WARNING_20, Family.WARNING);
 
 	/** The icon of an entity with a problem, by what it is */
 	static Glyph problem(Entity entity, EntityListing listing) {
