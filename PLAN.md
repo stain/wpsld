@@ -2308,10 +2308,21 @@ extension. Next:
   `09a8df20…`), and build the image (`podman build --network=host
   --output type=local,dest=dist .`, in a clone, as AGENTS.md says). A check
   in CI that the Dockerfile's pin is the latest published 25.x would stop this
-  being found by hand. JavaFX: 27.0.1.1 is on Maven
-  Central above the 27.0.1 pinned in `release.yml`, `ui/build.gradle` and the
-  Dockerfile (with the jmods' SHA-256s): see what 27.0.1.1 fixes and update
-  them together if it is a security fix.
+  being found by hand. JavaFX **27.0.1.1** (Maven Central
+  2026-11-17, "Nov 2026 CSPU": two commits on 27.0.1, a version bump and an update
+  of the bundled libxml2 to 2.15.4 in `javafx.web`, a module wpsld does not use,
+  so the risk is small) is **adopted** in `release.yml` (with the five jmods'
+  SHA-256s, checked by hashing the pinned 27.0.1's linux zip first), the
+  Dockerfile (linux and windows) and `ui/build.gradle`; build them (the
+  Dockerfile and the release workflow are not run here).
+  **The development container's JDK stays 25.0.2**: conda-forge has OpenJDK
+  25.0.5.1, but it needs libcups >=2.4.20 and libharfbuzz >=15.1 and every gtk3
+  build needs libcups <2.4, so they do not install together (tried 2026-11-19:
+  `conda env update --prune` dropped gtk3 and pango without an error, and 193 UI
+  tests failed with `no javafx_font_pango`; reverted, see `environment.yml` and
+  AGENTS.md). Try again when gtk3 is rebuilt, with a dry run first. The release is
+  built with Temurin, whose `cacerts` has HARICA's 2021 roots; conda-forge's, at
+  25.0.5.1 as at 25.0.2, has only the 2015 ones.
 - **A zip by FAIR Signposting**: `CrateRetriever` also follows
   `rel="item"` links to an RO-Crate zip (`type="application/zip"`, with
   the RO-Crate profile), as "Retrieving an RO-Crate" allows: downloaded

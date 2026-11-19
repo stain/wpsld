@@ -272,7 +272,7 @@ its jars, so that its native libraries end up in the image. Download the
 [JavaFX 27 jmods](https://gluonhq.com/products/javafx/) for your platform.
 Then, with an [Eclipse Temurin](https://adoptium.net/) 25 JDK:
 
-    ./gradlew -Pplatform=linux-x64 -PjavafxJmods=/path/to/javafx-jmods-27.0.1 :ui:appImageZip
+    ./gradlew -Pplatform=linux-x64 -PjavafxJmods=/path/to/javafx-jmods-27.0.1.1 :ui:appImageZip
 
 This makes `ui/build/image-zip/wpsld-<version>-linux-x64.zip`, an app image
 with a native launcher from `jpackage`. `jpackage` can only build for the

@@ -24,9 +24,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends libpangoft2-1.0
  && rm -rf /var/lib/apt/lists/*
 
 # Keep in sync with javafx.version in ui/build.gradle
-ARG JAVAFX_VERSION=27.0.1
-ARG JAVAFX_LINUX_JMODS_SHA256=323ceb45b938485f6921d7c31c994cc649adb1f75b16192580ff84a3119694ba
-ARG JAVAFX_WINDOWS_JMODS_SHA256=5c2a69a7ab42da347b0e8bb244a819e94af75d9f21ae4d129695a3ebc81e3979
+ARG JAVAFX_VERSION=27.0.1.1
+ARG JAVAFX_LINUX_JMODS_SHA256=1a20903dc231f98d01a29c6eafa2cf7cb98d3dca2dcd0603462ca89d9c631dcc
+ARG JAVAFX_WINDOWS_JMODS_SHA256=3778bc30311a535d879f50c02146a785563910b41e0025986eda903625052dcb
 # From https://api.adoptium.net/v3/assets/latest/25/hotspot?os=windows&architecture=x64&image_type=jmods
 ARG TEMURIN_WINDOWS_JMODS_SHA256=09a8df20d57da0f4807e219798f0e76c0a24c70dc23595115f8cf26c53fd2727
 
