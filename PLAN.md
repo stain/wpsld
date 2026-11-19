@@ -1946,3 +1946,73 @@ wpsld is in English only. Translating it means more than the UI's labels:
     `profile-documentation.md`, opened in the editor like any crate and
     usable at once as a profile for other crates. One example is not
     enough to infer value patterns (regexes); leave those to editing.
+- **Load vocabularies into a crate** *(TODO, designed in outline)*: for
+  the terms a crate (often a profile crate) uses or defines, read a
+  published vocabulary, e.g. Insert > Vocabulary from URL or File…, for an
+  address (content negotiation or `Link` headers as `CrateRetriever` does,
+  for JSON-LD, Turtle, RDF/XML) or a file in:
+  - RDFS (`rdfs:Class`, `rdf:Property`, `rdfs:label`, `rdfs:comment`,
+    `rdfs:subClassOf`, `rdfs:subPropertyOf`, `rdfs:domain`, `rdfs:range`,
+    `rdfs:seeAlso`, `rdfs:isDefinedBy`), and schema.org's way of saying
+    the same (`domainIncludes`, `rangeIncludes`, `supersededBy`);
+  - OWL (`owl:Class`, `owl:ObjectProperty`, `owl:DatatypeProperty`,
+    `owl:AnnotationProperty`, `owl:equivalentClass`, `owl:deprecated`,
+    `owl:Ontology` for the vocabulary's own name, version and licence),
+    taking the few elements needed, not reasoning (restrictions are shown
+    as text or left out, with a note);
+  - SKOS (`skos:ConceptScheme`, `skos:Concept`, `skos:prefLabel`,
+    `altLabel`, `definition`, `broader`/`narrower`, `inScheme`,
+    `hasTopConcept`, `notation`), for controlled vocabularies, as EDAM's
+    and many thesauri are.
+
+  What it becomes, chosen in a dialog like the profile inference's (which
+  terms to keep, a search and a filter by type, how many there are, as the
+  files' finders show):
+  - as **contextual entities** for use in an ordinary crate: a SKOS scheme
+    or a vocabulary's list of terms as a `DefinedTermSet` (`name`,
+    `description`, `url`, the `@id` the vocabulary's own), each concept as
+    a `DefinedTerm` (`name` from `prefLabel`, `description` from
+    `definition`, `termCode` from `notation`, `inDefinedTermSet`, `url`
+    its IRI, `alternateName` from `altLabel`), and, where the crate says
+    what a term is, classes as `rdfs:Class` and properties as `rdf:Property`
+    entities as RO-Crate's "Extending RO-Crate" describes, with `@id` the
+    term's IRI or a prefixed `@id` and the vocabulary's prefix added to the
+    crate's `@context` (kept, not renamed; check it for clashes with the
+    context's own terms, and the vocabulary's namespace for `@vocab`);
+  - as **rules of a profile crate** (MASP): a class becomes a class rule
+    (`rdfs:Class`, `prov:specializationOf` the class's IRI), a property a
+    property rule (`domainIncludes` the classes it is the domain of,
+    `rangeIncludes` its range, `rdfs:label`/`rdfs:comment` from the
+    vocabulary), `owl:Restriction` cardinalities as `sh:minCount` and
+    `sh:maxCount` where simple (`owl:minCardinality`, `owl:cardinality`),
+    and a SKOS scheme as a `DefinedTermSet` rule or an `ItemList` of the
+    values a property may take (see MASP.md), so a profile can be made
+    from a vocabulary rather than by hand;
+  - as **choices of a form** (the profile in use): a concept scheme
+    becomes the values to choose from for a property, as `ItemList` rules
+    do now, searchable by label and synonym, as the format finders are.
+  Keep where each term came from (`isDefinedBy`/`sameAs` the vocabulary's
+  IRI, its version or `dateModified`, and `retrieved`) so that a loaded
+  vocabulary can be checked for updates and its terms refreshed, merging
+  rather than duplicating (as pasting entities does); big vocabularies
+  (EDAM, NCIt) are loaded as a job, with a limit and a subset chosen
+  before anything is added, as the XML or Turtle parsing is untrusted
+  (sizes, entity expansion, no network from inside the parser; for Turtle
+  and RDF/XML check what the JDK can do alone, else a small reader, or
+  Jena only if it is accepted, as for file formats above).
+- **Editing profile crates**: more is probably needed to edit a profile
+  crate well, beyond the vocabularies, to be worked out as profile crates
+  are written. For example: a Profile mode of the editor choosing what the
+  forms show for a crate that *is* a profile (the MASP profile's own
+  classes and properties, as `rdfs:Class`, `rdf:Property`, `ItemList`,
+  `DefinedTermSet` and `PropertyValue` entities, with their cardinalities
+  and ranges); adding a class rule and its properties in one step; picking
+  a range from the classes of the profile and of schema.org; checking the
+  profile as a MASP profile (every property has a domain and a range, no
+  class without a label, every `domainIncludes` found, rules that clash)
+  and previewing the form it gives, as one using it would see it; creating
+  the profile's `profile-documentation.md`, `index.html` and
+  `crate-o-mode.json` with the profile; versioning (`version`,
+  `isBasedOn` the profile it extends, `supersededBy`), and publishing it
+  with a persistent identifier that its `conformsTo` users can load (see
+  Publishing).
