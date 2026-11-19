@@ -1410,10 +1410,136 @@ extension. Next:
   (`Accept: application/ld+json;profile="https://w3id.org/ro/crate"`),
   `ro-crate-metadata.json` beside a landing page, and HTML previews
   linking their metadata; it limits sizes and requests, as all it fetches
-  is untrusted. Opened read-only, or as a detached crate whose relative
-  `@id`s are resolved against where it came from (RO-Crate's base URI for
-  a crate on the web), to save locally with Save As. Also an RO-Crate
-  zip at a URL (below), downloaded to a temporary folder.
+  is untrusted. Opened read-only, with its relative `@id`s resolved
+  against its web base (next item), to save locally with Save As. Also an
+  RO-Crate zip at a URL (below), downloaded to a temporary folder.
+- **A crate on the web: attached or detached, and its web base**
+  *(TODO, designed; needs Open URL above)*. What RO-Crate 1.2 says
+  (`structure.md`, "Attached RO-Crate Package", "Detached RO-Crate
+  Package"; `appendix/relative-uris.md`):
+  - An Attached RO-Crate Package "can be stored and published in multiple
+    ways", among them "exposed as a Web resource within a folder
+    structure"; its metadata document "MUST be present in the RO-Crate
+    Root and it MUST be named `ro-crate-metadata.json`", and "the use of
+    relative URI references in the RO-Crate Metadata File ensures
+    identifiers of data entities work as they should" once its root
+    folder is on a web server. So a crate fetched from
+    `http://example.com/crate1/ro-crate-metadata.json` is an attached
+    crate whose RO-Crate Root is `http://example.com/crate1/`, and its
+    `hasPart` `file.txt` is `http://example.com/crate1/file.txt`.
+  - A Detached RO-Crate Package has no root folder; its metadata "is
+    accessed independently (e.g. as part of a programmatic API)", should
+    be named `${prefix}-ro-crate-metadata.json` if it is a file, its root
+    "SHOULD have an `@id` which is an absolute URL if it is available
+    online", and "any data entities ... MUST be Web-based Data Entities"
+    (absolute URIs); `#` local identifiers are still allowed for
+    contextual entities.
+
+  **Deciding**, in lib (e.g. `CrateRetriever.Retrieved#packaging()` or a
+  small `WebCrate` record beside it, so the TUI and CLI can use it too),
+  from `Retrieved.source()`, the URL the metadata document finally came
+  from *after all redirects* (not the URL the user typed, which may be a
+  DOI or a w3id.org redirect):
+  - the last path segment is `ro-crate-metadata.json` (or RO-Crate 1.0's
+    `ro-crate-metadata.jsonld`, as `CrateFile.isMetadataFile`): attached;
+    web base = the folder, `source.resolve("./")`, with query and
+    fragment dropped (a query means an API: detached, below);
+  - the path ends with `/` and the server answered with the crate itself
+    (content negotiation on a folder, as some servers do for
+    `index.html`/`ro-crate-metadata.json`): attached, base = that URL;
+  - anything else, e.g. `my-crate-ro-crate-metadata.json`, LDaCA's
+    `/api/object/…?meta=original`, ROHub's API, a DOI that negotiated
+    straight to JSON-LD at a record URL: detached; the base for
+    *resolving* (as JSON-LD does with the document URL) is still
+    `source`, but relative data entities are a problem (below);
+  - a `file:` URL is not a web crate: as now (`CrateFile`, by name).
+  - An `@base` in the document's own `@context`
+    (`JsonLdContext.getBase()`) wins over the URL for resolving, as
+    JSON-LD says; note it in the steps shown.
+  - `Content-Location` headers are ignored (rarely sent, and JSON-LD
+    1.1 uses the document URL); revisit if a repository needs it.
+  - Record the decision and why in `Retrieved.steps()`, e.g. "attached:
+    named ro-crate-metadata.json at http://example.com/crate1/", so the
+    window (and `wpsld-tui`'s status line) can say where relative paths
+    lead.
+
+  **Keeping it**: `CrateFile` gets `Optional<URI> webBase` (and the URL
+  asked for, `Optional<URI> openedFrom`, for the title, messages, recent
+  files and the persistent identifier below), set by `openWeb(Retrieved,
+  JsonNode)`, cleared by `open`/`openIn` and by a Save As to a local file
+  (after the warning below). A web crate has no `folder()`, `path` is
+  empty (Save becomes Save As), and `isAttached()` stays about a *local*
+  folder; add `isAttachedOnWeb()` for the decision above. The JSON is
+  not changed: no `@base` is added, the `@id`s stay relative as written,
+  so an unchanged crate saved is the crate as published.
+
+  **Using it** (the → beside a reference, the ↗ beside `@id`, and the
+  preview's links, all through `EntityPreview.address(String)` which
+  `EntityEditor.setAddress` already uses):
+  - a relative `@id` (not `#…`, not `_:…`; `./` included) resolves as
+    `webBase.resolve(id)` and opens in the browser, e.g. `file.txt` →
+    `http://example.com/crate1/file.txt`, `data/` → the folder's URL;
+    percent-encoded ids (`my%20file.txt`) stay encoded;
+  - for an attached web crate, not outside the root: `../other` resolves
+    to no link, as `local(...)` refuses paths outside the folder now, and
+    `CrateFolder`'s `rocrate:attached-outside` check applies to the URL
+    paths the same way;
+  - for a detached web crate, relative data entities still get a link
+    (resolved against `source`, often useful) but the tooltip says the
+    `@id` should be absolute;
+  - absolute `@id`s and `#`/`_:` ids as now. No HEAD requests just to
+    show a link; checking that files are there is Check Web Availability
+    (see "Attached and detached crates").
+  - `wpsld-tui` shows the resolved URL beside a relative `@id` (it
+    cannot open a browser everywhere; copying is enough), and
+    `wpsld preview` of a web crate writes links the same way.
+
+  **Checks**: a detached web crate with relative `File`/`Dataset` `@id`s
+  gets a REQUIRED issue ("Detached crate: data entities must be
+  web-based", spec quote, the resolved URL as the suggested fix), with a
+  repair that absolutizes them (below). An attached web crate gets
+  `CrateFolder`'s checks except "missing": files can't be listed over
+  HTTP, so missing files are for Check Web Availability.
+
+  **Saving it locally** (Save As, the only way to save a web crate):
+  before writing, if the crate has a web base and any relative `@id` of a
+  data entity (or one referenced from `hasPart`, or the root `./`), warn
+  in a dialog of the usual style, listing up to five ids with where they
+  lead now, e.g. "`file.txt` → http://example.com/crate1/file.txt": *"N
+  identifiers are relative to http://example.com/crate1/. Saved as
+  `<target>`, they will name files beside it instead, which wpsld does not
+  download, and the links to the web copies are lost."* Buttons:
+  - **Make Absolute** (default): one undo step (`UndoHistory`, as
+    renames are), rewriting each relative `@id` of a data entity (and
+    every reference to it, as `Crate` renames do) to `webBase.resolve(id)`,
+    leaving `#` ids alone (they stay local, as the appendix allows); the
+    root `./` stays `./` when saved as `ro-crate-metadata.json` (attached
+    locally, with web-based data entities, which RO-Crate allows) and
+    becomes the base URL when saved under another name (detached);
+    where the root has no `identifier`, the base (or the persistent
+    identifier it was opened by) is offered as `identifier`/`cite-as`, as
+    "Keep the persistent identifier" says, and, as the appendix suggests
+    for a fork, `isBasedOn` if the user goes on to change it;
+  - **Keep Relative**: save as is, e.g. to download the files by hand
+    next to it; the crate then becomes attached to the local folder (when
+    named `ro-crate-metadata.json`), its `@id`s naming files there;
+  - **Cancel**.
+  After either save the web base is dropped: the crate is now the local
+  file's. The same warning for Export as ZIP, and for copying entities
+  to another crate (`EntityClipboard` already writes `@base`, which
+  should be the web base for a web crate, so pasted relative ids become
+  absolute there).
+
+  **Tests**: lib, with the JDK's `HttpServer` as `TestCrateRetriever`
+  does: `…/crate1/ro-crate-metadata.json` → attached, base
+  `…/crate1/`; a redirect from `/doi/x` to `/crate1/ro-crate-metadata.json`
+  → base after the redirect; `/crate1/` answering JSON → attached;
+  `/api/object?id=…` and `x-ro-crate-metadata.json` → detached; an
+  `@base` in the context; `../escape` → no address. ui: TestFX for → on a
+  relative `hasPart` opening `http://…/crate1/file.txt` (a recording
+  `browse`), and the Save As warning's three choices (undo restores the
+  relative ids). Help: a paragraph in the tutorial on opening a crate from
+  the web, with its screenshot (see AGENTS.md).
 - **Save as ZIP and open ZIP**: File > Export as ZIP… writes an attached
   crate's folder as a zip, `ro-crate-metadata.json` at its top (or in a
   single folder, as RO-Crate allows), with the preview, skipping hidden
@@ -1499,7 +1625,13 @@ extension. Next:
   (the root's `@id` the base URI itself, or a persistent identifier if
   the user has one), and says which files were not found, leaving those
   unchanged until they are. One undo step; the descriptor's `about` and
-  every reference follow the renamed `@id`s.
+  every reference follow the renamed `@id`s. *(TODO)* For a crate opened
+  from the web (see "A crate on the web" under "Crates as ZIP, BagIt and
+  on the web"), the base URI is its recorded web base, filled in, and
+  the files are expected there already; the rewriting is the same as the
+  Save As warning's Make Absolute, so share it (in lib, e.g.
+  `Crate.absolutize(URI base)`, returning the renames for undo). It is
+  also the repair for a detached crate's relative data entities.
 - **Detached to attached** (Crate > Make Attached…): choose a folder; the
   `@id`s under a base URI (the root's, or one the user gives) become
   relative paths in it, and files there are offered to download (each
