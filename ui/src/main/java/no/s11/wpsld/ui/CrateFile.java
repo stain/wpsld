@@ -217,8 +217,7 @@ final class CrateFile {
 			URI address = attachment.web().get();
 			attachedTo = Optional.empty();
 			attached = false;
-			web = Optional.of(web.map(w -> w.withBase(address, "attached to " + address + " by the user"))
-					.orElseGet(() -> WebCrate.attachedTo(address)));
+			web = Optional.of(web.map(w -> w.attachedAt(address)).orElseGet(() -> WebCrate.attachedTo(address)));
 		} else {
 			attachedTo = Optional.empty();
 			attached = false;

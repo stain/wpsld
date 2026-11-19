@@ -224,6 +224,21 @@ public class TestWebCrate {
 		assertEquals(List.of(URI.create("https://example.com/crates/")), roots(named, crate));
 	}
 
+	/** Detached by the user and attached again, it is attached as before: its files are in the folder, not outside */
+	@Test
+	public void detachedThenAttachedAgain() {
+		WebCrate fetched = of("http://example.com/crate1/ro-crate-metadata.json");
+		WebCrate detached = fetched.withoutBase();
+		assertFalse(detached.attached());
+		assertEquals(Optional.empty(), detached.resolve("file.txt"));
+		WebCrate again = detached.attachedAt(URI.create("http://example.com/crate1/"));
+		assertTrue(again.attached());
+		assertEquals(Optional.of(URI.create("http://example.com/crate1/file.txt")), again.resolve("file.txt"));
+		assertEquals(Optional.empty(), again.resolve("../other/file.txt"));
+		// What it was fetched from is kept
+		assertEquals(fetched.source(), again.source());
+	}
+
 	@Test
 	public void adoptedBase() {
 		WebCrate api = of("https://data.example.com/api/export?id=abc");

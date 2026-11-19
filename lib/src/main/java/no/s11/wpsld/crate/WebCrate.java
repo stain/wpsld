@@ -147,6 +147,16 @@ public record WebCrate(URI source, Optional<URI> base, boolean attached, String 
 				Optional.empty());
 	}
 
+	/**
+	 * The same crate attached by the user to a web address (see
+	 * {@link #attachedTo}): an attached crate, whose files are paths in it, not
+	 * outside, whatever it was before, e.g. after being detached.
+	 */
+	public WebCrate attachedAt(URI newBase) {
+		return new WebCrate(source, Optional.of(newBase), true, reason + "; attached to " + newBase + " by the user",
+				asked, landing);
+	}
+
 	/** The same crate with no base for its relative <code>@id</code>s, detached by the user */
 	public WebCrate withoutBase() {
 		return new WebCrate(source, Optional.empty(), false, reason + "; detached by the user", asked, landing);
