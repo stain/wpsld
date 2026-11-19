@@ -1403,9 +1403,11 @@ extension. Next:
 
 ### Crates as ZIP, BagIt and on the web
 
-- **Open from the web, by dereferencing**: File > Open URL…, for a crate's
-  URL, DOI (`https://doi.org/…`) or other persistent identifier.
-  `CrateRetriever` (lib, not used by the editor yet) already follows
+- **Open from the web, by dereferencing**: File > Open URL… (done: a
+  background job, a notice, no recent files yet, and the failures shown
+  as the one message of the exception, not yet as every step tried), for
+  a crate's URL, DOI (`https://doi.org/…`) or other persistent
+  identifier. `CrateRetriever` already follows
   FAIR Signposting (`Link: <…>; rel="describedby"`), content negotiation
   (`Accept: application/ld+json;profile="https://w3id.org/ro/crate"`),
   `ro-crate-metadata.json` beside a landing page, and HTML previews
@@ -1414,7 +1416,12 @@ extension. Next:
   against its web base (next item), to save locally with Save As. Also an
   RO-Crate zip at a URL (below), downloaded to a temporary folder.
 - **A crate on the web: attached or detached, and its web base**
-  *(TODO, designed; needs Open URL above)*. What RO-Crate 1.2 says
+  *(done for a crate opened by File > Open URL…: `WebCrate` in lib,
+  `CrateFile.web()`, `EntityPreview.setWeb`, the notice, and the Save As
+  warning with `Crate.absolutize`, tested in `TestWebCrate` and
+  `TestCrateEditorWebCrate`; still to do: the checks, the TUI and CLI,
+  Export as ZIP and copying entities, `Content-Location`, and choosing
+  among a record's items, see the list below this one)*. What RO-Crate 1.2 says
   (`structure.md`, "Attached RO-Crate Package", "Detached RO-Crate
   Package"; `appendix/relative-uris.md`):
   - An Attached RO-Crate Package "can be stored and published in multiple
@@ -1570,7 +1577,8 @@ extension. Next:
   detached crate, fetching nothing. Manifests checked: SHA-512 (as
   RFC 8493 recommends) and SHA-256 (common); others reported as not
   checked.
-- **Open URL/PID defensively** (many ways to fail): repositories such as
+- **Open URL/PID defensively** *(TODO: the editor shows only the
+  exception's message so far)* (many ways to fail): repositories such as
   Zenodo, a common home of crates, link their files with
   `rel="item"` Signposting but without the RO-Crate profile, and a record
   may have several items (zips, JSON, other files): offer them for the

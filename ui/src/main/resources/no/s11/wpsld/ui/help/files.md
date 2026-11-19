@@ -13,6 +13,29 @@ and may show warnings about a file it did open. It also tries to choose a
 declared [profile](profiles.md). Choose **File > Open Folder...** to open
 a folder as a crate (see [Folders and files](folders.md)).
 
+### Crates on the web
+
+Choose **File > Open URL...** and give the address of a crate: of its
+`ro-crate-metadata.json`, of the folder it is in, of a page that leads to
+it, or a DOI (`10.5281/zenodo.1234`). It is fetched in the background and
+opened in no file, so Save asks where to save it.
+
+A crate whose metadata file is named `ro-crate-metadata.json` is an
+attached crate published on the web: its relative identifiers, such as
+`data/table.csv`, are paths in that folder, so with the crate at
+`http://example.com/crate1/ro-crate-metadata.json` the arrow beside it
+opens `http://example.com/crate1/data/table.csv` in the browser. This is
+worked out from where the crate was found in the end, after any redirects,
+and the notice at the foot of the window says where identifiers lead.
+Another name (`my-ro-crate-metadata.json`), or a service's address with a
+query, is a detached crate, which has no folder: its files should have
+web addresses of their own.
+
+The identifiers stay as written in the crate. Saving it to a file would
+make them name files beside the saved one instead, so wpsld asks first
+whether to **Make Absolute** (each becomes the web address it leads to,
+one step you can undo), **Keep Relative** or Cancel.
+
 ### Crates written in other ways
 
 RO-Crate's JSON-LD is *flattened*: each entity is written once in the
