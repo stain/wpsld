@@ -148,6 +148,14 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   chooser. Choose the target with our own dialog instead: the crate's
   folders as a tree (as View > Entities by Folder has them), the crate's
   folder at the top, with New Folder…, and nothing outside it.
+- **wpsld-cli's bullets and arrows garbled in a Windows console**
+  (*done*): `wpsld-cli repair .` in PowerShell showed `ÔÇó` for • and
+  `ÔåÆ` for →: UTF-8 read as the console's code page (850). picocli
+  4.7.7 takes the console's encoding from `sun.stdout.encoding`, which
+  Java 19 and later no longer set (it is `stdout.encoding` now), so it
+  wrote UTF-8. Now written in the encoding of `System.out` and
+  `System.err`, with •, → and the like as `*`, `->`… where the code page
+  lacks them.
 
 ## Repair Crate
 

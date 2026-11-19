@@ -19,10 +19,13 @@ package no.s11.wpsld.cli;
 
 import static org.junit.Assert.*;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -169,6 +172,19 @@ public class TestCli {
 		Path elsewhere = folder.resolve("elsewhere.html");
 		assertEquals(0, run("preview", "--offline", "-o", elsewhere.toString(), detached.toString()));
 		assertTrue(Files.readString(elsewhere).contains("<title>Broken</title>"));
+	}
+
+	/** In a Windows console's code page, not UTF-8; what it lacks in ASCII */
+	@Test
+	public void consoleEncoding() throws Exception {
+		String text = "• Cédric: Person → Person…";
+		for (String encoding : List.of("IBM850", "UTF-8")) {
+			ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+			PrintWriter console = Main.console(new PrintStream(bytes, true, encoding));
+			console.print(text);
+			console.flush();
+			assertEquals(encoding.equals("UTF-8") ? text : "* Cédric: Person -> Person...", bytes.toString(encoding));
+		}
 	}
 
 	@Test
