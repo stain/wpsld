@@ -1550,6 +1550,47 @@ extension. Next:
   `browse`), and the Save As warning's three choices (undo restores the
   relative ids). Help: a paragraph in the tutorial on opening a crate from
   the web, with its screenshot (see AGENTS.md).
+- **A zip, from disk or from the web: its arcp base and a viewer of its
+  files** *(TODO, designed in outline; one mechanism for a zip chosen in
+  File > Open, a zip found by Signposting, and `.eln`)*. A crate in a zip
+  is an attached crate whose folder is inside the archive, so its relative
+  `@id`s need a base that maps to the inside of the zip, as RO-Crate's
+  "Establishing a base URI inside a zip file" has it: the arcp scheme,
+  `arcp://uuid,<uuid>/`, with the UUID **name-based (version 5, SHA-1) from
+  where the zip was loaded from**: `file:///home/…/crate.zip` for a file,
+  the address it was downloaded from (`https://…`, after redirects, with
+  its query: `…/ro_crate?version=5`) for the web, so that opening the same
+  zip again, from the same place, gives the same base, and a copy
+  elsewhere another. (`java.util.UUID.nameUUIDFromBytes` is version 3,
+  MD5, so write version 5: the namespace and the exact string to hash are
+  to be taken from the arcp specification, https://w3id.org/arcp, and
+  tested against its examples; `no.s11.wpsld.arcp` has `arcp:` paths and a
+  file system, mostly stubs, see Storage backends.) The base is kept in
+  `CrateFile` as the web base is (not written into the JSON, or only as the
+  `@base` of the context when copying entities, as `EntityClipboard`
+  does), `WebCrate` is not used for it: a zip's `@id`s lead into the
+  archive, and a zip fetched from the web leads nowhere there.
+
+  There is no "Open Folder" for an archive, so the zip is opened with the
+  JDK's zip file system (`jdk.zipfs`, `FileSystems.newFileSystem`) and wpsld
+  gets a viewer of its own for what is in it, in Java: iterating the
+  entries as `Path`s of the zip file system, which `CrateFolder` (what the
+  crate describes and what the folder has, Entities by Folder), the checks
+  and the file metadata readers already take (they take a `Path`, so
+  check each that reads only; those that need a real file, such as
+  external readers, get a copy extracted to a temporary folder, as does
+  opening a file in the browser or another program, since a `jar:` or
+  zip-file-system URI means nothing outside the process). Read-only: Crate
+  > Extract to Folder… is the way to edit its files and add to them, Save
+  As writes the metadata alone, and the crate is edited as a detached one
+  (its `@id`s unchanged) until extracted. Checks against zip slip, entry
+  sizes and counts (zip bombs), names with `..` and absolute paths, and
+  duplicate entries; a single top-level folder is the root of the crate, as
+  the specification allows. A zip from the web is downloaded to a
+  temporary file as a job within size limits (the same Cancel window as
+  Open URL while it comes, no swapping out of the crate being edited
+  until it is here), then opened as a local zip with the web address as
+  its location.
 - **Save as ZIP and open ZIP**: File > Export as ZIP… writes an attached
   crate's folder as a zip, `ro-crate-metadata.json` at its top (or in a
   single folder, as RO-Crate allows), with the preview, skipping hidden
@@ -1672,13 +1713,60 @@ extension. Next:
      that is HTML without links, a JSON that is not a crate. Also the
      `Link` parsing of quoted commas, `anchor`s and relative `href`s.
 
-  Order to work in: (3) first, as it makes today's failures say the truth
-  and costs little; then (6) with it; then (2) and (5) (JSON only; the
-  text linkset only if a repository needs it); then (4) with the zip
-  download and the editor's choice window. A crate that came from a zip is
-  not "on the web" for `WebCrate`: its relative `@id`s are paths in the
-  archive, so it has no web base (the address it came from is kept as
-  where it was fetched, for the title and `cite-as`).
+  **Decisions** (2026-11-19):
+  - **Prefer JSON-LD online to an archive**, as it is the faster: so, after
+    the links with the RO-Crate `profile` (the specification's own
+    preference, either `describedby` or `item`) are put first among their
+    own kind, a `describedby` JSON(-LD) link that the prober (below)
+    shows to be a crate comes before an `item` zip, even a zip with the
+    profile. A `describedby` that fails the probe (WorkflowHub's,
+    Zenodo's) is dropped, and the zip is next. Candidates are listed
+    from the `Link` header, the HTML, *and the linkset*, and the same
+    `href` is tried once however many types it is listed with (Zenodo
+    lists its record five times).
+  - **Level 2 is needed: traverse the linkset**, not only the headers. A
+    `rel="linkset"` link (the `Link` header or `<link>`; Zenodo has only
+    that) is fetched with `Accept: application/linkset+json` (RFC 9264;
+    also `application/linkset`, the `Link` header's syntax, when a
+    server has only that), within the same limits, once (a linkset does
+    not lead to another). Its entries are taken for the page when their
+    `anchor` is the address of the landing page (as resolved after
+    redirects), the address asked for, or its `cite-as`; other anchors,
+    such as a file's own `collection` link back, are not the page's. The
+    links of the headers and of the linkset are merged and listed once.
+  - **Probe each candidate; pick when there is more than one.** A prober
+    (`CrateProbe` in lib, with `CrateReader` sharing its list of
+    descriptor `@id`s, `DESCRIPTOR_IDS`) answers whether a fetched
+    document is an RO-Crate metadata document, cheaply: it is JSON (a
+    `Content-Type` of `text/plain` or `application/octet-stream` is
+    fine, and HTML is not), an object with an `@graph` array, and the
+    array has the metadata descriptor of the specification's "Finding the
+    Root Data Entity": an entity whose `@id` is `ro-crate-metadata.json`,
+    or RO-Crate 0.2 and 1.0's `ro-crate-metadata.jsonld` (even when the
+    file itself is named `<prefix>-ro-crate-metadata.json`, as a detached
+    crate's may be), with an `about` that has an `@id`. Its
+    `conformsTo` is returned (`https://w3id.org/ro/crate/<version>`,
+    any version) but not required, and whether the root it is about
+    exists is for `CrateReader` to say, so that the probe stays one pass
+    over the `@graph` (streamed with Jackson, stopping at the
+    descriptor, within the size limit) and says why when it fails ("HTML
+    page", "JSON, but not an RO-Crate: no metadata descriptor in its
+    @graph", "DataCite's JSON-LD"). The JSON candidates are fetched
+    together (a few at a time, and the same limits for each) and
+    probed. **One that passes is opened. Several that pass are a choice**
+    for the user (two versions of the crate, or its own and a copy's).
+    **None that pass, and zip (or BagIt) items:** one with the RO-Crate
+    profile is the candidate; several are a choice, and a single one
+    without the profile is asked about too, as it may be data and big
+    (shown with its type and size). The choice window lists each with
+    what it is (name, type, size where known, why it is a candidate)
+    and never opens one unasked out of several.
+
+  Order to work in: the prober and the tests of `retrieve()` first, as
+  they make today's failures say the truth and cost little; then the
+  linkset (JSON) and `cite-as`/`license`; then the choice among several;
+  then the archives, with the zip handling below.
+
 - **A zip by FAIR Signposting**: `CrateRetriever` also follows
   `rel="item"` links to an RO-Crate zip (`type="application/zip"`, with
   the RO-Crate profile), as "Retrieving an RO-Crate" allows: downloaded
