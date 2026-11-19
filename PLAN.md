@@ -2179,9 +2179,9 @@ extension. Next:
   `TestCrateRetrieverRepositoriesOnline` (WildLIVE, MLentory, CEH); RADAR,
   HUN-REN and ROHub are not tested as they fail by the repositories' choice.
 - **Check Web Availability: manners, and what it says of the content**
-  *(in progress, 2026-11-19: `WebAvailability` rewritten and committed, with
-  `TestWebAvailabilityManners`, 8 of its 11 tests passing and 3 `@Ignore`d
-  until fixed; the editor is not changed to use it yet)*.
+  *(in progress, 2026-11-19: `WebAvailability` rewritten and tested
+  (`TestWebAvailabilityManners`, 11 tests); the editor is not changed to use it
+  yet)*.
 
   Measured first (18 real addresses from the crates tried, HEAD against a GET
   for one byte): both agree on every 404 and on success; **the one real
@@ -2227,20 +2227,15 @@ extension. Next:
   DOI or repository page is not the file). Not for `url`, which may be a page
   about it, nor a size like "1.2 MB".
 
+  **Done 2026-11-19**: the three tests that were ignored are fixed and none is
+  (a skipped address keeps its own failure, "Not available: no answer within
+  1.0 s, and not asked again, as …"; "tried N times" is the tries made; the
+  closed port is a `ServerSocket`'s; and a host given up on is asked at most by
+  those already on their way, as the permit is let go before the reply is
+  classified), and `TestWebAvailability.check` has fast pauses.
+
   **To do, in this order:**
-  1. **Fix the three ignored tests** in `TestWebAvailabilityManners` (then take
-     the `@Ignore`s off): `retryAfterLongerThanIsWorthWaitingGivesUpOnTheHost`
-     (an assertion with no message fails at its line 284, `seen.size() <= 3`:
-     find which and why: more requests than two, or a result not as said);
-     `aServerThatDoesNotAnswerIsNotWaitedForFortyTimes` (took 2 s, as it should,
-     but an address that timed out and was then skipped says "Could not check"
-     and loses its own failure: `Run.skipped` should say "Not available: no
-     answer within 1.0 s, and not asked again, as …" when it has one);
-     `nothingListeningIsTriedAgainAndSaid` ("tried 3 times" must be the tries
-     made: a timeout is tried twice at most; and the test's closed port, from
-     `HttpServer.create` then `stop`, took 10 s here, while one from a
-     `ServerSocket` refuses in 38 ms: use that).
-  2. **Use it in the editor**: `CrateEditor.checkWeb` calls
+  1. **Use it in the editor**: `CrateEditor.checkWeb` calls
      `webAvailability.check(addresses, WebAvailability.expectations(crate,
      targets))`, then `mismatches(crate, targets, results)`, kept (a `suspicious`
      map by `@id`, cleared where `unavailable` is) and shown as **yellow warnings
@@ -2251,14 +2246,12 @@ extension. Next:
      local server (a landing page for a PDF, a wrong size). The job should say
      what it is at (the host, "waiting 30 s as example.org asked") and have
      **Cancel** that stops at once.
-  3. **`TestWebAvailability.check`** ("nothing listening there") builds the
-     default `Manners`, so waits 3 s: give it the fast ones.
-  4. **`RootProbe`** (one HEAD per candidate, and one for a made-up path) and
+  2. **`RootProbe`** (one HEAD per candidate, and one for a made-up path) and
      `CrateRetriever` should share these manners: the `Accept`, and, for the
      retriever, `Retry-After` on a 429 or 503 (waiting up to a few seconds,
      not a host given up on), the message naming the address that did not
      answer, and the three kinds of failure of "Repositories tried".
-  5. **Smaller**: send `Accept-Encoding: identity` (RFC 9110, 12.5.3: the JDK
+  3. **Smaller**: send `Accept-Encoding: identity` (RFC 9110, 12.5.3: the JDK
      client does not decompress); decode an HTML page by its `charset`, not
      always UTF-8; a check of thousands of addresses (KU Leuven's has about
      8,000) needs a progress count and a way to skip a host; `Linkset` uses

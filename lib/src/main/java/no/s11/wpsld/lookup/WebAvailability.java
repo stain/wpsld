@@ -405,17 +405,19 @@ public class WebAvailability {
 			Host host = hosts.computeIfAbsent(uri.getHost().toLowerCase(Locale.ROOT), Host::new);
 			Optional<String> last = Optional.empty();
 			int status = 0;
+			int tries = 0;
 			for (int attempt = 1; attempt <= manners.attempts(); attempt++) {
 				if (host.gaveUp().isPresent()) {
-					return skipped(address, host);
+					return skipped(address, host, last);
 				}
 				host.awaitTurn();
 				Reply reply;
 				try {
 					// It may have been given up on while this waited for its turn
 					if (host.gaveUp().isPresent()) {
-						return skipped(address, host);
+						return skipped(address, host, last);
 					}
+					tries++;
 					reply = ask(uri, expected);
 				} finally {
 					host.done();
@@ -464,7 +466,7 @@ public class WebAvailability {
 				}
 			}
 			return new Result(address, status, Optional.of("Not available: " + last.orElse("not answered")
-					+ (manners.attempts() > 1 ? " (tried " + manners.attempts() + " times)" : "")));
+					+ (tries > 1 ? " (tried " + tries + " times)" : "")));
 		}
 
 		/** The pause before the next try: the first, then twice as long each time */
@@ -472,9 +474,14 @@ public class WebAvailability {
 			return manners.backoff().multipliedBy(1L << (attempt - 1));
 		}
 
-		private Result skipped(String address, Host host) {
-			return new Result(address, 0, Optional.of("Could not check: " + host.name + " is not asked any more, as "
-					+ host.gaveUp().orElse("it did not answer")));
+		/**
+		 * Not asked, or not asked again: an address that had already failed keeps what it was, with why it
+		 * was not tried again; one that was not asked at all is one that could not be checked
+		 */
+		private Result skipped(String address, Host host, Optional<String> last) {
+			String why = host.gaveUp().orElse("it did not answer");
+			return new Result(address, 0, Optional.of(last.map(l -> "Not available: " + l + ", and not asked again, as " + why)
+					.orElse("Could not check: " + host.name + " is not asked any more, as " + why)));
 		}
 
 		/** HEAD, and a GET for one byte where it shows a server that does not do HEAD right, or a length to confirm */

@@ -75,7 +75,9 @@ public class TestWebAvailability {
 
 	@Test
 	public void check() throws Exception {
-		WebAvailability web = new WebAvailability(ProfileCache.httpClient(Duration.ofSeconds(5)), Duration.ofSeconds(5));
+		// Not the default pauses between tries, which are seconds, for the last of this
+		WebAvailability web = new WebAvailability(ProfileCache.httpClient(Duration.ofSeconds(5)), Duration.ofSeconds(5),
+				new WebAvailability.Manners(2, 3, Duration.ofMillis(20), Duration.ofSeconds(10), 3));
 		List<WebAvailability.Result> results = web
 				.check(List.of(base + "/ok", base + "/moved", base + "/get-only", base + "/gone"));
 		assertEquals(List.of(true, true, true, false), results.stream().map(WebAvailability.Result::available).toList());
