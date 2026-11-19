@@ -123,6 +123,52 @@ public class ReadmeScreenshots {
 		}
 	}
 
+	/** A made-up crate that lacks what RO-Crate requires and has an object without @id, to check and repair */
+	@Test
+	public void checkAndRepairScreenshots() throws Exception {
+		String folder = System.getenv("SCREENSHOTS");
+		assumeNotNull(folder);
+		Path out = Path.of(folder);
+		Files.createDirectories(out);
+		Path crate = Files.createTempDirectory("tui-screenshots").resolve("ro-crate-metadata.json");
+		Files.writeString(crate, """
+				{"@context":"https://w3id.org/ro/crate/1.1/context","@graph":[
+				  {"@id":"ro-crate-metadata.json","@type":"CreativeWork",
+				   "about":{"@id":"./"},"conformsTo":{"@id":"https://w3id.org/ro/crate/1.1"}},
+				  {"@id":"./","@type":"Dataset","name":"Bird counts at Lake Example","hasPart":{"@id":"data/counts.csv"}},
+				  {"@id":"data/counts.csv","@type":"File","name":"Bird counts"},
+				  {"@id":"#alice","@type":"Person","name":"Alice Example",
+				   "affiliation":{"name":"Example University"}}
+				]}
+				""");
+		CrateSession session = CrateSession.open(crate);
+		DefaultVirtualTerminal terminal = new DefaultVirtualTerminal(new TerminalSize(100, 24));
+		ExecutorService executor = Executors.newSingleThreadExecutor();
+		try (Screen screen = new TerminalScreen(terminal)) {
+			screen.startScreen();
+			Future<?> task = executor.submit(() -> new Viewer(screen, session).run());
+			try {
+				await(terminal, "[Enter] Open");
+				terminal.addInput(new KeyStroke('c', false, false));
+				await(terminal, "problems.");
+				save(terminal, out.resolve("tui-check.png"));
+				key(terminal, KeyType.Escape);
+				await(terminal, "[Esc] Quit");
+				terminal.addInput(new KeyStroke('r', false, false));
+				await(terminal, "Repair Crate would do this");
+				save(terminal, out.resolve("tui-repair.png"));
+				key(terminal, KeyType.Escape);
+				await(terminal, "[Esc] Quit");
+				key(terminal, KeyType.Escape);
+				task.get(5, TimeUnit.SECONDS);
+			} finally {
+				task.cancel(true);
+			}
+		} finally {
+			executor.shutdownNow();
+		}
+	}
+
 	private static void key(DefaultVirtualTerminal terminal, KeyType key) throws InterruptedException {
 		terminal.addInput(new KeyStroke(key));
 		Thread.sleep(150);

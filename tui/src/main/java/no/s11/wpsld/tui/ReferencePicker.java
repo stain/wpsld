@@ -89,7 +89,7 @@ final class ReferencePicker {
 		List<Entity> candidates = candidates(property);
 		Set<Entity> chosen = new LinkedHashSet<>();
 		List<JsonNode> original = entity.getAll(property);
-		original.forEach(v -> Viewer.target(v, document).filter(candidates::contains).ifPresent(chosen::add));
+		original.forEach(v -> Values.target(v, document).filter(candidates::contains).ifPresent(chosen::add));
 		BasicWindow dialog = new BasicWindow("Choose " + property);
 		dialog.setCloseWindowWithEscape(true);
 		Panel panel = new Panel();
@@ -153,7 +153,7 @@ final class ReferencePicker {
 		List<JsonNode> result = new ArrayList<>();
 		Set<Entity> remaining = new LinkedHashSet<>(chosen);
 		for (JsonNode value : original) {
-			Optional<Entity> target = Viewer.target(value, document);
+			Optional<Entity> target = Values.target(value, document);
 			if (target.isPresent() && candidates.contains(target.get())) {
 				if (chosen.contains(target.get())) result.add(value);
 				remaining.remove(target.get());

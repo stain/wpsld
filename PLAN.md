@@ -59,14 +59,114 @@ main list or the references behind a nested view; `v` promotes a nested entity
 to the main list, and Escape closes nested views. The list is ordered as in
 the JavaFX list and can be filtered by ID, name or a type chosen from a
 searchable tree of the crate's types and their parents. See the README for
-its current keys and limits.
+its current keys and limits. `c` checks the crate and `r` runs Repair Crate
+(after showing what it would do), with the code of the editor and
+`wpsld-cli`, offline.
+
+The viewer's code is split by job: `Viewer` (the window and its keys),
+`Values` (how entities and values are worded on one line), `Status` (the
+bottom line), the dialogs (`TextDialog`, `ReferencePicker`, `TypePicker`,
+`CheckDialog`, `RepairDialog`), `CrateSession` (the file, saving) and
+`Maintenance` (check and repair).
+
+Next, in this order; none is started:
+
+1. **Add entities**: a new entity of a chosen type (searchable type tree as
+   for the filter) with an ID (suggested from the type and name, kept
+   unique; files and folders by their path), and linked from where it
+   belongs: the root's `hasPart` or `mentions`, or the property of the
+   entity it was added from. `Crate.add` and `Crate.addParts` do the
+   lib's side, as the editor's Add menu does.
+2. **Add properties not yet filled**: from the entity's types, the
+   properties of schema.org and, once there are profiles (4), those
+   the profile requires or recommends, searchable by name and with their
+   description; then a value of the kind the property takes (text, a
+   reference chosen as now, later dates, URLs and numbers). Empty
+   `license`, `description` and `datePublished` of the root, which Check
+   reports, are the first use.
+3. **Delete**: a value of a property (and the property when it was the
+   last), then an entity, with the references to it removed or kept as
+   unresolved, asked. Also add another value to a property that has some.
+4. **Profiles**: show which profile(s) the crate declares and matches
+   (`conformsTo`), choose or add one from those bundled or kept, and let the
+   profile drive which properties are offered, their labels and what is
+   required (see 2); and let Check fetch a declared profile that is not
+   kept, asked first, as the editor does.
+5. **Undo and redo**, perhaps first, since 1 to 3 need it (Check and Repair
+   don't, as Repair shows what it does first). Estimate: small to medium,
+   about a day or two with tests. `UndoHistory` in lib keeps snapshots of the
+   crate's JSON-LD at undo points, and the editor restores one by reading
+   the crate again (`CrateEditor.restore`). For the viewer that means:
+   (a) `CrateSession` owns a document that can be replaced, which `Viewer`,
+   `TypeFilter`, `ReferencePicker` and `Maintenance` now hold for good;
+   (b) the viewer holds `Entity` objects (`shown`, the list, the places in
+   `history`), which a restore makes stale, so hold identifiers and look
+   them up again; (c) a checkpoint after each edit, apply of a repair and
+   so on; (d) keys: `u` as a letter would search in the entity list, so
+   Ctrl-Z and Ctrl-Y, which Lanterna's raw terminal passes on; the
+   `*` mark already compares with the saved JSON, so undoing to the saved
+   state clears it.
+
+Smaller: show a property's label and description from the schema (or
+profile) in the bottom line; edit other value kinds (dates, URLs, numbers),
+and `@id` and `@type`; open a zip or a URL with `CrateRetriever`, and an
+entity-list-only start with no crate argument; values as wide as the terminal
+rather than cut at 48 columns; test the viewer on Windows (Lanterna's text
+terminal in `cmd` and Windows Terminal, `wpsld-tui.bat`), which the README
+describes but nobody has tried; the release workflow (below).
+
+Mouse support: Lanterna can capture the mouse (`DefaultTerminalFactory`'s
+mouse capture mode, e.g. click and release, with the wheel), and its GUI
+already turns clicks into actions for its own components. Try it for
+clicking a row of the entity list or of the properties (a double click as
+Enter), the buttons and rows of the dialogs, the wheel to scroll, and the
+keys of the bottom line as buttons (`[s] Save`, `[c] Check`), which would
+also help where letters can't be keys (see below). Capturing the mouse
+takes it from the terminal's own text selection and copy (usually Shift
+and drag still works), so decide whether it is on by default, or by an
+option (`--mouse`/`--no-mouse`) or a key, and say so in the README. Test
+it on the virtual terminal as the keys are, and in Windows Terminal and
+the usual Linux and macOS terminals.
+
+Copy and paste, so that the viewer is as usable with the system clipboard
+as other terminal tools are, such as Claude Code. Copy: the selected value,
+an entity's ID or an entity (as JSON-LD, and in the format of the editor's
+clipboard, so that it can be pasted there, and the other way: `Crate.paste`
+in lib adds copied entities), to the system clipboard. Terminals that
+accept the OSC 52 escape sequence set the clipboard of the machine the
+terminal runs on, also over SSH; otherwise a tool of the platform
+(`wl-copy`, `xclip`, `pbcopy`, `clip.exe`) if found. Find out which
+terminals support OSC 52 (some ask or limit it) and say in the README what to
+set. Paste: terminals send pasted text as keys, so its newlines would act as
+Enter and its letters as shortcuts; turn on bracketed paste (`ESC [?2004h`)
+and take the text between `ESC [200~` and `ESC [201~` as one input for the
+focused text field, the search or the text editor, and for the entity list,
+a search (or, in a property, a value that is an ID of an entity). Lanterna
+doesn't do this for us, as far as I know: check, and if needed read the
+sequences in an input filter before the key decoding. It interacts with the
+mouse (above): with the mouse captured, selecting text with the mouse needs
+Shift, so copy by key matters more.
+
+Also, from using it: `s`, `t`, `c` and `r` in the entity list are keys, so a
+search can't start with them (`/` first); with more keys (add, delete, undo)
+consider another way, e.g. a command key that opens a menu of actions, or
+Ctrl combinations. The problems in Check's dialog are cut at the width: show
+the selected one in full, wrapped. Check can't fetch a profile yet (see 4).
+A smoke test of the built image in the Dockerfile (start `wpsld-tui`, run
+`wpsld-cli check` on the example crate, and `--upgrade-module-path` with
+Lanterna's jar), as so far it was tried by hand. The zip's
+`tui/src/notices/THIRD-PARTY-NOTICES.txt` was made from the `ui` notices and
+Lanterna's licences: keep it in step when the dependencies change, e.g. by a
+script or a test comparing the two.
 
 The `ui` images and zips must not depend on `tui`, so that they carry neither
 Lanterna nor its LGPL requirements (see README). The `tui` module has a jlink
 setup of its own, for a smaller distribution with only `wpsld-tui` and
 `wpsld-cli` (no JavaFX, so no jmods needed), which the Dockerfile builds for
 Linux x64. To do: build and zip it in the release workflow for the other
-platforms, as `wpsld-tui-<version>-<platform>.zip`.
+platforms (Linux arm64, macOS, Windows, with the `.bat` launchers), as
+`wpsld-tui-<version>-<platform>.zip`, and cross-link the Windows one in the
+Dockerfile as for the editor.
 
 ### User help
 
