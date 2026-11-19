@@ -55,6 +55,8 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
 public class TestCrateEditorWebCrate extends UiTest {
 	private CrateEditor app;
 	private HttpServer server;
+	/** Held until released, by /slow/ro-crate-metadata.json */
+	private final java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
 
 	@Override
 	public void start(Stage stage) throws Exception {
@@ -69,6 +71,7 @@ public class TestCrateEditorWebCrate extends UiTest {
 
 	@After
 	public void stopServer() {
+		release.countDown();
 		if (server != null) {
 			server.stop(0);
 		}
@@ -86,7 +89,15 @@ public class TestCrateEditorWebCrate extends UiTest {
 			if (path.equals("/doi/x")) {
 				exchange.getResponseHeaders().add("Location", "/crate1/ro-crate-metadata.json");
 				exchange.sendResponseHeaders(302, -1);
-			} else if (path.equals("/crate1/ro-crate-metadata.json") || path.equals("/x-ro-crate-metadata.json")) {
+			} else if (path.equals("/crate1/ro-crate-metadata.json") || path.equals("/x-ro-crate-metadata.json")
+					|| path.equals("/slow/ro-crate-metadata.json")) {
+				if (path.startsWith("/slow")) {
+					try {
+						release.await();
+					} catch (InterruptedException e) {
+						Thread.currentThread().interrupt();
+					}
+				}
 				exchange.getResponseHeaders().add("Content-Type", "application/ld+json");
 				exchange.sendResponseHeaders(200, crate.length);
 				exchange.getResponseBody().write(crate);
@@ -208,5 +219,30 @@ public class TestCrateEditorWebCrate extends UiTest {
 	@Test
 	public void saveAsCancelled() throws Exception {
 		assertEquals(List.of(), saveAs("Cancel", "ro-crate-metadata.json"));
+	}
+
+	/**
+	 * While a crate is fetched a window says so, modal, with Cancel: the crate
+	 * being edited stays as it is, and cancelled, it is not replaced when the
+	 * server answers after all.
+	 */
+	@Test
+	public void cancelWhileFetching() throws Exception {
+		URI site = serve();
+		Stage stage = window();
+		String title = stage.getTitle();
+		interact(() -> app.openUrl(stage, site.resolve("/slow/ro-crate-metadata.json")));
+		waitForFx(30, () -> lookup("#openUrlProgress").tryQuery().isPresent());
+		assertTrue(app.notice().isEmpty());
+		assertEquals(title, stage.getTitle());
+		clickOn(lookup(".dialog-pane .button").match((Button b) -> b.getText().equals("Cancel")).queryButton());
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(lookup("#openUrlProgress").tryQuery().isEmpty());
+		// The answer comes, too late
+		release.countDown();
+		Thread.sleep(500);
+		WaitForAsyncUtils.waitForFxEvents();
+		assertTrue(app.notice().isEmpty());
+		assertEquals(title, stage.getTitle());
 	}
 }

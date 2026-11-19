@@ -1404,7 +1404,10 @@ extension. Next:
 ### Crates as ZIP, BagIt and on the web
 
 - **Open from the web, by dereferencing**: File > Open URL… (done: a
-  background job, a notice, no recent files yet, and the failures shown
+  window modal to the editor with Cancel while it is fetched, so that the
+  crate being edited can't change and is never swapped out unasked, and
+  that closes before the replacement, which can't be cancelled; a notice;
+  no recent files yet, and the failures shown
   as the one message of the exception, not yet as every step tried), for
   a crate's URL, DOI (`https://doi.org/…`) or other persistent
   identifier. `CrateRetriever` already follows

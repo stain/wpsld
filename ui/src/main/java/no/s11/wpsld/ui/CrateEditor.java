@@ -83,6 +83,7 @@ import javafx.scene.control.Dialog;
 import javafx.scene.control.ButtonBar.ButtonData;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
@@ -115,6 +116,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.util.StringConverter;
@@ -2903,8 +2905,13 @@ public class CrateEditor extends Application {
 	}
 
 	/**
-	 * Fetch a crate from the web as a job, and open it when it is there (see
-	 * {@link #openRetrieved}); what went wrong is said in a window.
+	 * Fetch a crate from the web, and open it when it is there (see
+	 * {@link #openRetrieved}); what went wrong is said in a window. While it
+	 * is fetched a window of its own, modal to the editor, says so and has
+	 * Cancel, so that the crate being edited can't be changed meanwhile, and
+	 * does not suddenly give way to the other. Once the crate is fetched the
+	 * window closes and it replaces the crate in one step, which can't be
+	 * cancelled.
 	 */
 	void openUrl(Stage stage, URI address) {
 		Task<CrateRetriever.Retrieved> task = new Task<>() {
@@ -2914,19 +2921,40 @@ public class CrateEditor extends Application {
 				return retriever.retrieve(address);
 			}
 		};
+		Dialog<Void> waiting = new Dialog<>();
+		waiting.initOwner(stage);
+		waiting.initModality(Modality.WINDOW_MODAL);
+		waiting.setTitle("Open URL");
+		waiting.setHeaderText("Opening " + address);
+		Label status = new Label();
+		status.setId("openUrlStatus");
+		status.textProperty().bind(task.messageProperty());
+		ProgressBar progress = new ProgressBar(ProgressBar.INDETERMINATE_PROGRESS);
+		progress.setPrefWidth(360);
+		Label explanation = new Label("This crate stays as it is until the other is here. Cancel to keep editing it.");
+		explanation.setWrapText(true);
+		explanation.setMaxWidth(360);
+		VBox content = new VBox(8, status, progress, explanation);
+		content.setId("openUrlProgress");
+		waiting.getDialogPane().setContent(content);
+		waiting.getDialogPane().getButtonTypes().setAll(ButtonType.CANCEL);
+		// Closing the window or Cancel stops fetching; after it is fetched, closing it does nothing
+		waiting.setOnHidden(e -> task.cancel(true));
 		task.setOnSucceeded(e -> {
-			if (mayClose(stage)) {
-				openRetrieved(stage, address, task.getValue());
-			}
+			waiting.close();
+			// From here on it replaces this crate, and can't be cancelled
+			openRetrieved(stage, address, task.getValue());
 		});
 		task.setOnFailed(e -> {
+			waiting.close();
 			Alert error = new Alert(AlertType.ERROR, String.valueOf(task.getException().getMessage()), ButtonType.OK);
 			error.initOwner(stage);
 			error.setHeaderText("Can't open " + address);
 			error.setResizable(true);
 			error.show();
 		});
-		inBackground(stage, "Open " + address, task);
+		jobs.start(jobs.job("Open " + address, opened, true), task);
+		waiting.show();
 	}
 
 	/**

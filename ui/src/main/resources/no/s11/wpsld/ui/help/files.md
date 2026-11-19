@@ -17,8 +17,10 @@ a folder as a crate (see [Folders and files](folders.md)).
 
 Choose **File > Open URL...** and give the address of a crate: of its
 `ro-crate-metadata.json`, of the folder it is in, of a page that leads to
-it, or a DOI (`10.5281/zenodo.1234`). It is fetched in the background and
-opened in no file, so Save asks where to save it.
+it, or a DOI (`10.5281/zenodo.1234`). A window says it is being fetched,
+and Cancel keeps the crate you are editing, which stays as it is until the
+other is here; then it is opened in its place, in no file, so Save asks
+where to save it.
 
 A crate whose metadata file is named `ro-crate-metadata.json` is an
 attached crate published on the web: its relative identifiers, such as
