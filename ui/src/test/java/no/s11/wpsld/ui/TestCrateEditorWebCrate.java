@@ -115,7 +115,7 @@ public class TestCrateEditorWebCrate extends UiTest {
 				exchange.sendResponseHeaders(200, crate.length);
 				exchange.getResponseBody().write(crate);
 			} else if ((path.equals("/README.md") && readmeThere) || path.equals("/files/README.md") || path.equals("/org")
-					|| path.equals("/licence")) {
+					|| path.equals("/licence") || path.equals("/files/ro-crate-metadata.json")) {
 				exchange.sendResponseHeaders(200, -1);
 			} else {
 				exchange.sendResponseHeaders(404, -1);
@@ -234,11 +234,12 @@ public class TestCrateEditorWebCrate extends UiTest {
 		assertEquals(List.of(site.resolve("/files/README.md").toString()), opened);
 
 		// Its files are asked for at that address: README.md is there, the other two (data/ and its file) are not;
-		// and the organisation's url and the licence's @id, which are there
+		// and the organisation's url and the licence's @id, which are there, and the metadata file beside the
+		// base, which an attached crate must have (not the root, which is the base folder, with no say in what is at it)
 		var task = WaitForAsyncUtils.asyncFx(() -> app.checkWeb(stage).orElseThrow()).get();
-		assertEquals(5, task.get(10, java.util.concurrent.TimeUnit.SECONDS).size());
+		assertEquals(6, task.get(10, java.util.concurrent.TimeUnit.SECONDS).size());
 		WaitForAsyncUtils.waitForFxEvents();
-		assertTrue(lookup("2 of 5 web resources are not available").tryQuery().isPresent());
+		assertTrue(lookup("2 of 6 web resources are not available").tryQuery().isPresent());
 
 		// Detached, nowhere to ask
 		interact(() -> app.attach(Attachment.none()));

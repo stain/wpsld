@@ -519,9 +519,10 @@ public class CrateEditor extends Application {
 					setGraphic(icon);
 					show("not-data", "In the crate's folder, but not in the crate: Add File(s) to Has Part to add it");
 				} else if (problems.containsKey(entity)) {
-					icon.set(EntityIcons.problem(entity, listing));
+					boolean warning = warnings.contains(entity);
+					icon.set(EntityIcons.problem(entity, listing, warning));
 					setGraphic(icon);
-					show("problem", problems.get(entity));
+					show(warning ? "warning" : "problem", problems.get(entity));
 				} else {
 					icon.set(EntityIcons.of(entity, listing));
 					setGraphic(icon);
@@ -531,7 +532,7 @@ public class CrateEditor extends Application {
 
 			/** The style class of a problem or a file not in the crate, if any, and the tooltip saying so */
 			private void show(String styleClass, String tooltip) {
-				for (String each : List.of("problem", "not-data")) {
+				for (String each : List.of("problem", "warning", "not-data")) {
 					boolean has = getStyleClass().contains(each);
 					if (each.equals(styleClass) && !has) {
 						getStyleClass().add(each);
@@ -1445,7 +1446,7 @@ public class CrateEditor extends Application {
 	 * page.html#t2, the file); and the web resources found unavailable by
 	 * Crate > Check Web Availability
 	 */
-	private Map<Entity, String> problems() {
+	private Map<Entity, String> problems(Set<Entity> warnings) {
 		Map<Entity, String> found = new HashMap<>();
 		crateFile.folder().ifPresent(folder -> {
 			for (Entity entity : crate.getEntities()) {
@@ -1456,12 +1457,22 @@ public class CrateEditor extends Application {
 				}
 			}
 		});
-		unavailable.forEach((id, problem) -> crate.get(id).ifPresent(entity -> found.put(entity, problem)));
+		Set<Entity> notFound = new HashSet<>(found.keySet());
+		unavailable.forEach((id, problem) -> crate.get(id).ifPresent(entity -> {
+			found.put(entity, problem);
+			// RO-Crate does not need an address to answer, which a person's or a defined term's, e.g. in an outdated
+			// namespace, is given for a human to follow: a warning, unless it is a work (a file, dataset, software)
+			if (!notFound.contains(entity) && !listing.isA(entity, "CreativeWork")) {
+				warnings.add(entity);
+			}
+		}));
 		return found;
 	}
 
-	/** The entities with a problem shown, see {@link #problems()} */
+	/** The entities with a problem shown, see {@link #problems(Set)} */
 	private Map<Entity, String> problems = Map.of();
+	/** Those of them with only a warning: not works, with a web address that does not answer */
+	private Set<Entity> warnings = Set.of();
 	/** Web resources found unavailable, by @id, and why */
 	private Map<String, String> unavailable = Map.of();
 
@@ -2585,12 +2596,14 @@ public class CrateEditor extends Application {
 			}
 			// The attached crate's folder, as it changes
 			folderWatch.watch(crateFile.folder());
-			Map<Entity, String> found = problems();
-			if (!found.equals(problems)) {
+			Set<Entity> soft = new HashSet<>();
+			Map<Entity, String> found = problems(soft);
+			if (!found.equals(problems) || !soft.equals(warnings)) {
 				problems = found;
+				warnings = soft;
 				entities.refresh();
 			}
-			tree.setProblems(problems);
+			tree.setProblems(problems, warnings);
 			if (byFolder) {
 				List<String> onDisk = showingFiles() ? filesOnDisk() : List.of();
 				List<EntityTree.Node> nodes = new ArrayList<>(

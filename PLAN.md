@@ -2156,9 +2156,20 @@ extension. Next:
   against the web base), and every `@id` that is a web address, of any
   entity, but not the descriptor or schema.org terms; plus, with a web base,
   the relative `@id`s of files and folders at the address they lead to (not
-  other entities' names). A failure says which property it was in. The
-  root's `@id` is asked about once it is the base, a folder that may have
-  no index page: to decide whether a folder address should be asked. To
+  other entities' names). A failure says which property it was in.
+  **Not the root's own `@id`**: RO-Crate only says it SHOULD be `./` or an
+  absolute URI (`root-data-entity.md`, "Root Data Entity identifier"), and
+  RECOMMENDS that a persistent identifier resolves to the crate (by
+  content negotiation or Signposting, with `cite-as`), but no representation
+  of a folder is required, and a folder may have no page; what must work for
+  an attached crate on the web is its `ro-crate-metadata.json` beside it,
+  which is asked instead (as of the root) when the crate is attached to a web
+  address. **Severity**: the specification requires no `@id` to resolve (a
+  DefinedTerm's `@id` in an outdated namespace, with a `url` as a fall-back for
+  people), so an address of a work (a CreativeWork or any kind of one: files,
+  datasets, software) that does not answer is a red problem, and of anything
+  else (people, organisations, terms, places) only a yellow warning (the row
+  and its icon; `warnings` in `CrateEditor`, `EntityTreeView`). To
   do: the root's `identifier`/`cite-as` as a persistent identifier if the
   user has one (the root's `@id`, "or a persistent identifier"); progress for
   the availability job, which asks four addresses at a time, so a crate of

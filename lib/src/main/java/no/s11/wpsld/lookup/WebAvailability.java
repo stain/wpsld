@@ -96,8 +96,13 @@ public class WebAvailability {
 	 * (see {@link WebCrate}), would be one: the latter only for files and
 	 * folders, as other entities' relative <code>@id</code>s (a person's name)
 	 * are not paths. Not the metadata descriptor, nor the schema.org terms a
-	 * crate refers to without describing them. An address several entities have
-	 * is listed for each, to be asked once (see {@link #addresses(List)}).
+	 * crate refers to without describing them, nor the <em>root data entity's
+	 * own</em> <code>@id</code>: RO-Crate asks only that it is <code>./</code> or
+	 * an absolute URI, with no say in what is at it (a folder may have no page
+	 * at all). What must work for an attached crate on the web is its metadata
+	 * file, <code>ro-crate-metadata.json</code> beside it, which is asked
+	 * instead, as of the root. An address several entities have is listed for
+	 * each, to be asked once (see {@link #addresses(List)}).
 	 *
 	 * @param web Where the crate is on the web, if anywhere
 	 */
@@ -106,7 +111,11 @@ public class WebAvailability {
 		java.util.Set<Entity> data = new java.util.HashSet<>(crate.dataEntities());
 		for (Entity entity : crate.getEntities()) {
 			String id = entity.getId();
-			if (isWeb(id)) {
+			if (entity == crate.getRoot()) {
+				// Not its @id, but the metadata file that an attached crate on the web must have
+				web.filter(WebCrate::attached).flatMap(WebCrate::base).ifPresent(base -> targets.add(
+						new Target(base.resolve(Crate.RO_CRATE_METADATA_JSON).toString(), id, Crate.RO_CRATE_METADATA_JSON)));
+			} else if (isWeb(id)) {
 				if (!Crate.isTerm(id)) {
 					targets.add(new Target(id, id, "@id"));
 				}
