@@ -1520,13 +1520,46 @@ extension. Next:
     top folder, as the specification allows), is there or not. The zip
     can be big, so a zip's size is shown and a download is the user's
     choice.
-  - a **Crate > Set RO-Crate Root…** (or a choice in the notice) to take one
-    of the suggestions, or an address typed in, as the web base, so that the
-    relative `@id`s lead there from then on (kept in `CrateFile` as the base
-    of an attached crate is, the JSON unchanged), and the Save As warning
-    applies; with a check, as a job, that a few of the files are there
-    (HEAD of the first ones, from the entities' sizes), and saying so
-    when they are not;
+  - **Choosing a root where it can't be determined is attaching the
+    crate**: **Crate > Attach…**, also as the button of the notice that
+    warns of a semi-detached crate (`showNotice` takes an action), says
+    what the relative `@id`s are relative to. The target is one of:
+    1. **a folder** on disk (a directory chooser), e.g. the crate's files
+       downloaded and unzipped by hand, or kept beside it by another tool;
+       the crate is then attached to it as one opened from a folder is
+       (`CrateFile.folder()`: the files listed in Entities by Folder, the
+       links, adding files, the checks), after showing how many of its files
+       are there and how many are not, as Save As to a folder does
+       (`CrateFolder.match`), and not accepted if none are, unless the user
+       insists;
+    2. **a web address**: a field, with the suggestions of
+       `WebCrate.suggestedRoots` to pick from, each with why, and a Check
+       that runs `RootProbe` on it and says if the first file is there (not
+       there is allowed: the user may know better, with the warning that
+       links may then lead nowhere); the crate keeps it as its web base
+       (`WebCrate.withBase`), the JSON unchanged, and the Save As warning
+       applies to it;
+    3. **a zip** *(once zip support is there, see "A zip, from disk or from
+       the web")*: a zip file (chosen on disk, or one of the record's
+       `item`s that is one), and then **the folder inside it** that is the
+       root, from the zip's entries (the top of the zip, or its single top
+       folder, or another folder the user picks in a tree of the entries),
+       with the arcp base of the zip; the crate is attached to that folder
+       of the zip file system, read-only.
+    **None** (Crate > Detach) puts it back to detached. Attaching is how
+    the crate is *looked at*, not an edit of it: it is not an undo step and
+    changes no `@id` (so it differs from Crate > Make Attached…/Make
+    Detached… below, which rewrite `@id`s between relative and absolute,
+    and move or fetch files); it is remembered with the crate (the state
+    folder, as recent files are), not written into it. The existing
+    **Attached to Folder** toggle (for a crate opened from a file whose
+    files are in its folder or not, see "Attached and detached crates") is
+    the folder case of this, so it becomes this: the menu has Attach… and
+    Detach, and says in the window's notice and the Crate menu what the
+    crate is attached to, rather than a checkbox that can only be a folder.
+    Opening a crate from the web ends semi-detached, as it is not known
+    where its files are, until the user attaches it, or `RootProbe` finds
+    them (above).
   - **use what the crate says about its files**: each File of such an
     export has its own `url` or `contentUrl` (KU Leuven's: one or two
     addresses, `https://rdr.kuleuven.be/api/access/datafile/129354`, for
@@ -1984,6 +2017,10 @@ extension. Next:
   checked against `contentSize` and any checksum, as a job). Files not
   downloaded keep their absolute `@id`s, as RO-Crate allows web-based
   data entities in an attached crate.
+- **Attach… and Detach** (Crate menu) say what a crate's relative `@id`s
+  are relative to: a folder, a web address or a folder inside a zip, with
+  no change to the crate: see "Semi-detached" under "Crates as ZIP, BagIt
+  and on the web". They replace the toggle below.
 - **Attached to Folder** (the Crate menu's toggle) stays for crates
   merely opened from elsewhere, e.g. downloaded on their own.
 
