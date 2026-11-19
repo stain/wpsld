@@ -1685,10 +1685,8 @@ extension. Next:
   check each that reads only; those that need a real file, such as
   external readers, get a copy extracted to a temporary folder, as does
   opening a file in the browser or another program, since a `jar:` or
-  zip-file-system URI means nothing outside the process). Read-only: Crate
-  > Extract to Folder… is the way to edit its files and add to them, Save
-  As writes the metadata alone, and the crate is edited as a detached one
-  (its `@id`s unchanged) until extracted. Checks against zip slip, entry
+  zip-file-system URI means nothing outside the process). Whether it can be
+  saved back depends on where the zip is: see "What Save does" below. Checks against zip slip, entry
   sizes and counts (zip bombs), names with `..` and absolute paths, and
   duplicate entries; a single top-level folder is the root of the crate, as
   the specification allows. A zip from the web is downloaded to a
@@ -1696,6 +1694,45 @@ extension. Next:
   Open URL while it comes, no swapping out of the crate being edited
   until it is here), then opened as a local zip with the web address as
   its location.
+- **What Save does, by where the crate is** *(TODO; the first row is
+  done)*. The crate's place decides, and **a crate is never saved to a place
+  it can't be written back to, or to a copy that is lost**:
+  | The crate is | Save | Save As |
+  |---|---|---|
+  | a file on disk, or a folder | the file, as now | as now |
+  | **fetched from the web** (Open URL, a web base) | **can't write back**: there is no general authentication, so no PUT or POST to a server. Save is never offered as writing there: it is **Save As, as for a new crate** (done: no path, so Save asks where; consider showing the menu item as "Save As…" and saying why in its tooltip, rather than "Save" that opens a chooser), and the web-ids warning applies (done) | a file or folder on disk, the web base dropped |
+  | **in a local zip** (opened from disk, e.g. `.crate.zip`, `.eln`) | **in place**, through the zip file system, which can write (`FileSystems.newFileSystem(zip)` and changes written when it is closed; to check: it rewrites the whole zip, so a big zip is a job with progress and Cancel, written to a temporary file beside it and then moved over it, as `SafeSave` does, never half written, and the file changed on disk by another program since it was opened asked about, as for a metadata file) | a zip elsewhere (a copy), or Extract to Folder… |
+  | **in a zip that was downloaded** (from the web, in a temporary file) | **never modifies the temporary zip** (which would be lost, in `/tmp` or the state folder): Save first asks where to save *the zip* (a zip file on disk), copies it there and goes on in that copy as a local zip, or extracts it to a folder (below) | the same |
+  | a folder inside a zip (Attach… to a folder of a zip, see above) | as its zip | as its zip |
+  The window's title and notice say where the crate is (a web address, a
+  zip and the folder in it) so that what Save will do is not a surprise,
+  and a crate with unsaved changes opened from the web asks before it is
+  closed or replaced as any other does (done).
+- **Zip handling goes both ways** *(TODO, with the zip item above, for zips
+  from disk as much as from the web)*:
+  - **Unpack to a folder**: Crate > Extract to Folder… (and the choice when
+    a zip is opened or downloaded) writes the zip's files into a folder the
+    user chooses (an empty or new one, never into one with other files
+    without asking, never outside it: zip slip), as a job with progress and
+    Cancel, checking entry sizes and counts as above, and then attaches the
+    crate to that folder (as Attach… does) and saves it there as a folder
+    crate; the zip itself is not changed or deleted. A single top-level
+    folder of the zip is the root: its contents, not the folder, go into
+    the chosen folder, saying so.
+  - **Turn an open folder into a zip**: File > Export as ZIP… (see "Save as
+    ZIP" below, there for an attached crate's folder; here also for a crate
+    attached to a folder with Attach…, and for one fetched from the web
+    whose files were attached to a folder): the folder's files and
+    `ro-crate-metadata.json` into a zip file the user names (`.crate.zip`
+    is suggested, as it is what repositories such as WorkflowHub use), at
+    the top or inside a single folder as chosen, skipping the hidden files
+    and, as it is for sharing, the crate's own `ro-crate-preview.html`
+    only if it is the crate's preview and wanted; through a temporary file
+    and then moved, never half written. The crate stays open on its folder
+    (a copy was made), with the option to open the zip (as a local zip, in
+    place).
+  - A **BagIt** zip and a BagIt folder in the same two directions (see
+    BagIt below).
 - **Save as ZIP and open ZIP**: File > Export as ZIP… writes an attached
   crate's folder as a zip, `ro-crate-metadata.json` at its top (or in a
   single folder, as RO-Crate allows), with the preview, skipping hidden
