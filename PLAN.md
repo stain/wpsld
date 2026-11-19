@@ -2293,7 +2293,22 @@ extension. Next:
   affected 25.0.5, so a release built now with `check-latest` has it, but
   the record does not say 25.0.5.1 is the fix: confirm from Oracle's or
   Adoptium's advisory before saying so, and consider failing the release for a
-  JDK older than a version set in the workflow. JavaFX: 27.0.1.1 is on Maven
+  JDK older than a version set in the workflow.
+  **The Dockerfile pins Temurin 25.0.5+8**, the affected release (it builds
+  the `dist/` zips and needs the Windows jmods of exactly its JDK build, with
+  their SHA-256, for cross-linking), while the GitHub workflows float to the
+  latest. 25.0.5.1+2 (an out-of-cycle release, 2026-11-18) was published
+  **without a Windows x64 JDK or jmods, and Docker Hub has no 25.0.5.1 image
+  yet (its newest tag is `25.0.5_8`)**, so the Dockerfile cannot move today.
+  To do, when they appear (check `https://api.github.com/repos/adoptium/temurin25-binaries/releases/tags/jdk-25.0.5.1%2B2`
+  for `OpenJDK25U-jmods_x64_windows_hotspot_25.0.5.1_2.zip`, and the tag
+  `eclipse-temurin:25.0.5.1_2-jdk`): set `TEMURIN_VERSION=25.0.5.1`,
+  `TEMURIN_BUILD=2` and `TEMURIN_WINDOWS_JMODS_SHA256` to the zip's `sha256sum`
+  (the method was checked on the current pin: it gives the Dockerfile's value,
+  `09a8df20…`), and build the image (`podman build --network=host
+  --output type=local,dest=dist .`, in a clone, as AGENTS.md says). A check
+  in CI that the Dockerfile's pin is the latest published 25.x would stop this
+  being found by hand. JavaFX: 27.0.1.1 is on Maven
   Central above the 27.0.1 pinned in `release.yml`, `ui/build.gradle` and the
   Dockerfile (with the jmods' SHA-256s): see what 27.0.1.1 fixes and update
   them together if it is a security fix.
