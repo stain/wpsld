@@ -3634,6 +3634,9 @@ public class CrateEditor extends Application {
 	 * @return Whether it was saved
 	 */
 	boolean saveAsChecked(Stage stage, Path file) {
+		if (!askAboutWebIds(stage, file)) {
+			return false;
+		}
 		Path folder = file.toAbsolutePath().getParent();
 		if (!CrateFile.isMetadataFile(file) || crateFile.folder().equals(Optional.of(folder))) {
 			return saveTo(stage, file);
@@ -3678,6 +3681,53 @@ public class CrateEditor extends Application {
 			return other != null && saveTo(stage, other.toPath());
 		}
 		return false;
+	}
+
+	/**
+	 * Before a crate fetched from the web is saved to a file: its relative
+	 * <code>@id</code>s lead to the web copies of its files, which saved
+	 * elsewhere they no longer do, but name files beside the saved one. Say
+	 * so, giving a few, and offer to make them absolute (one undo step, see
+	 * {@link Crate#absolutize}), or to keep them relative, e.g. to download
+	 * the files next to it.
+	 *
+	 * @return Whether to go on and save
+	 */
+	private boolean askAboutWebIds(Stage stage, Path file) {
+		Optional<WebCrate> web = crateFile.web();
+		if (web.isEmpty()) {
+			return true;
+		}
+		List<Entity> relative = crate.relativeEntities(web.get());
+		if (relative.isEmpty()) {
+			return true;
+		}
+		StringBuilder text = new StringBuilder();
+		text.append(relative.size()).append(relative.size() == 1 ? " identifier is" : " identifiers are")
+				.append(" relative to ").append(web.get().base()).append(", e.g. ")
+				.append(relative.stream().limit(3).map(e -> e.getId() + " \u2192 " + web.get().resolve(e.getId()).get())
+						.collect(Collectors.joining(", ")))
+				.append(".\n\nSaved as ").append(file.getFileName()).append(", they will name files beside it instead,"
+						+ " which wpsld doesn't download, and the links to the copies on the web are lost. Making them"
+						+ " absolute keeps them, as a crate whose files are on the web: a detached crate's data entities"
+						+ " are web addresses.");
+		ButtonType absolute = new ButtonType("Make Absolute", ButtonData.YES);
+		ButtonType keep = new ButtonType("Keep Relative", ButtonData.NO);
+		Alert alert = new Alert(AlertType.WARNING, text.toString(), absolute, keep, ButtonType.CANCEL);
+		alert.initOwner(stage);
+		alert.setHeaderText("The crate's files are on the web, not beside " + file.getFileName());
+		alert.setResizable(true);
+		ButtonType chosen = alert.showAndWait().orElse(ButtonType.CANCEL);
+		if (chosen == absolute) {
+			// A crate saved as ro-crate-metadata.json is attached to its folder, whose root is ./
+			crate.absolutize(web.get(), !CrateFile.isMetadataFile(file));
+			show(entityEditor.getEntity() == null || crate.get(entityEditor.getEntity().getId()).isEmpty()
+					? crate.getRoot()
+					: entityEditor.getEntity());
+			refresh();
+			checkpoint(placeOf(null), Optional.of("Make Identifiers Absolute"));
+		}
+		return chosen == absolute || chosen == keep;
 	}
 
 	/** Whether the user was asked about another tool's HTML preview of this crate */

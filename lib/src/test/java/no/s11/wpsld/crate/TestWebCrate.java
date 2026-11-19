@@ -19,7 +19,11 @@ package no.s11.wpsld.crate;
 
 import static org.junit.Assert.*;
 
+import java.io.ByteArrayInputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.Test;
@@ -93,5 +97,56 @@ public class TestWebCrate {
 	@Test
 	public void notWebCratesAreNone() {
 		assertEquals(Optional.empty(), WebCrate.of(URI.create("file:///tmp/crate/ro-crate-metadata.json"), Optional.empty()));
+	}
+
+	private static final String CRATE = """
+			{"@context": "https://w3id.org/ro/crate/1.2/context",
+			 "@graph": [
+			  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+			   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.2"}},
+			  {"@id": "./", "@type": "Dataset", "name": "A crate", "author": {"@id": "#alice"},
+			   "hasPart": [{"@id": "data/"}, {"@id": "README.md"}, {"@id": "https://example.org/x.csv"}]},
+			  {"@id": "data/", "@type": "Dataset", "hasPart": {"@id": "data/counts.csv"}},
+			  {"@id": "data/counts.csv", "@type": "File"},
+			  {"@id": "README.md", "@type": "File"},
+			  {"@id": "https://example.org/x.csv", "@type": "File"},
+			  {"@id": "#alice", "@type": "Person", "name": "Alice"}]}""";
+
+	private static Crate crate() {
+		return new CrateReader().read(new ByteArrayInputStream(CRATE.getBytes(StandardCharsets.UTF_8)), "test")
+				.crate().orElseThrow();
+	}
+
+	@Test
+	public void relativeEntitiesAreThoseLeadingSomewhere() {
+		WebCrate web = of("http://example.com/crate1/ro-crate-metadata.json");
+		assertEquals(List.of("data/", "data/counts.csv", "README.md"),
+				crate().relativeEntities(web).stream().map(Entity::getId).toList());
+	}
+
+	@Test
+	public void absolutizeKeepsLocalAndAbsoluteIds() {
+		Crate crate = crate();
+		WebCrate web = of("http://example.com/crate1/ro-crate-metadata.json");
+		Map<String, String> renamed = crate.absolutize(web, false);
+		assertEquals(Map.of("data/", "http://example.com/crate1/data/", "data/counts.csv",
+				"http://example.com/crate1/data/counts.csv", "README.md", "http://example.com/crate1/README.md"), renamed);
+		// References follow, others stay
+		assertEquals(List.of("http://example.com/crate1/data/", "http://example.com/crate1/README.md",
+				"https://example.org/x.csv"), crate.getRoot().getAll("hasPart").stream().map(v -> v.path("@id").asText()).toList());
+		assertEquals("./", crate.getRoot().getId());
+		assertTrue(crate.get("#alice").isPresent());
+		assertEquals(List.of(), crate.relativeEntities(web));
+		// Nothing more to do
+		assertEquals(Map.of(), crate.absolutize(web, false));
+	}
+
+	@Test
+	public void absolutizeTheRootForADetachedCrate() {
+		Crate crate = crate();
+		crate.absolutize(of("http://example.com/crate1/ro-crate-metadata.json"), true);
+		assertEquals("http://example.com/crate1/", crate.getRoot().getId());
+		// The descriptor is about it
+		assertEquals("http://example.com/crate1/", crate.toJson().get("@graph").get(0).get("about").get("@id").asText());
 	}
 }

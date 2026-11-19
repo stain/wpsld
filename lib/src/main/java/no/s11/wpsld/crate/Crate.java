@@ -17,6 +17,7 @@
  */
 package no.s11.wpsld.crate;
 
+import java.net.URI;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -446,6 +447,51 @@ public class Crate {
 		}
 		entity.setId(newId);
 		replaceReferences(oldId, newId);
+	}
+
+	/**
+	 * The entities, other than the root data entity, whose relative
+	 * <code>@id</code>s lead somewhere on the web (see
+	 * {@link WebCrate#resolve}): files and folders, and other entities named
+	 * by a path, but not <code>#local</code> and <code>_:blank</code> ones,
+	 * nor absolute ones.
+	 */
+	public List<Entity> relativeEntities(WebCrate web) {
+		return entities.stream().filter(e -> e != getRoot()).filter(e -> web.resolve(e.getId()).isPresent())
+				.toList();
+	}
+
+	/**
+	 * Make the relative <code>@id</code>s of a crate fetched from the web
+	 * absolute, as the RO-Crate specification's "Converting from Attached to
+	 * Detached RO-Crate Package" has it, so that they still lead there when
+	 * the crate is saved elsewhere: each entity listed by
+	 * {@link #relativeEntities} gets the address it leads to as its
+	 * <code>@id</code>, and every reference follows. An entity whose
+	 * address another entity already has is left as it is.
+	 *
+	 * @param root Whether the root data entity too: its <code>./</code>
+	 *             becomes the crate's address, as a detached crate's should be
+	 *             when available online; not for a crate to be saved as
+	 *             <code>ro-crate-metadata.json</code>, an attached crate whose
+	 *             root is its folder
+	 * @return The <code>@id</code>s as they were, and as they are now
+	 */
+	public Map<String, String> absolutize(WebCrate web, boolean root) {
+		Map<String, String> renamed = new LinkedHashMap<>();
+		List<Entity> relative = new ArrayList<>(relativeEntities(web));
+		if (root && web.resolve(getRoot().getId()).isPresent()) {
+			relative.add(getRoot());
+		}
+		for (Entity entity : relative) {
+			String oldId = entity.getId();
+			URI address = web.resolve(oldId).orElseThrow();
+			if (get(address.toString()).isEmpty()) {
+				rename(entity, address.toString());
+				renamed.put(oldId, address.toString());
+			}
+		}
+		return renamed;
 	}
 
 	/**

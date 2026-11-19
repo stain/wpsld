@@ -31,9 +31,13 @@ import java.util.Optional;
 
 import org.junit.After;
 import org.junit.Test;
+import org.testfx.util.WaitForAsyncUtils;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 
+import javafx.scene.control.Button;
 import javafx.scene.control.ListView;
 import javafx.stage.Stage;
 import no.s11.wpsld.crate.CrateReader;
@@ -156,5 +160,53 @@ public class TestCrateEditorWebCrate extends UiTest {
 		assertEquals(Optional.empty(), CrateEditor.webAddress("file:///etc/passwd"));
 		assertEquals(Optional.empty(), CrateEditor.webAddress("not an address"));
 		assertEquals(Optional.empty(), CrateEditor.webAddress("ftp://example.com/x"));
+	}
+
+	/** Opens the crate, and asks to save it as a file, answering the warning with a button; the saved file's @ids */
+	private List<String> saveAs(String button, String name) throws Exception {
+		URI site = serve();
+		Stage stage = window();
+		interact(() -> app.openUrl(stage, site.resolve("/crate1/ro-crate-metadata.json")));
+		waitForFx(30, () -> app.notice().isPresent());
+		Path file = Files.createTempDirectory("saved").resolve(name);
+		var saved = WaitForAsyncUtils.asyncFx(() -> app.saveAsChecked(stage, file));
+		waitForFx(30, () -> lookup(".dialog-pane").tryQuery().isPresent());
+		clickOn(lookup(".dialog-pane .button").match((Button b) -> b.getText().equals(button)).queryButton());
+		WaitForAsyncUtils.waitForFxEvents();
+		boolean done = saved.get();
+		assertEquals(!button.equals("Cancel"), done);
+		assertEquals(done, Files.exists(file));
+		if (!done) {
+			return List.of();
+		}
+		JsonNode graph = new ObjectMapper().readTree(file.toFile()).get("@graph");
+		List<String> ids = new ArrayList<>();
+		graph.forEach(e -> ids.add(e.get("@id").asText()));
+		return ids;
+	}
+
+	/** Saved elsewhere, relative @ids would name other files: Make Absolute keeps them leading to the web copies */
+	@Test
+	public void saveAsMakeAbsolute() throws Exception {
+		List<String> ids = saveAs("Make Absolute", "ro-crate-metadata.json");
+		String site = "http://127.0.0.1:" + server.getAddress().getPort() + "/crate1/";
+		assertTrue(ids.toString(), ids.contains(site + "README.md"));
+		assertTrue(ids.toString(), ids.contains(site + "data/counts.csv"));
+		assertFalse(ids.toString(), ids.contains("README.md"));
+		// An attached crate's root is its folder, and local ids are local
+		assertTrue(ids.toString(), ids.contains("./"));
+		assertTrue(ids.toString(), ids.contains("#alice"));
+	}
+
+	@Test
+	public void saveAsKeepRelative() throws Exception {
+		List<String> ids = saveAs("Keep Relative", "copy-ro-crate-metadata.json");
+		assertTrue(ids.toString(), ids.contains("README.md"));
+		assertTrue(ids.toString(), ids.contains("data/counts.csv"));
+	}
+
+	@Test
+	public void saveAsCancelled() throws Exception {
+		assertEquals(List.of(), saveAs("Cancel", "ro-crate-metadata.json"));
 	}
 }
