@@ -1828,14 +1828,45 @@ extension. Next:
     (`…/export?exporter=rocrate_json&…` has a query); its data entities
     should be absolute web addresses already, which the detached checks
     will say.
-  - Java did not trust `rdr.kuleuven.be`'s certificate chain in this
-    container (`PKIX path building failed`, while `curl` was fine): a
-    server that sends no intermediate certificate. wpsld cannot fix the
-    server; the failure should say so (the certificate, not "not found"),
-    and whether to trust the operating system's store (`-Djavax.net.ssl.trustStoreType`
-    on Windows and macOS, `Windows-ROOT`, `KeychainStore`) is for Preferences
-    to decide, not a quiet change. Try again from the real application
-    before treating it as a bug.
+  - **The trust store, not the server**: in this container (conda-forge
+    OpenJDK 25.0.2) Java refused `rdr.kuleuven.be` (`PKIX path building
+    failed`) while `curl` and Firefox were fine. The server sends its whole
+    chain (leaf, GEANT TLS RSA 1, signed by *HARICA TLS RSA Root CA
+    2021*, which `openssl` verifies); the JDK's `cacerts` has only
+    HARICA's 2015 roots, and the system's has the 2021 one. So an
+    application built on a JDK without the root fails for every site under
+    it (many European academic repositories: GEANT TLS is common), and the
+    runtime image `jlink` makes carries the JDK's store: check which JDK
+    the release workflow builds with and that its `cacerts` has
+    `HARICA TLS RSA Root CA 2021` and `HARICA TLS ECC Root CA 2021`
+    (`keytool -list -cacerts | grep -i harica`). The failure should say
+    the certificate is not trusted by this Java and by whom it was signed,
+    not "not found"; whether to use the operating system's store
+    (`Windows-ROOT`, `KeychainStore`) is for Preferences, not a quiet
+    change.
+  - **KU Leuven's crate is not valid JSON-LD**: 3,989 entities, of which
+    one, a folder named with spaces, has `"@id": ["New%20Patient%20Classification%201/", "New Patient Classification 1/"]`,
+    an array (its name encoded and not), where an `@id` is one string.
+    `CrateReader` drops that entity as an error and the editor refuses to
+    open the crate (`hasErrors`), and says "has no @id", which is not what
+    is wrong. To decide: (a) say what is wrong (`@id` is an array of 2
+    strings) in the message; (b) for Dataverse's export, and any crate
+    whose only errors are entities that can be dropped, open it with the
+    errors shown as warnings, listing what was dropped, rather than not at
+    all; (c) take the first string as the `@id` and the others as
+    `sameAs`, written back as one (as Repair Crate does for other
+    shapes). Tell Dataverse's exporter project when decided (see
+    `TestCrateRetrieverOnline`, which expects this one fault).
+  - **Integration test**: `TestCrateRetrieverOnline` (`./gradlew
+    onlineTest`, not in the build): DOI `10.48804/XES6PY`, as
+    `https://doi.org/…` and as `https://hdl.handle.net/…`, through the
+    redirects to the landing page, its Signposting (`cite-as`, the
+    `rocrate_json` `describedby`, the other exports, the linkset), then the
+    crate (RO-Crate 1.1, detached by `WebCrate`). It passes today because
+    the `rocrate_json` link comes before the other JSON exports in the
+    header and the first of equal rank is taken, not because it is known
+    to be a crate: the test then needs the prober to keep passing if
+    the order changes.
 - **A zip by FAIR Signposting**: `CrateRetriever` also follows
   `rel="item"` links to an RO-Crate zip (`type="application/zip"`, with
   the RO-Crate profile), as "Retrieving an RO-Crate" allows: downloaded
