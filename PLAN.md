@@ -1697,10 +1697,12 @@ extension. Next:
      download (zip or BagIt, from an `item` with the RO-Crate profile, or
      the only zip, or a `ro-crate-metadata.json` item), or a list of
      choices (`Item(href, type, profile, name, size)`, ranked: the RO-Crate
-     profile, then `.crate.zip`/`.eln`, then `ro-crate-metadata.json`, then
-     other zips, with a clearer label than the URL) for the editor to offer
+     profile, then a JSON that passed the probe, then `.crate.zip`/`.eln`,
+     then other zips, with a clearer label than the URL) for the editor to offer
      and the user to pick; never opening a file the user has not chosen out
-     of several. An `item` of another type (PDF, CSV) is not a crate.
+     of several. An `item` of another type (PDF, CSV) is not a crate; one
+     that may be JSON is probed (see Decisions), as Zenodo lists the
+     crate's `ro-crate-metadata.json` among the files, flagged as data.
   5. **`cite-as` and `license` are not read** (they are what "Keep the
      persistent identifier" below needs): return them with the result, from
      the same response as the document came from, or the linkset's entry.
@@ -1717,10 +1719,25 @@ extension. Next:
   - **Prefer JSON-LD online to an archive**, as it is the faster: so, after
     the links with the RO-Crate `profile` (the specification's own
     preference, either `describedby` or `item`) are put first among their
-    own kind, a `describedby` JSON(-LD) link that the prober (below)
-    shows to be a crate comes before an `item` zip, even a zip with the
-    profile. A `describedby` that fails the probe (WorkflowHub's,
-    Zenodo's) is dropped, and the zip is next. Candidates are listed
+    own kind, a JSON(-LD) link that the prober (below) shows to be a crate
+    comes before an `item` zip, even a zip with the profile. A
+    `describedby` that fails the probe (WorkflowHub's, Zenodo's) is
+    dropped, and the zip is next. **The JSON-LD may be an `item`, not a
+    `describedby`**: a repository such as Zenodo does not know that a
+    deposited `ro-crate-metadata.json` is metadata, not data, so it lists it
+    with the other files, as `rel="item"; type="application/json"` (or
+    `application/ld+json`, or `text/plain`, or no type at all), and only the
+    prober can tell. So the JSON candidates are the `describedby` links to
+    JSON(-LD) *and* the `item`s that may be JSON (by type, or by a name
+    ending in `.json` or `.jsonld`, when the type is missing or generic),
+    in one tier, ranked: the profile first, then by name
+    (`ro-crate-metadata.json`, `ro-crate-metadata.jsonld`,
+    `<prefix>-ro-crate-metadata.json`, `*.crate.json`), then others. A
+    record with many JSON data files must not be fetched whole: the named
+    candidates are probed first, with the full size limit; if none passes,
+    the others, at most five, each read only up to a smaller limit (about
+    1 MB, saying "not read to the end" if it was cut), as data files
+    seldom start as a crate's `@graph`. Candidates are listed
     from the `Link` header, the HTML, *and the linkset*, and the same
     `href` is tried once however many types it is listed with (Zenodo
     lists its record five times).
@@ -1749,12 +1766,15 @@ extension. Next:
     any version) but not required, and whether the root it is about
     exists is for `CrateReader` to say, so that the probe stays one pass
     over the `@graph` (streamed with Jackson, stopping at the
-    descriptor, within the size limit) and says why when it fails ("HTML
+    descriptor, within the size limit given for the candidate) and says
+    why when it fails ("HTML
     page", "JSON, but not an RO-Crate: no metadata descriptor in its
     @graph", "DataCite's JSON-LD"). The JSON candidates are fetched
     together (a few at a time, and the same limits for each) and
     probed. **One that passes is opened. Several that pass are a choice**
-    for the user (two versions of the crate, or its own and a copy's).
+    for the user (two versions of the crate, or its own and a copy's, or
+    a `describedby` and a JSON `item` that are the same file at two
+    addresses: those with the same content are one, by their checksum).
     **None that pass, and zip (or BagIt) items:** one with the RO-Crate
     profile is the candidate; several are a choice, and a single one
     without the profile is asked about too, as it may be data and big
