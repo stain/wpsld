@@ -121,7 +121,17 @@ warning, with a warning triangle so that the two differ by more than their
 colour, if it belongs to anything else, such as a person or a defined term, as
 RO-Crate does not need
 any address to answer (a defined term's address may be in an outdated
-namespace, for instance, and only there for a person to follow). It needs an internet connection, and asks
+namespace, for instance, and only there for a person to follow). An address
+that answers but does not look like what the crate says is a yellow warning
+too, for a file as for anything else: a `contentUrl` or identifier whose
+length is not the file's `contentSize`, or that is a web page (HTML) where
+another `encodingFormat` is said, which is usually a landing page, such as a
+DOI's or a repository's, where the file's own address is wanted.
+wpsld asks politely: HEAD first (a request for one byte of the file where a
+server does not do HEAD right), a few at a time and fewer to one server,
+pausing a server as long as it asks (`Retry-After`), trying again after a
+busy answer, and giving up on a server that does not answer, so that a
+server that is down does not take as many waits as it has addresses. It needs an internet connection, and asks
 a few addresses at a time, in the background: the foot of the window
 shows it, and **Show...** there brings up its progress, with **Cancel**.
 

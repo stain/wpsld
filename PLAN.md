@@ -2180,8 +2180,7 @@ extension. Next:
   HUN-REN and ROHub are not tested as they fail by the repositories' choice.
 - **Check Web Availability: manners, and what it says of the content**
   *(in progress, 2026-11-19: `WebAvailability` rewritten and tested
-  (`TestWebAvailabilityManners`, 11 tests); the editor is not changed to use it
-  yet)*.
+  (`TestWebAvailabilityManners`, 11 tests) and used by the editor)*.
 
   Measured first (18 real addresses from the crates tried, HEAD against a GET
   for one byte): both agree on every 404 and on success; **the one real
@@ -2235,17 +2234,15 @@ extension. Next:
   classified), and `TestWebAvailability.check` has fast pauses.
 
   **To do, in this order:**
-  1. **Use it in the editor**: `CrateEditor.checkWeb` calls
-     `webAvailability.check(addresses, WebAvailability.expectations(crate,
-     targets))`, then `mismatches(crate, targets, results)`, kept (a `suspicious`
-     map by `@id`, cleared where `unavailable` is) and shown as **yellow warnings
-     whatever the entity's type** (the `warnings` set, with the text as the
-     tooltip) unless it is also a red problem; the summary says how many
-     addresses were not available, how many were not asked (a host given up
-     on) and how many look wrong; help text in `views.md`; a UI test with a
-     local server (a landing page for a PDF, a wrong size). The job should say
-     what it is at (the host, "waiting 30 s as example.org asked") and have
-     **Cancel** that stops at once.
+  1. **Use it in the editor** *(done 2026-11-19 for the check, the warnings and
+     the summary: `CrateEditor.checkWeb` passes `expectations`, keeps `mismatches`
+     as `suspicious` by `@id`, shows them as yellow warnings whatever the type
+     and says how many "do not look like what the crate says"; the help in
+     `views.md`; `contentThatIsNotWhatTheCrateSaysIsAWarning`)*. Still to do:
+     the job should say what it is at (the host, "waiting 30 s as example.org
+     asked") and have **Cancel** that stops at once; the summary should count
+     separately the addresses "could not be checked" (a host given up on) from
+     those not available, as it now counts both as not available.
   2. **`RootProbe`** (one HEAD per candidate, and one for a made-up path) and
      `CrateRetriever` should share these manners: the `Accept`, and, for the
      retriever, `Retry-After` on a 429 or 503 (waiting up to a few seconds,

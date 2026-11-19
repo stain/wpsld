@@ -1458,12 +1458,22 @@ public class CrateEditor extends Application {
 			}
 		});
 		Set<Entity> notFound = new HashSet<>(found.keySet());
+		// What is there, but not as the crate says: only a warning, of a file or anything else
+		suspicious.forEach((id, text) -> crate.get(id).ifPresent(entity -> {
+			if (!found.containsKey(entity)) {
+				found.put(entity, text);
+				warnings.add(entity);
+			}
+		}));
 		unavailable.forEach((id, problem) -> crate.get(id).ifPresent(entity -> {
 			found.put(entity, problem);
 			// RO-Crate does not need an address to answer, which a person's or a defined term's, e.g. in an outdated
 			// namespace, is given for a human to follow: a warning, unless it is a work (a file, dataset, software)
 			if (!notFound.contains(entity) && !listing.isA(entity, "CreativeWork")) {
 				warnings.add(entity);
+			} else {
+				// Not there is a problem, whatever else is said of what was
+				warnings.remove(entity);
 			}
 		}));
 		return found;
@@ -1475,6 +1485,8 @@ public class CrateEditor extends Application {
 	private Set<Entity> warnings = Set.of();
 	/** Web resources found unavailable, by @id, and why */
 	private Map<String, String> unavailable = Map.of();
+	/** Web resources that are there but do not look like what the crate says (a landing page, another length), by @id */
+	private Map<String, String> suspicious = Map.of();
 
 	/**
 	 * Crate > Update File Details: choose what to update of the files of an
@@ -1967,12 +1979,15 @@ public class CrateEditor extends Application {
 			return Optional.empty();
 		}
 		Object checked = opened;
+		// What the crate says of each file (its size and kind), to compare with what the server says: taken here,
+		// as the crate is not read from the thread that asks
+		Map<String, WebAvailability.Expectation> expectations = WebAvailability.expectations(crate, targets);
 		Task<List<WebAvailability.Result>> task = new Task<>() {
 			@Override
 			protected List<WebAvailability.Result> call() throws InterruptedException {
 				updateMessage("Asking " + addresses.size() + (addresses.size() == 1 ? " web address" : " web addresses")
 						+ " whether they are available…");
-				return webAvailability.check(addresses);
+				return webAvailability.check(addresses, expectations);
 			}
 		};
 		task.setOnSucceeded(e -> {
@@ -1991,15 +2006,24 @@ public class CrateEditor extends Application {
 							: target.property() + " " + target.address() + ": " + problem, (a, b) -> a + "; " + b);
 				}
 			}
+			// What is there but does not look like what the crate says: a landing page for a file, another length
+			Map<String, String> suspect = new HashMap<>();
+			Map<WebAvailability.Target, String> looksWrong = WebAvailability.mismatches(crate, targets, results);
+			looksWrong.forEach((target, text) -> suspect.merge(target.id(), text, (a, b) -> a + "; " + b));
 			unavailable = found;
+			suspicious = suspect;
 			relist();
-			Alert done = new Alert(found.isEmpty() ? AlertType.INFORMATION : AlertType.WARNING,
-					results.stream().filter(r -> !r.available()).map(r -> r.address() + ": " + r.problem().get())
-							.collect(Collectors.joining("\n")),
+			boolean fine = found.isEmpty() && suspect.isEmpty();
+			Alert done = new Alert(fine ? AlertType.INFORMATION : AlertType.WARNING,
+					Stream.concat(results.stream().filter(r -> !r.available()).map(r -> r.address() + ": " + r.problem().get()),
+							looksWrong.values().stream()).collect(Collectors.joining("\n")),
 					ButtonType.OK);
 			done.initOwner(stage);
-			done.setHeaderText(found.isEmpty() ? "All " + results.size() + " web resources are available"
-					: found.size() + " of " + results.size() + " web resources are not available");
+			done.setHeaderText(fine ? "All " + results.size() + " web resources are available"
+					: (found.isEmpty() ? "" : found.size() + " of " + results.size() + " web resources are not available")
+							+ (found.isEmpty() || suspect.isEmpty() ? "" : ", and ")
+							+ (suspect.isEmpty() ? "" : suspect.size() + (suspect.size() == 1 ? " does" : " do")
+									+ " not look like what the crate says"));
 			done.setResizable(true);
 			done.show();
 		});
@@ -2943,6 +2967,7 @@ public class CrateEditor extends Application {
 		crate = other;
 		hideNotice();
 		unavailable = Map.of();
+		suspicious = Map.of();
 		previewAsked = false;
 		keepPreview = false;
 		notInCrate.clear();
