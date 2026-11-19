@@ -37,7 +37,7 @@ public class TestWebCrate {
 	public void metadataFileIsAttachedToItsFolder() {
 		WebCrate crate = of("http://example.com/crate1/ro-crate-metadata.json");
 		assertTrue(crate.attached());
-		assertEquals(URI.create("http://example.com/crate1/"), crate.base());
+		assertEquals(Optional.of(URI.create("http://example.com/crate1/")), crate.base());
 		assertEquals(Optional.of(URI.create("http://example.com/crate1/file.txt")), crate.resolve("file.txt"));
 		assertEquals(Optional.of(URI.create("http://example.com/crate1/data/")), crate.resolve("data/"));
 		assertEquals(Optional.of(URI.create("http://example.com/crate1/")), crate.resolve("./"));
@@ -51,17 +51,19 @@ public class TestWebCrate {
 	public void folderIsAttached() {
 		WebCrate crate = of("https://example.com/crate1/");
 		assertTrue(crate.attached());
-		assertEquals(URI.create("https://example.com/crate1/"), crate.base());
+		assertEquals(Optional.of(URI.create("https://example.com/crate1/")), crate.base());
 	}
 
 	@Test
 	public void otherNamesAndQueriesAreDetached() {
 		WebCrate named = of("https://example.com/crates/my-ro-crate-metadata.json");
 		assertFalse(named.attached());
-		// Still resolved against the document, to lead somewhere
-		assertEquals(Optional.of(URI.create("https://example.com/crates/file.txt")), named.resolve("file.txt"));
+		// No folder, so no base: not resolved against the document, which is no telling where files are
+		assertEquals(Optional.empty(), named.base());
+		assertEquals(Optional.empty(), named.resolve("file.txt"));
 		WebCrate api = of("https://data.example.com/api/object?id=abc&meta=original");
 		assertFalse(api.attached());
+		assertEquals(Optional.empty(), api.resolve("Calibration.Trial26.enf"));
 		// A query with the metadata file's name is still a service
 		assertFalse(of("https://example.com/ro-crate-metadata.json?version=2").attached());
 	}
@@ -71,11 +73,16 @@ public class TestWebCrate {
 		WebCrate crate = WebCrate.of(URI.create("https://example.com/a/ro-crate-metadata.json"),
 				Optional.of("https://files.example.org/b/")).orElseThrow();
 		assertTrue(crate.attached());
-		assertEquals(URI.create("https://files.example.org/b/"), crate.base());
+		assertEquals(Optional.of(URI.create("https://files.example.org/b/")), crate.base());
 		assertEquals(Optional.of(URI.create("https://files.example.org/b/x.csv")), crate.resolve("x.csv"));
 		// A relative @base is against the address
-		assertEquals(URI.create("https://example.com/other/"), WebCrate
+		assertEquals(Optional.of(URI.create("https://example.com/other/")), WebCrate
 				.of(URI.create("https://example.com/a/ro-crate-metadata.json"), Optional.of("../other/")).orElseThrow().base());
+		// The one thing that gives a detached crate a base
+		WebCrate detached = WebCrate.of(URI.create("https://example.com/api/crate?id=1"),
+				Optional.of("https://files.example.org/b/")).orElseThrow();
+		assertFalse(detached.attached());
+		assertEquals(Optional.of(URI.create("https://files.example.org/b/x.csv")), detached.resolve("x.csv"));
 	}
 
 	@Test
@@ -89,7 +96,8 @@ public class TestWebCrate {
 		// Outside the folder, which an attached crate can't have
 		assertEquals(Optional.empty(), crate.resolve("../other/file.txt"));
 		assertEquals(Optional.empty(), crate.resolve("/elsewhere"));
-		assertEquals(Optional.empty(), crate.resolve("a b"));
+		// A file name with a space, written as it is
+		assertEquals(Optional.of(URI.create("http://example.com/crate1/a%20b")), crate.resolve("a b"));
 		// Inside, however it is written
 		assertEquals(Optional.of(URI.create("http://example.com/crate1/b.txt")), crate.resolve("a/../b.txt"));
 	}
@@ -148,5 +156,52 @@ public class TestWebCrate {
 		assertEquals("http://example.com/crate1/", crate.getRoot().getId());
 		// The descriptor is about it
 		assertEquals("http://example.com/crate1/", crate.toJson().get("@graph").get(0).get("about").get("@id").asText());
+	}
+
+	/** Detached with relative files and no @base: semi-detached, there is no telling where they are */
+	@Test
+	public void semiDetachedHasRelativeFilesWithNoBase() {
+		Crate crate = crate();
+		WebCrate api = of("https://data.example.com/api/export?id=abc");
+		assertEquals(List.of("data/", "data/counts.csv", "README.md"),
+				crate.unanchoredDataEntities(api).stream().map(Entity::getId).toList());
+		// Nothing to make absolute, as nothing leads anywhere
+		assertEquals(List.of(), crate.relativeEntities(api));
+		assertEquals(Map.of(), crate.absolutize(api, false));
+		// Attached, or with a base, they are anchored
+		assertEquals(List.of(), crate.unanchoredDataEntities(of("http://example.com/crate1/ro-crate-metadata.json")));
+		assertEquals(List.of(), crate.unanchoredDataEntities(WebCrate.of(URI.create("https://data.example.com/api/export?id=abc"),
+				Optional.of("https://files.example.org/")).orElseThrow()));
+	}
+
+	@Test
+	public void relativeReferences() {
+		assertTrue(WebCrate.isRelative("data/counts.csv"));
+		assertTrue(WebCrate.isRelative("./"));
+		assertTrue(WebCrate.isRelative("van der Have, Tuur"));
+		assertFalse(WebCrate.isRelative("#alice"));
+		assertFalse(WebCrate.isRelative("_:b0"));
+		assertFalse(WebCrate.isRelative("https://example.org/x"));
+		assertFalse(WebCrate.isRelative(""));
+	}
+
+	@Test
+	public void suggestedRoots() {
+		WebCrate api = of("https://rdr.example.org/api/datasets/export?exporter=x&persistentId=doi:10.1/X");
+		Crate crate = new CrateReader().read(new ByteArrayInputStream("""
+				{"@context": "https://w3id.org/ro/crate/1.1/context",
+				 "@graph": [
+				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"}},
+				  {"@id": "./", "@type": "Dataset", "name": "D", "identifier": "https://doi.org/10.1/X",
+				   "cite-as": {"@id": "https://doi.org/10.1/X"}}]}""".getBytes(StandardCharsets.UTF_8)), "test").crate()
+				.orElseThrow();
+		// The DOI once, however it is given; the export's own address is no folder, as it has a query
+		List<WebCrate.Root> roots = api.suggestedRoots(crate.getRoot());
+		assertEquals(List.of(URI.create("https://doi.org/10.1/X")), roots.stream().map(WebCrate.Root::address).toList());
+		// Beside a metadata document with another name, a folder it could be attached in
+		WebCrate named = of("https://example.com/crates/my-ro-crate-metadata.json");
+		assertEquals(List.of(URI.create("https://doi.org/10.1/X"), URI.create("https://example.com/crates/")),
+				named.suggestedRoots(crate.getRoot()).stream().map(WebCrate.Root::address).toList());
 	}
 }

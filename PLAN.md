@@ -1459,9 +1459,14 @@ extension. Next:
     `index.html`/`ro-crate-metadata.json`): attached, base = that URL;
   - anything else, e.g. `my-crate-ro-crate-metadata.json`, LDaCA's
     `/api/object/…?meta=original`, ROHub's API, a DOI that negotiated
-    straight to JSON-LD at a record URL: detached; the base for
-    *resolving* (as JSON-LD does with the document URL) is still
-    `source`, but relative data entities are a problem (below);
+    straight to JSON-LD at a record URL: detached, and **with no base**:
+    the address of the document says nothing of where files are (KU
+    Leuven's export has `Calibration.Trial26.enf`, which is not at
+    `https://rdr.kuleuven.be/api/datasets/Calibration.Trial26.enf`: the
+    DOI has gone from the path), so JSON-LD's way of resolving against the
+    document's address is *not* used, whatever the address; services
+    mangle relative paths, which is why attached or detached is decided
+    first. Only the context's `@base` gives such a crate a base;
   - a `file:` URL is not a web crate: as now (`CrateFile`, by name).
   - An `@base` in the document's own `@context`
     (`JsonLdContext.getBase()`) wins over the URL for resolving, as
@@ -1472,6 +1477,45 @@ extension. Next:
     named ro-crate-metadata.json at http://example.com/crate1/", so the
     window (and `wpsld-tui`'s status line) can say where relative paths
     lead.
+
+  **Semi-detached** *(done: the notice; to do: the rest)*. A detached
+  crate with no `@base` that still has relative data entities (File or
+  Dataset with a relative `@id`: `Crate.unanchoredDataEntities`) is neither
+  fully detached (all absolute, as the specification wants) nor attached
+  (a folder to be relative to): the paths are most likely those of other
+  items of the same record, or of files inside an archive that is one of
+  its items, but there is no telling which. Such crates come from
+  repositories' exports, such as Dataverse's, and must open. Done: the
+  notice warns that it is neither, how many files and one example, that
+  they are not linked, and what its RO-Crate Root could be
+  (`WebCrate.suggestedRoots`: the root's own `@id` if it is a web address,
+  its `identifier` and `cite-as`, such as the DOI, and the folder beside the
+  document when its address has no query), with the reason for each. To do:
+  - a **Crate > Set RO-Crate Root…** (or a choice in the notice) to take one
+    of the suggestions, or an address typed in, as the web base, so that the
+    relative `@id`s lead there from then on (kept in `CrateFile` as the base
+    of an attached crate is, the JSON unchanged), and the Save As warning
+    applies; with a check, as a job, that a few of the files are there
+    (HEAD of the first ones, from the entities' sizes), and saying so
+    when they are not;
+  - **use what the crate says about its files**: each File of such an
+    export has its own `url` or `contentUrl` (KU Leuven's: one or two
+    addresses, `https://rdr.kuleuven.be/api/access/datafile/129354`, for
+    two versions of the file), so the → beside a relative `@id` should open
+    that, as in an attached crate whose files are also on the web
+    ("Data entities in an attached RO-Crate that are also on the web"),
+    rather than nothing; several are listed in the preview;
+  - **match the paths to the record's items**: with Signposting's `item`
+    links (and the linkset's), a relative `@id` may be the name of an
+    item (`Calibration.Trial26.enf` at `…/files/Calibration.Trial26.enf`),
+    or a path inside the one archive item (see the zip item below, with the
+    arcp base): offer these as suggestions for the root as well, not
+    taken without the user's choice;
+  - relative `@id`s that are not paths at all (Dataverse's contact names,
+    `van der Have, Tuur`, as the `@id` of a Person) are not files: they
+    don't count, as only File and Dataset entities do, and a repair could
+    offer to make them local (`#…`) identifiers;
+  - **the array `@id`** of an entity in the same export (see Dataverse).
 
   **Keeping it**: `CrateFile` gets `Optional<URI> webBase` (and the URL
   asked for, `Optional<URI> openedFrom`, for the title, messages, recent
@@ -1494,9 +1538,8 @@ extension. Next:
     to no link, as `local(...)` refuses paths outside the folder now, and
     `CrateFolder`'s `rocrate:attached-outside` check applies to the URL
     paths the same way;
-  - for a detached web crate, relative data entities still get a link
-    (resolved against `source`, often useful) but the tooltip says the
-    `@id` should be absolute;
+  - for a detached web crate, no link for a relative `@id`, unless the
+    context has an `@base` (done: `WebCrate.base()` is empty);
   - absolute `@id`s and `#`/`_:` ids as now. No HEAD requests just to
     show a link; checking that files are there is Check Web Availability
     (see "Attached and detached crates").

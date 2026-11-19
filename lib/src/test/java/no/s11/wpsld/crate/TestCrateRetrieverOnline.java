@@ -116,5 +116,15 @@ public class TestCrateRetrieverOnline {
 		// An export with a query, not a metadata file in a folder: detached, relative ids lead nowhere on the web
 		WebCrate web = WebCrate.of(retrieved.source(), document.context().getBase()).orElseThrow();
 		assertFalse(web.attached());
+		// And semi-detached: its files have relative @ids that are not at the address of the export
+		// (not https://rdr.kuleuven.be/api/datasets/Calibration.Trial26.enf), but each File has its own url
+		assertEquals(java.util.Optional.empty(), web.base());
+		assertEquals(java.util.Optional.empty(), web.resolve("Calibration.Trial26.enf"));
+		assertTrue(crate.unanchoredDataEntities(web).size() > 1000);
+		// What its root could be: the dataset as published, not the export's address, which has a query
+		assertEquals(java.util.List.of(URI.create("https://doi.org/" + DOI)),
+				web.suggestedRoots(crate.getRoot()).stream().map(WebCrate.Root::address).toList());
+		Entity file = crate.get("Calibration.Trial26.enf").orElseThrow();
+		assertTrue(file.getAll("url").stream().allMatch(u -> u.asText().startsWith("https://rdr.kuleuven.be/api/access/datafile/")));
 	}
 }

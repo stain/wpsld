@@ -31,7 +31,11 @@ worked out from where the crate was found in the end, after any redirects,
 and the notice at the foot of the window says where identifiers lead.
 Another name (`my-ro-crate-metadata.json`), or a service's address with a
 query, is a detached crate, which has no folder: its files should have
-web addresses of their own.
+web addresses of their own. wpsld does not guess where a detached crate's
+relative identifiers lead from the address it came from, as a service's
+address says nothing of where the files are. If it still has relative
+identifiers for files (neither detached nor attached, as repositories'
+exports often are), the notice says so and gives what its root could be.
 
 The identifiers stay as written in the crate. Saving it to a file would
 make them name files beside the saved one instead, so wpsld asks first

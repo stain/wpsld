@@ -155,7 +155,15 @@ public class TestCrateEditorWebCrate extends UiTest {
 		Stage stage = window();
 		interact(() -> app.openUrl(stage, site.resolve("/x-ro-crate-metadata.json")));
 		waitForFx(30, () -> app.notice().isPresent());
-		assertTrue(app.notice().orElseThrow(), app.notice().orElseThrow().contains("detached crate"));
+		String notice = app.notice().orElseThrow();
+		assertTrue(notice, notice.contains("detached crate"));
+		// Its files have relative @ids, but there is no telling where: not linked
+		assertTrue(notice, notice.contains("neither fully detached nor attached"));
+		assertTrue(notice, notice.contains("There is no telling where"));
+		// What its root could be: the folder beside it, the address having no query
+		assertTrue(notice, notice.contains("Its RO-Crate Root could be " + site.resolve("/") + " (the folder beside the metadata document)"));
+		select("README.md");
+		assertTrue(lookup("#openId").query().isDisabled());
 	}
 
 	@Test

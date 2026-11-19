@@ -2984,12 +2984,38 @@ public class CrateEditor extends Application {
 		chooseProfile(document);
 		refresh();
 		List<String> notes = document.problems().stream().map(Problem::toString).toList();
-		showNotice("Opened from " + retrieved.source() + web.map(w -> (w.attached() ? " as an attached crate: its"
-				: " as a detached crate: its") + " relative identifiers lead to " + w.base()
-				+ ", though they are saved as written. Save As keeps a copy here.").orElse(".")
+		showNotice("Opened from " + retrieved.source() + web.map(w -> webNotice(w, crate)).orElse(".")
 				+ (notes.isEmpty() ? "" : " " + notes.size() + (notes.size() == 1 ? " warning" : " warnings")
 						+ ": " + String.join(" ", notes)), null, null);
 		return true;
+	}
+
+	/**
+	 * What to tell about a crate fetched from the web: attached, with where its
+	 * relative identifiers lead; detached, and then, if it still has relative
+	 * files, that it is semi-detached: there is no telling where they are.
+	 */
+	static String webNotice(WebCrate web, Crate crate) {
+		if (web.base().isPresent()) {
+			return (web.attached() ? " as an attached crate: its" : " as a detached crate with an @base: its")
+					+ " relative identifiers lead to " + web.base().get()
+					+ ", though they are saved as written. Save As keeps a copy here.";
+		}
+		List<Entity> unanchored = crate.unanchoredDataEntities(web);
+		if (unanchored.isEmpty()) {
+			return " as a detached crate, with no folder, so no relative identifiers to lead anywhere.";
+		}
+		List<WebCrate.Root> roots = web.suggestedRoots(crate.getRoot());
+		return " as a detached crate, with no folder, but " + unanchored.size()
+				+ (unanchored.size() == 1 ? " file has" : " files have") + " relative identifiers, e.g. "
+				+ unanchored.get(0).getId() + ": neither fully detached nor attached. There is no telling where they"
+				+ " are, perhaps other files of the same record, or in an archive it has, so they are not linked"
+				+ " (the files' own addresses, if they have any, are)."
+				+ (roots.isEmpty() ? ""
+						: " Its RO-Crate Root could be "
+								+ roots.stream().map(r -> r.address() + " (" + r.why() + ")")
+										.collect(Collectors.joining(", or "))
+								+ ".");
 	}
 
 	/**
@@ -3732,7 +3758,7 @@ public class CrateEditor extends Application {
 		}
 		StringBuilder text = new StringBuilder();
 		text.append(relative.size()).append(relative.size() == 1 ? " identifier is" : " identifiers are")
-				.append(" relative to ").append(web.get().base()).append(", e.g. ")
+				.append(" relative to ").append(web.get().base().orElseThrow()).append(", e.g. ")
 				.append(relative.stream().limit(3).map(e -> e.getId() + " \u2192 " + web.get().resolve(e.getId()).get())
 						.collect(Collectors.joining(", ")))
 				.append(".\n\nSaved as ").append(file.getFileName()).append(", they will name files beside it instead,"

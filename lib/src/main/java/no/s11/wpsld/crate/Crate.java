@@ -462,6 +462,21 @@ public class Crate {
 	}
 
 	/**
+	 * The files and folders, other than the root data entity, with a relative
+	 * <code>@id</code> in a crate that has no base to resolve it against (a
+	 * detached crate, see {@link WebCrate}, with no <code>@base</code>): none if
+	 * the crate has one. What a semi-detached crate is, by having any.
+	 */
+	public List<Entity> unanchoredDataEntities(WebCrate web) {
+		if (web.base().isPresent()) {
+			return List.of();
+		}
+		return entities.stream().filter(e -> e != getRoot())
+				.filter(e -> e.getTypes().contains("File") || e.getTypes().contains("Dataset"))
+				.filter(e -> WebCrate.isRelative(e.getId())).toList();
+	}
+
+	/**
 	 * Make the relative <code>@id</code>s of a crate fetched from the web
 	 * absolute, as the RO-Crate specification's "Converting from Attached to
 	 * Detached RO-Crate Package" has it, so that they still lead there when
