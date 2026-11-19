@@ -91,10 +91,21 @@ public class CrateRetriever {
 	 * @param steps   How it was found from the URL asked for, e.g. "Link
 	 *                header", "HTML link", "content negotiation", "folder";
 	 *                empty if the URL gave it
+	 * @param asked   The address asked for, which may be a DOI or a Handle that
+	 *                redirected (and so is not a place for files)
+	 * @param landing The page the document was found from, where it was after
+	 *                redirects, e.g. a repository's landing page whose
+	 *                Signposting <code>Link</code> header (or HTML) pointed to
+	 *                it; none if the address gave the document itself
 	 */
-	public record Retrieved(URI source, byte[] content, List<String> steps) {
+	public record Retrieved(URI source, byte[] content, List<String> steps, URI asked, Optional<URI> landing) {
 		public Retrieved {
 			steps = List.copyOf(steps);
+		}
+
+		/** Asked for by the address it came from, with no landing page */
+		public Retrieved(URI source, byte[] content, List<String> steps) {
+			this(source, content, steps, source, Optional.empty());
 		}
 	}
 
@@ -164,6 +175,8 @@ public class CrateRetriever {
 		private final URI asked;
 		private final Set<String> requested = new LinkedHashSet<>();
 		private final List<String> steps = new ArrayList<>();
+		/** The first page that led to the document, see {@link Retrieved#landing()} */
+		private URI landing;
 
 		Attempt(URI asked) {
 			this.asked = asked;
@@ -207,6 +220,7 @@ public class CrateRetriever {
 				steps.add("folder");
 				Response metadata = get(folder.get(), ACCEPT);
 				if (metadata.ok()) {
+					landing = plain.at();
 					// Not recognised as JSON: let CrateReader say what is wrong
 					return retrieved(metadata);
 				}
@@ -230,6 +244,9 @@ public class CrateRetriever {
 				return Optional.empty();
 			}
 			steps.add(step);
+			if (landing == null) {
+				landing = response.at();
+			}
 			Response target = get(described.get(), ACCEPT);
 			if (target.json()) {
 				return Optional.of(retrieved(target));
@@ -249,7 +266,7 @@ public class CrateRetriever {
 		}
 
 		private Retrieved retrieved(Response response) {
-			return new Retrieved(response.at(), response.body(), steps);
+			return new Retrieved(response.at(), response.body(), steps, asked, Optional.ofNullable(landing));
 		}
 
 		private Response get(URI uri, String accept) throws IOException, InterruptedException {

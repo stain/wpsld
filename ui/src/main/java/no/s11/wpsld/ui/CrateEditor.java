@@ -138,6 +138,7 @@ import no.s11.wpsld.lookup.CrateRepair;
 import no.s11.wpsld.lookup.DOI;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.EntityJson;
+import no.s11.wpsld.crate.RootProbe;
 import no.s11.wpsld.crate.Places;
 import no.s11.wpsld.lookup.GeoNames;
 import no.s11.wpsld.lookup.ORCID;
@@ -2849,6 +2850,10 @@ public class CrateEditor extends Application {
 		}
 	}
 
+	/** Looks for where a semi-detached crate's files are, see {@link #findRoot} */
+	private final RootProbe rootProbe = new RootProbe(ProfileCache.httpClient(ProfileCache.DEFAULT_TIMEOUT),
+			ProfileCache.DEFAULT_TIMEOUT);
+
 	/** Fetches crates from the web, see {@link #openUrl} */
 	private final CrateRetriever retriever = new CrateRetriever(ProfileCache.httpClient(ProfileCache.DEFAULT_TIMEOUT),
 			ProfileCache.DEFAULT_TIMEOUT);
@@ -2978,7 +2983,7 @@ public class CrateEditor extends Application {
 			error.show();
 			return false;
 		}
-		Optional<WebCrate> web = WebCrate.of(retrieved.source(), document.context().getBase());
+		Optional<WebCrate> web = WebCrate.of(retrieved, document.context().getBase());
 		edit(document.crate().get(), Optional.empty());
 		web.ifPresent(w -> crateFile.openWeb(w, asked, crate.toJson()));
 		chooseProfile(document);
@@ -2987,7 +2992,48 @@ public class CrateEditor extends Application {
 		showNotice("Opened from " + retrieved.source() + web.map(w -> webNotice(w, crate)).orElse(".")
 				+ (notes.isEmpty() ? "" : " " + notes.size() + (notes.size() == 1 ? " warning" : " warnings")
 						+ ": " + String.join(" ", notes)), null, null);
+		web.filter(w -> !crate.unanchoredDataEntities(w).isEmpty()).ifPresent(this::findRoot);
 		return true;
+	}
+
+	/**
+	 * For a semi-detached crate (see {@link WebCrate}), look in the background
+	 * for where its files are: the first of them, by HEAD, beside each of the
+	 * places its root could be (see {@link RootProbe}). Only if it is found
+	 * is the base taken, as the crate is not changed and nothing was guessed;
+	 * else the user is left to choose, as it may be in a zip that has not
+	 * been looked into.
+	 */
+	private void findRoot(WebCrate web) {
+		Optional<String> file = RootProbe.firstFile(crate);
+		List<WebCrate.Root> candidates = web.suggestedRoots(crate.getRoot());
+		if (file.isEmpty() || candidates.isEmpty()) {
+			return;
+		}
+		Object token = opened;
+		Task<Optional<WebCrate.Root>> task = new Task<>() {
+			@Override
+			protected Optional<WebCrate.Root> call() throws InterruptedException {
+				updateMessage("Looking for " + file.get());
+				return rootProbe.find(file.get(), candidates);
+			}
+		};
+		task.setOnSucceeded(e -> {
+			// Another crate may be open by now
+			if (token != opened || task.getValue().isEmpty()) {
+				return;
+			}
+			WebCrate.Root root = task.getValue().get();
+			crateFile.web().ifPresent(current -> {
+				crateFile.setWeb(current.withBase(root.address(), file.get() + " found beside " + root.address()));
+				Entity shown = entityEditor.getEntity();
+				show(shown == null || crate.get(shown.getId()).isEmpty() ? crate.getRoot() : shown);
+				showNotice("Found the files beside " + root.address() + " (" + root.why() + "): " + file.get()
+						+ " is there, so relative identifiers lead there, though they are saved as written.", null,
+						null);
+			});
+		});
+		jobs.start(jobs.job("Look for the files of " + web.source(), opened, false), task);
 	}
 
 	/**
@@ -3009,7 +3055,8 @@ public class CrateEditor extends Application {
 		return " as a detached crate, with no folder, but " + unanchored.size()
 				+ (unanchored.size() == 1 ? " file has" : " files have") + " relative identifiers, e.g. "
 				+ unanchored.get(0).getId() + ": neither fully detached nor attached. There is no telling where they"
-				+ " are, perhaps other files of the same record, or in an archive it has, so they are not linked"
+				+ " are, perhaps other files of the same record, or inside a zip file among its files that has not"
+				+ " been looked into, so they are not linked"
 				+ " (the files' own addresses, if they have any, are)."
 				+ (roots.isEmpty() ? ""
 						: " Its RO-Crate Root could be "

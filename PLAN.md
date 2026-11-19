@@ -1488,9 +1488,38 @@ extension. Next:
   repositories' exports, such as Dataverse's, and must open. Done: the
   notice warns that it is neither, how many files and one example, that
   they are not linked, and what its RO-Crate Root could be
-  (`WebCrate.suggestedRoots`: the root's own `@id` if it is a web address,
-  its `identifier` and `cite-as`, such as the DOI, and the folder beside the
-  document when its address has no query), with the reason for each. To do:
+  (`WebCrate.suggestedRoots`), with the reason for each: the **landing
+  page** the metadata was found from (its address after the redirections,
+  `Retrieved.landing()`); the root's own `@id`, `identifier` and `cite-as`
+  when they are web addresses; and the folder beside the document, when
+  its address has no query. **Never an address earlier in the
+  redirections** that led there: not the DOI or Handle asked for
+  (`Retrieved.asked()`), nor any persistent identifier resolver's address
+  (`doi.org`, `hdl.handle.net`, `w3id.org`, `purl.org`, `identifiers.org`,
+  …), as they lead to the landing page and are not where files are.
+  Choosing among them is a heuristic, so it is the user's to do, *unless*
+  it can be checked: `RootProbe` (done) does one HTTP `HEAD` for the first
+  file of the root's `hasPart` (a `File` before a folder) beside each
+  candidate (four at most), and a `HEAD` of a made-up path that must not be
+  answered 200 (a server that has a page for any path says nothing); only if
+  the file is there is that candidate taken, in the background after
+  opening, saying so (`CrateEditor.findRoot`). Otherwise the user is left to
+  choose. **Not finding the files is not finding that there is no root**:
+  they may be inside a zip file (or other archive) among the record's items
+  that has not been looked into.
+  - **A root inside an archive** *(TODO)*: each `item` of the record that is
+    a zip (from the `Link` headers and the linkset, see Signposting) is
+    another candidate, "inside <name>", with the arcp base of the zip (see
+    "A zip, from disk or from the web"), and it is not taken without the
+    user. It can be checked without downloading the whole zip: a zip lists
+    its entries at its end, so an HTTP `Range` request for the last 64 kB
+    (`bytes=-65536`, and the next range if the central directory is
+    longer) gives the names of the entries (`206`; servers without ranges
+    answer `200` with the whole file, which is then not read), and the
+    first file of the crate, as a path in it (also under the zip's single
+    top folder, as the specification allows), is there or not. The zip
+    can be big, so a zip's size is shown and a download is the user's
+    choice.
   - a **Crate > Set RO-Crate Root…** (or a choice in the notice) to take one
     of the suggestions, or an address typed in, as the web base, so that the
     relative `@id`s lead there from then on (kept in `CrateFile` as the base

@@ -185,23 +185,51 @@ public class TestWebCrate {
 		assertFalse(WebCrate.isRelative(""));
 	}
 
-	@Test
-	public void suggestedRoots() {
-		WebCrate api = of("https://rdr.example.org/api/datasets/export?exporter=x&persistentId=doi:10.1/X");
-		Crate crate = new CrateReader().read(new ByteArrayInputStream("""
+	private static Crate crateWithIdentifiers(String id, String identifier) {
+		return new CrateReader().read(new ByteArrayInputStream(("""
 				{"@context": "https://w3id.org/ro/crate/1.1/context",
 				 "@graph": [
-				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+				  {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "%s"},
 				   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"}},
-				  {"@id": "./", "@type": "Dataset", "name": "D", "identifier": "https://doi.org/10.1/X",
-				   "cite-as": {"@id": "https://doi.org/10.1/X"}}]}""".getBytes(StandardCharsets.UTF_8)), "test").crate()
-				.orElseThrow();
-		// The DOI once, however it is given; the export's own address is no folder, as it has a query
-		List<WebCrate.Root> roots = api.suggestedRoots(crate.getRoot());
-		assertEquals(List.of(URI.create("https://doi.org/10.1/X")), roots.stream().map(WebCrate.Root::address).toList());
+				  {"@id": "%s", "@type": "Dataset", "name": "D", "identifier": "%s",
+				   "cite-as": {"@id": "%s"}}]}""".formatted(id, id, identifier, identifier)).getBytes(StandardCharsets.UTF_8)),
+				"test").crate().orElseThrow();
+	}
+
+	private static List<URI> roots(WebCrate web, Crate crate) {
+		return web.suggestedRoots(crate.getRoot()).stream().map(WebCrate.Root::address).toList();
+	}
+
+	/** Never an address earlier in the redirections, such as the DOI that was asked for, nor a resolver's */
+	@Test
+	public void suggestedRootsAreNotEarlierRedirections() {
+		Crate crate = crateWithIdentifiers("./", "https://doi.org/10.1/X");
+		URI doi = URI.create("https://doi.org/10.1/X");
+		URI landing = URI.create("https://rdr.example.org/dataset.xhtml?persistentId=doi:10.1/X");
+		URI export = URI.create("https://rdr.example.org/api/datasets/export?exporter=x&persistentId=doi:10.1/X");
+		WebCrate web = WebCrate.of(new CrateRetriever.Retrieved(export, new byte[0], List.of("Link header"), doi,
+				Optional.of(landing)), Optional.empty()).orElseThrow();
+		// The landing page, and not the DOI (a resolver, and what was asked); no folder, as the export has a query
+		assertEquals(List.of(landing), roots(web, crate));
+		assertEquals("the landing page the metadata was found from", web.suggestedRoots(crate.getRoot()).get(0).why());
+		// What the crate says itself, as long as it is not a resolver's address, or what was asked for
+		Crate own = crateWithIdentifiers("https://data.example.org/dataset/1/", "https://data.example.org/dataset/1");
+		assertEquals(List.of(landing, URI.create("https://data.example.org/dataset/1/"),
+				URI.create("https://data.example.org/dataset/1")), roots(web, own));
+		// No landing page: the data came from the address asked for
+		WebCrate direct = of("https://rdr.example.org/api/export?id=1");
+		assertEquals(List.of(), roots(direct, crate));
 		// Beside a metadata document with another name, a folder it could be attached in
 		WebCrate named = of("https://example.com/crates/my-ro-crate-metadata.json");
-		assertEquals(List.of(URI.create("https://doi.org/10.1/X"), URI.create("https://example.com/crates/")),
-				named.suggestedRoots(crate.getRoot()).stream().map(WebCrate.Root::address).toList());
+		assertEquals(List.of(URI.create("https://example.com/crates/")), roots(named, crate));
+	}
+
+	@Test
+	public void adoptedBase() {
+		WebCrate api = of("https://data.example.com/api/export?id=abc");
+		WebCrate found = api.withBase(URI.create("https://files.example.org/a/"), "found");
+		assertFalse(found.attached());
+		assertEquals(Optional.of(URI.create("https://files.example.org/a/x.csv")), found.resolve("x.csv"));
+		assertTrue(found.reason().endsWith("; found"));
 	}
 }

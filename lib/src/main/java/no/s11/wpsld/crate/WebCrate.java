@@ -70,8 +70,15 @@ import java.util.Optional;
  * @param attached Whether it is an attached crate, see above
  * @param reason   Why, to show, e.g. "named ro-crate-metadata.json at
  *                 http://example.com/crate1/"
+ * @param asked    The address asked for, e.g. a DOI, which redirected
+ * @param landing  The page it was found from, e.g. a repository's landing page
  */
-public record WebCrate(URI source, Optional<URI> base, boolean attached, String reason) {
+public record WebCrate(URI source, Optional<URI> base, boolean attached, String reason, URI asked,
+		Optional<URI> landing) {
+	/** Hosts of persistent identifier resolvers, which redirect: never a place for files */
+	private static final java.util.Set<String> RESOLVERS = java.util.Set.of("doi.org", "dx.doi.org", "hdl.handle.net",
+			"handle.net", "w3id.org", "purl.org", "identifiers.org", "n2t.net", "arks.org", "ror.org", "orcid.org");
+
 	/**
 	 * Decide what a crate fetched from an <code>http:</code> or
 	 * <code>https:</code> address is.
@@ -81,6 +88,18 @@ public record WebCrate(URI source, Optional<URI> base, boolean attached, String 
 	 * @return None for other addresses, e.g. a file
 	 */
 	public static Optional<WebCrate> of(URI source, Optional<String> contextBase) {
+		return of(source, source, Optional.empty(), contextBase);
+	}
+
+	/**
+	 * As {@link #of(URI, Optional)} for what was retrieved, knowing the address
+	 * asked for and the landing page it was found from.
+	 */
+	public static Optional<WebCrate> of(CrateRetriever.Retrieved retrieved, Optional<String> contextBase) {
+		return of(retrieved.source(), retrieved.asked(), retrieved.landing(), contextBase);
+	}
+
+	private static Optional<WebCrate> of(URI source, URI asked, Optional<URI> landing, Optional<String> contextBase) {
 		String scheme = source.getScheme() == null ? "" : source.getScheme().toLowerCase(Locale.ROOT);
 		if (!scheme.equals("http") && !scheme.equals("https")) {
 			return Optional.empty();
@@ -116,7 +135,18 @@ public record WebCrate(URI source, Optional<URI> base, boolean attached, String 
 			base = declared;
 			reason += "; the context's @base " + declared.get() + " is used to resolve identifiers";
 		}
-		return Optional.of(new WebCrate(source, base, attached, reason));
+		return Optional.of(new WebCrate(source, base, attached, reason, asked, landing));
+	}
+
+	/**
+	 * The same crate with a base chosen for its relative <code>@id</code>s, by
+	 * the user or found by {@link RootProbe}, not changing what it is
+	 * otherwise (a detached crate stays one).
+	 *
+	 * @param why Where the base came from, added to the reason
+	 */
+	public WebCrate withBase(URI newBase, String why) {
+		return new WebCrate(source, Optional.of(newBase), attached, reason + "; " + why, asked, landing);
 	}
 
 	/**
@@ -130,13 +160,17 @@ public record WebCrate(URI source, Optional<URI> base, boolean attached, String 
 
 	/**
 	 * What the RO-Crate Root of a crate with no folder of its own could be,
-	 * for the user to choose from (nothing here chooses): the root data
-	 * entity's own <code>@id</code> if it is a web address, its
-	 * <code>identifier</code> and <code>cite-as</code> (the dataset as
-	 * published, e.g. a DOI), and the folder beside the metadata document
-	 * where a file named <code>ro-crate-metadata.json</code> would make it an
-	 * attached crate, unless its address has a query, as a service's has, which
-	 * is not a place for files.
+	 * for the user to choose from, or {@link RootProbe} to check (nothing here
+	 * chooses): the landing page the metadata document was found from (its
+	 * address after redirects), the root data entity's own <code>@id</code>
+	 * and its <code>identifier</code> and <code>cite-as</code> if they are web
+	 * addresses, and the folder beside the metadata document where a file
+	 * named <code>ro-crate-metadata.json</code> would make it an attached
+	 * crate, unless its address has a query, as a service's has, which is not
+	 * a place for files. <em>Never</em> an address earlier in the redirections
+	 * that led here, such as the DOI or Handle asked for, or the address of
+	 * any persistent identifier resolver: they lead to the landing page, they
+	 * are not where the files are.
 	 *
 	 * @param root The root data entity
 	 */
@@ -146,13 +180,22 @@ public record WebCrate(URI source, Optional<URI> base, boolean attached, String 
 			try {
 				URI uri = new URI(text.strip());
 				String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
-				if ((scheme.equals("http") || scheme.equals("https")) && uri.getHost() != null) {
+				String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+				if ((scheme.equals("http") || scheme.equals("https")) && !host.isEmpty() && !RESOLVERS.contains(host)
+						&& !uri.equals(asked) && !uri.equals(source)) {
 					found.putIfAbsent(uri, new Root(uri, why));
 				}
 			} catch (java.net.URISyntaxException e) {
 				// Not an address
 			}
 		};
+		// The landing page is where the redirections ended, even if it was asked for
+		landing.ifPresent(page -> {
+			String host = page.getHost() == null ? "" : page.getHost().toLowerCase(Locale.ROOT);
+			if (!RESOLVERS.contains(host) && !page.equals(source)) {
+				found.putIfAbsent(page, new Root(page, "the landing page the metadata was found from"));
+			}
+		});
 		add.accept(root.getId(), "the root data entity's own @id");
 		for (String property : List.of("identifier", "cite-as")) {
 			for (var value : root.getAll(property)) {

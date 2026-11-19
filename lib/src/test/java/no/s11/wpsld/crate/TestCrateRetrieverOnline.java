@@ -93,7 +93,7 @@ public class TestCrateRetrieverOnline {
 	}
 
 	/** Found through the Signposting of the landing page, and a crate of RO-Crate 1.1 for the dataset */
-	private static void checkCrate(CrateRetriever.Retrieved retrieved) {
+	private static void checkCrate(CrateRetriever.Retrieved retrieved) throws InterruptedException {
 		assertEquals(URI.create(EXPORT), retrieved.source());
 		assertEquals(java.util.List.of("Link header"), retrieved.steps());
 		CrateDocument document = new CrateReader().read(new ByteArrayInputStream(retrieved.content()),
@@ -114,16 +114,21 @@ public class TestCrateRetrieverOnline {
 		assertFalse(crate.getRoot().getAll("name").isEmpty());
 		assertTrue(crate.getEntities().size() > 1);
 		// An export with a query, not a metadata file in a folder: detached, relative ids lead nowhere on the web
-		WebCrate web = WebCrate.of(retrieved.source(), document.context().getBase()).orElseThrow();
+		WebCrate web = WebCrate.of(retrieved, document.context().getBase()).orElseThrow();
 		assertFalse(web.attached());
 		// And semi-detached: its files have relative @ids that are not at the address of the export
 		// (not https://rdr.kuleuven.be/api/datasets/Calibration.Trial26.enf), but each File has its own url
 		assertEquals(java.util.Optional.empty(), web.base());
 		assertEquals(java.util.Optional.empty(), web.resolve("Calibration.Trial26.enf"));
 		assertTrue(crate.unanchoredDataEntities(web).size() > 1000);
-		// What its root could be: the dataset as published, not the export's address, which has a query
-		assertEquals(java.util.List.of(URI.create("https://doi.org/" + DOI)),
-				web.suggestedRoots(crate.getRoot()).stream().map(WebCrate.Root::address).toList());
+		// What its root could be: the landing page where the DOI led, not the DOI, which is only a redirection
+		// (nor the Handle's), nor the export's address, which has a query
+		java.util.List<URI> roots = web.suggestedRoots(crate.getRoot()).stream().map(WebCrate.Root::address).toList();
+		assertEquals(java.util.List.of(retrieved.landing().orElseThrow()), roots);
+		assertEquals("https://rdr.kuleuven.be/dataset.xhtml?persistentId=doi:" + DOI, roots.get(0).toString());
+		// Its first file is not beside the landing page, so nothing is chosen: the files are not there (as
+		// it would be if the crate said where), perhaps in a zip that is not looked into
+		assertEquals(java.util.Optional.empty(), new RootProbe(HTTP, TIMEOUT).find(crate, web));
 		Entity file = crate.get("Calibration.Trial26.enf").orElseThrow();
 		assertTrue(file.getAll("url").stream().allMatch(u -> u.asText().startsWith("https://rdr.kuleuven.be/api/access/datafile/")));
 	}

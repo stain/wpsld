@@ -126,6 +126,14 @@ final class CrateFile {
 		return web;
 	}
 
+	/**
+	 * A base found for the relative <code>@id</code>s of the crate on the web
+	 * (see {@link WebCrate#withBase}), without changing the crate.
+	 */
+	void setWeb(WebCrate crate) {
+		web = Optional.of(crate);
+	}
+
 	/** The address the crate on the web was asked for by */
 	Optional<URI> openedFrom() {
 		return openedFrom;

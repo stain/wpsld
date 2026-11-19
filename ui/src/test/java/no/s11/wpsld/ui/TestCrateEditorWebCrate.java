@@ -55,6 +55,8 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
 public class TestCrateEditorWebCrate extends UiTest {
 	private CrateEditor app;
 	private HttpServer server;
+	/** Whether /README.md answers 200, as the first file of the example crate, to be found beside the document */
+	private volatile boolean readmeThere;
 	/** Held until released, by /slow/ro-crate-metadata.json */
 	private final java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
 
@@ -101,6 +103,8 @@ public class TestCrateEditorWebCrate extends UiTest {
 				exchange.getResponseHeaders().add("Content-Type", "application/ld+json");
 				exchange.sendResponseHeaders(200, crate.length);
 				exchange.getResponseBody().write(crate);
+			} else if (path.equals("/README.md") && readmeThere) {
+				exchange.sendResponseHeaders(200, -1);
 			} else {
 				exchange.sendResponseHeaders(404, -1);
 			}
@@ -164,6 +168,31 @@ public class TestCrateEditorWebCrate extends UiTest {
 		assertTrue(notice, notice.contains("Its RO-Crate Root could be " + site.resolve("/") + " (the folder beside the metadata document)"));
 		select("README.md");
 		assertTrue(lookup("#openId").query().isDisabled());
+	}
+
+	/**
+	 * A semi-detached crate's first file is looked for beside where the root
+	 * could be, and if it is there, that is the base: nothing is guessed, and
+	 * nothing is chosen for the user otherwise.
+	 */
+	@Test
+	public void findsTheFilesBesideTheDocument() throws Exception {
+		readmeThere = true;
+		URI site = serve();
+		Stage stage = window();
+		List<String> opened = new ArrayList<>();
+		interact(() -> app.browse = opened::add);
+		interact(() -> app.openUrl(stage, site.resolve("/x-ro-crate-metadata.json")));
+		waitForFx(30, () -> app.notice().filter(n -> n.contains("Found the files beside")).isPresent());
+		String notice = app.notice().orElseThrow();
+		assertTrue(notice, notice.contains("Found the files beside " + site.resolve("/")));
+		assertTrue(notice, notice.contains("README.md is there"));
+		select("README.md");
+		assertFalse(lookup("#openId").query().isDisabled());
+		clickOn("#openId");
+		assertEquals(List.of(site.resolve("/README.md").toString()), opened);
+		// Still as written
+		assertTrue(entities().getItems().stream().anyMatch(e -> e.getId().equals("README.md")));
 	}
 
 	@Test
