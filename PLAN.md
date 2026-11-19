@@ -777,6 +777,51 @@ all three OSes against the performance crates.
   fields know they are entities: reference fields paste a single entity's
   `@id`, other fields nothing. Paste in the list adds them (also from such
   a document, or the text), mentioned by the root.
+  0. **Paste a whole RO-Crate** *(TODO)*. When Paste finds a *full RO-Crate
+     metadata document* on the clipboard (text or `application/ld+json`: a
+     `@graph` with a metadata descriptor `about` a root data entity, as
+     the prober of "Retrieving" decides, `CrateProbe`; not a few entities
+     copied from a crate, whose document has no descriptor), it does not
+     just add its entities but **asks**, in a dialog:
+     - **Open as a new RO-Crate**: as if it had been opened from a URL with
+       no base, a detached crate in no file (Save is Save As), checked by
+       `CrateReader` as any crate is, with its problems shown, and the
+       current crate asked about first if it has unsaved changes. No web
+       base and no landing page, so a crate with relative `@id`s is
+       semi-detached and has the "Attach…" button (see "Semi-detached");
+       its `@context` is its own.
+     - **Add all its entities to this crate**: every entity but the pasted
+       crate's descriptor, and its root data entity as an entity of its own
+       (an ordinary Dataset, not this crate's root: its `hasPart` and the
+       rest kept; mentioned from this crate's root by `hasPart` only if the
+       user says so, or as `mentions`, to decide), under the rules for
+       pasted `@id`s below (a `#` id that is taken is renamed, absolute ones
+       merged). This needs **`@context` merging**: the pasted crate's terms
+       must mean the same in this one. Terms both contexts define the same
+       are as they are; a term the pasted context defines that this one
+       does not is **added to this crate's context** as an object (as
+       `{"term": "iri"}`, from the pasted context if it is inline, or, if
+       it is a context by address, that address added to the array and the
+       terms it defines kept if they clash with none); a term both define
+       *differently* is a clash, shown in the dialog (the entities using it
+       listed), to resolve by renaming it in the pasted entities (to a
+       prefixed or absolute IRI that means what the pasted context meant, so
+       never silently the wrong meaning) or by cancelling; `@vocab` and
+       `@base` that differ are clashes too (a pasted `@base` makes relative
+       `@id`s absolute first, as Detach does, `Crate.absolutize`). The
+       RO-Crate versions' own contexts (1.1, 1.2, 1.3 and the drafts) are
+       the same for this: terms a later one added just come with it, and
+       `conformsTo` of the pasted descriptor is not copied. The same
+       merging serves "Add the entities of a crate opened from a file or a
+       URL to this one" and entity paste from a document with another
+       context, now guarded by `EntityClipboard.guard`.
+     - Which is asked as the first thing Paste does in the list, with
+       **Cancel**, and the choice (and "don't ask again": always add, always
+       open) in Preferences. Pasting into a text field is unchanged.
+     - Tests: a crate on the clipboard (`application/ld+json` and text),
+       the dialog's three buttons, opening (no base, notice), adding with
+       the same context, with a context that adds a term, with a clash
+       (renamed, cancelled), undo of the add as one step.
   1. **Several entities** *(done)*. Select several in the entity list (multiple
      selection); Copy puts them all in one `@graph`; Paste adds them all
      and selects them. A shallow copy: references to entities outside the
@@ -1884,6 +1929,23 @@ extension. Next:
     `profile` wins over a JSON(-LD) one;
   - size and request limits, a loop guard, and `Retrieved.steps()`.
 
+  **`rel="linkset"` started** (2026-11-19: `Linkset`, tested by
+  `TestLinksetRetrieval`): when the `Link` header and the HTML give no
+  `describedby`, a link to a link set (`rel="linkset"` in either, JSON first
+  and `application/linkset` text second, two at most) is fetched once, and the
+  `describedby` links of the entries that are about the page are ranked as any
+  are; the step is "linkset". **Which entries are the page's**: those whose
+  `anchor` is its address as asked, after redirects (also with or without a
+  final `/` or a fragment), or (for a link set whose links come with no
+  anchor, as in the text format) all; else, as ROHub's is anchored at the
+  API address of what the page describes, the only entry that has any
+  `describedby` or `item`; never the links of other anchors (Zenodo's files'
+  own `collection` links back, another page's metadata). Not yet: the
+  `item`s (the zip of a crate, a deposited `ro-crate-metadata.json`), the
+  `cite-as` and `license`, a link set merged with the header's links rather
+  than tried only when they give none, `Content-Location`, and the
+  prober; see below.
+
   Missing, found by running it on the real thing (the probe is in the
   session notes: `java -cp lib/build/classes/java/main:… Probe <url>`):
   1. **`rel="item"` is ignored**, so WorkflowHub's DOI
@@ -2101,9 +2163,9 @@ extension. Next:
   | **OneStop4WildLIVE**, `https://wildlive.senckenberg.de/captureevent/wildlive/963d905b946c6119ed5f` | **opens** | `Link` header `describedby` to `/api/call?…method=getAsROCrate`: a detached crate with absolute `@id`s, `contentUrl`s on its files, RO-Crate **1.2-DRAFT**, whose context is not one we know: its terms warn. Tested. To do: treat `https://w3id.org/ro/crate/1.2-DRAFT/context` (and other drafts and release candidates) as the bundled 1.2 context. |
   | **MLentory**, `https://mlentory.zbmed.de/mlentory_graph/bb23…582a` | **opens** | an HTML `<link rel="describedby">` to `…/ro-crate-metadata.json` in a folder: an attached crate on the web. Its own faults: `@dcterms` (not a keyword) in the context, `@vocab` set to the context's address, an entity nested in a value. Tested. To do: `CrateReader` warns "More than one metadata descriptor" because the root's `@id` is an absolute address that *ends* with `/ro-crate-metadata.json`: that is the root (the descriptor's `about`), not a descriptor, so it should not count. |
   | **UK CEH** (EIDC), `doi:10.5285/3970a138-c035-40ac-bf1d-a2f8a464644a` | "opens" a **non-crate** | no Signposting, no `Link` headers; content negotiation answers `application/ld+json;profile="https://w3id.org/ro/crate"` with CEH's own metadata JSON (`accessLimitation`, `authors`, …), which has no `@graph`: the case the specification's tip warns of. Its page offers `format=ttl`, `schema.org`, `bib`, `ris`, `gemini`, `json`, no crate. Tested as is: the prober must say "no RO-Crate here: it claims the profile but is not one". |
-  | **RADAR** (KIT), `https://dx.doi.org/10.35097/1054` | fails, HTTP 403 | the landing page's `Link` headers have `describedby … type="application/ld+json"; profile="https://w3id.org/ro/crate/1.1/context"` (`…/exportrocrate`), a tar `item` and others; the crate export itself answers **403 Forbidden** to non-browser clients, whatever the `User-Agent`. **Not to be got round** (no pretending to be a browser): the failure should say it was refused, by which address, and suggest downloading the crate from the page in a browser and opening the file. Note the profile is the *context's* address, not `https://w3id.org/ro/crate`: it already ranks as the profile (`contains`); a tar item is not a zip. |
+  | **RADAR** (KIT), `https://dx.doi.org/10.35097/1054` | fails, HTTP 403 | the landing page's `Link` headers have `describedby … type="application/ld+json"; profile="https://w3id.org/ro/crate/1.1/context"` (`…/exportrocrate`), a tar `item` and others; the crate export itself answers **403 Forbidden** to non-browser clients, whatever the `User-Agent`. **Not to be got round** (no pretending to be a browser): the failure should say it was refused, by which address, and suggest downloading the crate from the page in a browser and opening the file. The same 403 for a second RADAR dataset (`…/radar/de/export/7j69dwbftunf1egw/exportrocrate`), so it is the export and not one dataset. Note the profile is the *context's* address, not `https://w3id.org/ro/crate`: it already ranks as the profile (`contains`); a tar item is not a zip. |
   | **HUN-REN ARP** (Dataverse 6.9), `hdl:21.15109/ARP/2DHQF1` | fails, "Invalid redirection" | the landing page is behind **Anubis**, a proof-of-work bot wall: a `302` with no `Location`, and its own cookies. Not to be solved or got round; the failure should say that the site's bot protection stopped a program, not "invalid redirection". Its API works (version 6.9, exporters: Datacite, OAI_ORE, dataverse_json, dcterms, ddi, html, oai_datacite, oai_dc, oai_ddi, schema.org): **no RO-Crate export**, so there is no crate either way. |
-  | **ROHub**, `https://w3id.org/ro-id/2176fd9b-bef8-486a-b414-fef7edb37732` | fails, timeout | the landing page (www.rohub.org) has only `rel="linkset"` (`application/linkset` and `application/linkset+json`, at `api.rohub.org/api/ros/<id>/json/`), whose one `describedby` is `…/crate/download/` (`application/ld+json`) and which has 114 `item`s (`…/resources/<id>/download`, no type). Today `crate/download/` answers **504 Gateway Time-out** after 30 s (the crate of 114 resources is slow to make), and content negotiation on the identifier answers 503, which is what timed out the retriever (20 s). Needs linkset traversal, and a timeout that says which address did not answer. The zip you said it has was not in the linkset today: look again (the item `type`s are missing, so only their addresses say). |
+  | **ROHub**, `https://w3id.org/ro-id/2176fd9b-bef8-486a-b414-fef7edb37732` | fails, timeout | the landing page (www.rohub.org) has only `rel="linkset"` (`application/linkset` and `application/linkset+json`, at `api.rohub.org/api/ros/<id>/json/`), whose one `describedby` is `…/crate/download/` (`application/ld+json`) and which has 114 `item`s (`…/resources/<id>/download`, no type). Today `crate/download/` answers **504 Gateway Time-out** after 30 s (the crate of 114 resources is slow to make), and content negotiation on the identifier answers 503, which is what timed out the retriever (20 s). Linkset traversal is done (it now goes on to `crate/download/` and fails there with the 504, naming the address); still needs a timeout that says which address did not answer, and to look again for the zip. The zip you said it has was not in the linkset today: look again (the item `type`s are missing, so only their addresses say). |
   | Zenodo, `doi:10.5281/zenodo.24059872` | "opens" a **non-crate** | a `rel="linkset"` only; its `describedby` are Zenodo's own metadata. Needs linkset and prober. |
   | WorkflowHub, `doi:10.48546/workflowhub.workflow.120.5` | fails | the crate only as `rel="item"` zip with the profile. Needs items and zips. |
 

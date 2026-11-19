@@ -149,6 +149,75 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   folders as a tree (as View > Entities by Folder has them), the crate's
   folder at the top, with New Folder…, and nothing outside it.
 
+## Opening crates from repositories (found 2026-11-19)
+
+Found by trying opening crates from KU Leuven's, DataverseNO and HUN-REN's
+Dataverses, Zenodo, WorkflowHub, ROHub, UK CEH, RADAR, OneStop4WildLIVE and
+MLentory (see "Repositories tried" in [PLAN.md](PLAN.md)); to do one at a
+time. Mostly not wpsld's faults, but what wpsld says and does about them is.
+
+- **A document that is not a crate is handed back as the crate**: UK CEH
+  claims the RO-Crate profile and gives its own metadata; Zenodo's and
+  DataverseNO's `describedby` are their own records and exports. The
+  editor then says "No @graph array", which is true but does not say that
+  the repository has no RO-Crate. Needs the prober (`CrateProbe`: JSON, an
+  `@graph`, a metadata descriptor `ro-crate-metadata.json` or
+  `.jsonld` with an `about`) and, when none of the candidates is one, a
+  message saying so, and what the repository did give.
+- **Failures read alike but are not**: *refused* (RADAR's crate export, HTTP
+  403 to non-browser requests, also for a second dataset), *blocked* (HUN-REN's
+  Dataverse, behind the bot wall Anubis: a `302` with no `Location`, which
+  Java reports as "Invalid redirection"), *did not answer* (ROHub: a
+  request timed out, which does not say which, after 20 s; its crate
+  download answers 504 and content negotiation 503) and *not a crate*. Each
+  should say which, with the address, as `Retrieved.steps` lists what was
+  tried; for refused and blocked, say who refused and that a person can
+  download the crate in a browser and open the file. **Never** retry with
+  other headers to get past a refusal or a bot wall, or solve its challenge:
+  they are the repositories' decisions.
+- **No `User-Agent` of our own** is sent by `CrateRetriever` (Java's
+  default), where `WebAvailability` and the lookups send
+  `wpsld-… (+https://github.com/stain/wpsld)`: send it for retrieving too, so
+  that repositories can tell wpsld, and its version, from other clients, as
+  they ask.
+- **RO-Crate 1.2's drafts are unknown contexts**: OneStop4WildLIVE's crate
+  has the context `https://w3id.org/ro/crate/1.2-DRAFT/context`, not
+  in `ContextCache.bundled()`, so every term warns "not defined by the
+  @context, so not understood" and the forms know none of them. Take
+  `1.2-DRAFT`, `1.2-RC*` and the like (and `1.3-DRAFT`) as the bundled
+  release of that number, saying so in a warning once, rather than a warning
+  per term; likewise a context by address that is not bundled and cannot be
+  fetched (no network, a timeout): fetch it as a job when opened from the
+  web, within limits.
+- **"More than one metadata descriptor" for a root with an `@id` that is
+  an address ending in `/ro-crate-metadata.json`** (MLentory's: the root
+  dataset's `@id` is the metadata file's own address, which is allowed, as
+  the root's `@id` may be any absolute URI): `CrateReader.descriptors` takes
+  every entity whose `@id` ends with the file's name for a descriptor
+  (as a detached crate's `<prefix>-ro-crate-metadata.json` may be). The
+  descriptor is the one whose `@id` is *exactly* `ro-crate-metadata.json` (or
+  `.jsonld`, RO-Crate 1.0); an entity that another's `about` names is the
+  root, not a descriptor. The same crate has `@dcterms` in its context (not a
+  keyword) and `@vocab` set to the context's address: warnings, correctly,
+  and the publisher's to fix.
+- **A crate with an entity whose `@id` is an array does not open** (KU
+  Leuven's: a folder named with spaces, `["New%20Patient…/", "New Patient…/"]`):
+  `CrateReader` drops it as an error ("has no @id", which is not what is
+  wrong) and the editor refuses to open a crate with errors. To decide, in
+  this order: say what is wrong (an `@id` that is an array of 2 strings); open
+  a crate whose errors are only entities that were dropped, with them listed as
+  warnings, rather than not at all; and take the first string as the `@id` and
+  the others as `sameAs`, written back as one (Repair Crate). Tell
+  Dataverse's exporter project (`gdcc/exporter-ro-crate`, as far as known).
+- **Java does not trust some European academic sites** with the JDK of this
+  container (conda-forge OpenJDK 25.0.2: HARICA's 2015 roots, not
+  `HARICA TLS RSA Root CA 2021`, under which GEANT TLS issues, e.g.
+  KU Leuven's `rdr.kuleuven.be`): `PKIX path building failed`. The
+  runtime image `jlink` makes carries the JDK's `cacerts`, so check that of
+  the JDK the release workflow builds with has both 2021 roots
+  (`keytool -list -cacerts | grep -i harica`), and say in the failure that the
+  certificate is not trusted by this Java, and signed by whom.
+
 ## Repair Crate
 
 - **Types written as IRIs**, e.g. ROHub's `http://schema.org/Person` and
