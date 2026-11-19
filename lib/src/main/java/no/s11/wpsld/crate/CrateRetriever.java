@@ -241,6 +241,11 @@ public class CrateRetriever {
 				step = "HTML link";
 			}
 			if (described.isEmpty()) {
+				// FAIR Signposting level 2: only a link to a link set, which lists the rest
+				described = viaLinkset(response);
+				step = "linkset";
+			}
+			if (described.isEmpty()) {
 				return Optional.empty();
 			}
 			steps.add(step);
@@ -263,6 +268,36 @@ public class CrateRetriever {
 				return Optional.of(retrieved(target));
 			}
 			throw new IOException("Can't load " + target.at() + ": HTTP " + target.status());
+		}
+
+		/**
+		 * The best <code>describedby</code> link of a page's link set (see
+		 * {@link Linkset}), if it has one: fetched once, within the same limits,
+		 * and not followed any further. A link set that can't be had or read is
+		 * not an error, as the page may still lead to its crate otherwise.
+		 */
+		private Optional<URI> viaLinkset(Response page) throws IOException, InterruptedException {
+			String html = page.html() ? new String(page.body(), StandardCharsets.UTF_8) : "";
+			Set<URI> addresses = new LinkedHashSet<>(List.of(page.at(), asked));
+			for (Linkset.Reference reference : Linkset.discover(page.headers(), html, page.at()).stream().limit(2).toList()) {
+				Response set = get(reference.href(), Linkset.ACCEPT);
+				if (!set.ok()) {
+					continue;
+				}
+				URI best = null;
+				int bestRank = 0;
+				for (Linkset.Link link : Linkset.about(Linkset.parse(set.body(), set.type(), set.at()), addresses)) {
+					int rank = rank(link.params());
+					if (rank > bestRank) {
+						best = link.href();
+						bestRank = rank;
+					}
+				}
+				if (best != null) {
+					return Optional.of(best);
+				}
+			}
+			return Optional.empty();
 		}
 
 		private Retrieved retrieved(Response response) {
@@ -331,7 +366,7 @@ public class CrateRetriever {
 	 * metadata: <code>rel</code> describedby, and the RO-Crate profile or a
 	 * JSON(-LD) type. Those with the profile come first.
 	 */
-	private static int rank(Map<String, String> params) {
+	static int rank(Map<String, String> params) {
 		List<String> rels = List.of(params.getOrDefault("rel", "").toLowerCase(Locale.ROOT).split("\\s+"));
 		if (!rels.contains("describedby")) {
 			return 0;
