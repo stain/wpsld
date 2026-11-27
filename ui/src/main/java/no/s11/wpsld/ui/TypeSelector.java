@@ -48,7 +48,8 @@ import no.s11.wpsld.soss.SchemaFromJsonLd;
  * search of type names and descriptions that trims the tree to the matches
  * and their superclasses. Types outside schema.org, e.g. a profile's
  * <code>RepositoryCollection</code> or RO-Crate's
- * <code>ComputationalWorkflow</code>, come first under Thing.
+ * <code>ComputationalWorkflow</code>, come first under Thing, then, greyed,
+ * guesses: types used in the crate that nothing defines.
  */
 public class TypeSelector extends Dialog<ClassDef> {
 	private static final String S = "http://schema.org/";
@@ -58,6 +59,8 @@ public class TypeSelector extends Dialog<ClassDef> {
 	private final ClassDef thing;
 	/** Types outside schema.org, as kinds of Thing */
 	private final List<ClassDef> others;
+	/** Types used in the crate, defined nowhere, after the others */
+	private final List<ClassDef> guessed;
 	private final TreeView<ClassDef> tree = new TreeView<>();
 	private final Label status = new Label();
 	/** Types matching the search, shown in bold */
@@ -72,8 +75,19 @@ public class TypeSelector extends Dialog<ClassDef> {
 	 *               {@link CrateTerms#otherClass}
 	 */
 	public TypeSelector(SchemaFromJsonLd schema, List<ClassDef> others, Window owner) {
+		this(schema, others, List.of(), owner);
+	}
+
+	/**
+	 * @param others  Types outside schema.org to offer too, e.g. from
+	 *                {@link CrateTerms#otherClass}
+	 * @param guessed Types used in the crate that nothing defines, offered
+	 *                greyed after them
+	 */
+	public TypeSelector(SchemaFromJsonLd schema, List<ClassDef> others, List<ClassDef> guessed, Window owner) {
 		this.schema = schema;
 		this.others = List.copyOf(others);
+		this.guessed = List.copyOf(guessed);
 		this.terms = new CrateTerms(schema);
 		this.thing = schema.getClasses().get(URI.create(S + "Thing"));
 		initOwner(owner);
@@ -92,6 +106,10 @@ public class TypeSelector extends Dialog<ClassDef> {
 				super.updateItem(classDef, empty);
 				setText(empty || classDef == null ? null : label(classDef));
 				setStyle(!empty && matches.contains(classDef) ? "-fx-font-weight: bold;" : "");
+				getStyleClass().remove("guessed");
+				if (!empty && guessed.contains(classDef)) {
+					getStyleClass().add("guessed");
+				}
 				setTooltip(empty || classDef == null ? null
 						: classDef.getComment().map(Labels::plainText).map(EntityEditor::tooltip).orElse(null));
 			}
@@ -127,7 +145,7 @@ public class TypeSelector extends Dialog<ClassDef> {
 			status.setText("");
 			return;
 		}
-		matches = Stream.concat(others.stream(), schema.getClasses().values().stream())
+		matches = Stream.concat(Stream.concat(others.stream(), guessed.stream()), schema.getClasses().values().stream())
 				.filter(c -> !schema.isSuperseded(c))
 				.filter(c -> c.getName().toLowerCase(Locale.ROOT).contains(q)
 						|| terms.name(c).toLowerCase(Locale.ROOT).contains(q)
@@ -166,7 +184,9 @@ public class TypeSelector extends Dialog<ClassDef> {
 	 * The subclasses of a type, with the types outside schema.org under Thing.
 	 */
 	private Stream<ClassDef> subclasses(ClassDef classDef) {
-		return classDef == thing ? Stream.concat(others.stream(), schema.subclasses(thing)) : schema.subclasses(classDef);
+		return classDef == thing
+				? Stream.concat(Stream.concat(others.stream(), guessed.stream()), schema.subclasses(thing))
+				: schema.subclasses(classDef);
 	}
 
 	private void select(ClassDef classDef) {

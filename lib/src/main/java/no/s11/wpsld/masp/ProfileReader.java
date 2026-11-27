@@ -113,8 +113,9 @@ public class ProfileReader {
 	 * <code>prov:specializationOf</code>, <code>sh:minCount</code> and the
 	 * other constraints of a MASP rule. Unlike a profile's rules, a
 	 * <code>domainIncludes</code> may also be a vocabulary type, which then
-	 * stands for a class rule of that type. No schema resource, root or
-	 * descriptor rule is looked for.
+	 * stands for a class rule of that type, and a property without one is of
+	 * <code>schema:Thing</code>. No schema resource, root or descriptor rule
+	 * is looked for.
 	 */
 	public Profile readDefinitions(CrateDocument document) {
 		return new Reading(document).definitions();
@@ -194,7 +195,11 @@ public class ProfileReader {
 			}
 			for (Entity entity : properties) {
 				String id = document.expandId(entity.getId());
-				PropertyRule property = propertyRule(id, entity, ruleIds);
+				PropertyRule property = propertyRule(id, entity, ruleIds, false);
+				if (property.domain().isEmpty()) {
+					property = new PropertyRule(id, property.label(), property.name(), property.comment(),
+							property.specializationOf(), List.of(S + "Thing"), property.range(), property.values());
+				}
 				propertyRules.put(id, property);
 				// A vocabulary type as the domain, as ad hoc terms have it
 				for (String domain : property.domain()) {
@@ -285,8 +290,16 @@ public class ProfileReader {
 		}
 
 		private PropertyRule propertyRule(String id, Entity entity, Set<String> ruleIds) {
+			return propertyRule(id, entity, ruleIds, true);
+		}
+
+		/**
+		 * @param needsDomain Whether to warn of a rule without
+		 *                    <code>domainIncludes</code>
+		 */
+		private PropertyRule propertyRule(String id, Entity entity, Set<String> ruleIds, boolean needsDomain) {
 			List<String> domain = document.references(entity, S + "domainIncludes");
-			if (domain.isEmpty()) {
+			if (domain.isEmpty() && needsDomain) {
 				warn("Property rule " + entity.getId() + " has no domainIncludes, so applies to no class rule");
 			}
 			List<RangeItem> range = new ArrayList<>();

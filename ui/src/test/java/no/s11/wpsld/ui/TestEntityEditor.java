@@ -38,6 +38,7 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TitledPane;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
 import javafx.scene.input.KeyCode;
@@ -91,6 +92,27 @@ public class TestEntityEditor extends UiTest {
 
 	private static JsonNode ref(String id) {
 		return JSON.objectNode().put("@id", id);
+	}
+
+	@Test
+	public void guessesFromTheCrate() {
+		interact(() -> editor.setCrate(() -> crate));
+		Entity alice = crate.add("Person");
+		alice.set("mood", Optional.of(JSON.textNode("happy")));
+		Entity bob = crate.add("Person");
+		crate.add("Mystery");
+		edit(bob);
+		// Used with Person, defined nowhere: greyed, and folded as Bob has none
+		TitledPane guessed = lookup("#guessedProperties").queryAs(TitledPane.class);
+		assertTrue(guessed.getStyleClass().contains("guessed"));
+		assertFalse(guessed.isExpanded());
+		edit(alice);
+		assertTrue(lookup("#guessedProperties").queryAs(TitledPane.class).isExpanded());
+		assertTrue(visibleProperties().contains("mood"));
+		// A type used in the crate, as written there
+		edit(bob);
+		chooseType("Mystery");
+		assertTrue(bob.getTypes().toString(), bob.getTypes().contains("Mystery"));
 	}
 
 	@Test

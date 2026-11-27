@@ -23,6 +23,7 @@ import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -61,7 +62,22 @@ public class TestCrateDefinedFields {
 			   "rangeIncludes": {"@id": "http://schema.org/Text"}, "sh:minCount": 1, "sh:maxCount": 1},
 			  {"@id": "https://example.org/terms#education", "@type": "rdf:Property", "rdfs:label": "education",
 			   "rdfs:comment": "Highest degree", "domainIncludes": {"@id": "http://schema.org/Person"},
-			   "rangeIncludes": {"@id": "http://schema.org/Text"}}
+			   "rangeIncludes": {"@id": "http://schema.org/Text"}},
+			  {"@id": "https://example.org/terms#reviewed", "@type": "rdf:Property", "rdfs:label": "reviewed",
+			   "domainIncludes": {"@id": "http://schema.org/CreativeWork"}},
+			  {"@id": "https://example.org/terms#note", "@type": "rdf:Property", "rdfs:label": "note"}
+			 ]}""";
+
+	/** A crate using types and properties nothing defines */
+	private static final String UNDEFINED = """
+			{"@context": "https://w3id.org/ro/crate/1.2/context",
+			 "@graph": [{"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+			   "conformsTo": {"@id": "https://w3id.org/ro/crate/1.2"}},
+			  {"@id": "./", "@type": "Dataset", "name": "People"},
+			  {"@id": "#alice", "@type": "Person", "name": "Alice", "mood": "happy", "pet": {"@id": "#rex"}},
+			  {"@id": "#bob", "@type": "Person", "name": "Bob", "mood": "calm", "shoeSize": 44},
+			  {"@id": "#rex", "@type": ["Mystery", "Thing"], "name": "Rex", "barks": true},
+			  {"@id": "#acme", "@type": "Organization", "name": "ACME", "motto": "Yes", "site": "https://example.com/"}
 			 ]}""";
 
 	@BeforeClass
@@ -123,6 +139,54 @@ public class TestCrateDefinedFields {
 		FormFields profile = CrateDefinedFields.of(
 				new ProfileFormFields(ProfileCache.bundled().bundled(CORE).orElseThrow(), schemaOrg), crate);
 		assertNotNull(field(profile.fieldsFor(Set.of(URI.create("http://schema.org/Person"))), "education"));
+	}
+
+	@Test
+	public void ofSuperclassesAndThing() {
+		Crate crate = crate(DEFINING);
+		FormFields fields = CrateDefinedFields.of(schemaOrg, crate);
+		// The root: a CreativeWork, and a Thing
+		List<FormField> dataset = fields.fieldsFor(Set.of(URI.create("http://schema.org/Dataset")), true);
+		assertEquals(CrateDefinedFields.DEFINED, field(dataset, "reviewed").group());
+		assertEquals(CrateDefinedFields.DEFINED, field(dataset, "note").group());
+		// The crate's own type, a Thing too
+		Entity visit = crate.get("#visit").orElseThrow();
+		assertNotNull(field(fields.fieldsFor(fields.typesOf(visit, terms)), "note"));
+		assertFalse(fields.fieldsFor(Set.of(URI.create("http://schema.org/Person"))).stream()
+				.anyMatch(f -> f.name().equals("reviewed")));
+	}
+
+	@Test
+	public void guessedProperties() {
+		Crate crate = crate(UNDEFINED);
+		CrateDefinedFields fields = CrateDefinedFields.of(schemaOrg, crate);
+		// Used by Alice and Bob, also for Carol, a Person with none of them
+		Entity carol = crate.add("Person", "#carol");
+		List<FormField> guessed = fields.guessedFieldsFor(carol, terms);
+		assertEquals(List.of("mood", "pet", "shoeSize"), guessed.stream().map(FormField::name).toList());
+		assertTrue(guessed.stream().allMatch(f -> f.tier() == FieldTier.GUESSED && f.group().equals(CrateDefinedFields.GUESSED)));
+		assertEquals(ValueKind.TEXT, field(guessed, "mood").kind());
+		assertTrue(field(guessed, "mood").comment().orElseThrow().contains("2 entities of type Person"));
+		assertEquals(ValueKind.REFERENCE, field(guessed, "pet").kind());
+		assertEquals(ValueKind.NUMBER, field(guessed, "shoeSize").kind());
+		// Not an Organization's; schema.org's own are no guesses
+		assertEquals(List.of("motto", "site"), fields.guessedFieldsFor(crate.get("#acme").orElseThrow(), terms).stream()
+				.map(FormField::name).toList());
+		assertEquals(List.of(URI.create("http://schema.org/URL")), field(fields.guessedFieldsFor(crate.get("#acme")
+				.orElseThrow(), terms), "site").range().stream().map(c -> c.getID()).toList());
+		// Nor those the crate defines
+		Crate defining = crate(DEFINING);
+		assertEquals(List.of(), CrateDefinedFields.of(schemaOrg, defining)
+				.guessedFieldsFor(defining.get("#visit").orElseThrow(), terms));
+	}
+
+	@Test
+	public void undefinedTypes() {
+		assertEquals(Map.of("Mystery", 1), CrateDefinedFields.of(schemaOrg, crate(UNDEFINED)).undefinedTypes(terms));
+		// Defined in the crate, or RDF's own
+		CrateDefinedFields defining = CrateDefinedFields.of(schemaOrg, crate(DEFINING));
+		assertEquals(Map.of(), defining.undefinedTypes(terms));
+		assertEquals("SiteVisit", defining.termFor(URI.create(TERMS + "SiteVisit")));
 	}
 
 	@Test

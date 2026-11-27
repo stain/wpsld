@@ -93,7 +93,10 @@ those are rules, everything else in the crate is ignored. Other roles seen:
   reads the crate's own `rdfs:Class` and `rdf:Property` entities as rules too
   (`ProfileReader.readDefinitions`, `CrateDefinedFields`), beside the chosen
   profile's, with a vocabulary type (e.g. `schema:Person`) allowed as their
-  `domainIncludes`, and expands the crate's types with its own `@context`.
+  `domainIncludes` (which, as in RDFS, then also covers its subtypes; none
+  means `schema:Thing`), and expands the crate's types with its own
+  `@context`. Types and properties the crate uses but nothing defines are
+  offered apart, greyed, as guesses.
 - `sh:minCount`/`sh:maxCount` **on a class** = how many instances of the type the
   whole crate must/may have.
 - May also carry `rdfs:subClassOf` (LDAC: `CollectionEvent` ⊂ `Event`, `CreateAction`).

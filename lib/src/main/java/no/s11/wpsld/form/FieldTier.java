@@ -26,5 +26,10 @@ public enum FieldTier {
 	/** Named by the profile, but optional: what it suggests describing */
 	SUGGESTED,
 	/** Other properties the vocabulary allows for the type */
-	OTHER
+	OTHER,
+	/**
+	 * Properties defined nowhere, but used in the crate with the entity's
+	 * types: a guess (see {@link CrateDefinedFields#guessedFieldsFor})
+	 */
+	GUESSED
 }

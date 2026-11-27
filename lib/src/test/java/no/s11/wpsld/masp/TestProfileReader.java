@@ -227,7 +227,8 @@ public class TestProfileReader {
 				  {"@id": "./", "@type": "Dataset"},
 				  {"@id": "https://example.org/terms#education", "@type": "rdf:Property", "rdfs:label": "education",
 				   "rdfs:comment": "Highest degree", "domainIncludes": {"@id": "http://schema.org/Person"},
-				   "sh:minCount": 1}
+				   "sh:minCount": 1},
+				  {"@id": "https://example.org/terms#mood", "@type": "rdf:Property", "rdfs:label": "mood"}
 				 ]}""".getBytes(StandardCharsets.UTF_8)), "test"));
 		PropertyRule education = defined.propertyRules().get(terms + "education");
 		assertEquals("education", education.label());
@@ -236,6 +237,9 @@ public class TestProfileReader {
 		assertEquals(List.of(S + "Person"), defined.classRule(S + "Person").orElseThrow().types());
 		assertEquals(List.of(education), defined.propertiesOf(S + "Person"));
 		assertTrue(defined.rootRule().isEmpty());
+		// Without domainIncludes, of any Thing
+		assertEquals(List.of(S + "Thing"), defined.propertyRules().get(terms + "mood").domain());
+		assertEquals(List.of(), defined.problems());
 	}
 
 	@Test

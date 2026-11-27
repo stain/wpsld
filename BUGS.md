@@ -215,11 +215,15 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   field of that range; without one, for any entity, as text or a
   reference as they are used. *Partly done:* the crate's own
   `rdfs:Class`/`rdf:Property` definitions are read as MASP rules
-  (`CrateDefinedFields`): properties with a `domainIncludes` are fields of
-  those types (required with `sh:minCount`), the classes are offered as
-  types, and types the crate's `@context` names are recognised. Still to
-  do: types and properties used but not defined, and properties without a
-  `domainIncludes`.
+  (`CrateDefinedFields`): properties are fields of their `domainIncludes`
+  types and subtypes, or of Thing without one (required with
+  `sh:minCount`), the classes are offered as types, and types the crate's
+  `@context` names are recognised. Types and properties used but defined
+  nowhere are offered greyed, as guesses: the types in Add Type, the
+  properties in a group "Used in the crate, defined nowhere" for entities
+  sharing a type with where they are used, their kind of value guessed
+  from the values. Still to do: a type or property defined in a profile
+  crate the crate `conformsTo` other than the one chosen.
 - **CodeMeta**: read `codemeta.json` files (JSON-LD, context
   `https://w3id.org/codemeta/3.0`, mostly schema.org terms) to describe a
   SoftwareSourceCode or SoftwareApplication: name, description, version,

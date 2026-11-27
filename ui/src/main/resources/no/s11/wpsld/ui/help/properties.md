@@ -6,6 +6,21 @@ link a dataset to a person. Select an entity to see fields for its
 appear first. The **?** or information button beside a field shows its
 definition.
 
+## Properties the crate defines or uses
+
+A crate can define properties of its own, as `rdf:Property` entities
+(with `rdfs:label`, `rdfs:comment`, `domainIncludes` and perhaps a
+profile's `sh:minCount`). These appear in **Defined in the crate**, or
+**Required by the crate**, for entities of their `domainIncludes` types
+and their subtypes, or for every entity if they have none.
+
+Properties nothing defines, but which other entities of the same type use
+in the crate, appear greyed in **Used in the crate, defined nowhere**,
+open only when the entity has one of them. These are guesses, and so is
+whether they take text, numbers or links.
+
+## Finding properties
+
 In the list-style form, type a property name or label in **Search
 properties** to find it; clear the search to see the other groups again.
 A group of a type's properties, such as **From CreativeWork**, opens when
