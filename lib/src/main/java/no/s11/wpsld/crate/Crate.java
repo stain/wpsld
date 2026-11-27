@@ -185,10 +185,18 @@ public class Crate {
 	 * access); others, e.g. absolute IRIs and relative paths, as they are.
 	 */
 	public String expandId(String id) {
+		return jsonLdContext().expandId(id);
+	}
+
+	/**
+	 * The crate's <code>@context</code> processed (from the bundled contexts,
+	 * without network access), when first needed.
+	 */
+	public JsonLdContext jsonLdContext() {
 		if (processed == null) {
 			processed = JsonLdContext.of(context, ContextCache.bundled());
 		}
-		return processed.expandId(id);
+		return processed;
 	}
 
 	public Entity getRoot() {

@@ -20,6 +20,8 @@ package no.s11.wpsld.masp;
 import java.util.List;
 import java.util.Optional;
 
+import no.s11.wpsld.crate.Crate;
+
 /**
  * A MASP property rule (<code>rdf:Property</code>): a property of the
  * entities matching its domain class rules.
@@ -31,7 +33,9 @@ import java.util.Optional;
  * @param name             Human readable name, if the profile gives one other
  *                         than the label (its <code>name</code>)
  * @param comment          Description in the profile
- * @param specializationOf The vocabulary properties the rule specialises
+ * @param specializationOf The vocabulary properties the rule specialises;
+ *                         without any, a property of its own, see
+ *                         {@link #properties()}
  * @param domain           Ids of the class rules it applies to
  * @param range            What the values may be
  * @param values           How many values each matching entity must/may have
@@ -41,5 +45,16 @@ public record PropertyRule(String id, String label, Optional<String> name, Optio
 
 	public boolean isRequired() {
 		return values.isRequired();
+	}
+
+	/**
+	 * The properties the rule is about: those it specialises, else (a new
+	 * property) the rule's own <code>@id</code> if absolute.
+	 */
+	public List<String> properties() {
+		if (!specializationOf.isEmpty()) {
+			return specializationOf;
+		}
+		return Crate.isAbsolute(id) ? List.of(id) : List.of();
 	}
 }

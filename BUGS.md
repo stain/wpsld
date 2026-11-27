@@ -213,7 +213,13 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   the property search to add. With an `rdf:Property` definition
   (`domainIncludes`, `rangeIncludes`), offered for those classes with a
   field of that range; without one, for any entity, as text or a
-  reference as they are used.
+  reference as they are used. *Partly done:* the crate's own
+  `rdfs:Class`/`rdf:Property` definitions are read as MASP rules
+  (`CrateDefinedFields`): properties with a `domainIncludes` are fields of
+  those types (required with `sh:minCount`), the classes are offered as
+  types, and types the crate's `@context` names are recognised. Still to
+  do: types and properties used but not defined, and properties without a
+  `domainIncludes`.
 - **CodeMeta**: read `codemeta.json` files (JSON-LD, context
   `https://w3id.org/codemeta/3.0`, mostly schema.org terms) to describe a
   SoftwareSourceCode or SoftwareApplication: name, description, version,

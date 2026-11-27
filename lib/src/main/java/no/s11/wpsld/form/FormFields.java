@@ -19,7 +19,12 @@ package no.s11.wpsld.form;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
+
+import no.s11.wpsld.crate.CrateTerms;
+import no.s11.wpsld.crate.Entity;
 
 /**
  * Decides which fields an editor shows for an entity.
@@ -78,4 +83,12 @@ public interface FormFields {
 	 * A name to show for this choice of fields, e.g. in a drop-down.
 	 */
 	String getName();
+
+	/**
+	 * An entity's types as IRIs, to ask for its fields with: by the RO-Crate
+	 * context, also those outside schema.org.
+	 */
+	default Set<URI> typesOf(Entity entity, CrateTerms terms) {
+		return entity.getTypes().stream().map(terms::iri).flatMap(Optional::stream).collect(Collectors.toSet());
+	}
 }

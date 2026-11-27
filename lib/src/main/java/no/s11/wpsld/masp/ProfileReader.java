@@ -63,6 +63,11 @@ import no.s11.wpsld.masp.RangeItem.ValueConstraint;
  * <code>ro-crate-metadata.json</code>; its property rule <code>about</code>
  * ranges over the root's class rule.</li>
  * </ol>
+ * A rule without <code>prov:specializationOf</code> is about a type or
+ * property of its own, its <code>@id</code>. The same shape also defines new
+ * terms in an ordinary crate (RO-Crate's ad hoc terms), which
+ * {@link #readDefinitions(CrateDocument)} reads as rules.
+ * <p>
  * Like the crate reader it never throws for what is in the crate, and reads
  * what it can. MASP profiles write <code>sh:minCount</code> without defining
  * <code>sh:</code>, so both that and the SHACL IRI are accepted, as numbers
@@ -97,6 +102,27 @@ public class ProfileReader {
 
 	public Profile read(CrateDocument document) {
 		return new Reading(document).read();
+	}
+
+	/**
+	 * The types and properties a crate defines itself, as rules: its
+	 * <code>rdfs:Class</code> and <code>rdf:Property</code> entities (ad hoc
+	 * terms, e.g. <code>{"@id": "https://example.org/terms#education",
+	 * "@type": "rdf:Property", "rdfs:label": "education", "domainIncludes":
+	 * {"@id": "schema:Person"}}</code>), with or without
+	 * <code>prov:specializationOf</code>, <code>sh:minCount</code> and the
+	 * other constraints of a MASP rule. Unlike a profile's rules, a
+	 * <code>domainIncludes</code> may also be a vocabulary type, which then
+	 * stands for a class rule of that type. No schema resource, root or
+	 * descriptor rule is looked for.
+	 */
+	public Profile readDefinitions(CrateDocument document) {
+		return new Reading(document).definitions();
+	}
+
+	/** The last part of an IRI, e.g. <code>education</code> of <code>https://example.org/terms#education</code> */
+	private static String localName(String iri) {
+		return iri.replaceFirst(".*[/#:]", "");
 	}
 
 	private static class Reading {
@@ -150,6 +176,36 @@ public class ProfileReader {
 			Optional<String> descriptorRule = descriptorRule();
 			Optional<String> rootRule = descriptorRule.flatMap(this::rootRule);
 			return profile(root.getId(), identifiers, name, version, isProfileOf, descriptorRule, rootRule);
+		}
+
+		Profile definitions() {
+			if (document.crate().isEmpty()) {
+				return profile(document.source(), List.of(), Optional.of("Defined in the crate"), Optional.empty(),
+						List.of(), Optional.empty(), Optional.empty());
+			}
+			List<Entity> classes = document.entitiesOfType(RDFS + "Class");
+			List<Entity> properties = document.entitiesOfType(RDF + "Property");
+			Set<String> ruleIds = new LinkedHashSet<>();
+			Stream.concat(classes.stream(), properties.stream()).map(e -> document.expandId(e.getId()))
+					.forEach(ruleIds::add);
+			for (Entity entity : classes) {
+				String id = document.expandId(entity.getId());
+				classRules.put(id, classRule(id, entity));
+			}
+			for (Entity entity : properties) {
+				String id = document.expandId(entity.getId());
+				PropertyRule property = propertyRule(id, entity, ruleIds);
+				propertyRules.put(id, property);
+				// A vocabulary type as the domain, as ad hoc terms have it
+				for (String domain : property.domain()) {
+					if (!classRules.containsKey(domain) && isAbsolute(domain)) {
+						classRules.put(domain, new ClassRule(domain, localName(domain), Optional.empty(),
+								List.of(domain), List.of(), Cardinality.ANY));
+					}
+				}
+			}
+			return profile(document.source(), List.of(), Optional.of("Defined in the crate"), Optional.empty(),
+					List.of(), Optional.empty(), Optional.empty());
 		}
 
 		private Profile profile(String id, List<String> identifiers, Optional<String> name, Optional<String> version,
@@ -364,9 +420,10 @@ public class ProfileReader {
 		}
 
 		private String label(Entity entity) {
+			String id = document.expandId(entity.getId());
 			return text(entity, RDFS + "label").or(() -> text(entity, S + "name"))
 					.or(() -> document.references(entity, PROV_SPECIALIZATION_OF).stream().findFirst()
-							.map(iri -> iri.replaceFirst(".*[/#]", "")))
+							.or(() -> Optional.of(id).filter(Crate::isAbsolute)).map(ProfileReader::localName))
 					.orElse(entity.getId());
 		}
 

@@ -196,6 +196,49 @@ public class TestProfileReader {
 	}
 
 	@Test
+	public void rulesOfTheirOwnTerms() {
+		String terms = "https://example.org/terms#";
+		Profile profile = profile("{\"@id\": \"https://example.org/terms#SiteVisit\"}, {\"@id\": \"https://example.org/terms#siteName\"},"
+				+ " {\"@id\": \"#local\"}",
+				"{\"@id\": \"https://example.org/terms#SiteVisit\", \"@type\": \"rdfs:Class\"}",
+				"{\"@id\": \"https://example.org/terms#siteName\", \"@type\": \"rdf:Property\","
+						+ " \"domainIncludes\": {\"@id\": \"https://example.org/terms#SiteVisit\"}}",
+				"{\"@id\": \"#local\", \"@type\": \"rdfs:Class\"}");
+		ClassRule visit = profile.classRule(terms + "SiteVisit").orElseThrow();
+		// No prov:specializationOf: the rule's own @id is the type
+		assertEquals(List.of(terms + "SiteVisit"), visit.types());
+		assertEquals("SiteVisit", visit.label());
+		assertEquals(List.of(visit), profile.classRulesFor(Set.of(terms + "SiteVisit", S + "Thing")));
+		PropertyRule siteName = profile.propertyRules().get(terms + "siteName");
+		assertEquals(List.of(terms + "siteName"), siteName.properties());
+		assertEquals("siteName", siteName.label());
+		assertEquals(List.of(siteName), profile.propertiesOf(visit.id()));
+		// A local @id names no type
+		assertEquals(List.of(), profile.classRule("#local").orElseThrow().types());
+		assertEquals(List.of(), profile.classRulesFor(Set.of("#local")));
+	}
+
+	@Test
+	public void definitionsInACrate() {
+		String terms = "https://example.org/terms#";
+		Profile defined = reader.readDefinitions(crateReader.read(new ByteArrayInputStream("""
+				{"@context": ["https://w3id.org/ro/crate/1.2/context", {"education": "https://example.org/terms#education"}],
+				 "@graph": [{"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"}},
+				  {"@id": "./", "@type": "Dataset"},
+				  {"@id": "https://example.org/terms#education", "@type": "rdf:Property", "rdfs:label": "education",
+				   "rdfs:comment": "Highest degree", "domainIncludes": {"@id": "http://schema.org/Person"},
+				   "sh:minCount": 1}
+				 ]}""".getBytes(StandardCharsets.UTF_8)), "test"));
+		PropertyRule education = defined.propertyRules().get(terms + "education");
+		assertEquals("education", education.label());
+		assertTrue(education.isRequired());
+		// The vocabulary type of its domain stands for a class rule
+		assertEquals(List.of(S + "Person"), defined.classRule(S + "Person").orElseThrow().types());
+		assertEquals(List.of(education), defined.propertiesOf(S + "Person"));
+		assertTrue(defined.rootRule().isEmpty());
+	}
+
+	@Test
 	public void noRulesWithoutSchemaResource() {
 		Profile profile = reader.read(crateReader.read(new ByteArrayInputStream(
 				("{\"@context\": \"https://w3id.org/ro/crate/1.2/context\", \"@graph\": [{\"@id\": \"./\","
