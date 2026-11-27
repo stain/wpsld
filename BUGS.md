@@ -236,6 +236,18 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   crate's `CrateProfiles`), so as not to define again what the profile
   has. Ask first, or list them for a `rdfs:comment` to be filled in, as
   the definitions would be guesses.
+  Check (`CrateCheck`, so also `wpsld-cli check`) takes the profiles
+  already, but reports only what the crate reader finds: terms the
+  `@context` doesn't define and undefined prefixes (RO-Crate's MUST). It
+  could also report, as RECOMMENDED, what RO-Crate 1.2/1.3 say under "Add
+  local definitions of ad hoc terms": terms from outside schema.org that
+  the context maps but neither the crate nor the profile defines ("ad-hoc
+  terms SHOULD also include definitions in the RO-Crate"), and definitions
+  without an absolute `@id`, `name` and `description`, or without the
+  `rdfs:label` and `rdfs:comment` that SHOULD repeat them. The spec also
+  allows `DefinedTerm` for such definitions, which
+  `ProfileReader.readDefinitions` doesn't read yet. Repair's fix would
+  then answer Check's issue.
 - **CodeMeta**: read `codemeta.json` files (JSON-LD, context
   `https://w3id.org/codemeta/3.0`, mostly schema.org terms) to describe a
   SoftwareSourceCode or SoftwareApplication: name, description, version,
