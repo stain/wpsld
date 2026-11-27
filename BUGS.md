@@ -148,6 +148,29 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   chooser. Choose the target with our own dialog instead: the crate's
   folders as a tree (as View > Entities by Folder has them), the crate's
   folder at the top, with New Folder…, and nothing outside it.
+- **Known limits of the crate's own and guessed terms**
+  (`CrateDefinedFields`, branch `masp-match-all-types`), untried in the
+  application itself, only in tests:
+  - Only `rdfs:Class` and `rdf:Property` definitions are read, not
+    `DefinedTerm`, which RO-Crate also allows for ad hoc terms.
+  - A definition or rule with a local `@id` (`#siteName`) and no
+    `prov:specializationOf` matches nothing, as MASP has it; a crate
+    whose context maps a term to such an `@id` gets no fields for it.
+  - The crate's types are expanded with its `@context` from the bundled
+    contexts only (`Crate.jsonLdContext()`), not a remote one.
+  - The definitions are read again each time a form is shown, from the
+    whole crate: may be slow for crates of many thousands of entities.
+  - An entity's own undefined properties are now editable guessed
+    fields rather than read-only under "Not properties of…", so its
+    "Suggest type" buttons no longer count them.
+  - A profile's field keeps its place and group when the crate defines
+    the same property, taking only the crate's description; a crate's
+    `sh:minCount` on it is then not checked.
+  - Guessed property names that are not IRI references (spaces) get an
+    IRI of `#` and the name URL-encoded; guessed types with such names are
+    not offered.
+  - Add Type writes a crate-defined type as the crate's `@context`
+    compacts it; with several terms for one IRI, the first.
 
 ## Repair Crate
 
