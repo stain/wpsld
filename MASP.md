@@ -82,8 +82,21 @@ those are rules, everything else in the crate is ignored. Other roles seen:
 }
 ```
 
-- `prov:specializationOf` links to the base vocabulary class; an entity matches
-  the rule when its (context-resolved) `@type` matches that.
+- `prov:specializationOf` links to the base vocabulary class(es); an entity
+  matches the rule when its (context-resolved) `@type`s include **all** of them
+  (a rule for `["AssessAction", "prov:Activity"]` is not one for every
+  `prov:Activity`). Without it, the rule is about a type of its own, its
+  `@id` (absolute or compact, e.g. `ldac:CollectionEvent`); a local `@id`
+  such as `#class_Thing` then matches nothing. Property rules likewise: one
+  without `prov:specializationOf` is about the property its `@id` names.
+- The same shapes in an ordinary crate are RO-Crate's ad hoc terms: wpsld
+  reads the crate's own `rdfs:Class` and `rdf:Property` entities as rules too
+  (`ProfileReader.readDefinitions`, `CrateDefinedFields`), beside the chosen
+  profile's, with a vocabulary type (e.g. `schema:Person`) allowed as their
+  `domainIncludes` (which, as in RDFS, then also covers its subtypes; none
+  means `schema:Thing`), and expands the crate's types with its own
+  `@context`. Types and properties the crate uses but nothing defines are
+  offered apart, greyed, as guesses.
 - `sh:minCount`/`sh:maxCount` **on a class** = how many instances of the type the
   whole crate must/may have.
 - May also carry `rdfs:subClassOf` (LDAC: `CollectionEvent` ⊂ `Event`, `CreateAction`).

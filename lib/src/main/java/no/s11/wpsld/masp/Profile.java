@@ -95,11 +95,15 @@ public record Profile(String id, List<String> identifiers, Optional<String> name
 
 	/**
 	 * The class rules for an entity with these types (expanded IRIs): those
-	 * specialising one of the types.
+	 * whose {@link ClassRule#types()} it has all of, as MASP matches. Many
+	 * rules share a type, e.g. <code>prov:Activity</code> beside
+	 * <code>AssessAction</code> or <code>SendAction</code>, or
+	 * <code>CreativeWork</code> beside <code>prov:Plan</code>, so one of them
+	 * is not enough.
 	 */
 	public List<ClassRule> classRulesFor(Set<String> typeIris) {
 		Set<String> types = Set.copyOf(typeIris.stream().map(CrateDocument::normalise).toList());
-		return classRules.values().stream().filter(c -> c.specializationOf().stream().anyMatch(types::contains))
-				.toList();
+		return classRules.values().stream().filter(c -> !c.types().isEmpty()
+				&& types.containsAll(c.types().stream().map(CrateDocument::normalise).toList())).toList();
 	}
 }

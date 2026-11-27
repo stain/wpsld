@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import no.s11.wpsld.crate.Crate;
@@ -107,15 +106,16 @@ public record CrateProfiles(List<String> declared, List<Profile> matched, Map<St
 
 	/**
 	 * Properties' labels as the editor's form shows them for these fields:
-	 * the fields' own labels for the crate's entities' types, else made from
+	 * the fields' own labels for the crate's entities' types, also those the
+	 * crate defines (see {@link CrateDefinedFields}), else made from
 	 * the term (see {@link Labels#fromTerm})
 	 */
-	public static Function<String, String> labels(Crate crate, FormFields fields, CrateTerms terms) {
+	public static Function<String, String> labels(Crate crate, FormFields chosen, CrateTerms terms) {
+		FormFields fields = CrateDefinedFields.of(chosen, crate);
 		Map<String, String> labels = new HashMap<>();
 		Map<Set<URI>, Boolean> seen = new HashMap<>();
 		for (Entity entity : crate.getEntities()) {
-			Set<URI> types = entity.getTypes().stream().map(terms::iri).flatMap(Optional::stream)
-					.collect(Collectors.toSet());
+			Set<URI> types = fields.typesOf(entity, terms);
 			boolean root = entity == crate.getRoot();
 			if (seen.putIfAbsent(types, root) == null || root) {
 				fields.fieldsFor(types, root).forEach(f -> labels.putIfAbsent(f.name(), f.label()));

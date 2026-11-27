@@ -154,6 +154,7 @@ import no.s11.wpsld.crate.UndoHistory;
 import no.s11.wpsld.crate.WebCrate;
 import no.s11.wpsld.crate.UndoHistory.Place;
 import no.s11.wpsld.crate.UndoHistory.Step;
+import no.s11.wpsld.form.CrateDefinedFields;
 import no.s11.wpsld.form.EntityListing;
 import no.s11.wpsld.form.CratePreview;
 import no.s11.wpsld.form.EntityTree;
@@ -444,6 +445,7 @@ public class CrateEditor extends Application {
 					return entity;
 				}, this::rename);
 		entityEditor.setBrowse(address -> browse.accept(address));
+		entityEditor.setCrate(() -> crate);
 		// Places: a map, and looking them up in GeoNames
 		entityEditor.setMapTiles(mapTiles);
 		entityEditor.setFindPlace(name -> new PlaceFinder(stage, name, () -> settings.geonamesUsername(), placeSearch,
@@ -4124,7 +4126,8 @@ public class CrateEditor extends Application {
 		mentionUnlinked();
 		// The profile's required properties, then RO-Crate's own checks
 		// (worded alike, so each problem only once)
-		List<String> problems = Stream.concat(Stream.concat(RequiredFields.check(crate, profiles.getValue(), terms)
+		List<String> problems = Stream.concat(Stream.concat(RequiredFields
+				.check(crate, CrateDefinedFields.of(profiles.getValue(), crate), terms)
 				.stream(), CrateChecks.check(crate).stream()),
 				// Those of an attached crate's files and folder
 				crateFile.folder().map(folder -> CrateFolder.problems(crate, folder)).orElse(List.of()).stream())

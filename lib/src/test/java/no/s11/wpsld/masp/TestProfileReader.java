@@ -175,6 +175,74 @@ public class TestProfileReader {
 	}
 
 	@Test
+	public void classRulesMatchAllTheirTypes() {
+		String prov = "http://www.w3.org/ns/prov#";
+		Profile profile = profile("{\"@id\": \"#assess\"}, {\"@id\": \"#send\"}, {\"@id\": \"#plan\"}, {\"@id\": \"#bare\"}",
+				"{\"@id\": \"#assess\", \"@type\": \"rdfs:Class\", \"prov:specializationOf\":"
+						+ " [{\"@id\": \"https://schema.org/AssessAction\"}, {\"@id\": \"prov:Activity\"}]}",
+				"{\"@id\": \"#send\", \"@type\": \"rdfs:Class\", \"prov:specializationOf\":"
+						+ " [{\"@id\": \"http://schema.org/SendAction\"}, {\"@id\": \"prov:Activity\"}]}",
+				"{\"@id\": \"#plan\", \"@type\": \"rdfs:Class\", \"prov:specializationOf\":"
+						+ " [{\"@id\": \"http://schema.org/CreativeWork\"}, {\"@id\": \"prov:Plan\"}]}",
+				"{\"@id\": \"#bare\", \"@type\": \"rdfs:Class\"}");
+		ClassRule assess = profile.classRule("#assess").orElseThrow();
+		ClassRule plan = profile.classRule("#plan").orElseThrow();
+		// Sharing prov:Activity with #send is not enough; the https schema.org IRI is read as http
+		assertEquals(List.of(assess), profile.classRulesFor(Set.of(S + "AssessAction", prov + "Activity")));
+		assertEquals(List.of(), profile.classRulesFor(Set.of(prov + "Activity")));
+		// The metadata descriptor is a CreativeWork, but no prov:Plan
+		assertEquals(List.of(), profile.classRulesFor(Set.of(S + "CreativeWork")));
+		assertEquals(List.of(plan), profile.classRulesFor(Set.of(S + "CreativeWork", prov + "Plan", S + "Thing")));
+	}
+
+	@Test
+	public void rulesOfTheirOwnTerms() {
+		String terms = "https://example.org/terms#";
+		Profile profile = profile("{\"@id\": \"https://example.org/terms#SiteVisit\"}, {\"@id\": \"https://example.org/terms#siteName\"},"
+				+ " {\"@id\": \"#local\"}",
+				"{\"@id\": \"https://example.org/terms#SiteVisit\", \"@type\": \"rdfs:Class\"}",
+				"{\"@id\": \"https://example.org/terms#siteName\", \"@type\": \"rdf:Property\","
+						+ " \"domainIncludes\": {\"@id\": \"https://example.org/terms#SiteVisit\"}}",
+				"{\"@id\": \"#local\", \"@type\": \"rdfs:Class\"}");
+		ClassRule visit = profile.classRule(terms + "SiteVisit").orElseThrow();
+		// No prov:specializationOf: the rule's own @id is the type
+		assertEquals(List.of(terms + "SiteVisit"), visit.types());
+		assertEquals("SiteVisit", visit.label());
+		assertEquals(List.of(visit), profile.classRulesFor(Set.of(terms + "SiteVisit", S + "Thing")));
+		PropertyRule siteName = profile.propertyRules().get(terms + "siteName");
+		assertEquals(List.of(terms + "siteName"), siteName.properties());
+		assertEquals("siteName", siteName.label());
+		assertEquals(List.of(siteName), profile.propertiesOf(visit.id()));
+		// A local @id names no type
+		assertEquals(List.of(), profile.classRule("#local").orElseThrow().types());
+		assertEquals(List.of(), profile.classRulesFor(Set.of("#local")));
+	}
+
+	@Test
+	public void definitionsInACrate() {
+		String terms = "https://example.org/terms#";
+		Profile defined = reader.readDefinitions(crateReader.read(new ByteArrayInputStream("""
+				{"@context": ["https://w3id.org/ro/crate/1.2/context", {"education": "https://example.org/terms#education"}],
+				 "@graph": [{"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"}},
+				  {"@id": "./", "@type": "Dataset"},
+				  {"@id": "https://example.org/terms#education", "@type": "rdf:Property", "rdfs:label": "education",
+				   "rdfs:comment": "Highest degree", "domainIncludes": {"@id": "http://schema.org/Person"},
+				   "sh:minCount": 1},
+				  {"@id": "https://example.org/terms#mood", "@type": "rdf:Property", "rdfs:label": "mood"}
+				 ]}""".getBytes(StandardCharsets.UTF_8)), "test"));
+		PropertyRule education = defined.propertyRules().get(terms + "education");
+		assertEquals("education", education.label());
+		assertTrue(education.isRequired());
+		// The vocabulary type of its domain stands for a class rule
+		assertEquals(List.of(S + "Person"), defined.classRule(S + "Person").orElseThrow().types());
+		assertEquals(List.of(education), defined.propertiesOf(S + "Person"));
+		assertTrue(defined.rootRule().isEmpty());
+		// Without domainIncludes, of any Thing
+		assertEquals(List.of(S + "Thing"), defined.propertyRules().get(terms + "mood").domain());
+		assertEquals(List.of(), defined.problems());
+	}
+
+	@Test
 	public void noRulesWithoutSchemaResource() {
 		Profile profile = reader.read(crateReader.read(new ByteArrayInputStream(
 				("{\"@context\": \"https://w3id.org/ro/crate/1.2/context\", \"@graph\": [{\"@id\": \"./\","

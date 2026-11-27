@@ -81,7 +81,8 @@ public record CrateCheck(boolean read, CrateProfiles profiles, List<Issue> issue
 		Set<String> said = new HashSet<>();
 		List<Issue> issues = Stream.of(reading, CrateChecks.issues(crate).stream(),
 				profiles.matched().stream()
-						.flatMap(p -> RequiredFields.issues(crate, new ProfileFormFields(p, schemaOrg), terms).stream()),
+						.flatMap(p -> RequiredFields.issues(crate,
+								CrateDefinedFields.of(new ProfileFormFields(p, schemaOrg), crate), terms).stream()),
 				folder.map(f -> CrateFolder.issues(crate, f)).orElse(List.of()).stream(), undescribed)
 				.flatMap(s -> s).filter(i -> said.add(i.message())).toList();
 		return new CrateCheck(true, profiles, issues);

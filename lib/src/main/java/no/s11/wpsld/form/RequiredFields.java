@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.CrateTerms;
@@ -49,7 +48,8 @@ public class RequiredFields {
 	 * of: the profile of the fields, else schema.org (see {@link Issue})
 	 */
 	public static List<Issue> issues(Crate crate, FormFields fields, CrateTerms terms) {
-		Issue.Source source = fields instanceof ProfileFormFields p
+		FormFields chosen = fields instanceof CrateDefinedFields c ? c.getFields() : fields;
+		Issue.Source source = chosen instanceof ProfileFormFields p
 				? new Issue.Source(p.getProfile().identifiers().stream().findFirst().orElse(p.getProfile().id()),
 						p.getProfile().name().orElse(fields.getName()))
 				: new Issue.Source("https://schema.org/", fields.getName());
@@ -57,8 +57,7 @@ public class RequiredFields {
 		for (Entity entity : crate.getEntities()) {
 			boolean root = entity == crate.getRoot();
 			String who = root ? "The root data entity" : entity.getLabel();
-			Set<URI> types = entity.getTypes().stream().map(terms::iri).flatMap(Optional::stream)
-					.collect(Collectors.toSet());
+			Set<URI> types = fields.typesOf(entity, terms);
 			for (FormField field : fields.fieldsFor(types, root)) {
 				int values = entity.getAll(field.name()).size();
 				if (values < field.minCount()) {

@@ -15,6 +15,11 @@ File and Photograph. Keep File for a file and Dataset for the root dataset.
 When adding a more general type, wpsld may ask whether to add it anyway or
 replace the more specific type.
 
+Types the crate defines itself, as `rdfs:Class` entities with a name in
+its `@context`, are listed under Thing with those of the profile. Types
+the crate uses but nothing defines are listed there too, greyed: a guess,
+to give an entity the same type as others in the crate.
+
 Use the **×** beside a type to remove it. Removing the last type changes
 the entity to Thing; a lone Thing cannot be removed. Changing types keeps
 existing values, though some may move to **Not properties of...** or

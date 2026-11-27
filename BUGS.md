@@ -148,6 +148,29 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   chooser. Choose the target with our own dialog instead: the crate's
   folders as a tree (as View > Entities by Folder has them), the crate's
   folder at the top, with New Folder…, and nothing outside it.
+- **Known limits of the crate's own and guessed terms**
+  (`CrateDefinedFields`, branch `masp-match-all-types`), untried in the
+  application itself, only in tests:
+  - Only `rdfs:Class` and `rdf:Property` definitions are read, not
+    `DefinedTerm`, which RO-Crate also allows for ad hoc terms.
+  - A definition or rule with a local `@id` (`#siteName`) and no
+    `prov:specializationOf` matches nothing, as MASP has it; a crate
+    whose context maps a term to such an `@id` gets no fields for it.
+  - The crate's types are expanded with its `@context` from the bundled
+    contexts only (`Crate.jsonLdContext()`), not a remote one.
+  - The definitions are read again each time a form is shown, from the
+    whole crate: may be slow for crates of many thousands of entities.
+  - An entity's own undefined properties are now editable guessed
+    fields rather than read-only under "Not properties of…", so its
+    "Suggest type" buttons no longer count them.
+  - A profile's field keeps its place and group when the crate defines
+    the same property, taking only the crate's description; a crate's
+    `sh:minCount` on it is then not checked.
+  - Guessed property names that are not IRI references (spaces) get an
+    IRI of `#` and the name URL-encoded; guessed types with such names are
+    not offered.
+  - Add Type writes a crate-defined type as the crate's `@context`
+    compacts it; with several terms for one IRI, the first.
 - **wpsld-cli's bullets and arrows garbled in a Windows console**
   (*done*): `wpsld-cli repair .` in PowerShell showed `ÔÇó` for • and
   `ÔåÆ` for →: UTF-8 read as the console's code page (850). picocli
@@ -296,7 +319,41 @@ time. Mostly not wpsld's faults, but what wpsld says and does about them is.
   the property search to add. With an `rdf:Property` definition
   (`domainIncludes`, `rangeIncludes`), offered for those classes with a
   field of that range; without one, for any entity, as text or a
-  reference as they are used.
+  reference as they are used. *Partly done:* the crate's own
+  `rdfs:Class`/`rdf:Property` definitions are read as MASP rules
+  (`CrateDefinedFields`): properties are fields of their `domainIncludes`
+  types and subtypes, or of Thing without one (required with
+  `sh:minCount`), the classes are offered as types, and types the crate's
+  `@context` names are recognised. Types and properties used but defined
+  nowhere are offered greyed, as guesses: the types in Add Type, the
+  properties in a group "Used in the crate, defined nowhere" for entities
+  sharing a type with where they are used, their kind of value guessed
+  from the values. Still to do: a type or property defined in a profile
+  crate the crate `conformsTo` other than the one chosen.
+- **Repair: define the terms a crate uses but nothing defines** (TODO):
+  Crate > Repair Crate (and `wpsld-cli repair`) could add an
+  `rdfs:Class` or `rdf:Property` entity (RO-Crate's ad hoc terms, with
+  `rdfs:label` as written, `domainIncludes` the types it is used with,
+  `rangeIncludes` as `CrateDefinedFields` guesses it, and a term in the
+  crate's `@context` if it has no IRI) for each type and property that
+  `CrateDefinedFields.undefinedTypes`/`guessedFieldsFor` find, unless the
+  profile defines it. But `CrateRepair.repair(crate, terms)` doesn't take
+  the profile into account now: it would need the chosen profile (or the
+  crate's `CrateProfiles`), so as not to define again what the profile
+  has. Ask first, or list them for a `rdfs:comment` to be filled in, as
+  the definitions would be guesses.
+  Check (`CrateCheck`, so also `wpsld-cli check`) takes the profiles
+  already, but reports only what the crate reader finds: terms the
+  `@context` doesn't define and undefined prefixes (RO-Crate's MUST). It
+  could also report, as RECOMMENDED, what RO-Crate 1.2/1.3 say under "Add
+  local definitions of ad hoc terms": terms from outside schema.org that
+  the context maps but neither the crate nor the profile defines ("ad-hoc
+  terms SHOULD also include definitions in the RO-Crate"), and definitions
+  without an absolute `@id`, `name` and `description`, or without the
+  `rdfs:label` and `rdfs:comment` that SHOULD repeat them. The spec also
+  allows `DefinedTerm` for such definitions, which
+  `ProfileReader.readDefinitions` doesn't read yet. Repair's fix would
+  then answer Check's issue.
 - **CodeMeta**: read `codemeta.json` files (JSON-LD, context
   `https://w3id.org/codemeta/3.0`, mostly schema.org terms) to describe a
   SoftwareSourceCode or SoftwareApplication: name, description, version,
@@ -645,4 +702,3 @@ skip or take the Linux path. Try in the Windows and macOS builds:
   stick), Cancel midway; file dates kept.
 - **Tika and the runtime image**: formats found by content in the
   packaged app (the image includes Tika, checked in the Linux build).
-

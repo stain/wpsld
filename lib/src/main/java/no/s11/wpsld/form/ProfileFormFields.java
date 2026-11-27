@@ -45,7 +45,8 @@ import no.s11.wpsld.soss.PropertyDef;
  * The profile's rule for the root data entity applies to the root only, as
  * RO-Crate types don't tell the root from other entities of its type (both
  * are Datasets). Rules for other entities match by their
- * <code>prov:specializationOf</code> types.
+ * <code>prov:specializationOf</code> types, or for a type of their own, by
+ * their <code>@id</code> (see {@link ClassRule#types()}).
  */
 public class ProfileFormFields implements FormFields {
 	public static final String REQUIRED = "Required";
@@ -65,6 +66,11 @@ public class ProfileFormFields implements FormFields {
 		return profile;
 	}
 
+	/** The vocabulary's fields, for what the profile does not name */
+	public SchemaOrgFormFields getVocabulary() {
+		return vocabulary;
+	}
+
 	@Override
 	public String getName() {
 		return profile.name().orElse(profile.id()) + profile.version().map(v -> " " + v).orElse("");
@@ -82,6 +88,17 @@ public class ProfileFormFields implements FormFields {
 
 	@Override
 	public List<FormField> fieldsFor(Set<URI> types, boolean root) {
+		List<FormField> fields = ruleFieldsFor(types, root);
+		Set<String> names = fields.stream().map(FormField::name).collect(Collectors.toSet());
+		vocabulary.fieldsFor(types, root).stream().filter(f -> !names.contains(f.name())).forEach(fields::add);
+		return fields;
+	}
+
+	/**
+	 * The fields the profile's rules give for an entity, required first,
+	 * without the vocabulary's others.
+	 */
+	public List<FormField> ruleFieldsFor(Set<URI> types, boolean root) {
 		List<FormField> fields = new ArrayList<>();
 		Set<String> names = new LinkedHashSet<>();
 		for (ClassRule rule : rulesFor(types, root)) {
@@ -94,7 +111,6 @@ public class ProfileFormFields implements FormFields {
 		}
 		// Required before suggested, whichever rule they come from
 		fields.sort((a, b) -> a.tier().compareTo(b.tier()));
-		vocabulary.fieldsFor(types, root).stream().filter(f -> !names.contains(f.name())).forEach(fields::add);
 		return fields;
 	}
 
@@ -108,7 +124,7 @@ public class ProfileFormFields implements FormFields {
 			return List.of();
 		}
 		return profile.rootRule().flatMap(profile::classRule).stream()
-				.flatMap(r -> r.specializationOf().stream()).map(URI::create).toList();
+				.flatMap(r -> r.types().stream()).map(URI::create).toList();
 	}
 
 	/**
@@ -118,7 +134,7 @@ public class ProfileFormFields implements FormFields {
 	 */
 	@Override
 	public List<URI> otherTypes() {
-		return profile.classRules().values().stream().flatMap(r -> r.specializationOf().stream()).distinct()
+		return profile.classRules().values().stream().flatMap(r -> r.types().stream()).distinct()
 				.map(URI::create).filter(iri -> !terms.getSchema().getClasses().containsKey(iri)).toList();
 	}
 
@@ -134,7 +150,7 @@ public class ProfileFormFields implements FormFields {
 	}
 
 	private FormField field(PropertyRule rule) {
-		Optional<PropertyDef> property = rule.specializationOf().stream().map(URI::create)
+		Optional<PropertyDef> property = rule.properties().stream().map(URI::create)
 				.map(terms.getSchema().getProperties()::get).filter(Objects::nonNull).findFirst()
 				.or(() -> terms.propertyDef(rule.label()));
 		List<ClassDef> range = range(rule);
@@ -143,7 +159,7 @@ public class ProfileFormFields implements FormFields {
 			range = property.map(PropertyDef::getRangeIncludes).orElse(List.of());
 		}
 		URI iri = property.map(PropertyDef::getID)
-				.orElseGet(() -> URI.create(rule.specializationOf().stream().findFirst().orElse(rule.id())));
+				.orElseGet(() -> URI.create(rule.properties().stream().findFirst().orElse(rule.id())));
 		FieldTier tier = rule.isRequired() ? FieldTier.REQUIRED : FieldTier.SUGGESTED;
 		return new FormField(rule.label(), iri, rule.name().orElseGet(() -> Labels.fromTerm(rule.label())),
 				rule.comment().or(() -> property.flatMap(PropertyDef::getComment)),
@@ -159,7 +175,7 @@ public class ProfileFormFields implements FormFields {
 		List<ClassDef> range = new ArrayList<>();
 		rule.range().forEach(item -> {
 			if (item instanceof ClassRuleRange c) {
-				profile.classRule(c.classRuleId()).ifPresent(r -> r.specializationOf().stream().map(URI::create)
+				profile.classRule(c.classRuleId()).ifPresent(r -> r.types().stream().map(URI::create)
 						.map(terms.getSchema().getClasses()::get).filter(Objects::nonNull).forEach(range::add));
 			} else if (item instanceof IriRange i) {
 				Optional.ofNullable(terms.getSchema().getClasses().get(URI.create(i.iri()))).ifPresent(range::add);

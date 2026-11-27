@@ -105,11 +105,13 @@ import no.s11.wpsld.lookup.ROR;
 import no.s11.wpsld.crate.Places;
 import no.s11.wpsld.lookup.PRONOMFormats;
 import no.s11.wpsld.lookup.SPDXLicenses;
+import no.s11.wpsld.form.CrateDefinedFields;
 import no.s11.wpsld.form.EntityTypes;
 import no.s11.wpsld.form.FieldTier;
 import no.s11.wpsld.form.FormField;
 import no.s11.wpsld.form.FormFields;
 import no.s11.wpsld.form.Labels;
+import no.s11.wpsld.form.ProfileFormFields;
 import no.s11.wpsld.form.ValueKind;
 import no.s11.wpsld.soss.ClassDef;
 import no.s11.wpsld.soss.PropertyDef;
@@ -133,6 +135,10 @@ public class EntityEditor extends ScrollPane {
 
 	private final SchemaFromJsonLd schema;
 	private FormFields formFields;
+	/** The crate, for the types and properties it defines itself, if given */
+	private Supplier<Crate> crate;
+	/** The form fields with the crate's own, as of the form shown */
+	private FormFields shownFields;
 	/** The crate's root data entity, whose form may differ (profile rules for the root) */
 	private final Supplier<Entity> root;
 	private final EntityTypes entityTypes;
@@ -241,11 +247,26 @@ public class EntityEditor extends ScrollPane {
 	}
 
 	/**
+	 * The crate edited, whose own definitions of types and properties
+	 * (<code>rdfs:Class</code>, <code>rdf:Property</code>) add to the form
+	 * fields, see {@link CrateDefinedFields}.
+	 */
+	public void setCrate(Supplier<Crate> crate) {
+		this.crate = crate;
+	}
+
+	/** The form fields for the form shown: those chosen, with the crate's own */
+	private FormFields fields() {
+		return shownFields != null ? shownFields : formFields;
+	}
+
+	/**
 	 * Use other form fields, e.g. another profile, for the entity shown and
 	 * those edited after.
 	 */
 	public void setFormFields(FormFields formFields) {
 		this.formFields = Objects.requireNonNull(formFields);
+		shownFields = null;
 		if (entity != null) {
 			showForm();
 		}
@@ -288,7 +309,7 @@ public class EntityEditor extends ScrollPane {
 	 * Let the user choose a type to add to the entity, e.g. for a new entity.
 	 */
 	public void chooseType() {
-		TypeSelector selector = new TypeSelector(schema, otherTypes(), getScene().getWindow());
+		TypeSelector selector = new TypeSelector(schema, otherTypes(), guessedTypes(), getScene().getWindow());
 		selector.getDialogPane().addEventFilter(KeyEvent.KEY_PRESSED, event -> {
 			if (typeHelp != null && HelpDialog.isHelpShortcut(event)) {
 				event.consume();
@@ -303,16 +324,54 @@ public class EntityEditor extends ScrollPane {
 	}
 
 	/**
-	 * Types to offer outside schema.org: those the profile names, then the
-	 * RO-Crate context's, e.g. RepositoryCollection and ComputationalWorkflow.
+	 * Types to offer outside schema.org: those the profile names, then those
+	 * the crate defines, written as its <code>@context</code> names them,
+	 * then the RO-Crate context's, e.g. RepositoryCollection and
+	 * ComputationalWorkflow.
 	 */
 	private List<ClassDef> otherTypes() {
 		Map<URI, ClassDef> others = new LinkedHashMap<>();
-		for (URI iri : formFields.otherTypes()) {
-			others.put(iri, terms.otherClass(iri, Optional.of("From the profile " + formFields.getName() + ": " + iri)));
+		Optional<CrateDefinedFields> crateFields = fields() instanceof CrateDefinedFields c ? Optional.of(c)
+				: Optional.empty();
+		Set<URI> defined = crateFields.flatMap(CrateDefinedFields::getDefinitions)
+				.map(d -> d.classRules().values().stream().flatMap(r -> r.types().stream()).map(URI::create)
+						.collect(Collectors.toSet()))
+				.orElse(Set.of());
+		for (URI iri : fields().otherTypes()) {
+			Optional<ClassDef> ofTheCrate = crateFields.filter(c -> defined.contains(iri))
+					.flatMap(c -> typeOfTheCrate(c.termFor(iri), "Defined in the crate: " + iri));
+			others.put(iri, ofTheCrate.orElseGet(() -> terms.otherClass(iri,
+					Optional.of("From the profile " + fields().getName() + ": " + iri))));
 		}
 		terms.contextClasses().forEach(c -> others.putIfAbsent(c.getID(), c));
 		return List.copyOf(others.values());
+	}
+
+	/**
+	 * Types used in the crate but defined nowhere, to offer apart as guesses
+	 */
+	private List<ClassDef> guessedTypes() {
+		if (!(fields() instanceof CrateDefinedFields c)) {
+			return List.of();
+		}
+		return c.undefinedTypes(terms).entrySet().stream()
+				.map(t -> typeOfTheCrate(t.getKey(), "Defined nowhere, but used in the crate by " + t.getValue()
+						+ (t.getValue() == 1 ? " entity" : " entities") + ": a guess"))
+				.flatMap(Optional::stream).toList();
+	}
+
+	/**
+	 * A type as the crate writes it, e.g. <code>SiteVisit</code>, as a kind of
+	 * Thing; none for a name that is no IRI reference (e.g. with spaces)
+	 */
+	private Optional<ClassDef> typeOfTheCrate(String written, String comment) {
+		ClassDef thing = schema.getClasses().get(URI.create("http://schema.org/Thing"));
+		try {
+			return Optional.of(new ClassDef(new URI(written), Optional.of(written), Optional.of(comment),
+					() -> thing == null ? List.of() : List.of(thing)));
+		} catch (URISyntaxException e) {
+			return Optional.empty();
+		}
 	}
 
 	private Optional<ClassDef> classDef(String typeName) {
@@ -390,7 +449,7 @@ public class EntityEditor extends ScrollPane {
 		add.setOnAction(e -> chooseType());
 		chips.getChildren().add(add);
 		// Types the profile requires, e.g. Dataset for the root; a subtype will do
-		for (URI required : formFields.requiredTypes(typeIris(), entity == root.get())) {
+		for (URI required : fields().requiredTypes(typeIris(), entity == root.get())) {
 			Optional<ClassDef> schemaClass = Optional.ofNullable(schema.getClasses().get(required));
 			boolean has = schemaClass.map(c -> entityTypes.isA(entity.getTypes(), c))
 					.orElse(typeIris().stream().map(URI::toString).map(CrateDocument::normalise)
@@ -403,7 +462,7 @@ public class EntityEditor extends ScrollPane {
 				notice.setId(id("requiredType", name));
 				notice.getStyleClass().add("error-text");
 				notice.setStyle("-fx-font-weight: bold;");
-				notice.setTooltip(tooltip("The profile " + formFields.getName() + " requires this entity to be a "
+				notice.setTooltip(tooltip("The profile " + fields().getName() + " requires this entity to be a "
 						+ name + " (or a kind of " + name + ")"));
 				chips.getChildren().add(notice);
 				Button addRequired = new Button("Add " + name);
@@ -419,7 +478,7 @@ public class EntityEditor extends ScrollPane {
 	 * The entity's types as IRIs, also those outside schema.org.
 	 */
 	private Set<URI> typeIris() {
-		return entity.getTypes().stream().map(terms::iri).flatMap(Optional::stream).collect(Collectors.toSet());
+		return fields().typesOf(entity, terms);
 	}
 
 	/**
@@ -435,6 +494,8 @@ public class EntityEditor extends ScrollPane {
 	}
 
 	private void showForm() {
+		// The crate's definitions as they are now, e.g. a property just added
+		shownFields = crate == null ? formFields : CrateDefinedFields.of(formFields, crate.get());
 		form.getChildren().clear();
 
 		GridPane header = grid();
@@ -494,7 +555,13 @@ public class EntityEditor extends ScrollPane {
 
 		notebookTabs.clear();
 		reloads.clear();
-		List<FormField> fields = formFields.fieldsFor(typeIris(), entity == root.get());
+		List<FormField> fields = new ArrayList<>(fields().fieldsFor(typeIris(), entity == root.get()));
+		// Guesses last: properties used in the crate with its types, defined nowhere
+		if (fields() instanceof CrateDefinedFields crateFields) {
+			Set<String> known = fields.stream().map(FormField::name).collect(Collectors.toSet());
+			crateFields.guessedFieldsFor(entity, terms).stream().filter(f -> !known.contains(f.name()))
+					.forEach(fields::add);
+		}
 		labels.clear();
 		ranges.clear();
 		fields.forEach(f -> labels.putIfAbsent(f.name(), f.label()));
@@ -571,7 +638,7 @@ public class EntityEditor extends ScrollPane {
 
 		// Retired properties of the types: editable when in use, and found by
 		// the search when named exactly, e.g. to add one on purpose
-		List<FormField> retiredFields = formFields.retiredFieldsFor(typeIris()).stream()
+		List<FormField> retiredFields = fields().retiredFieldsFor(typeIris()).stream()
 				.filter(f -> !fieldNames.contains(f.name())).toList();
 		retiredFields.forEach(f -> labels.putIfAbsent(f.name(), f.label()));
 		retiredFields.forEach(f -> ranges.putIfAbsent(f.name(), f.range()));
@@ -656,21 +723,28 @@ public class EntityEditor extends ScrollPane {
 		// Groups of a profile's required and suggested properties first and
 		// open; then the vocabulary's, of which only the most specific opens
 		// when there are none of the profile's
-		boolean profileGroups = fields.stream().anyMatch(f -> f.tier() != FieldTier.OTHER);
+		boolean profileGroups = fields.stream()
+				.anyMatch(f -> f.tier() != FieldTier.OTHER && f.tier() != FieldTier.GUESSED);
 		boolean first = true;
 		for (Map.Entry<String, List<FormField>> group : byGroup.entrySet()) {
 			List<FormField> groupFields = group.getValue();
 			boolean hasValues = groupFields.stream().anyMatch(f -> entity.get(f.name()).isPresent());
 			boolean other = groupFields.get(0).tier() == FieldTier.OTHER;
-			String title = (other ? "From " + group.getKey() : group.getKey() + " by " + formFields.getName())
-					+ " (" + groupFields.size() + ")";
+			boolean guessed = groupFields.get(0).tier() == FieldTier.GUESSED;
+			String title = groupTitle(group.getKey(), other) + " (" + groupFields.size() + ")";
 			// The vocabulary's other groups open, if in use, with only those
 			// in use until asked for all (e.g. CreativeWork's hundred), other
 			// than those the header shows (e.g. the root's thousands of parts)
 			FieldGroup fieldGroup = other && hasValues && !(first && !profileGroups)
 					? new FieldGroup(title, groupFields, f -> entity.get(f.name()).isPresent()
 							&& !HEADER.contains(f.name()) && !headerLinks.contains(f.name()))
-					: new FieldGroup(title, groupFields, !other || hasValues || (first && !profileGroups));
+					: new FieldGroup(title, groupFields,
+							guessed ? hasValues : !other || hasValues || (first && !profileGroups));
+			if (guessed) {
+				// Greyed, as a guess
+				fieldGroup.pane.getStyleClass().add("guessed");
+				fieldGroup.pane.setId("guessedProperties");
+			}
 			if (other) {
 				first = false;
 			}
@@ -1006,6 +1080,19 @@ public class EntityEditor extends ScrollPane {
 	}
 
 	/**
+	 * A group's title: the vocabulary's by type, the profile's by its name,
+	 * the crate's own as they are (see {@link CrateDefinedFields})
+	 */
+	private String groupTitle(String group, boolean other) {
+		if (other) {
+			return "From " + group;
+		}
+		return group.equals(ProfileFormFields.REQUIRED) || group.equals(ProfileFormFields.SUGGESTED)
+				? group + " by " + fields().getName()
+				: group;
+	}
+
+	/**
 	 * The groups as tabs of a notebook in the style of OS/2's Properties
 	 * notebook, each with pages of {@link #FIELDS_PER_PAGE} fields.
 	 */
@@ -1013,7 +1100,7 @@ public class EntityEditor extends ScrollPane {
 		for (Map.Entry<String, List<FormField>> group : byGroup.entrySet()) {
 			List<FormField> groupFields = group.getValue();
 			boolean other = groupFields.get(0).tier() == FieldTier.OTHER;
-			String title = other ? "From " + group.getKey() : group.getKey() + " by " + formFields.getName();
+			String title = groupTitle(group.getKey(), other);
 			List<Notebook.Page> pages = new ArrayList<>();
 			for (int from = 0; from < groupFields.size(); from += FIELDS_PER_PAGE) {
 				List<FormField> page = groupFields.subList(from, Math.min(from + FIELDS_PER_PAGE, groupFields.size()));

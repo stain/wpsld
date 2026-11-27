@@ -27,6 +27,15 @@
     -fx-text-fill: -wpsld-error-text;
 }
 
+/* Guesses: types and properties used in the crate, but defined nowhere */
+.guessed > .title > .text {
+    -fx-fill: -wpsld-faint-text;
+}
+
+.guessed .label, .tree-cell.guessed {
+    -fx-text-fill: -wpsld-faint-text;
+}
+
 /*
  * A scale under a job's progress, shown only where a style asks (OS/2
  * Warp); a job's buttons on the right, unless a style asks otherwise. Set
