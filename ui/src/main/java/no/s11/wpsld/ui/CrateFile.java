@@ -18,6 +18,7 @@
 package no.s11.wpsld.ui;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -31,6 +32,7 @@ import java.util.UUID;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import no.s11.wpsld.crate.Crate;
+import no.s11.wpsld.crate.WebCrate;
 
 /**
  * The RO-Crate Metadata File being edited: where it is, once opened or
@@ -76,6 +78,18 @@ final class CrateFile {
 	private Optional<Path> newIn = Optional.empty();
 	/** Whether the crate is its folder's, see {@link #folder()} */
 	private boolean attached;
+	/**
+	 * A folder the user attached the crate to (Crate > Attach…), other than the
+	 * one its file is in: its relative <code>@id</code>s are paths in it
+	 */
+	private Optional<Path> attachedTo = Optional.empty();
+	/**
+	 * Where the crate was fetched from on the web, and what its relative
+	 * <code>@id</code>s mean there, until it is saved to a file
+	 */
+	private Optional<WebCrate> web = Optional.empty();
+	/** The address asked for when it was fetched, e.g. a DOI, which led to {@link WebCrate#source()} */
+	private Optional<URI> openedFrom = Optional.empty();
 
 	/**
 	 * @param saved A new crate, not saved anywhere yet
@@ -92,8 +106,43 @@ final class CrateFile {
 		base = newBase();
 		newIn = Optional.empty();
 		attached = false;
+		attachedTo = Optional.empty();
+		web = Optional.empty();
+		openedFrom = Optional.empty();
 		this.path = Optional.empty();
 		reset(path, saved);
+	}
+
+	/**
+	 * A crate fetched from the web: in no file yet, so Save is Save As, with
+	 * its relative <code>@id</code>s leading where the {@link WebCrate} says,
+	 * until it is saved to a file. Its JSON is not changed.
+	 *
+	 * @param openedFrom The address asked for, which may lead to the crate's
+	 *                   after redirects
+	 */
+	void openWeb(WebCrate crate, URI openedFrom, JsonNode saved) {
+		open(Optional.empty(), saved);
+		web = Optional.of(crate);
+		this.openedFrom = Optional.of(openedFrom);
+	}
+
+	/** The crate's place on the web, if fetched from there and not saved to a file since */
+	Optional<WebCrate> web() {
+		return web;
+	}
+
+	/**
+	 * A base found for the relative <code>@id</code>s of the crate on the web
+	 * (see {@link WebCrate#withBase}), without changing the crate.
+	 */
+	void setWeb(WebCrate crate) {
+		web = Optional.of(crate);
+	}
+
+	/** The address the crate on the web was asked for by */
+	Optional<URI> openedFrom() {
+		return openedFrom;
 	}
 
 	/**
@@ -120,6 +169,9 @@ final class CrateFile {
 	 * are paths in; none for a detached crate.
 	 */
 	Optional<Path> folder() {
+		if (attachedTo.isPresent()) {
+			return attachedTo;
+		}
 		if (!attached) {
 			return Optional.empty();
 		}
@@ -143,7 +195,42 @@ final class CrateFile {
 	 * downloaded on its own, whose files are elsewhere.
 	 */
 	void setAttached(boolean attached) {
+		attachedTo = Optional.empty();
 		this.attached = attached && canAttach();
+	}
+
+	/**
+	 * Say what the crate's relative <code>@id</code>s are relative to: a folder
+	 * of the user's choice, a web address, or nothing. The crate is not
+	 * changed. Attached to a folder, a crate fetched from the web is no
+	 * longer attached on the web (its files are the folder's), and attached
+	 * to a web address, a crate is not to a folder. Detached, a crate fetched
+	 * from the web goes on being one, with no base for its relative
+	 * <code>@id</code>s.
+	 */
+	void attach(Attachment attachment) {
+		if (attachment.folder().isPresent()) {
+			attachedTo = attachment.folder();
+			attached = true;
+			web = Optional.empty();
+		} else if (attachment.web().isPresent()) {
+			URI address = attachment.web().get();
+			attachedTo = Optional.empty();
+			attached = false;
+			web = Optional.of(web.map(w -> w.attachedAt(address)).orElseGet(() -> WebCrate.attachedTo(address)));
+		} else {
+			attachedTo = Optional.empty();
+			attached = false;
+			web = web.map(WebCrate::withoutBase);
+		}
+	}
+
+	/** What the crate is attached to now, as {@link #attach} takes it */
+	Attachment attachment() {
+		if (folder().isPresent()) {
+			return Attachment.toFolder(folder().get());
+		}
+		return web.flatMap(WebCrate::base).map(Attachment::toWeb).orElse(Attachment.none());
 	}
 
 	/**
@@ -151,7 +238,7 @@ final class CrateFile {
 	 * crate's folder's <code>ro-crate-metadata.json</code>.
 	 */
 	Optional<Path> saveTarget() {
-		return path.or(() -> newIn.map(folder -> folder.resolve(Crate.RO_CRATE_METADATA_JSON)));
+		return path.or(() -> newIn.or(() -> attachedTo).map(folder -> folder.resolve(Crate.RO_CRATE_METADATA_JSON)));
 	}
 
 	/**
@@ -164,9 +251,15 @@ final class CrateFile {
 		if (this.path.isPresent() && !this.path.equals(path)) {
 			base = newBase();
 		}
+		// Saved to a file, it is no longer the one on the web
+		if (path.isPresent() && !path.equals(this.path)) {
+			web = Optional.empty();
+			openedFrom = Optional.empty();
+		}
 		// Attached by its name when first in a file, or in another; else as it was
 		if (path.isPresent() && !path.equals(this.path)) {
 			attached = isMetadataFile(path.get());
+			attachedTo = Optional.empty();
 			newIn = Optional.empty();
 		}
 		this.path = path;
@@ -293,8 +386,23 @@ final class CrateFile {
 	 * the same name; "Untitled" for a new crate.
 	 */
 	String name() {
+		if (web.isPresent() && saveTarget().isEmpty()) {
+			return webName(web.get().source());
+		}
 		return saveTarget().map(p -> p.getParent() == null || p.getParent().getFileName() == null ? p.getFileName()
 				: p.getParent().getFileName().resolve(p.getFileName())).map(Path::toString).orElse(UNTITLED);
+	}
+
+	/** The folder and name of a crate's address, as for a file: <code>crate1/ro-crate-metadata.json</code> */
+	private static String webName(URI source) {
+		String[] segments = Optional.ofNullable(source.getPath()).orElse("").split("/");
+		String name = segments.length > 0 ? segments[segments.length - 1] : "";
+		if (name.isEmpty()) {
+			return Optional.ofNullable(source.getHost()).orElse(source.toString());
+		}
+		String query = source.getRawQuery() == null ? "" : "?" + source.getRawQuery();
+		return (segments.length > 1 && !segments[segments.length - 2].isEmpty()
+				? segments[segments.length - 2] + "/" : "") + name + query;
 	}
 
 	/**

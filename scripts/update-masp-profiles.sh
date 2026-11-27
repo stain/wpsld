@@ -19,6 +19,11 @@
 
 set -eu
 
+# What this script calls itself to the sites it downloads from, as wpsld does
+# in its requests: its name and version, then where it is (RFC 9110, 10.1.5)
+WPSLD_VERSION=$(sed -n 's/^version=//p' "$(dirname "$0")/../gradle.properties")
+USER_AGENT="wpsld/${WPSLD_VERSION:-development} (https://github.com/stain/wpsld; update script)"
+
 REPO=Language-Research-Technology/ro-crate-masp
 RESOURCES=$(dirname "$0")/../lib/src/main/resources
 DIR=$RESOURCES/masp-profiles
@@ -32,7 +37,7 @@ REF=$1
 shift
 [ $# -gt 0 ] || set -- ro-crate
 
-COMMIT=$(curl -fsSL "https://api.github.com/repos/$REPO/commits/$REF" | jq -r .sha)
+COMMIT=$(curl -fsSL -A "$USER_AGENT" "https://api.github.com/repos/$REPO/commits/$REF" | jq -r .sha)
 case "$COMMIT" in
     [0-9a-f]*) ;;
     *) echo "Can't resolve $REF in $REPO" >&2; exit 1 ;;
@@ -48,7 +53,7 @@ for PROFILE in "$@"; do
     URL=https://raw.githubusercontent.com/$REPO/$COMMIT/$UPSTREAM
     FILE=masp-profiles/$PROFILE.json
     echo "  $UPSTREAM"
-    curl -fsSL -o "$RESOURCES/$FILE" "$URL"
+    curl -fsSL -A "$USER_AGENT" -o "$RESOURCES/$FILE" "$URL"
     jq -e '."@graph" | type == "array"' "$RESOURCES/$FILE" > /dev/null \
         || { echo "$URL is not a flattened RO-Crate" >&2; exit 1; }
     SHA256=$(sha256sum "$RESOURCES/$FILE" | cut -d' ' -f1)

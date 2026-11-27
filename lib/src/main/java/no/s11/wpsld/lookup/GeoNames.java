@@ -42,6 +42,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import no.s11.wpsld.crate.Entity;
 import no.s11.wpsld.crate.Places;
 import com.fasterxml.jackson.databind.node.TextNode;
+import no.s11.wpsld.util.UserAgent;
 
 /**
  * Looks up places by name in <a href="https://www.geonames.org/">GeoNames</a>,
@@ -114,17 +115,17 @@ public class GeoNames {
 	private final String userAgent;
 
 	/**
-	 * @param userAgent Names the application to GeoNames, e.g.
-	 *                  <code>wpsld/0.4.0</code>
+	 * Names wpsld and its version to GeoNames, as they ask applications to
+	 * (see {@link UserAgent}).
 	 */
-	public GeoNames(HttpClient http, Duration timeout, String userAgent) {
-		this(http, timeout, userAgent, SERVICE);
+	public GeoNames(HttpClient http, Duration timeout) {
+		this(http, timeout, SERVICE);
 	}
 
-	public GeoNames(HttpClient http, Duration timeout, String userAgent, URI service) {
+	public GeoNames(HttpClient http, Duration timeout, URI service) {
 		this.http = Objects.requireNonNull(http);
 		this.timeout = Objects.requireNonNull(timeout);
-		this.userAgent = Objects.requireNonNull(userAgent);
+		this.userAgent = UserAgent.get();
 		this.service = Objects.requireNonNull(service);
 	}
 

@@ -110,7 +110,7 @@ crate folder or metadata file. Use the arrow keys and Enter to open an
 entity or follow a reference; Escape goes back or quits. The entity list
 shows the root first, then sorts by type and name. Type to filter by name
 or ID, or press `/` to focus the search (needed for searches starting with
-`s` or `t`); Enter opens the selected result and Tab returns to the list.
+`s`, `t`, `c` or `r`); Enter opens the selected result and Tab returns to the list.
 Press `t` in the list to choose a type or parent type from a searchable
 tree; choosing All types clears the type filter. PageUp and PageDown browse
 adjacent entities in the filtered main list, or adjacent
@@ -121,6 +121,12 @@ value or choose existing referenced entities.
 In the chooser, type to filter by name or ID, Tab to the list and Space
 to select; Enter applies the selection. In the multiline text editor,
 Enter inserts a newline and Tab moves to Apply or Cancel. Press `s` to save.
+Press `c` to check the crate, as `wpsld-cli check` does, with the unsaved
+changes: the profiles it is checked against, and its problems and warnings;
+Enter on one goes to its entity and property. Press `r` for Repair Crate, as in
+the editor and `wpsld-cli repair`: it first shows what it would do, and changes
+the crate (to save) only if you choose Apply. Both work offline, with the
+profiles that are bundled or kept by the editor, and don't fetch others.
 Available actions appear at the bottom, including in dialogs; save messages
 are replaced by the actions on the next key press. Unsaved changes are marked
 with `*` and quitting asks before discarding them.
@@ -142,8 +148,10 @@ changed on disk since opening.
 | Type to filter by name or ID; Tab goes to the list | `t` chooses a type from the tree of the crate's types |
 | ![Editing a text value](docs/screenshots/tui-edit-text.png) | ![Choosing the entities a property refers to](docs/screenshots/tui-choose-reference.png) |
 | `e` on a text value: Enter inserts a newline, Tab goes to Apply | `e` on a reference: type to filter, Space selects |
-| ![The organization an author's affiliation refers to, opened from the author](docs/screenshots/tui-reference.png) | |
-| Enter on a reference opens it; Escape goes back | |
+| ![The organization an author's affiliation refers to, opened from the author](docs/screenshots/tui-reference.png) | ![The problems and warnings of a crate](docs/screenshots/tui-check.png) |
+| Enter on a reference opens it; Escape goes back | `c` checks the crate; Enter goes to the entity of a problem |
+| ![What Repair Crate would do](docs/screenshots/tui-repair.png) | |
+| `r` shows what Repair Crate would do; Apply does it | |
 
 The image includes Java's desktop module, which Lanterna needs even in a
 terminal. It is not included in the release zips of the editor, which don't
@@ -272,7 +280,7 @@ its jars, so that its native libraries end up in the image. Download the
 [JavaFX 27 jmods](https://gluonhq.com/products/javafx/) for your platform.
 Then, with an [Eclipse Temurin](https://adoptium.net/) 25 JDK:
 
-    ./gradlew -Pplatform=linux-x64 -PjavafxJmods=/path/to/javafx-jmods-27.0.1 :ui:appImageZip
+    ./gradlew -Pplatform=linux-x64 -PjavafxJmods=/path/to/javafx-jmods-27.0.1.1 :ui:appImageZip
 
 This makes `ui/build/image-zip/wpsld-<version>-linux-x64.zip`, an app image
 with a native launcher from `jpackage`. `jpackage` can only build for the

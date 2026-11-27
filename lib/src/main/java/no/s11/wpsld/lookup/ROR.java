@@ -45,6 +45,7 @@ import com.fasterxml.jackson.databind.node.TextNode;
 
 import no.s11.wpsld.crate.Crate;
 import no.s11.wpsld.crate.Entity;
+import no.s11.wpsld.util.UserAgent;
 
 /**
  * Finds organisations in the <a href="https://ror.org/">Research
@@ -133,14 +134,14 @@ public class ROR {
 	private final URI service;
 	private final String userAgent;
 
-	public ROR(HttpClient http, Duration timeout, String userAgent) {
-		this(http, timeout, userAgent, SERVICE);
+	public ROR(HttpClient http, Duration timeout) {
+		this(http, timeout, SERVICE);
 	}
 
-	public ROR(HttpClient http, Duration timeout, String userAgent, URI service) {
+	public ROR(HttpClient http, Duration timeout, URI service) {
 		this.http = Objects.requireNonNull(http);
 		this.timeout = Objects.requireNonNull(timeout);
-		this.userAgent = Objects.requireNonNull(userAgent);
+		this.userAgent = UserAgent.get();
 		this.service = Objects.requireNonNull(service);
 	}
 

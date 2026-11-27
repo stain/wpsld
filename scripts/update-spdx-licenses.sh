@@ -19,6 +19,11 @@
 
 set -eu
 
+# What this script calls itself to the sites it downloads from, as wpsld does
+# in its requests: its name and version, then where it is (RFC 9110, 10.1.5)
+WPSLD_VERSION=$(sed -n 's/^version=//p' "$(dirname "$0")/../gradle.properties")
+USER_AGENT="wpsld/${WPSLD_VERSION:-development} (https://github.com/stain/wpsld; update script)"
+
 REPO=spdx/license-list-data
 DIR=$(dirname "$0")/../lib/src/main/resources/spdx-licenses
 
@@ -33,7 +38,7 @@ SOURCE=https://raw.githubusercontent.com/$REPO/$TAG/jsonld/licenses.jsonld
 TEMP=$(mktemp -d)
 trap 'rm -rf "$TEMP"' EXIT
 echo "Downloading $SOURCE"
-curl -fsSL -o "$TEMP/licenses.jsonld" "$SOURCE"
+curl -fsSL -A "$USER_AGENT" -o "$TEMP/licenses.jsonld" "$SOURCE"
 SHA256=$(sha256sum "$TEMP/licenses.jsonld" | cut -d' ' -f1)
 
 mkdir -p "$DIR"

@@ -1,7 +1,15 @@
 # Conda environment for building and running wpsld (lib + JavaFX ui).
 # Build with the Gradle wrapper:  ./gradlew build   /   ./gradlew :ui:run
 #
-# OpenJDK 25, as required by JavaFX 27.
+# OpenJDK 25, as required by JavaFX 27. Not pinned to 25.0.5.1 or later, which
+# follows the 25.0.5 that CVE-2026-114938 lists as affected (2026-11-19): conda-forge's
+# OpenJDK 25.0.5.1 needs libcups >=2.4.20 and libharfbuzz >=15.1, and every gtk3 build
+# needs libcups <2.4, so they do not install together, and JavaFX's font natives need
+# pango, which comes with gtk3 (conda env update --prune then dropped gtk3 without an
+# error, and every UI test failed: no javafx_font_pango). Try again when gtk3 is built
+# for libcups 2.4: conda env create --dry-run -p /tmp/x -f environment.yml. This JDK is
+# for building and testing here; the release is built with the latest Temurin 25. Its
+# trust store (cacerts) lacks HARICA's 2021 root certificates too (see AGENTS.md).
 # JavaFX itself is fetched by the org.openjfx Gradle plugin; gtk3 and the
 # X11/GL libraries below are what its native code needs at runtime.
 name: wpsld

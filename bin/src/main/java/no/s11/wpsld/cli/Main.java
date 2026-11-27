@@ -17,9 +17,16 @@
  */
 package no.s11.wpsld.cli;
 
+import java.io.FilterWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.io.UncheckedIOException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetEncoder;
+import java.util.Map;
 import java.util.Properties;
 import java.util.function.Supplier;
 
@@ -77,6 +84,8 @@ public final class Main implements Runnable {
 	 */
 	static CommandLine commandLine(Main main) {
 		CommandLine line = new CommandLine(main);
+		line.setOut(console(System.out));
+		line.setErr(console(System.err));
 		line.setExecutionExceptionHandler((e, commandLine, parsed) -> {
 			if (!(e instanceof IOException) && !(e instanceof UncheckedIOException)) {
 				throw e;
@@ -90,6 +99,44 @@ public final class Main implements Runnable {
 		});
 		return line;
 	}
+
+	/**
+	 * Writing to a console in its own encoding, e.g. code page 850 in a
+	 * Windows console, with what it lacks of {@link #PLAIN} written in
+	 * ASCII. picocli's own writers take the encoding from
+	 * sun.stdout.encoding, which Java 19 and later no longer set, and so
+	 * write UTF-8, garbled there.
+	 */
+	static PrintWriter console(PrintStream stream) {
+		Charset charset = stream.charset();
+		CharsetEncoder encoder = charset.newEncoder();
+		return new PrintWriter(new FilterWriter(new OutputStreamWriter(stream, charset)) {
+			@Override
+			public void write(int c) throws IOException {
+				write(String.valueOf((char) c));
+			}
+
+			@Override
+			public void write(char[] chars, int offset, int length) throws IOException {
+				write(new String(chars, offset, length));
+			}
+
+			@Override
+			public void write(String text, int offset, int length) throws IOException {
+				StringBuilder plain = new StringBuilder(length);
+				for (int i = offset; i < offset + length; i++) {
+					char c = text.charAt(i);
+					String instead = PLAIN.get(c);
+					plain.append(instead != null && !encoder.canEncode(c) ? instead : String.valueOf(c));
+				}
+				out.write(plain.toString());
+			}
+		}, true);
+	}
+
+	/** In ASCII, the characters of our messages a code page may lack */
+	private static final Map<Character, String> PLAIN = Map.of('•', "*", '→', "->", '←', "<-", '…', "...",
+			'–', "-", '—', "-", '‘', "'", '’', "'", '“', "\"", '”', "\"");
 
 	@Override
 	public void run() {

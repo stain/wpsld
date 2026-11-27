@@ -222,7 +222,7 @@ public class TestDOI {
 		server.start();
 		try {
 			URI local = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/");
-			DOI dois = new DOI(HttpClient.newHttpClient(), Duration.ofSeconds(5), "wpsld/test",
+			DOI dois = new DOI(HttpClient.newHttpClient(), Duration.ofSeconds(5),
 					Map.of("crossref", local, "datacite", local, "resolver", local));
 			// A DOI is looked up at its agency
 			assertEquals("RO-Crate Metadata Specification 1.0", dois.search("doi:10.5281/zenodo.3541888").get(0).title());

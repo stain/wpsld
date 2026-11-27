@@ -93,7 +93,7 @@ public class TestORCID {
 		});
 		server.start();
 		try {
-			ORCID orcid = new ORCID(HttpClient.newHttpClient(), Duration.ofSeconds(5), "wpsld/test",
+			ORCID orcid = new ORCID(HttpClient.newHttpClient(), Duration.ofSeconds(5),
 					URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/"));
 			assertEquals("Josiah Carberry", orcid.search("Josiah Carberry").get(0).name());
 			assertEquals("/expanded-search/?q=Josiah+Carberry&rows=25", asked.get());

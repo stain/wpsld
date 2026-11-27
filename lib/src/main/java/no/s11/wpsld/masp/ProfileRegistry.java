@@ -31,6 +31,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import no.s11.wpsld.crate.CrateRetriever;
+import no.s11.wpsld.util.UserAgent;
 
 /**
  * A registry listing RO-Crate profiles and where their profile crates are,
@@ -108,8 +109,8 @@ public interface ProfileRegistry {
 	 */
 	static JsonNode getJson(HttpClient http, HttpRequest.Builder request, Duration timeout, String accept)
 			throws IOException, InterruptedException {
-		HttpResponse<InputStream> response = http.send(request.timeout(timeout).header("Accept", accept).GET().build(),
-				HttpResponse.BodyHandlers.ofInputStream());
+		HttpResponse<InputStream> response = http.send(request.timeout(timeout).header("Accept", accept)
+				.header("User-Agent", UserAgent.get()).GET().build(), HttpResponse.BodyHandlers.ofInputStream());
 		try (InputStream in = response.body()) {
 			if (response.statusCode() != 200) {
 				throw new IOException("HTTP " + response.statusCode() + " from " + response.uri());

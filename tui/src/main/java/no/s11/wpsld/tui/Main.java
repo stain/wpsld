@@ -24,6 +24,9 @@ import no.s11.wpsld.crate.CrateReader;
 
 /** A terminal viewer and editor for a crate. */
 public final class Main {
+	/** RO-Crate 1.0's name for the metadata file */
+	static final String RO_CRATE_METADATA_JSONLD = "ro-crate-metadata.jsonld";
+
 	private Main() {
 	}
 
@@ -67,8 +70,8 @@ public final class Main {
 
 	static Path metadataPath(Path path) {
 		if (Files.isDirectory(path) && !Files.exists(path.resolve(Crate.RO_CRATE_METADATA_JSON))
-				&& Files.exists(path.resolve("ro-crate-metadata.jsonld"))) {
-			path = path.resolve("ro-crate-metadata.jsonld");
+				&& Files.exists(path.resolve(RO_CRATE_METADATA_JSONLD))) {
+			path = path.resolve(RO_CRATE_METADATA_JSONLD);
 		} else if (Files.isDirectory(path)) {
 			path = path.resolve(Crate.RO_CRATE_METADATA_JSON);
 		}

@@ -17,6 +17,7 @@
  */
 package no.s11.wpsld.crate;
 
+import java.net.URI;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -124,7 +125,7 @@ public class Crate {
 		}
 	}
 	/** The <code>@context</code> to write, as read or RO-Crate 1.3's */
-	private final JsonNode context;
+	private JsonNode context;
 	/** The metadata descriptor as read, to write again; else a new one for 1.3 */
 	private final Optional<Entity> descriptor;
 	/** The context processed, when first needed */
@@ -176,6 +177,50 @@ public class Crate {
 	 */
 	public JsonNode getContext() {
 		return context.deepCopy();
+	}
+
+	/** The <code>@base</code> of the crate's <code>@context</code>, if it has one */
+	public Optional<String> getBase() {
+		return base(context);
+	}
+
+	private static Optional<String> base(JsonNode context) {
+		Optional<String> found = Optional.empty();
+		for (JsonNode part : context.isArray() ? context : List.of(context)) {
+			if (part.path("@base").isTextual()) {
+				found = Optional.of(part.get("@base").asText());
+			}
+		}
+		return found;
+	}
+
+	/**
+	 * Set the <code>@base</code> of the crate's <code>@context</code>, as the
+	 * last of an array of contexts, or remove it. RO-Crate mentions it only
+	 * for reading a crate as a graph, to say what relative <code>@id</code>s
+	 * are relative to (e.g. an arcp base from a fresh UUID, which makes a
+	 * detached crate's identifiers absolute in the graph, "harmless, but can be
+	 * removed"): the <code>@id</code>s themselves are what a detached crate
+	 * has to have absolute.
+	 *
+	 * @param base The address, or none to remove it
+	 */
+	public void setBase(Optional<String> base) {
+		com.fasterxml.jackson.databind.node.ArrayNode parts = JsonNodeFactory.instance.arrayNode();
+		for (JsonNode part : context.isArray() ? context : List.of(context)) {
+			if (part.isObject() && part.has("@base")) {
+				ObjectNode without = ((ObjectNode) part.deepCopy());
+				without.remove("@base");
+				if (!without.isEmpty()) {
+					parts.add(without);
+				}
+			} else {
+				parts.add(part.deepCopy());
+			}
+		}
+		base.ifPresent(b -> parts.addObject().put("@base", b));
+		context = parts.size() == 1 ? parts.get(0) : parts;
+		processed = null;
 	}
 
 	/**
@@ -454,6 +499,117 @@ public class Crate {
 		}
 		entity.setId(newId);
 		replaceReferences(oldId, newId);
+	}
+
+	/**
+	 * The entities, other than the root data entity, whose relative
+	 * <code>@id</code>s lead somewhere on the web (see
+	 * {@link WebCrate#resolve}): files and folders, and other entities named
+	 * by a path, but not <code>#local</code> and <code>_:blank</code> ones,
+	 * nor absolute ones.
+	 */
+	public List<Entity> relativeEntities(WebCrate web) {
+		return entities.stream().filter(e -> e != getRoot()).filter(e -> web.resolve(e.getId()).isPresent())
+				.toList();
+	}
+
+	/**
+	 * The entities, other than the root data entity, with a relative
+	 * <code>@id</code>: not <code>#local</code>, <code>_:blank</code> or
+	 * absolute ones. What a detached crate has to have absolute (see
+	 * {@link #absolutize}), files and folders, but also other entities written
+	 * with a path or a name.
+	 */
+	public List<Entity> relativeEntities() {
+		return entities.stream().filter(e -> e != getRoot()).filter(e -> WebCrate.isRelative(e.getId())).toList();
+	}
+
+	/**
+	 * The files and folders, other than the root data entity, with a relative
+	 * <code>@id</code> in a crate that has no base to resolve it against (a
+	 * detached crate, see {@link WebCrate}, with no <code>@base</code>): none if
+	 * the crate has one. What a semi-detached crate is, by having any.
+	 */
+	public List<Entity> unanchoredDataEntities(WebCrate web) {
+		if (web.base().isPresent()) {
+			return List.of();
+		}
+		return entities.stream().filter(e -> e != getRoot())
+				.filter(e -> e.getTypes().contains("File") || e.getTypes().contains("Dataset"))
+				.filter(e -> WebCrate.isRelative(e.getId())).toList();
+	}
+
+	/**
+	 * Make the relative <code>@id</code>s of a crate fetched from the web
+	 * absolute, as the RO-Crate specification's "Converting from Attached to
+	 * Detached RO-Crate Package" has it, so that they still lead there when
+	 * the crate is saved elsewhere: each entity listed by
+	 * {@link #relativeEntities} gets the address it leads to as its
+	 * <code>@id</code>, and every reference follows. An entity whose
+	 * address another entity already has is left as it is.
+	 *
+	 * @param root Whether the root data entity too: its <code>./</code>
+	 *             becomes the crate's address, as a detached crate's should be
+	 *             when available online; not for a crate to be saved as
+	 *             <code>ro-crate-metadata.json</code>, an attached crate whose
+	 *             root is its folder
+	 * @return The <code>@id</code>s as they were, and as they are now
+	 */
+	public Map<String, String> absolutize(WebCrate web, boolean root) {
+		return absolutize(web, root, false);
+	}
+
+	/**
+	 * The address a file says it can be downloaded from, if it says one: its
+	 * <code>contentUrl</code>, else its <code>url</code>, when it has exactly
+	 * one web address (<code>http:</code> or <code>https:</code>) as that
+	 * property. Not when it has several (e.g. for several versions of the file),
+	 * as there is no telling which.
+	 */
+	public static Optional<URI> downloadAddress(Entity entity) {
+		for (String property : List.of("contentUrl", "url")) {
+			List<String> addresses = entity.getAll(property).stream()
+					.map(v -> v.isTextual() ? v.asText() : v.path("@id").asText("")).map(String::strip)
+					.filter(a -> a.startsWith("http://") || a.startsWith("https://")).distinct().toList();
+			if (addresses.size() == 1) {
+				try {
+					return Optional.of(new URI(addresses.get(0)));
+				} catch (java.net.URISyntaxException e) {
+					return Optional.empty();
+				}
+			}
+			if (addresses.size() > 1) {
+				return Optional.empty();
+			}
+		}
+		return Optional.empty();
+	}
+
+	/**
+	 * As {@link #absolutize(WebCrate, boolean)}, optionally giving each entity
+	 * that says where it can be downloaded from (see {@link #downloadAddress})
+	 * that address as its <code>@id</code>, rather than where its path leads
+	 * from the base: the address its own metadata gives is more likely to be
+	 * where the file is. The root data entity has its path's address.
+	 *
+	 * @param downloadAddresses Whether to use them
+	 */
+	public Map<String, String> absolutize(WebCrate web, boolean root, boolean downloadAddresses) {
+		Map<String, String> renamed = new LinkedHashMap<>();
+		List<Entity> relative = new ArrayList<>(relativeEntities(web));
+		if (root && web.resolve(getRoot().getId()).isPresent()) {
+			relative.add(getRoot());
+		}
+		for (Entity entity : relative) {
+			String oldId = entity.getId();
+			URI address = (downloadAddresses && entity != getRoot() ? downloadAddress(entity) : Optional.<URI>empty())
+					.orElseGet(() -> web.resolve(oldId).orElseThrow());
+			if (get(address.toString()).isEmpty()) {
+				rename(entity, address.toString());
+				renamed.put(oldId, address.toString());
+			}
+		}
+		return renamed;
 	}
 
 	/**

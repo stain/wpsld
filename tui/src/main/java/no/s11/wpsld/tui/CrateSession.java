@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Optional;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -52,6 +53,14 @@ final class CrateSession {
 
 	Path file() {
 		return file;
+	}
+
+	/** The folder of an attached crate, whose metadata file is named as RO-Crate names it; none for a detached one */
+	Optional<Path> folder() {
+		String name = file.getFileName() == null ? "" : file.getFileName().toString();
+		return name.equals(Crate.RO_CRATE_METADATA_JSON) || name.equals(Main.RO_CRATE_METADATA_JSONLD)
+				? Optional.of(file.toAbsolutePath().getParent())
+				: Optional.empty();
 	}
 
 	boolean dirty() {
