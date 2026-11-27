@@ -175,6 +175,27 @@ public class TestProfileReader {
 	}
 
 	@Test
+	public void classRulesMatchAllTheirTypes() {
+		String prov = "http://www.w3.org/ns/prov#";
+		Profile profile = profile("{\"@id\": \"#assess\"}, {\"@id\": \"#send\"}, {\"@id\": \"#plan\"}, {\"@id\": \"#bare\"}",
+				"{\"@id\": \"#assess\", \"@type\": \"rdfs:Class\", \"prov:specializationOf\":"
+						+ " [{\"@id\": \"https://schema.org/AssessAction\"}, {\"@id\": \"prov:Activity\"}]}",
+				"{\"@id\": \"#send\", \"@type\": \"rdfs:Class\", \"prov:specializationOf\":"
+						+ " [{\"@id\": \"http://schema.org/SendAction\"}, {\"@id\": \"prov:Activity\"}]}",
+				"{\"@id\": \"#plan\", \"@type\": \"rdfs:Class\", \"prov:specializationOf\":"
+						+ " [{\"@id\": \"http://schema.org/CreativeWork\"}, {\"@id\": \"prov:Plan\"}]}",
+				"{\"@id\": \"#bare\", \"@type\": \"rdfs:Class\"}");
+		ClassRule assess = profile.classRule("#assess").orElseThrow();
+		ClassRule plan = profile.classRule("#plan").orElseThrow();
+		// Sharing prov:Activity with #send is not enough; the https schema.org IRI is read as http
+		assertEquals(List.of(assess), profile.classRulesFor(Set.of(S + "AssessAction", prov + "Activity")));
+		assertEquals(List.of(), profile.classRulesFor(Set.of(prov + "Activity")));
+		// The metadata descriptor is a CreativeWork, but no prov:Plan
+		assertEquals(List.of(), profile.classRulesFor(Set.of(S + "CreativeWork")));
+		assertEquals(List.of(plan), profile.classRulesFor(Set.of(S + "CreativeWork", prov + "Plan", S + "Thing")));
+	}
+
+	@Test
 	public void noRulesWithoutSchemaResource() {
 		Profile profile = reader.read(crateReader.read(new ByteArrayInputStream(
 				("{\"@context\": \"https://w3id.org/ro/crate/1.2/context\", \"@graph\": [{\"@id\": \"./\","
