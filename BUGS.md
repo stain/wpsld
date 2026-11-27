@@ -224,6 +224,18 @@ to do one at a time. Longer-term plans are in [PLAN.md](PLAN.md).
   sharing a type with where they are used, their kind of value guessed
   from the values. Still to do: a type or property defined in a profile
   crate the crate `conformsTo` other than the one chosen.
+- **Repair: define the terms a crate uses but nothing defines** (TODO):
+  Crate > Repair Crate (and `wpsld-cli repair`) could add an
+  `rdfs:Class` or `rdf:Property` entity (RO-Crate's ad hoc terms, with
+  `rdfs:label` as written, `domainIncludes` the types it is used with,
+  `rangeIncludes` as `CrateDefinedFields` guesses it, and a term in the
+  crate's `@context` if it has no IRI) for each type and property that
+  `CrateDefinedFields.undefinedTypes`/`guessedFieldsFor` find, unless the
+  profile defines it. But `CrateRepair.repair(crate, terms)` doesn't take
+  the profile into account now: it would need the chosen profile (or the
+  crate's `CrateProfiles`), so as not to define again what the profile
+  has. Ask first, or list them for a `rdfs:comment` to be filled in, as
+  the definitions would be guesses.
 - **CodeMeta**: read `codemeta.json` files (JSON-LD, context
   `https://w3id.org/codemeta/3.0`, mostly schema.org terms) to describe a
   SoftwareSourceCode or SoftwareApplication: name, description, version,
